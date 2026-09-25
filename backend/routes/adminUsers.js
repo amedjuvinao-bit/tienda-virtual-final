@@ -25,6 +25,12 @@ const {
 const {
   recordTwoFactorChangeAlert,
 } = require('../security/adminSecurityAlertService');
+const {
+  requiredUserWritePermissions,
+  canGrantRole,
+  canAssignBranches,
+  canAccessUserScope,
+} = require('../security/adminUserWritePolicy');
 
 const router = express.Router();
 
@@ -359,16 +365,49 @@ async function resolveRole({ role, roleRef }) {
     });
   }
 
-  if (!roleDoc) {
-    roleDoc = await AdminRole.findOne({
-      code: 'seller',
-      deletedAt: null,
-      active: true,
-      status: 'active',
-    });
+  return roleDoc;
+}
+
+async function ensureCanAssignRole(req, roleDoc) {
+  if (isCurrentAdminOwner(req)) return { ok: true };
+
+  const actorRoleFilter = {
+    code: cleanLower(req.adminRole),
+    deletedAt: null,
+    active: true,
+    status: 'active',
+  };
+  if (req.adminUserDoc?.roleRef) actorRoleFilter._id = req.adminUserDoc.roleRef;
+
+  const actorRole = await AdminRole.findOne(actorRoleFilter).lean();
+  const actorPermissions = await requirePermission.getEffectivePermissions(req);
+
+  if (!canGrantRole({
+    actorCode: req.adminRole,
+    actorRole,
+    targetRole: roleDoc,
+    actorPermissions,
+  })) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'No puedes asignar un perfil con privilegios superiores a los tuyos.',
+    };
   }
 
-  return roleDoc;
+  return { ok: true };
+}
+
+function ensureCanAssignBranches(req, assignedBranches) {
+  const allowed = canAssignBranches({
+    actorCode: req.adminRole,
+    actorBranches: req.adminBranches,
+    assignedBranches,
+  });
+
+  return allowed
+    ? { ok: true }
+    : { ok: false, status: 403, message: 'No puedes asignar una sede fuera de tu alcance.' };
 }
 
 async function getDefaultBranch() {
@@ -495,6 +534,19 @@ async function ensureCanManageTargetUser(req, targetUser, action = 'update') {
     };
   }
 
+  if (!canAccessUserScope({
+    actorCode: req.adminRole,
+    actorBranches: req.adminBranches,
+    targetBranches: targetUser.branches || [],
+    viewOnly: action === 'view',
+  })) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'No tienes acceso al usuario en estas sedes.',
+    };
+  }
+
   const currentAdminId = String(req.adminUserId || '');
   const targetUserId = String(targetUser._id || '');
 
@@ -599,8 +651,12 @@ router.get(
   '/meta',
   requireAdmin,
   requirePermission('admin-users:view'),
-  async (_req, res) => {
+  async (req, res) => {
     try {
+      const isGlobal = isCurrentAdminOwner(req) || cleanLower(req.adminRole) === 'admin';
+      const authorizedBranches = (req.adminBranches || [])
+        .map((item) => toObjectId(item.branch))
+        .filter(Boolean);
       const [roles, branches] = await Promise.all([
         AdminRole.find({
           deletedAt: null,
@@ -614,6 +670,7 @@ router.get(
           deletedAt: null,
           active: true,
           status: 'active',
+          ...(!isGlobal ? { _id: { $in: authorizedBranches } } : {}),
         })
           .sort({ isMain: -1, name: 1 })
           .lean(),
@@ -648,6 +705,18 @@ router.get(
   async (req, res) => {
     try {
       const filter = buildListFilter(req.query);
+      if (!isCurrentAdminOwner(req) && cleanLower(req.adminRole) !== 'admin') {
+        const branchIds = (req.adminBranches || [])
+          .map((item) => toObjectId(item.branch))
+          .filter(Boolean);
+        if (req.query.branchId &&
+            !branchIds.some((id) => String(id) === String(req.query.branchId))) {
+          return sendError(res, 403, 'No tienes acceso a esa sede.');
+        }
+        filter['branches.branch'] = req.query.branchId
+          ? toObjectId(req.query.branchId)
+          : { $in: branchIds };
+      }
       const sort = parseSort(req.query);
       const { page, limit, skip } = parsePagination(req.query);
 
@@ -707,6 +776,11 @@ router.get(
         return sendError(res, 404, 'Usuario administrativo no encontrado.');
       }
 
+      const allowed = await ensureCanManageTargetUser(req, user, 'view');
+      if (!allowed.ok) {
+        return sendError(res, allowed.status, allowed.message);
+      }
+
       return res.json({
         ok: true,
         data: buildUserSecurityResponse(user),
@@ -726,7 +800,7 @@ router.get(
 router.post(
   '/',
   requireAdmin,
-  requirePermission('admin-users:create'),
+  requirePermission.all(requiredUserWritePermissions('POST')),
   async (req, res) => {
     try {
       const body = req.body || {};
@@ -756,6 +830,15 @@ router.post(
 
       if (!roleDoc) {
         return sendError(res, 400, 'Rol administrativo inválido.');
+      }
+
+      if (body.permissions !== undefined) {
+        return sendError(res, 400, 'Los permisos se asignan mediante el perfil, no desde el usuario.');
+      }
+
+      const roleAllowed = await ensureCanAssignRole(req, roleDoc);
+      if (!roleAllowed.ok) {
+        return sendError(res, roleAllowed.status, roleAllowed.message);
       }
 
       if (isOwnerRole(roleDoc.code) && !isCurrentAdminOwner(req)) {
@@ -788,6 +871,11 @@ router.post(
         fallbackBranch
       );
 
+      const branchesAllowed = ensureCanAssignBranches(req, assignedBranches);
+      if (!branchesAllowed.ok) {
+        return sendError(res, branchesAllowed.status, branchesAllowed.message);
+      }
+
       const user = new AdminUser({
         firstName: cleanText(body.firstName),
         lastName: cleanText(body.lastName),
@@ -800,10 +888,7 @@ router.post(
 
         role: roleDoc.code,
         roleRef: roleDoc._id,
-        permissions:
-          Array.isArray(body.permissions) && body.permissions.length
-            ? normalizePermissions(body.permissions)
-            : normalizePermissions(roleDoc.permissions || []),
+        permissions: normalizePermissions(roleDoc.permissions || []),
 
         branches: assignedBranches,
         defaultBranch: getDefaultBranchFromAssigned(assignedBranches),
@@ -857,11 +942,16 @@ router.post(
 router.put(
   '/:id',
   requireAdmin,
-  requirePermission('admin-users:update'),
+  (req, res, next) =>
+    requirePermission.all(requiredUserWritePermissions('PUT', req.body))(req, res, next),
   async (req, res) => {
     try {
       const { id } = req.params;
       const body = req.body || {};
+
+      if (body.permissions !== undefined) {
+        return sendError(res, 400, 'Los permisos se asignan mediante el perfil, no desde el usuario.');
+      }
 
       if (!isValidObjectId(id)) {
         return sendError(res, 400, 'ID de usuario inválido.');
@@ -870,7 +960,7 @@ router.put(
       const user = await AdminUser.findOne({
         _id: toObjectId(id),
         deletedAt: null,
-      });
+      }).select('+tokenVersion');
 
       const allowed = await ensureCanManageTargetUser(req, user, 'update');
 
@@ -894,6 +984,11 @@ router.put(
           return sendError(res, 400, 'Rol administrativo inválido.');
         }
 
+        const roleAllowed = await ensureCanAssignRole(req, roleDoc);
+        if (!roleAllowed.ok) {
+          return sendError(res, roleAllowed.status, roleAllowed.message);
+        }
+
         if (isOwnerRole(roleDoc.code) && !isCurrentAdminOwner(req)) {
           return sendError(
             res,
@@ -902,7 +997,8 @@ router.put(
           );
         }
 
-        if (String(roleDoc.code) !== String(user.role)) {
+        if (String(roleDoc.code) !== String(user.role) ||
+            String(roleDoc._id) !== String(user.roleRef || '')) {
           const roleAllowed = await ensureCanManageTargetUser(
             req,
             user,
@@ -972,13 +1068,9 @@ router.put(
         user.role = roleDoc.code;
         user.roleRef = roleDoc._id;
 
-        if (roleChanged && body.permissions === undefined) {
+        if (roleChanged) {
           user.permissions = normalizePermissions(roleDoc.permissions || []);
         }
-      }
-
-      if (body.permissions !== undefined) {
-        user.permissions = normalizePermissions(body.permissions);
       }
 
       if (
@@ -993,15 +1085,19 @@ router.put(
           fallbackBranch
         );
 
+        const branchesAllowed = ensureCanAssignBranches(req, assignedBranches);
+        if (!branchesAllowed.ok) {
+          return sendError(res, branchesAllowed.status, branchesAllowed.message);
+        }
+
         user.branches = assignedBranches;
         user.defaultBranch = getDefaultBranchFromAssigned(assignedBranches);
       }
 
       if (body.status !== undefined || body.active !== undefined) {
-        const statusAction =
-          body.active === false || cleanLower(body.status) !== 'active'
-            ? 'disable'
-            : 'update';
+        const disabling = body.active === false ||
+          (body.status !== undefined && cleanLower(body.status) !== 'active');
+        const statusAction = disabling ? 'disable' : 'update';
 
         const statusAllowed = await ensureCanManageTargetUser(
           req,
@@ -1013,7 +1109,7 @@ router.put(
           return sendError(res, statusAllowed.status, statusAllowed.message);
         }
 
-        if (body.active === false || cleanLower(body.status) !== 'active') {
+        if (disabling) {
           const lastOwnerCheck = await ensureNotLastOwner(user);
 
           if (!lastOwnerCheck.ok) {
@@ -1046,7 +1142,11 @@ router.put(
 
       user.updatedBy = getCurrentAdminId(req);
 
-      await user.save();
+      if (body.status !== undefined || body.active !== undefined) {
+        await user.invalidateSessions();
+      } else {
+        await user.save();
+      }
 
       const savedUser = await AdminUser.findById(user._id)
         .populate('roleRef', 'name code level scope')
@@ -1097,7 +1197,7 @@ router.patch(
       const user = await AdminUser.findOne({
         _id: toObjectId(id),
         deletedAt: null,
-      });
+      }).select('+tokenVersion');
 
       const allowed = await ensureCanManageTargetUser(req, user, 'disable');
 
@@ -1105,10 +1205,11 @@ router.patch(
         return sendError(res, allowed.status, allowed.message);
       }
 
-      const lastOwnerCheck = await ensureNotLastOwner(user);
-
-      if (!lastOwnerCheck.ok) {
-        return sendError(res, lastOwnerCheck.status, lastOwnerCheck.message);
+      if (active === false || (status !== undefined && cleanLower(status) !== 'active')) {
+        const lastOwnerCheck = await ensureNotLastOwner(user);
+        if (!lastOwnerCheck.ok) {
+          return sendError(res, lastOwnerCheck.status, lastOwnerCheck.message);
+        }
       }
 
       if (status !== undefined) {
@@ -1148,7 +1249,7 @@ router.patch(
 router.patch(
   '/:id/password',
   requireAdmin,
-  requirePermission('admin-users:update'),
+  requirePermission('admin-users:password'),
   async (req, res) => {
     try {
       const { id } = req.params;

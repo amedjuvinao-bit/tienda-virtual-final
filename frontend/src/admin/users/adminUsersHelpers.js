@@ -207,6 +207,28 @@ export function buildUserPayload(form) {
   };
 }
 
+export function buildUserEditPayload(form, originalUser, branches = [], roles = []) {
+  const payload = buildUserPayload(form);
+  const original = buildFormFromUser(originalUser, branches, roles);
+
+  for (const field of [
+    'firstName', 'lastName', 'username', 'email', 'phone',
+    'documentType', 'documentNumber', 'role', 'status', 'mustChangePassword',
+  ]) {
+    if (String(form[field]).trim() === String(original[field]).trim()) {
+      delete payload[field];
+    }
+  }
+
+  if (!Object.hasOwn(payload, 'status')) delete payload.active;
+  if (form.branchId === original.branchId) {
+    delete payload.defaultBranch;
+    delete payload.branches;
+  }
+
+  return payload;
+}
+
 export function buildPasswordPayload(form) {
   return {
     password: form.password,

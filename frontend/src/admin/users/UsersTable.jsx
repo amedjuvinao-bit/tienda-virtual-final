@@ -184,6 +184,12 @@ export default function UsersTable({
   branches,
   statusSavingId,
   deleteSavingId,
+  canEdit,
+  canChangePassword,
+  canDisable,
+  currentUserId,
+  currentRole,
+  currentBranches,
   canManageTwoFactor,
   onEditUser,
   onChangePassword,
@@ -235,6 +241,19 @@ export default function UsersTable({
         const isSavingStatus = statusSavingId === user._id;
         const isDeleting = deleteSavingId === user._id;
         const isOwnerUser = user.username === 'owner' || user.role === 'owner';
+        const privileged = currentRole === 'owner' || currentRole === 'admin';
+        const ownBranchIds = new Set((currentBranches || []).map((item) => String(item.branch || '')));
+        const targetBranches = Array.isArray(user.branches) ? user.branches : [];
+        const withinScope = privileged || (targetBranches.length > 0 &&
+          targetBranches.every((item) => ownBranchIds.has(String(item.branch))));
+        const canManageTarget = withinScope && (!isOwnerUser || canManageTwoFactor);
+        const canEditTarget = canEdit && canManageTarget;
+        const canResetPassword = canChangePassword && canManageTarget;
+        const canToggleStatus = canDisable && canManageTarget &&
+          String(currentUserId) !== String(user._id);
+        const canDeleteTarget = canToggleStatus && !isOwnerUser;
+        const hasMoreActions = canResetPassword || canManageTwoFactor ||
+          canToggleStatus || canDeleteTarget;
         const isActionsOpen = openActionsId === user._id;
         const primaryBranch = getPrimaryBranchLabel(user, branches);
         const roleDetails = getUserRoleDetails(user, roles);
@@ -400,7 +419,7 @@ export default function UsersTable({
                       : '2FA OPCIONAL'}
                 </span>
 
-                <button
+                {canEditTarget && <button
                   type="button"
                   onClick={() => {
                     closeActions();
@@ -411,9 +430,9 @@ export default function UsersTable({
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   Editar
-                </button>
+                </button>}
 
-                <div
+                {hasMoreActions && <div
                   ref={isActionsOpen ? actionsRef : null}
                   className="relative z-[100] w-full"
                 >
@@ -442,7 +461,7 @@ export default function UsersTable({
                         backdropFilter: 'blur(var(--admin-glass-blur))',
                       }}
                     >
-                      <button
+                      {canResetPassword && <button
                         type="button"
                         onClick={() => {
                           closeActions();
@@ -460,7 +479,7 @@ export default function UsersTable({
                           style={{ color: 'var(--admin-primary)' }}
                         />
                         Cambiar contraseña
-                      </button>
+                      </button>}
 
                       {canManageTwoFactor ? (
                         <button
@@ -481,7 +500,7 @@ export default function UsersTable({
                         </button>
                       ) : null}
 
-                      <button
+                      {canToggleStatus && <button
                         type="button"
                         onClick={() => {
                           closeActions();
@@ -497,9 +516,9 @@ export default function UsersTable({
                           : isActive
                             ? 'Desactivar usuario'
                             : 'Activar usuario'}
-                      </button>
+                      </button>}
 
-                      <button
+                      {canDeleteTarget && <button
                         type="button"
                         onClick={() => {
                           closeActions();
@@ -516,10 +535,10 @@ export default function UsersTable({
                       >
                         <Trash2 className="h-4 w-4" />
                         {isDeleting ? 'Eliminando...' : 'Eliminar usuario'}
-                      </button>
+                      </button>}
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
           </article>

@@ -12,6 +12,7 @@ import {
   updateAdminUserTwoFactor,
 } from '../api/adminUsersApi';
 import { useAuth } from '../../context/AuthContext';
+import { hasAdminPermission } from '../security/adminPermissions';
 
 import UserFormModal from './UserFormModal';
 import UserPasswordModal from './UserPasswordModal';
@@ -23,6 +24,7 @@ import {
   EMPTY_FORM,
   EMPTY_PASSWORD_FORM,
   buildFormFromUser,
+  buildUserEditPayload,
   buildPasswordPayload,
   buildUserPayload,
   getDefaultBranchId,
@@ -66,6 +68,7 @@ export default function AdminUsersPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [editingUserId, setEditingUserId] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
   const [passwordUser, setPasswordUser] = useState(null);
   const [confirmModal, setConfirmModal] = useState(EMPTY_CONFIRM_MODAL);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -79,6 +82,24 @@ export default function AdminUsersPage() {
     adminUser?.adminRole || adminUser?.actualRole || adminUser?.role || ''
   ).toLowerCase();
   const isOwner = currentRole === 'owner';
+  const canCreate = hasAdminPermission(adminUser, 'admin-users:create') &&
+    hasAdminPermission(adminUser, 'admin-users:assign_role');
+  const canEdit = hasAdminPermission(adminUser, 'admin-users:update');
+  const canAssign = hasAdminPermission(adminUser, 'admin-users:assign_role');
+  const canChangePassword = hasAdminPermission(adminUser, 'admin-users:password');
+  const canDisable = hasAdminPermission(adminUser, 'admin-users:disable');
+
+  const assignableRoles = roles.filter((role) => {
+    if (isOwner) return true;
+    if (role.code === 'owner') return false;
+    if (currentRole === 'admin') return true;
+    const ownLevel = Number(adminUser?.roleRef?.level);
+    return role.code !== 'admin' && Number.isFinite(ownLevel) &&
+      Number(role.level) >= ownLevel &&
+      (adminUser?.roleRef?.scope === 'global' || role.scope !== 'global') &&
+      Array.isArray(role.permissions) &&
+      role.permissions.every((permission) => hasAdminPermission(adminUser, permission));
+  });
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -192,14 +213,15 @@ export default function AdminUsersPage() {
   const openCreateModal = () => {
     setModalMode('create');
     setEditingUserId('');
+    setEditingUser(null);
     setModalError('');
     setSuccessMessage('');
 
     setForm({
       ...EMPTY_FORM,
       role:
-        roles.find((role) => role.code === 'cashier')?.code ||
-        roles[0]?.code ||
+        assignableRoles.find((role) => role.code === 'cashier')?.code ||
+        assignableRoles[0]?.code ||
         'cashier',
       branchId: getDefaultBranchId(branches),
     });
@@ -210,6 +232,7 @@ export default function AdminUsersPage() {
   const openEditModal = (user) => {
     setModalMode('edit');
     setEditingUserId(user?._id || '');
+    setEditingUser(user || null);
     setModalError('');
     setSuccessMessage('');
     setForm(buildFormFromUser(user, branches, roles));
@@ -229,6 +252,7 @@ export default function AdminUsersPage() {
     setShowUserModal(false);
     setModalError('');
     setEditingUserId('');
+    setEditingUser(null);
   };
 
   const closePasswordModal = () => {
@@ -320,7 +344,10 @@ export default function AdminUsersPage() {
           return;
         }
 
-        await updateAdminUser(editingUserId, buildUserPayload(form));
+        await updateAdminUser(
+          editingUserId,
+          buildUserEditPayload(form, editingUser, branches, roles)
+        );
 
         setSuccessMessage('Usuario administrativo actualizado correctamente.');
       } else {
@@ -539,23 +566,23 @@ export default function AdminUsersPage() {
               background: 'var(--admin-glass-soft-bg)',
             }}
           >
-            <button
+            {canCreate && <button
               type="button"
               onClick={openCreateModal}
-              disabled={metaLoading || branches.length === 0 || roles.length === 0}
+              disabled={metaLoading || branches.length === 0 || assignableRoles.length === 0}
               className="rounded-2xl px-4 py-2.5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed"
               style={{
                 background: 'var(--admin-button-bg)',
                 color: 'var(--admin-button-text)',
                 border: '1px solid var(--admin-button-bg)',
                 opacity:
-                  metaLoading || branches.length === 0 || roles.length === 0
+                  metaLoading || branches.length === 0 || assignableRoles.length === 0
                     ? 0.75
                     : 1,
               }}
             >
               Nuevo usuario
-            </button>
+            </button>}
 
             <button
               type="button"
@@ -687,6 +714,12 @@ export default function AdminUsersPage() {
             statusSavingId={statusSavingId}
             deleteSavingId={deleteSavingId}
             onEditUser={openEditModal}
+            canEdit={canEdit}
+            canChangePassword={canChangePassword}
+            canDisable={canDisable}
+            currentUserId={adminUser?.id || adminUser?._id || ''}
+            currentRole={currentRole}
+            currentBranches={adminUser?.branches || adminUser?.profile?.branches || []}
             onChangePassword={openPasswordModal}
             canManageTwoFactor={isOwner}
             onManageTwoFactor={openTwoFactorModal}
@@ -699,8 +732,15 @@ export default function AdminUsersPage() {
       <UserFormModal
         open={showUserModal}
         mode={modalMode}
-        roles={roles}
+        roles={modalMode === 'create'
+          ? assignableRoles
+          : roles.filter((role) => role.code === editingUser?.role ||
+              assignableRoles.some((allowed) => allowed.code === role.code))}
         branches={branches}
+        canAssign={canAssign && String(editingUserId) !== String(adminUser?.id || adminUser?._id)}
+        canDisable={canDisable && String(editingUserId) !== String(adminUser?.id || adminUser?._id)}
+        canChangePassword={canChangePassword}
+        hasMultipleBranches={Boolean(editingUser?.branches?.length > 1)}
         form={form}
         setForm={setForm}
         saving={saving}

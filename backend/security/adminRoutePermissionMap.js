@@ -13,6 +13,7 @@ const {
 const {
   resolveSiteSettingsWritePermissions,
 } = require('./siteSettingsWritePermissions');
+const { requiredUserWritePermissions } = require('./adminUserWritePolicy');
 
 const ADMIN_ROUTE_PERMISSION_RULES = [
   /* =========================================================
@@ -1445,6 +1446,7 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     method: 'POST',
     path: '/api/admin/users',
     permission: 'admin-users:create',
+    additionalPermissions: ['admin-users:assign_role'],
     description: 'Crear usuario administrativo.',
     audit: true,
   },
@@ -1452,6 +1454,8 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     method: 'PUT',
     path: '/api/admin/users/:id',
     permission: 'admin-users:update',
+    dynamic: true,
+    resolvePermissions: (req) => requiredUserWritePermissions('PUT', req.body),
     description: 'Editar usuario administrativo.',
     audit: true,
   },
@@ -1461,6 +1465,14 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     permission: 'admin-users:update',
     description: 'Editar parcialmente usuario administrativo.',
     audit: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/admin/users/:id/status',
+    permission: 'admin-users:disable',
+    description: 'Cambiar el estado de acceso de un usuario administrativo.',
+    audit: true,
+    danger: true,
   },
   {
     method: 'PATCH',

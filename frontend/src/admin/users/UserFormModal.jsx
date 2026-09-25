@@ -8,6 +8,10 @@ export default function UserFormModal({
   mode,
   roles,
   branches,
+  canAssign,
+  canDisable,
+  canChangePassword,
+  hasMultipleBranches,
   form,
   setForm,
   saving,
@@ -362,6 +366,7 @@ export default function UserFormModal({
                   <select
                     value={form.role}
                     onChange={(event) => updateField('role', event.target.value)}
+                    disabled={isEditMode && !canAssign}
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     required
                     style={inputStyle}
@@ -447,6 +452,7 @@ export default function UserFormModal({
                     onChange={(event) =>
                       updateField('branchId', event.target.value)
                     }
+                    disabled={isEditMode && (!canAssign || hasMultipleBranches)}
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     required
                     style={inputStyle}
@@ -473,6 +479,7 @@ export default function UserFormModal({
                   <select
                     value={form.status}
                     onChange={(event) => updateField('status', event.target.value)}
+                    disabled={isEditMode && !canDisable}
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={inputStyle}
                   >
@@ -505,6 +512,7 @@ export default function UserFormModal({
                     onChange={(event) =>
                       updateField('mustChangePassword', event.target.checked)
                     }
+                    disabled={isEditMode && !canChangePassword}
                     className="h-4 w-4"
                     style={{
                       accentColor: 'var(--admin-primary)',
