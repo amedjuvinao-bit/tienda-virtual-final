@@ -64,6 +64,25 @@ function parseBoolean(value, fallback = null) {
   return fallback;
 }
 
+function resolveUserStatus(body = {}) {
+  const hasStatus = body.status !== undefined;
+  const hasActive = body.active !== undefined;
+  if (!hasStatus && !hasActive) return null;
+  if (hasActive && typeof body.active !== 'boolean') {
+    throw Object.assign(new Error('El estado de acceso no es válido.'), { status: 400 });
+  }
+  const status = hasStatus ? cleanLower(body.status) :
+    body.active ? 'active' : 'inactive';
+  if (!AdminUser.getStatuses().includes(status)) {
+    throw Object.assign(new Error('Selecciona un estado de usuario válido.'), { status: 400 });
+  }
+  const active = status === 'active';
+  if (hasActive && body.active !== active) {
+    throw Object.assign(new Error('El estado y el acceso deben coincidir.'), { status: 400 });
+  }
+  return { status, active };
+}
+
 function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -78,8 +97,12 @@ function toObjectId(value) {
 }
 
 function parsePagination(query = {}) {
-  const page = Math.max(Number(query.page || DEFAULT_PAGE), 1);
-  const rawLimit = Math.max(Number(query.limit || DEFAULT_LIMIT), 1);
+  const requestedPage = Number(query.page);
+  const requestedLimit = Number(query.limit);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
+    ? requestedPage : DEFAULT_PAGE;
+  const rawLimit = Number.isSafeInteger(requestedLimit) && requestedLimit > 0
+    ? requestedLimit : DEFAULT_LIMIT;
   const limit = Math.min(rawLimit, MAX_LIMIT);
   const skip = (page - 1) * limit;
 
@@ -398,11 +421,12 @@ async function ensureCanAssignRole(req, roleDoc) {
   return { ok: true };
 }
 
-function ensureCanAssignBranches(req, assignedBranches) {
+function ensureCanAssignBranches(req, assignedBranches, currentBranches = []) {
   const allowed = canAssignBranches({
     actorCode: req.adminRole,
     actorBranches: req.adminBranches,
     assignedBranches,
+    currentBranches,
   });
 
   return allowed
@@ -440,26 +464,27 @@ function normalizeBranchInput(input) {
   return [input];
 }
 
-async function buildAssignedBranches(input, fallbackBranch = null) {
+function branchInputId(item) {
+  return typeof item === 'string' ? item : item?.branch?._id || item?.branch || item?._id || item?.id || '';
+}
+
+async function buildAssignedBranches(input, fallbackBranch = null, preferredDefault = null) {
   const rawBranches = normalizeBranchInput(input);
 
-  const branchIds = rawBranches
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      if (item?.branch) return item.branch;
-      if (item?._id) return item._id;
-      if (item?.id) return item.id;
-      return '';
-    })
-    .filter((id) => isValidObjectId(id));
+  const branchIds = rawBranches.map(branchInputId);
+  if (branchIds.some((id) => !isValidObjectId(id))) {
+    throw Object.assign(new Error('Selecciona sedes válidas.'), { status: 400 });
+  }
 
   let uniqueBranchIds = [...new Set(branchIds.map((id) => String(id)))];
 
-  if (!uniqueBranchIds.length && fallbackBranch?._id) {
+  if (!uniqueBranchIds.length && input == null && fallbackBranch?._id) {
     uniqueBranchIds = [String(fallbackBranch._id)];
   }
 
-  if (!uniqueBranchIds.length) return [];
+  if (!uniqueBranchIds.length) {
+    throw Object.assign(new Error('Selecciona al menos una sede.'), { status: 400 });
+  }
 
   const branches = await Branch.find({
     _id: { $in: uniqueBranchIds.map((id) => toObjectId(id)) },
@@ -471,49 +496,35 @@ async function buildAssignedBranches(input, fallbackBranch = null) {
   const branchMap = new Map(
     branches.map((branch) => [String(branch._id), branch])
   );
+  if (branchMap.size !== uniqueBranchIds.length) {
+    throw Object.assign(new Error('Una de las sedes no está disponible.'), { status: 400 });
+  }
+
+  const requestedDefault = preferredDefault ? String(preferredDefault) :
+    String(branchInputId(rawBranches.find((item) => item?.isDefault === true)) || uniqueBranchIds[0]);
+  if (!uniqueBranchIds.includes(requestedDefault)) {
+    throw Object.assign(new Error('La sede principal debe estar entre las sedes asignadas.'), { status: 400 });
+  }
 
   const assigned = [];
 
-  uniqueBranchIds.forEach((branchId, index) => {
+  uniqueBranchIds.forEach((branchId) => {
     const branch = branchMap.get(String(branchId));
 
     if (!branch) return;
 
-    const raw = rawBranches.find((item) => {
-      const itemId =
-        typeof item === 'string'
-          ? item
-          : item?.branch || item?._id || item?.id || '';
-
-      return String(itemId) === String(branchId);
-    });
+    const raw = rawBranches.find((item) => String(branchInputId(item)) === String(branchId));
 
     assigned.push({
       branch: branch._id,
       branchName: branch.name,
       branchCode: branch.code,
-      isDefault: raw?.isDefault === true || index === 0,
+      isDefault: String(branchId) === requestedDefault,
       canSell: raw?.canSell !== false,
       canManageInventory: raw?.canManageInventory === true,
       canInvoice: raw?.canInvoice === true,
     });
   });
-
-  if (assigned.length) {
-    let hasDefault = false;
-
-    assigned.forEach((item) => {
-      if (item.isDefault && !hasDefault) {
-        hasDefault = true;
-      } else if (item.isDefault && hasDefault) {
-        item.isDefault = false;
-      }
-    });
-
-    if (!hasDefault) {
-      assigned[0].isDefault = true;
-    }
-  }
 
   return assigned;
 }
@@ -600,7 +611,7 @@ function buildListFilter(query = {}) {
     deletedAt: null,
   };
 
-  const q = cleanText(query.q || query.search || '');
+  const q = cleanText(query.q || query.search || '').slice(0, 120);
 
   if (q) {
     const regex = new RegExp(escapeRegex(q), 'i');
@@ -868,13 +879,18 @@ router.post(
       const fallbackBranch = await getDefaultBranch();
       const assignedBranches = await buildAssignedBranches(
         body.branches || body.branchIds || body.defaultBranch,
-        fallbackBranch
+        fallbackBranch,
+        body.defaultBranch
       );
 
       const branchesAllowed = ensureCanAssignBranches(req, assignedBranches);
       if (!branchesAllowed.ok) {
         return sendError(res, branchesAllowed.status, branchesAllowed.message);
       }
+
+      const initialStatus = resolveUserStatus({
+        status: body.status || 'active', active: body.active,
+      });
 
       const user = new AdminUser({
         firstName: cleanText(body.firstName),
@@ -893,8 +909,8 @@ router.post(
         branches: assignedBranches,
         defaultBranch: getDefaultBranchFromAssigned(assignedBranches),
 
-        status: cleanLower(body.status || 'active'),
-        active: body.active !== false,
+        status: initialStatus.status,
+        active: initialStatus.active,
 
         mustChangePassword: body.mustChangePassword !== false,
         emailVerified: body.emailVerified === true,
@@ -916,6 +932,8 @@ router.post(
         data: buildUserPublicResponse(user),
       });
     } catch (error) {
+      if (error?.status === 400) return sendError(res, 400, error.message);
+
       console.error('❌ Error creando usuario admin:', error.message);
 
       if (error?.code === 11000) {
@@ -1080,12 +1098,16 @@ router.put(
       ) {
         const fallbackBranch = await getDefaultBranch();
 
+        const requestedBranches = body.branches !== undefined ? body.branches :
+          body.branchIds !== undefined ? body.branchIds :
+          user.branches?.length ? user.branches : body.defaultBranch;
         const assignedBranches = await buildAssignedBranches(
-          body.branches || body.branchIds || body.defaultBranch,
-          fallbackBranch
+          requestedBranches,
+          fallbackBranch,
+          body.defaultBranch
         );
 
-        const branchesAllowed = ensureCanAssignBranches(req, assignedBranches);
+        const branchesAllowed = ensureCanAssignBranches(req, assignedBranches, user.branches || []);
         if (!branchesAllowed.ok) {
           return sendError(res, branchesAllowed.status, branchesAllowed.message);
         }
@@ -1094,9 +1116,9 @@ router.put(
         user.defaultBranch = getDefaultBranchFromAssigned(assignedBranches);
       }
 
-      if (body.status !== undefined || body.active !== undefined) {
-        const disabling = body.active === false ||
-          (body.status !== undefined && cleanLower(body.status) !== 'active');
+      const nextStatus = resolveUserStatus(body);
+      if (nextStatus) {
+        const disabling = !nextStatus.active;
         const statusAction = disabling ? 'disable' : 'update';
 
         const statusAllowed = await ensureCanManageTargetUser(
@@ -1121,13 +1143,8 @@ router.put(
           }
         }
 
-        if (body.status !== undefined) {
-          user.status = cleanLower(body.status);
-        }
-
-        if (body.active !== undefined) {
-          user.active = body.active === true;
-        }
+        user.status = nextStatus.status;
+        user.active = nextStatus.active;
       }
 
       user.emailVerified =
@@ -1142,7 +1159,7 @@ router.put(
 
       user.updatedBy = getCurrentAdminId(req);
 
-      if (body.status !== undefined || body.active !== undefined) {
+      if (nextStatus) {
         await user.invalidateSessions();
       } else {
         await user.save();
@@ -1158,6 +1175,8 @@ router.put(
         data: buildUserPublicResponse(savedUser),
       });
     } catch (error) {
+      if (error?.status === 400) return sendError(res, 400, error.message);
+
       console.error('❌ Error actualizando usuario admin:', error.message);
 
       if (error?.code === 11000) {
@@ -1188,7 +1207,7 @@ router.patch(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, active } = req.body || {};
+      const nextStatusInput = req.body || {};
 
       if (!isValidObjectId(id)) {
         return sendError(res, 400, 'ID de usuario inválido.');
@@ -1205,20 +1224,18 @@ router.patch(
         return sendError(res, allowed.status, allowed.message);
       }
 
-      if (active === false || (status !== undefined && cleanLower(status) !== 'active')) {
+      const nextStatus = resolveUserStatus(nextStatusInput);
+      if (!nextStatus) return sendError(res, 400, 'Indica el nuevo estado del usuario.');
+
+      if (!nextStatus.active) {
         const lastOwnerCheck = await ensureNotLastOwner(user);
         if (!lastOwnerCheck.ok) {
           return sendError(res, lastOwnerCheck.status, lastOwnerCheck.message);
         }
       }
 
-      if (status !== undefined) {
-        user.status = cleanLower(status);
-      }
-
-      if (active !== undefined) {
-        user.active = active === true;
-      }
+      user.status = nextStatus.status;
+      user.active = nextStatus.active;
 
       user.updatedBy = getCurrentAdminId(req);
 
@@ -1231,6 +1248,8 @@ router.patch(
         data: buildUserPublicResponse(user),
       });
     } catch (error) {
+      if (error?.status === 400) return sendError(res, 400, error.message);
+
       console.error('❌ Error cambiando estado usuario admin:', error.message);
 
       return sendError(

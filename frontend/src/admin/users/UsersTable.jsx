@@ -382,14 +382,14 @@ export default function UsersTable({
                       className="text-[10px] font-black uppercase tracking-[0.16em]"
                       style={{ color: 'var(--admin-card-muted-text)' }}
                     >
-                      Sede
+                      {targetBranches.length > 1 ? 'Sedes · principal' : 'Sede'}
                     </p>
 
                     <p
                       className="break-words text-xs font-black leading-4"
                       style={{ color: 'var(--admin-card-text)' }}
                     >
-                      {primaryBranch}
+                      {primaryBranch}{targetBranches.length > 1 ? ` +${targetBranches.length - 1}` : ''}
                     </p>
                   </div>
                 </div>

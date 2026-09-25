@@ -13,6 +13,7 @@ export const EMPTY_FORM = {
   password: '',
   role: 'cashier',
   branchId: '',
+  assignedBranches: [],
   status: 'active',
   mustChangePassword: true,
 };
@@ -106,12 +107,39 @@ export function getUserBranchId(user, branches = []) {
   return branchValue || getDefaultBranchId(branches);
 }
 
+const branchIdOf = (item) => String(item?.branch?._id || item?.branch || item?._id || '');
+
+export function getUserAssignedBranches(user, branches = []) {
+  const assigned = (user?.branches || []).map((item) => ({
+    branch: branchIdOf(item),
+    canSell: item.canSell !== false,
+    canManageInventory: item.canManageInventory === true,
+    canInvoice: item.canInvoice === true,
+  })).filter((item) => item.branch);
+  if (assigned.length) return assigned;
+  const id = getUserBranchId(user, branches);
+  return id ? [{ branch: String(id), canSell: true, canManageInventory: false, canInvoice: false }] : [];
+}
+
 export function roleCanManageInventory(role) {
   return ['owner', 'admin', 'manager', 'warehouse'].includes(role);
 }
 
 export function roleCanInvoice(role) {
   return ['owner', 'admin', 'manager', 'billing'].includes(role);
+}
+
+export function getNewBranchAssignment(branchId, role, actorBranches = [], globalAccess = false) {
+  const actorAccess = actorBranches.find((item) =>
+    String(item.branch?._id || item.branch) === String(branchId));
+  return {
+    branch: branchId,
+    canSell: globalAccess || actorAccess?.canSell === true,
+    canManageInventory: roleCanManageInventory(role) &&
+      (globalAccess || actorAccess?.canManageInventory === true),
+    canInvoice: roleCanInvoice(role) &&
+      (globalAccess || actorAccess?.canInvoice === true),
+  };
 }
 
 export function buildFormFromUser(user, branches = [], roles = []) {
@@ -130,6 +158,7 @@ export function buildFormFromUser(user, branches = [], roles = []) {
       roles[0]?.code ||
       'cashier',
     branchId: getUserBranchId(user, branches),
+    assignedBranches: getUserAssignedBranches(user, branches),
     status: user?.status || 'active',
     mustChangePassword: user?.mustChangePassword === true,
   };
@@ -154,8 +183,9 @@ export function validateUserForm(form, modalMode) {
     return 'Debes seleccionar un rol.';
   }
 
-  if (!form.branchId) {
-    return 'Debes seleccionar una sede.';
+  if (!form.assignedBranches?.length || !form.branchId ||
+      !form.assignedBranches.some((item) => item.branch === form.branchId)) {
+    return 'Selecciona al menos una sede y marca cuál será la principal.';
   }
 
   return '';
@@ -195,15 +225,13 @@ export function buildUserPayload(form) {
     active: form.status === 'active',
     mustChangePassword: form.mustChangePassword,
     defaultBranch: form.branchId,
-    branches: [
-      {
-        branch: form.branchId,
-        isDefault: true,
-        canSell: true,
-        canManageInventory: roleCanManageInventory(form.role),
-        canInvoice: roleCanInvoice(form.role),
-      },
-    ],
+    branches: form.assignedBranches.map((item) => ({
+      branch: item.branch,
+      isDefault: item.branch === form.branchId,
+      canSell: item.canSell !== false,
+      canManageInventory: item.canManageInventory === true,
+      canInvoice: item.canInvoice === true,
+    })),
   };
 }
 
@@ -221,7 +249,11 @@ export function buildUserEditPayload(form, originalUser, branches = [], roles = 
   }
 
   if (!Object.hasOwn(payload, 'status')) delete payload.active;
-  if (form.branchId === original.branchId) {
+  const branchSettings = (assigned) => [...assigned]
+    .sort((a, b) => a.branch.localeCompare(b.branch));
+  if (form.branchId === original.branchId &&
+      JSON.stringify(branchSettings(form.assignedBranches)) ===
+      JSON.stringify(branchSettings(original.assignedBranches))) {
     delete payload.defaultBranch;
     delete payload.branches;
   }

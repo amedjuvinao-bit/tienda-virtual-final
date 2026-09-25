@@ -1,6 +1,6 @@
 // frontend/src/admin/users/AdminUsersPage.jsx
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createAdminUser,
   deleteAdminUser,
@@ -28,6 +28,7 @@ import {
   buildPasswordPayload,
   buildUserPayload,
   getDefaultBranchId,
+  getNewBranchAssignment,
   validatePasswordForm,
   validateUserForm,
 } from './adminUsersHelpers';
@@ -64,6 +65,12 @@ export default function AdminUsersPage() {
   const [passwordError, setPasswordError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const requestId = useRef(0);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
@@ -100,29 +107,6 @@ export default function AdminUsersPage() {
       Array.isArray(role.permissions) &&
       role.permissions.every((permission) => hasAdminPermission(adminUser, permission));
   });
-
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-
-    if (!q) return users;
-
-    return users.filter((user) => {
-      const text = [
-        user.username,
-        user.email,
-        user.displayName,
-        user.firstName,
-        user.lastName,
-        user.role,
-        user.status,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return text.includes(q);
-    });
-  }, [users, search]);
 
   const confirmModalLoading =
     (confirmModal.type === 'status' && Boolean(statusSavingId)) ||
@@ -173,15 +157,21 @@ export default function AdminUsersPage() {
       setRoles(loadedRoles);
       setBranches(loadedBranches);
 
-      setForm((current) => ({
+      setForm((current) => {
+        const selectedBranch = current.branchId || getDefaultBranchId(loadedBranches);
+        return ({
         ...current,
         role:
           current.role ||
           loadedRoles.find((role) => role.code === 'cashier')?.code ||
           loadedRoles[0]?.code ||
           'cashier',
-        branchId: current.branchId || getDefaultBranchId(loadedBranches),
-      }));
+        branchId: selectedBranch,
+        assignedBranches: current.assignedBranches?.length ? current.assignedBranches :
+          selectedBranch ? [{ branch: selectedBranch, canSell: true,
+            canManageInventory: false, canInvoice: false }] : [],
+      });
+      });
     } catch (err) {
       console.error('❌ Error cargando meta usuarios:', err);
       setError(err?.userMessage || 'No se pudo cargar la información base.');
@@ -190,25 +180,33 @@ export default function AdminUsersPage() {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
       setError('');
 
       const response = await getAdminUsers({
-        page: 1,
-        limit: 50,
+        page,
+        limit: 20,
         sort: '-createdAt',
+        q: debouncedSearch.trim(),
+        status: statusFilter,
       });
 
+      if (currentRequest !== requestId.current) return;
       setUsers(response?.data || []);
+      setTotal(Number(response?.total || 0));
+      setTotalPages(Math.max(Number(response?.totalPages || 1), 1));
+      if (page > Number(response?.totalPages || 1)) setPage(Math.max(Number(response?.totalPages || 1), 1));
     } catch (err) {
+      if (currentRequest !== requestId.current) return;
       console.error('❌ Error cargando usuarios administrativos:', err);
       setError(err?.userMessage || 'No se pudieron cargar los usuarios.');
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, statusFilter]);
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -217,13 +215,15 @@ export default function AdminUsersPage() {
     setModalError('');
     setSuccessMessage('');
 
+    const selectedBranch = getDefaultBranchId(branches);
+    const selectedRole = assignableRoles.find((role) => role.code === 'cashier')?.code ||
+      assignableRoles[0]?.code || 'cashier';
     setForm({
       ...EMPTY_FORM,
-      role:
-        assignableRoles.find((role) => role.code === 'cashier')?.code ||
-        assignableRoles[0]?.code ||
-        'cashier',
-      branchId: getDefaultBranchId(branches),
+      role: selectedRole,
+      branchId: selectedBranch,
+      assignedBranches: selectedBranch ? [getNewBranchAssignment(selectedBranch, selectedRole,
+        adminUser?.branches || [], isOwner || currentRole === 'admin')] : [],
     });
 
     setShowUserModal(true);
@@ -507,8 +507,17 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadMeta();
-    loadUsers();
   }, []);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    loadUsers();
+    return () => { requestId.current += 1; };
+  }, [loadUsers]);
 
   return (
     <div className="space-y-5">
@@ -539,7 +548,7 @@ export default function AdminUsersPage() {
                   color: 'var(--admin-primary-soft-text)',
                 }}
               >
-                {users.length} usuarios registrados
+                {total} usuarios encontrados
               </span>
             </div>
 
@@ -624,7 +633,7 @@ export default function AdminUsersPage() {
               className="mt-1 text-sm"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Mostrando {filteredUsers.length} de {users.length} usuarios.
+              Mostrando {users.length} de {total} usuarios. Página {page} de {totalPages}.
             </p>
           </div>
 
@@ -646,14 +655,26 @@ export default function AdminUsersPage() {
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Nombre, usuario, correo o rol..."
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              placeholder="Nombre, usuario, correo o documento..."
               className="w-full bg-transparent text-sm outline-none"
               style={{
                 color: 'var(--admin-input-text)',
               }}
             />
           </div>
+          <select aria-label="Filtrar usuarios por estado" value={statusFilter}
+            onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
+            className="rounded-2xl border px-4 py-2.5 text-sm" style={{
+              background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)',
+              color: 'var(--admin-input-text)',
+            }}>
+            <option value="all">Todos los estados</option>
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+            <option value="pending">Pendientes</option>
+            <option value="blocked">Bloqueados</option>
+          </select>
         </div>
 
         {successMessage && (
@@ -694,7 +715,7 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        {!loading && !metaLoading && filteredUsers.length === 0 && (
+        {!loading && !metaLoading && users.length === 0 && (
           <div
             className="mt-6 rounded-2xl border px-4 py-6 text-center text-sm font-semibold"
             style={{
@@ -706,9 +727,9 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        {!loading && !metaLoading && filteredUsers.length > 0 && (
+        {!loading && !metaLoading && users.length > 0 && (
           <UsersTable
-            users={filteredUsers}
+            users={users}
             roles={roles}
             branches={branches}
             statusSavingId={statusSavingId}
@@ -727,6 +748,17 @@ export default function AdminUsersPage() {
             onDeleteUser={handleDeleteUser}
           />
         )}
+        {!loading && totalPages > 1 && (
+          <nav aria-label="Páginas de usuarios" className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}
+              className="rounded-2xl border px-4 py-2 text-sm font-bold disabled:opacity-50"
+              style={{ borderColor: 'var(--admin-light-panel-border)', background: 'var(--admin-light-panel-bg)', color: 'var(--admin-light-panel-text)' }}>Anterior</button>
+            <span className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {totalPages}</span>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}
+              className="rounded-2xl border px-4 py-2 text-sm font-bold disabled:opacity-50"
+              style={{ borderColor: 'var(--admin-light-panel-border)', background: 'var(--admin-light-panel-bg)', color: 'var(--admin-light-panel-text)' }}>Siguiente</button>
+          </nav>
+        )}
       </section>
 
       <UserFormModal
@@ -740,7 +772,11 @@ export default function AdminUsersPage() {
         canAssign={canAssign && String(editingUserId) !== String(adminUser?.id || adminUser?._id)}
         canDisable={canDisable && String(editingUserId) !== String(adminUser?.id || adminUser?._id)}
         canChangePassword={canChangePassword}
-        hasMultipleBranches={Boolean(editingUser?.branches?.length > 1)}
+        actorBranches={adminUser?.branches || []}
+        globalBranchAccess={isOwner || currentRole === 'admin'}
+        hasUnavailableBranches={Boolean(editingUser?.branches?.some((item) =>
+          !branches.some((branch) => String(branch._id) === String(item.branch?._id || item.branch))
+        ))}
         form={form}
         setForm={setForm}
         saving={saving}

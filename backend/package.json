@@ -10,6 +10,7 @@
     "test:admin-auth-security": "node scripts/testAdminAuthSecurityHardening.js",
     "test:admin-session-security": "node scripts/testAdminSessionSecurity.js",
     "test:admin-users-stage1": "node scripts/testAdminUsersStage1.js",
+    "test:admin-users-stage2": "node scripts/testAdminUsersStage2.js",
     "test:admin-2fa-security": "node scripts/testAdminTwoFactorSecurity.js",
     "test:admin-security-stage4": "node scripts/testAdminSecurityStage4.js",
     "test:admin-security-stage5": "node scripts/testAdminSecurityStage5.js",

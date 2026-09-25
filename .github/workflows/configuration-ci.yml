@@ -65,6 +65,7 @@ jobs:
           npm --prefix backend run test:configuration-level-plus-stage4
           npm --prefix backend run test:configuration-level-plus-stage5
           npm --prefix backend run test:admin-users-stage1
+          npm --prefix backend run test:admin-users-stage2
 
       - name: Validar interfaz de Configuracion
         run: |
@@ -75,6 +76,7 @@ jobs:
           npm --prefix frontend run test:configuration-level-plus-stage4
           npm --prefix frontend run test:configuration-level-plus-stage5
           npm --prefix frontend run test:admin-users-stage1
+          npm --prefix frontend run test:admin-users-stage2
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

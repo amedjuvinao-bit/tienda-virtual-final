@@ -60,11 +60,9 @@ describe('Usuarios: separación de acciones', () => {
     render(<AdminUsersPage />);
     const editor = await screen.findByRole('button', { name: 'Editar' });
     await userEvent.setup().click(editor);
-    await waitFor(() => expect(screen.getAllByRole('combobox')).toHaveLength(4));
-    const [, role, branch, status] = screen.getAllByRole('combobox');
-    expect(role).toBeDisabled();
-    expect(branch).toBeDisabled();
-    expect(status).toBeDisabled();
+    expect(await screen.findByRole('combobox', { name: /perfil administrativo/i })).toBeDisabled();
+    expect(screen.getByRole('group', { name: /sedes autorizadas/i })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: /^estado$/i })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Más' })).not.toBeInTheDocument();
   });
 

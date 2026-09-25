@@ -61,6 +61,15 @@ assert.equal(canAssignBranches({
   assignedBranches: [{ branch: 'a' }],
 }), true);
 assert.equal(canAssignBranches({
+  actorCode: 'manager', actorBranches: [{ branch: 'a', canInvoice: false }],
+  assignedBranches: [{ branch: 'a', canInvoice: true }],
+}), false);
+assert.equal(canAssignBranches({
+  actorCode: 'manager', actorBranches: [{ branch: 'a', canInvoice: false }],
+  currentBranches: [{ branch: 'a', canInvoice: true }],
+  assignedBranches: [{ branch: 'a', canInvoice: true }],
+}), true);
+assert.equal(canAssignBranches({
   actorCode: 'manager', actorBranches: [{ branch: 'a' }],
   assignedBranches: [{ branch: 'b' }],
 }), false);

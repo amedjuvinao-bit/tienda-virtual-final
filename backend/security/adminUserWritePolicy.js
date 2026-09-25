@@ -46,13 +46,23 @@ function canGrantRole({ actorCode, actorRole, targetRole, actorPermissions = [] 
   });
 }
 
-function canAssignBranches({ actorCode, actorBranches = [], assignedBranches = [] }) {
+function canAssignBranches({ actorCode, actorBranches = [], assignedBranches = [], currentBranches = [] }) {
   const actor = String(actorCode || '').toLowerCase();
   if (actor === 'owner' || actor === 'admin') return true;
 
-  const authorized = new Set(actorBranches.map((item) => String(item.branch || '')));
+  const authorized = new Map(actorBranches.map((item) => [String(item.branch || ''), item]));
+  const existing = new Map(currentBranches.map((item) => [String(item.branch || ''), item]));
   return assignedBranches.length > 0 && assignedBranches.every(
-    (item) => authorized.has(String(item.branch))
+    (item) => {
+      const id = String(item.branch);
+      const actorAccess = authorized.get(id);
+      if (!actorAccess) return false;
+      const previous = existing.get(id);
+      return ['canSell', 'canManageInventory', 'canInvoice'].every((capability) =>
+        item[capability] !== true || actorAccess[capability] === true ||
+        previous?.[capability] === true
+      );
+    }
   );
 }
 
