@@ -12,6 +12,36 @@
           const color = localStorage.getItem(document.documentElement.dataset.adminContext === 'login' ? 'rb_admin_loader_login_color' : 'rb_admin_loader_panel_color');
           if (/^#[0-9a-f]{6}$/i.test(color || '')) document.documentElement.style.setProperty(document.documentElement.dataset.adminContext === 'login' ? '--rb-loader-login-color' : '--rb-loader-panel-color', color);
         } catch { /* Primer acceso: se usa el color neutro. */ }
+        // Adelanta la única consulta de configuración al inicio del documento.
+        const configuredApi = '%VITE_API_BASE_URL%';
+        const apiBase = configuredApi.startsWith('http://') || configuredApi.startsWith('https://')
+          ? configuredApi.replace(/\/+$/, '')
+          : ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:5000' : '';
+        if (apiBase) {
+          window.__adminInitialSettingsPromise = fetch(`${apiBase}/api/site-settings`, {
+            headers: { Accept: 'application/json' },
+          }).then(async (response) => {
+            if (!response.ok) throw new Error(`Error HTTP ${response.status} en /api/site-settings`);
+            const settings = await response.json();
+            const loginTheme = settings?.loginAdmin?.theme;
+            const colors = [
+              [settings?.loginAdmin?.customizations?.[loginTheme]?.primary, 'rb_admin_loader_login_color', '--rb-loader-login-color'],
+              [settings?.admin?.theme?.primary, 'rb_admin_loader_panel_color', '--rb-loader-panel-color'],
+            ];
+            for (const [color, key, variable] of colors) {
+              if (!/^#[0-9a-f]{6}$/i.test(color || '')) continue;
+              document.documentElement.style.setProperty(variable, color);
+              try { localStorage.setItem(key, color); } catch { /* El color queda aplicado en esta sesión. */ }
+            }
+            const model = settings?.admin?.loader?.model;
+            if (['halo', 'pulse', 'orbit', 'wave', 'linear'].includes(model)) {
+              document.documentElement.dataset.adminLoader = model;
+              try { localStorage.setItem('rb_admin_loader_model', model); } catch { /* La elección queda aplicada en esta sesión. */ }
+            }
+            return settings;
+          });
+          window.__adminInitialSettingsPromise.catch(() => {});
+        }
       }
     </script>
     <style>

@@ -923,6 +923,7 @@ export default function Login({ initialSettings, loaderModel }) {
   const [storeName, setStoreName] = useState('tu tienda');
   const [storeLogo, setStoreLogo] = useState('');
   const [loginSettingsReady, setLoginSettingsReady] = useState(false);
+  const [loginSettingsError, setLoginSettingsError] = useState(false);
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);
   const [requiredPasswordUser, setRequiredPasswordUser] = useState(null);
@@ -943,6 +944,7 @@ export default function Login({ initialSettings, loaderModel }) {
 
   useEffect(() => {
     let active = true;
+    let retryTimer;
 
     const applySettings = (settings, identity = {}) => {
       const normalized = normalizeLoginSettings(settings);
@@ -955,9 +957,11 @@ export default function Login({ initialSettings, loaderModel }) {
     };
 
     const loadSettings = async () => {
+      window.clearTimeout(retryTimer);
       try {
         const response = await fetchSiteSettings();
         if (active) {
+          setLoginSettingsError(false);
           applySettings(response?.loginAdmin, {
             ...response?.store,
             logo:
@@ -966,11 +970,13 @@ export default function Login({ initialSettings, loaderModel }) {
               response?.theme?.header?.logoDark ||
               '',
           });
+          setLoginSettingsReady(true);
         }
       } catch {
-        // El acceso continúa disponible con el diseño seguro predeterminado.
-      } finally {
-        if (active) setLoginSettingsReady(true);
+        if (active) {
+          setLoginSettingsError(true);
+          retryTimer = window.setTimeout(loadSettings, 2000);
+        }
       }
     };
 
@@ -993,6 +999,7 @@ export default function Login({ initialSettings, loaderModel }) {
 
     return () => {
       active = false;
+      window.clearTimeout(retryTimer);
       window.removeEventListener("admin-login-settings-updated", syncLoginConfig);
     };
   }, []);
@@ -1015,7 +1022,7 @@ export default function Login({ initialSettings, loaderModel }) {
   }, []);
 
   if (!loginSettingsReady) {
-    return <AdminLoadingScreen context="login" model={loaderModel} message="Preparando acceso seguro…" />;
+    return <AdminLoadingScreen context="login" model={loaderModel} message={loginSettingsError ? 'Esperando configuración del servidor…' : 'Preparando acceso seguro…'} />;
   }
 
   const registerFailedAttempt = () => {

@@ -22,6 +22,19 @@ describe('Login durante la carga inicial', () => {
 
   afterEach(cleanup);
 
+  it('espera al backend sin mostrar un login genérico tras fallar la configuración', async () => {
+    fetchSiteSettings.mockRejectedValueOnce(new Error('backend no disponible'));
+    const { container } = render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('status', { name: 'Esperando configuración del servidor…' })).toBeInTheDocument();
+    expect(screen.queryByText('Hola de nuevo')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-login-theme]')).not.toBeInTheDocument();
+  });
+
   it('no muestra el tema predeterminado antes de recibir el tema guardado', async () => {
     let resolveSettings;
     fetchSiteSettings.mockReturnValueOnce(new Promise((resolve) => {

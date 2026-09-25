@@ -9,6 +9,12 @@ const API_BASE = API_BASE_URL;
  * { theme: {...}, menus: {...}, ... }
  */
 export async function fetchSiteSettings() {
+  // El HTML ya inició esta petición para colorear el indicador antes de cargar React.
+  const initialSettings = globalThis.__adminInitialSettingsPromise;
+  if (initialSettings) {
+    delete globalThis.__adminInitialSettingsPromise;
+    return initialSettings;
+  }
   const url = `${API_BASE}/api/site-settings`;
 
   const res = await fetch(url, {

@@ -1,5 +1,5 @@
 import 'react-toastify/dist/ReactToastify.css';
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -146,10 +146,13 @@ export default function App() {
   const [themeFromServer, setThemeFromServer] = useState(null);
   const [loadingPage, setLoadingPage] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
+  const [adminConnectionError, setAdminConnectionError] = useState(false);
+  const adminConnectionErrorLogged = useRef(false);
   const [adminLoader, setAdminLoader] = useState(getRememberedAdminLoader);
   const [siteSettingsFromServer, setSiteSettingsFromServer] = useState(null);
 
   const reloadTheme = async () => {
+    let succeeded = false;
     try {
       if (!window.location.pathname.startsWith('/admin')) setLoadingPage(true);
       const data = await fetchSiteSettings();
@@ -169,16 +172,22 @@ export default function App() {
         applyTheme(normalizedTheme);
         console.log('Tema aplicado desde /api/site-settings');
       }
+      succeeded = true;
+      adminConnectionErrorLogged.current = false;
+      setAdminConnectionError(false);
     } catch (error) {
-      console.error('Error cargando site settings:', error);
+      if (!adminConnectionErrorLogged.current) console.error('Error cargando site settings:', error);
+      adminConnectionErrorLogged.current = true;
+      if (window.location.pathname.startsWith('/admin')) setAdminConnectionError(true);
     } finally {
       const finish = () => {
         setLoadingPage(false);
-        setThemeReady(true);
+        if (succeeded || !window.location.pathname.startsWith('/admin')) setThemeReady(true);
       };
       if (window.location.pathname.startsWith('/admin')) finish();
       else setTimeout(finish, 400);
     }
+    return succeeded;
   };
 
   useEffect(() => {
@@ -193,7 +202,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    reloadTheme();
+    let active = true;
+    let retryTimer;
+    const loadInitialSettings = async () => {
+      const ready = await reloadTheme();
+      if (active && !ready && window.location.pathname.startsWith('/admin')) {
+        retryTimer = window.setTimeout(loadInitialSettings, 2000);
+      }
+    };
+    loadInitialSettings();
+    return () => {
+      active = false;
+      window.clearTimeout(retryTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -224,7 +245,7 @@ export default function App() {
                 <GlobalFloatingButtons theme={themeFromServer} />
                 {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
 
-                {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : <Routes>
+                {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
