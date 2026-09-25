@@ -48,6 +48,22 @@ afterEach(() => {
 });
 
 describe('CashSessionsPageReport Etapa 4', () => {
+  it('consulta la sede una vez y cambia el período sin recargar caja ni configuración', async () => {
+    render(<CashSessionsPageReport />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));
+    await screen.findByRole('button', { name: 'Últimos 7 días' });
+    await waitFor(() => expect(getCashJourneySummary).toHaveBeenCalledTimes(1));
+    expect(getPosBootstrap).toHaveBeenCalledTimes(1);
+    expect(getCurrentCashSession).toHaveBeenCalledTimes(1);
+    expect(listCashSessions).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Últimos 7 días' }));
+    await waitFor(() => expect(getCashJourneySummary).toHaveBeenCalledWith({ branchId: branch.id, range: 'last_7_days' }));
+    expect(getPosBootstrap).toHaveBeenCalledTimes(1);
+    expect(getCurrentCashSession).toHaveBeenCalledTimes(1);
+    expect(listCashSessions).toHaveBeenCalledTimes(1);
+  });
+
   it('permite al supervisor certificar una jornada completamente conciliada', async () => {
     render(<CashSessionsPageReport />);
     fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));

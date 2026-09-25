@@ -461,7 +461,7 @@ export default function PosSalesPageSafe() {
       setBootstrap(data);
       setBranchId(nextBranchId);
       setPaymentMethod(data?.defaultBranch?.settings?.defaultPaymentMethod || data?.paymentMethods?.[0]?.key || 'cash');
-      if (nextBranchId) await loadCashSession(nextBranchId);
+      if (nextBranchId && nextBranchId === branchId) void loadCashSession(nextBranchId);
     } catch (err) {
       setError(err?.message || 'No fue posible cargar el POS.');
     } finally {
@@ -648,7 +648,7 @@ export default function PosSalesPageSafe() {
       } finally {
         if (active) setProductsLoading(false);
       }
-    }, 350);
+    }, searchTerm.trim() ? 250 : 0);
 
     return () => {
       active = false;

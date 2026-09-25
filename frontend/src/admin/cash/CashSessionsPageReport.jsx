@@ -1,6 +1,6 @@
 // frontend/src/admin/cash/CashSessionsPageReport.jsx
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertCircle,
@@ -941,6 +941,8 @@ export default function CashSessionsPageReport() {
   const [todayJourneyClose, setTodayJourneyClose] = useState(null);
   const [journeyCloseNotes, setJourneyCloseNotes] = useState('');
   const [journeyCertifying, setJourneyCertifying] = useState(false);
+  const initialLoadRef = useRef(false);
+  const journeyRequestRef = useRef(0);
 
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
   const journeyCertified = Boolean(todayJourneyClose);
@@ -972,9 +974,7 @@ export default function CashSessionsPageReport() {
       listCashSessions({ branchId, limit: 12 }),
     ]);
     const supervisorAccess = current?.access?.canSupervise === true;
-    const journey = supervisorAccess
-      ? await getCashJourneySummary({ branchId, range })
-      : null;
+    const journey = supervisorAccess ? await getCashJourneySummary({ branchId, range }) : null;
 
     const session = current?.session || null;
     setCanSupervise(supervisorAccess);
@@ -1005,6 +1005,8 @@ export default function CashSessionsPageReport() {
   }, [cashRegisterCode, refreshForBranch, selectedBranchId]);
 
   useEffect(() => {
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
     loadData();
   }, [loadData]);
 
@@ -1036,6 +1038,7 @@ export default function CashSessionsPageReport() {
 
   const handleBranchChange = async (event) => {
     const branchId = event.target.value;
+    journeyRequestRef.current += 1;
     setSelectedBranchId(branchId);
     setActiveView('operation');
     setOperationDialog(null);
@@ -1245,9 +1248,23 @@ export default function CashSessionsPageReport() {
     }
   };
 
-  const handleJourneyRangeChange = (nextRange) => {
+  const handleJourneyRangeChange = async (nextRange) => {
     if (nextRange === journeyRange) return;
-    setJourneyRange(nextRange);
+    if (!canSupervise || !selectedBranchId) return;
+    const request = ++journeyRequestRef.current;
+    try {
+      setLoading(true);
+      setError('');
+      const journey = await getCashJourneySummary({ branchId: selectedBranchId, range: nextRange });
+      if (request !== journeyRequestRef.current) return;
+      setJourneyRange(nextRange);
+      setJourneySummary(journey?.summary || null);
+      if (nextRange === 'today') setTodayJourneyClose(journey?.summary?.journeyClose || null);
+    } catch (err) {
+      if (request === journeyRequestRef.current) setError(err?.message || 'No fue posible consultar la jornada.');
+    } finally {
+      if (request === journeyRequestRef.current) setLoading(false);
+    }
   };
 
   const handleCertifyJourney = async () => {
