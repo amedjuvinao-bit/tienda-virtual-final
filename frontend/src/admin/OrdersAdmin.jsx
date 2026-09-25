@@ -1,9 +1,8 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React, { useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
-import OrderDetailModal from './orders/components/OrderDetailModal';
 import OrdersActiveFilters from './orders/components/OrdersActiveFilters';
 import OrdersBulkActions from './orders/components/OrdersBulkActions';
 import OrdersControlToggle from './orders/components/OrdersControlToggle';
@@ -29,6 +28,8 @@ import {
   toCOP,
 } from './orders/ordersAdminModel';
 import './orders/ordersAdmin.css';
+
+const OrderDetailModal = lazy(() => import('./orders/components/OrderDetailModal'));
 
 export default function OrdersAdmin() {
   const [searchParams] = useSearchParams();
@@ -284,29 +285,39 @@ export default function OrdersAdmin() {
         />
       </main>
 
-      <OrderDetailModal
-        open={detail.showDetail}
-        onClose={detail.closeOrderDetail}
-        order={detail.orderSelected}
-        onSaveStatus={capabilities.canUpdateStatus ? detail.saveStatus : null}
-        onSaveTags={capabilities.canUpdateTags ? detail.saveTags : null}
-        onTogglePrinted={capabilities.canMarkPrinted ? detail.togglePrinted : null}
-        onToggleArchived={capabilities.canArchive ? detail.toggleArchived : null}
-        canAddNotes={capabilities.canAddNotes}
-        canSendEmail={capabilities.canSendEmail}
-        canEditCustomerData={capabilities.canEditCustomerData}
-        onCustomerDataUpdated={detail.handleOrderUpdated}
-        onOrderUpdated={detail.handleOrderUpdated}
-        canUpdateFulfillment={capabilities.canUpdateFulfillment}
-        canDownloadBilling={capabilities.canDownloadBilling}
-        canConfirmManualPayment={capabilities.canConfirmManualPayment}
-        canRefund={capabilities.canRefund}
-        canAutomateRefund={capabilities.canAutomateRefund}
-        canManageReturns={capabilities.canManageReturns}
-        canManageReturnPolicy={capabilities.canManageReturnPolicy}
-        savingId={detail.savingId}
-        populated={filters.populate}
-      />
+      {detail.showDetail && (
+        <Suspense fallback={
+          <div className="admin-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-black/50" role="status">
+            <span className="admin-card-glass rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: 'var(--admin-card-text)' }}>
+              Cargando detalle de orden…
+            </span>
+          </div>
+        }>
+          <OrderDetailModal
+            open={detail.showDetail}
+            onClose={detail.closeOrderDetail}
+            order={detail.orderSelected}
+            onSaveStatus={capabilities.canUpdateStatus ? detail.saveStatus : null}
+            onSaveTags={capabilities.canUpdateTags ? detail.saveTags : null}
+            onTogglePrinted={capabilities.canMarkPrinted ? detail.togglePrinted : null}
+            onToggleArchived={capabilities.canArchive ? detail.toggleArchived : null}
+            canAddNotes={capabilities.canAddNotes}
+            canSendEmail={capabilities.canSendEmail}
+            canEditCustomerData={capabilities.canEditCustomerData}
+            onCustomerDataUpdated={detail.handleOrderUpdated}
+            onOrderUpdated={detail.handleOrderUpdated}
+            canUpdateFulfillment={capabilities.canUpdateFulfillment}
+            canDownloadBilling={capabilities.canDownloadBilling}
+            canConfirmManualPayment={capabilities.canConfirmManualPayment}
+            canRefund={capabilities.canRefund}
+            canAutomateRefund={capabilities.canAutomateRefund}
+            canManageReturns={capabilities.canManageReturns}
+            canManageReturnPolicy={capabilities.canManageReturnPolicy}
+            savingId={detail.savingId}
+            populated={filters.populate}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

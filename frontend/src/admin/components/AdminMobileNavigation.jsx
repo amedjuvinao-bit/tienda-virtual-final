@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal, Search, X } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { preloadAdminRoute } from '../adminRoutePreload';
 
 function normalizeSearch(value = '') {
   return String(value)
@@ -155,6 +156,8 @@ export default function AdminMobileNavigation({ primaryLinks = [], groups = [] }
                         <NavLink
                           key={item.to}
                           to={item.to}
+                          onPointerEnter={() => { void preloadAdminRoute(item.to); }}
+                          onFocus={() => { void preloadAdminRoute(item.to); }}
                           className="admin-mobile-more-link"
                           data-active={isCurrentPath(location.pathname, item.to) ? 'true' : 'false'}
                         >
@@ -180,6 +183,8 @@ export default function AdminMobileNavigation({ primaryLinks = [], groups = [] }
             <NavLink
               key={item.to}
               to={item.to}
+              onPointerEnter={() => { void preloadAdminRoute(item.to); }}
+              onFocus={() => { void preloadAdminRoute(item.to); }}
               className="admin-mobile-bottom-link"
               data-active={isCurrentPath(location.pathname, item.to) ? 'true' : 'false'}
               aria-label={item.mobileLabel || item.label}

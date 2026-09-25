@@ -12,6 +12,7 @@ import { fetchSiteSettings } from './theme/siteSettingsApi';
 import { applyTheme } from './theme/applyTheme';
 import { normalizeGlobalConfig } from './admin/appearance/general/generalHelpers';
 import GlobalPageLoader from './components/GlobalPageLoader';
+import RouteLoaderEffect from './components/RouteLoaderEffect';
 import AppToastContainer from './components/AppToastContainer';
 import { AppConfirmProvider } from './components/AppConfirmProvider';
 import AdminPermissionRoute from './admin/security/AdminPermissionRoute';
@@ -19,6 +20,7 @@ import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import { CartProvider } from './context/CartContext.jsx';
 import { FavoritesProvider } from './context/FavoritesContext.jsx';
+import { loadOrdersAdmin, loadProductsAdmin } from './admin/adminRoutePreload';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
@@ -49,7 +51,7 @@ const ResetPasswordPage = lazy(() => import('./admin/ResetPasswordPage'));
 const FormularioProducto = lazy(() => import('./admin/FormularioProducto'));
 const AdminLayout = lazy(() => import('./admin/AdminLayout'));
 const Dashboard = lazy(() => import('./admin/Dashboard'));
-const ProductosAdmin = lazy(() => import('./admin/ProductosAdmin'));
+const ProductosAdmin = lazy(loadProductsAdmin);
 const InventoryAdmin = lazy(() => import('./admin/InventoryAdmin'));
 const PosSalesPage = lazy(() => import('./admin/pos/PosSalesPage'));
 const CashSessionsPage = lazy(() => import('./admin/cash/CashSessionsPage'));
@@ -69,7 +71,7 @@ const NotFoundPageEditor = lazy(() => import('./admin/pages/NotFoundPageEditor')
 const ConfiguracionPage = lazy(() => import('./admin/ConfiguracionPage'));
 const CarritosAdmin = lazy(() => import('./admin/CarritosAdmin'));
 const FavoritosAdmin = lazy(() => import('./admin/FavoritosAdmin'));
-const OrdersAdmin = lazy(() => import('./admin/OrdersAdmin'));
+const OrdersAdmin = lazy(loadOrdersAdmin);
 const AppearancePage = lazy(() => import('./admin/AppearancePage'));
 
 const RB_SETTINGS_TICK_KEY = 'rb_site_settings_tick';
@@ -82,19 +84,6 @@ function ScrollToHash() {
     const el = document.getElementById(hash.replace('#', ''));
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [hash, pathname]);
-
-  return null;
-}
-
-function RouteLoaderEffect({ setLoadingPage, readyForRouteLoader }) {
-  const location = useLocation();
-
-  useEffect(() => {
-    if (!readyForRouteLoader) return undefined;
-    setLoadingPage(true);
-    const t = setTimeout(() => setLoadingPage(false), 400);
-    return () => clearTimeout(t);
-  }, [location.pathname, setLoadingPage, readyForRouteLoader]);
 
   return null;
 }
@@ -142,7 +131,7 @@ export default function App() {
 
   const reloadTheme = async () => {
     try {
-      setLoadingPage(true);
+      if (!window.location.pathname.startsWith('/admin')) setLoadingPage(true);
       const data = await fetchSiteSettings();
 
       if (data?.theme) {
@@ -158,10 +147,12 @@ export default function App() {
     } catch (error) {
       console.error('Error cargando site settings:', error);
     } finally {
-      setTimeout(() => {
+      const finish = () => {
         setLoadingPage(false);
         setThemeReady(true);
-      }, 400);
+      };
+      if (window.location.pathname.startsWith('/admin')) finish();
+      else setTimeout(finish, 400);
     }
   };
 

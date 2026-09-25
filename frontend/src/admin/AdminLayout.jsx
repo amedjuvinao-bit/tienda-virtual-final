@@ -1,5 +1,5 @@
 // src/admin/AdminLayout.jsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Outlet,
   useNavigate,
@@ -57,6 +57,7 @@ import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
 import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import AdminMobileNavigation from './components/AdminMobileNavigation';
+import { preloadAdminRoute } from './adminRoutePreload';
 import './theme/adminModuleHero.css';
 import './theme/adminMobileSystem.css';
 
@@ -495,6 +496,7 @@ export default function AdminLayout() {
   });
 
   const handleCommandSelect = (path) => {
+    void preloadAdminRoute(path);
     setCommandQuery('');
     setCommandOpen(false);
     navigate(path);
@@ -2242,6 +2244,8 @@ export default function AdminLayout() {
                         <NavLink
                           key={item.to}
                           to={item.to}
+                          onPointerEnter={() => { void preloadAdminRoute(item.to); }}
+                          onFocus={() => { void preloadAdminRoute(item.to); }}
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                           data-tooltip={item.label}
@@ -2422,6 +2426,8 @@ export default function AdminLayout() {
                           <NavLink
                             key={item.to}
                             to={item.to}
+                            onPointerEnter={() => { void preloadAdminRoute(item.to); }}
+                            onFocus={() => { void preloadAdminRoute(item.to); }}
                             role="option"
                             aria-selected={item.to === activeCommandItem?.to}
                             className="admin-command-result"
@@ -2548,7 +2554,13 @@ export default function AdminLayout() {
                 boxShadow: 'var(--admin-shadow-content, 0 16px 48px rgba(0,0,0,0.06))',
               }}
             >
-              <Outlet />
+              <Suspense fallback={
+                <div className="flex min-h-52 items-center justify-center p-6 text-sm font-semibold" role="status">
+                  Abriendo módulo…
+                </div>
+              }>
+                <Outlet />
+              </Suspense>
             </section>
           </main>
         </div>
