@@ -8,7 +8,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import api from '../../../lib/api';
+import api, { adminFetch } from '../../../lib/api';
 import { getDownloadErrorMessage } from '../../billing/api/adminBillingApi';
 import useAdminPermissions from '../../security/useAdminPermissions';
 
@@ -165,7 +165,7 @@ function DocumentCard({
         return;
       }
 
-      const response = await fetch(url);
+      const response = await adminFetch(url);
 
       if (!response.ok) {
         throw new Error('No fue posible descargar el archivo.');

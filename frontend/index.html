@@ -10,13 +10,14 @@
         try { document.documentElement.dataset.adminLoader = localStorage.getItem('rb_admin_loader_model') || 'halo'; } catch { document.documentElement.dataset.adminLoader = 'halo'; }
         try {
           const color = localStorage.getItem(document.documentElement.dataset.adminContext === 'login' ? 'rb_admin_loader_login_color' : 'rb_admin_loader_panel_color');
-          if (/^#[0-9a-f]{6}$/i.test(color || '')) document.documentElement.style.setProperty('--admin-preload-color', color);
+          if (/^#[0-9a-f]{6}$/i.test(color || '')) document.documentElement.style.setProperty(document.documentElement.dataset.adminContext === 'login' ? '--rb-loader-login-color' : '--rb-loader-panel-color', color);
         } catch { /* Primer acceso: se usa el color neutro. */ }
       }
     </script>
     <style>
       .admin-preload { display: none; }
-      html[data-admin-entry="true"] .admin-preload { position: relative; box-sizing: border-box; display: grid; min-height: 100dvh; place-items: center; overflow: hidden; color: var(--admin-preload-color, #506477); font-family: system-ui, sans-serif; }
+      html[data-admin-entry="true"] .admin-preload { position: relative; box-sizing: border-box; display: grid; min-height: 100dvh; place-items: center; overflow: hidden; color: var(--rb-loader-panel-color, #506477); font-family: system-ui, sans-serif; }
+      html[data-admin-context="login"] .admin-preload { color: var(--rb-loader-login-color, #506477); }
       .admin-preload__skeleton { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
       .admin-preload__skeleton i { position: absolute; display: block; border-radius: 12px; background: color-mix(in srgb, currentColor 8%, transparent); }
       .admin-preload__skeleton i:nth-child(1) { top: 0; left: 0; right: 0; height: 64px; border-radius: 0; }

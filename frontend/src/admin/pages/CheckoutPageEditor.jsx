@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../../config/apiBaseUrl";
@@ -443,7 +444,7 @@ export default function CheckoutPageEditor() {
       setLoading(true);
       setNotFound(false);
 
-      const res = await fetch(`${API_BASE}/api/pages/${id}`);
+      const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
       if (res.status === 404) {
         setPage(null);
@@ -539,7 +540,7 @@ export default function CheckoutPageEditor() {
       const body = new FormData();
       body.append("file", titleImageFile);
 
-      const res = await fetch(`${API_BASE}/api/uploads`, {
+      const res = await adminFetch(`${API_BASE}/api/uploads`, {
         method: "POST",
         body,
       });
@@ -594,7 +595,7 @@ export default function CheckoutPageEditor() {
       const body = new FormData();
       body.append("file", paymentMethodsImageFile);
 
-      const res = await fetch(`${API_BASE}/api/uploads`, {
+      const res = await adminFetch(`${API_BASE}/api/uploads`, {
         method: "POST",
         body,
       });
@@ -642,7 +643,7 @@ export default function CheckoutPageEditor() {
         checkoutPageConfig: buildSafeCheckoutPageConfig(form.checkoutPageConfig),
       };
 
-      const res = await fetch(`${API_BASE}/api/pages/${id}`, {
+      const res = await adminFetch(`${API_BASE}/api/pages/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

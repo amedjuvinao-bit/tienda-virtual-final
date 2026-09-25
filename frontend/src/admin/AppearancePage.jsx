@@ -1,3 +1,4 @@
+import { adminFetch } from '../lib/api';
 // src/admin/AppearancePage.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
@@ -532,7 +533,7 @@ export default function AppearancePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/pages`);
+        const res = await adminFetch(`${API_BASE}/api/pages`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
@@ -648,7 +649,7 @@ export default function AppearancePage() {
     const form = new FormData();
     form.append(fieldName, file);
 
-    const res = await fetch(url, {
+    const res = await adminFetch(url, {
       method: "POST",
       body: form,
     });

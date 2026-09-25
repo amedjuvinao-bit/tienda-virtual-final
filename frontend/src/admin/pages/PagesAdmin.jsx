@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 // src/admin/pages/PagesAdmin.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -236,7 +237,7 @@ export default function PagesAdmin() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_BASE}/api/pages`);
+      const res = await adminFetch(`${API_BASE}/api/pages`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -315,7 +316,7 @@ export default function PagesAdmin() {
         payload.productDetailConfig = {};
       }
 
-      const res = await fetch(`${API_BASE}/api/pages`, {
+      const res = await adminFetch(`${API_BASE}/api/pages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -389,7 +390,7 @@ export default function PagesAdmin() {
     try {
       setDeletingPageId(pageId);
 
-      const res = await fetch(`${API_BASE}/api/pages/${pageId}`, {
+      const res = await adminFetch(`${API_BASE}/api/pages/${pageId}`, {
         method: "DELETE",
       });
 

@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 // src/admin/pages/FavoritesPageEditor.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -224,7 +225,7 @@ export default function FavoritesPageEditor() {
       try {
         setLoading(true);
 
-        const res = await fetch(`${API_BASE}/api/pages/${id}`);
+        const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
@@ -288,7 +289,7 @@ export default function FavoritesPageEditor() {
     const data = new FormData();
     data.append("file", file);
 
-    const res = await fetch(`${API_BASE}/api/uploads`, {
+    const res = await adminFetch(`${API_BASE}/api/uploads`, {
       method: "POST",
       body: data,
     });
@@ -342,7 +343,7 @@ export default function FavoritesPageEditor() {
         favoritesPageConfig: buildSafeFavoritesPageConfig(form.favoritesPageConfig),
       };
 
-      const res = await fetch(`${API_BASE}/api/pages/${id}`, {
+      const res = await adminFetch(`${API_BASE}/api/pages/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

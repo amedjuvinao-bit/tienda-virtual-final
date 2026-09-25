@@ -59,6 +59,7 @@ import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import AdminMobileNavigation from './components/AdminMobileNavigation';
 import { preloadAdminRoute } from './adminRoutePreload';
 import AdminLoadingScreen from './loading/AdminLoadingScreen';
+import useAdminModuleLoading from './loading/useAdminModuleLoading';
 import { getRememberedAdminLoader, normalizeAdminLoader } from './loading/adminLoaderConfig';
 import './theme/adminModuleHero.css';
 import './theme/adminMobileSystem.css';
@@ -106,6 +107,7 @@ export default function AdminLayout({ initialSettings }) {
   const { logout, adminUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const moduleLoading = useAdminModuleLoading(location.pathname);
 
   const activeAdminName =
     adminUser?.displayName ||
@@ -281,7 +283,7 @@ export default function AdminLayout({ initialSettings }) {
     try {
       setReviewsLoading(true);
       setReviewsError('');
-      const res = await api.get('/api/products/admin/reviews');
+      const res = await api.get('/api/products/admin/reviews', { skipAdminRouteLoader: true });
       const rows = Array.isArray(res?.data?.reviews) ? res.data.reviews : [];
       setReviews(rows);
     } catch (error) {
@@ -696,6 +698,23 @@ export default function AdminLayout({ initialSettings }) {
         .admin-content-card {
           border-radius: var(--admin-radius);
           padding: calc(var(--admin-padding) * 1.35);
+        }
+
+        .admin-module-loading .admin-loading {
+          min-height: 0;
+          padding: 0 0 10px;
+        }
+
+        .admin-module-loading .admin-loading__content {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .admin-module-loading .admin-loading__visual {
+          width: 40px;
+          height: 30px;
+          transform: scale(.7);
         }
 
         .admin-area .admin-header-panel {
@@ -2569,6 +2588,11 @@ export default function AdminLayout({ initialSettings }) {
                 boxShadow: 'var(--admin-shadow-content, 0 16px 48px rgba(0,0,0,0.06))',
               }}
             >
+              {moduleLoading && (
+                <div className="admin-module-loading">
+                  <AdminLoadingScreen compact model={loaderModel} message="Cargando módulo…" />
+                </div>
+              )}
               <Suspense fallback={
                 <AdminLoadingScreen compact model={loaderModel} message="Abriendo módulo…" />
               }>

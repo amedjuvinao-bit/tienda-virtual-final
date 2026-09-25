@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 // src/admin/pages/NotFoundPageEditor.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -256,7 +257,7 @@ export default function NotFoundPageEditor() {
         setLoading(true);
 
         const target = String(id || "").trim() || "not-found";
-        const res = await fetch(`${API_BASE}/api/pages/${target}`);
+        const res = await adminFetch(`${API_BASE}/api/pages/${target}`);
 
         const data = await res.json().catch(() => ({}));
 
@@ -305,7 +306,7 @@ export default function NotFoundPageEditor() {
     const body = new FormData();
     body.append("file", file);
 
-    const response = await fetch(`${API_BASE}/api/uploads`, {
+    const response = await adminFetch(`${API_BASE}/api/uploads`, {
       method: "POST",
       body,
     });
@@ -419,7 +420,7 @@ export default function NotFoundPageEditor() {
         notFoundPageConfig: normalizedConfig,
       };
 
-      const res = await fetch(`${API_BASE}/api/pages/${pageId}`, {
+      const res = await adminFetch(`${API_BASE}/api/pages/${pageId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

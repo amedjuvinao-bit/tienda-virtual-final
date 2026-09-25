@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/BlockConfigPanel.jsx
 import React, { useState } from "react";
 import LookSectionUI from "../appearance/sections/look/LookSectionUI";
@@ -461,7 +462,7 @@ function uploadFactory() {
     const formData = new FormData();
     formData.append(fieldName, file);
 
-    const res = await fetch(`${API_BASE}/api/uploads`, {
+    const res = await adminFetch(`${API_BASE}/api/uploads`, {
       method: "POST",
       body: formData,
     });

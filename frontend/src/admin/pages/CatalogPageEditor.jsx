@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/CatalogPageEditor.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -817,7 +818,7 @@ export default function CatalogPageEditor() {
       setLoading(true);
       setNotFound(false);
 
-      const res = await fetch(`${API_BASE}/api/pages/${id}`);
+      const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
       if (res.status === 404) {
         setPage(null);
@@ -866,10 +867,10 @@ export default function CatalogPageEditor() {
       if (query) params.set('q', query);
       productKeys.forEach((value) => params.append('productKeys', value));
       const [productsResponse, metaResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/products?${params.toString()}`),
+        adminFetch(`${API_BASE}/api/products?${params.toString()}`),
         query || productKeys.length
           ? Promise.resolve(null)
-          : fetch(`${API_BASE}/api/products/meta`),
+          : adminFetch(`${API_BASE}/api/products/meta`),
       ]);
       if (!productsResponse.ok) throw new Error(`HTTP ${productsResponse.status}`);
       const data = await productsResponse.json();
@@ -1069,7 +1070,7 @@ export default function CatalogPageEditor() {
       const body = new FormData();
       body.append("file", titleImageFile);
 
-      const res = await fetch(`${API_BASE}/api/uploads`, {
+      const res = await adminFetch(`${API_BASE}/api/uploads`, {
         method: "POST",
         body,
       });
@@ -1134,7 +1135,7 @@ export default function CatalogPageEditor() {
         catalogConfig: safeCatalogConfig,
       };
 
-      const res = await fetch(`${API_BASE}/api/pages/${id}`, {
+      const res = await adminFetch(`${API_BASE}/api/pages/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

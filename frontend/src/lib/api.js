@@ -10,6 +10,38 @@ const ADMIN_SESSION_EXPIRED_EVENT = 'admin-session-expired';
 
 let adminSessionActive = false;
 let refreshPromise = null;
+const adminRouteRequests = new Map();
+const adminRouteListeners = new Set();
+
+export function getAdminRouteRequestCount(pathname) {
+  return adminRouteRequests.get(pathname) || 0;
+}
+
+export function subscribeAdminRouteRequests(listener) {
+  adminRouteListeners.add(listener);
+  return () => adminRouteListeners.delete(listener);
+}
+
+function changeAdminRouteRequestCount(pathname, delta) {
+  const next = Math.max(0, getAdminRouteRequestCount(pathname) + delta);
+  if (next) adminRouteRequests.set(pathname, next);
+  else adminRouteRequests.delete(pathname);
+  adminRouteListeners.forEach((listener) => listener(pathname, next));
+}
+
+export async function adminFetch(input, init) {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const url = String(typeof input === 'string' ? input : input?.url || '');
+  const method = String(init?.method || input?.method || 'GET').toUpperCase();
+  const track = pathname.startsWith('/admin/') && method === 'GET' &&
+    !url.includes('/api/site-settings') && !url.includes('/api/admin/auth/');
+  if (track) changeAdminRouteRequestCount(pathname, 1);
+  try {
+    return await fetch(input, init);
+  } finally {
+    if (track) changeAdminRouteRequestCount(pathname, -1);
+  }
+}
 
 function wait(milliseconds) {
   return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
@@ -161,6 +193,38 @@ api.interceptors.response.use(
     error.userMessage =
       backendMsg || statusMsgMap[status] || 'Error de red o servidor. Intenta nuevamente.';
 
+    return Promise.reject(error);
+  }
+);
+
+// Solo observamos lecturas reales: navegar a un módulo precargado no requiere espera.
+api.interceptors.request.use((config) => {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const url = String(config.url || '');
+  if (
+    pathname.startsWith('/admin/') &&
+    String(config.method || 'get').toLowerCase() === 'get' &&
+    !config.skipAdminRouteLoader &&
+    !url.includes('/api/site-settings') &&
+    !url.includes('/api/admin/auth/')
+  ) {
+    config._adminRouteLoadingPath = pathname;
+    changeAdminRouteRequestCount(pathname, 1);
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => {
+    if (response.config._adminRouteLoadingPath) {
+      changeAdminRouteRequestCount(response.config._adminRouteLoadingPath, -1);
+    }
+    return response;
+  },
+  (error) => {
+    if (error.config?._adminRouteLoadingPath) {
+      changeAdminRouteRequestCount(error.config._adminRouteLoadingPath, -1);
+    }
     return Promise.reject(error);
   }
 );

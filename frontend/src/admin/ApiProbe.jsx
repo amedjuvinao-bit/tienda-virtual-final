@@ -1,3 +1,4 @@
+import { adminFetch } from '../lib/api';
 import React, { useState } from 'react';
 import { API_BASE_URL } from '../config/apiBaseUrl';
 
@@ -12,7 +13,7 @@ export default function ApiProbe() {
     setStatus('loading'); setError(''); setData(null);
     for (const url of endpoints) {
       try {
-        const res = await fetch(url, { method: 'GET' });
+        const res = await adminFetch(url, { method: 'GET' });
         if (!res.ok) {
           throw new Error(`HTTP ${res.status} ${res.statusText}`);
         }

@@ -1,3 +1,4 @@
+import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/PageEditor.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -76,7 +77,7 @@ export default function PageEditor() {
       setLoading(true);
       setNotFound(false);
 
-      const res = await fetch(`${API_BASE}/api/pages/${id}`);
+      const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
       if (res.status === 404) {
         setPage(null);
@@ -100,7 +101,7 @@ export default function PageEditor() {
   };
 
   const savePage = async (nextPageData) => {
-    const res = await fetch(`${API_BASE}/api/pages/${id}`, {
+    const res = await adminFetch(`${API_BASE}/api/pages/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
