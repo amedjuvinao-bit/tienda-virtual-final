@@ -9,6 +9,7 @@ const adminAuth = require('../routes/adminAuth');
 
 async function main() {
   const app = express();
+  app.use(express.json());
   app.use('/api/admin/auth', adminAuth);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
@@ -33,11 +34,27 @@ async function main() {
     method: 'POST',
     headers: {
       origin: 'http://localhost:5173',
+      'content-type': 'application/json',
       cookie: `rb_admin_refresh=${'s'.repeat(32)}.${'k'.repeat(64)}`,
     },
+    body: '{}',
   });
 
   try {
+    const invalidJson = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/auth/logout`, {
+      method: 'POST',
+      headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+      body: 'null',
+    });
+    assert.equal(invalidJson.status, 400, 'Express rejects the old null JSON body before logout');
+
+    const validRefresh = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/auth/refresh`, {
+      method: 'POST',
+      headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(validRefresh.status, 401, 'a valid empty JSON body reaches refresh authentication');
+
     shouldFail = true;
     const failed = await logout();
     assert.equal(failed.status, 503);

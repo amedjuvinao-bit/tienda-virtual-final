@@ -35,6 +35,8 @@ describe('cierre pendiente antes del siguiente acceso', () => {
     expect(api.post.mock.calls.map(([url]) => url)).toEqual([
       '/api/admin/auth/logout', '/api/admin/auth/logout', '/api/admin/auth/login',
     ]);
+    expect(api.post.mock.calls[0][1]).toEqual({});
+    expect(api.post.mock.calls[1][1]).toEqual({});
     expect(isAdminLogoutPending()).toBe(false);
   });
 

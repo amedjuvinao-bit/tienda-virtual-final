@@ -49,11 +49,11 @@ function wait(milliseconds) {
 
 async function refreshAdminSessionCookie() {
   try {
-    return await api.post(ADMIN_REFRESH_URL, null, { skipAdminRefresh: true });
+    return await api.post(ADMIN_REFRESH_URL, {}, { skipAdminRefresh: true });
   } catch (error) {
     if (error?.response?.status !== 409) throw error;
     await wait(150);
-    return api.post(ADMIN_REFRESH_URL, null, { skipAdminRefresh: true });
+    return api.post(ADMIN_REFRESH_URL, {}, { skipAdminRefresh: true });
   }
 }
 

@@ -241,7 +241,7 @@ export async function verifyAdminSession() {
 
 export async function logoutAdminSession() {
   try {
-    const response = await api.post(`${BASE_URL}/logout`, null, {
+    const response = await api.post(`${BASE_URL}/logout`, {}, {
       skipAdminRefresh: true,
     });
     if (response.data?.ok !== true) {
