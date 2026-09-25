@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import api, {
   clearLegacyAdminToken,
   setAdminSessionActive,
@@ -91,6 +91,10 @@ export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminUser, setAdminUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [logoutPending, setLogoutPending] = useState(isAdminLogoutPending);
+  const [logoutInFlight, setLogoutInFlight] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const logoutObserved = useRef(false);
 
   const clearClientSession = () => {
     setAdminSessionActive(false);
@@ -99,9 +103,28 @@ export function AuthProvider({ children }) {
     removeLegacySessionStorage();
   };
 
+  const retryPendingLogout = async () => {
+    if (!isAdminLogoutPending()) {
+      setLogoutPending(false);
+      return true;
+    }
+    setLogoutInFlight(true);
+    setLogoutError('');
+    try {
+      await finishPendingAdminLogout();
+      setLogoutPending(false);
+      return true;
+    } catch {
+      setLogoutPending(true);
+      setLogoutError('El servidor no confirmó el cierre. Reintenta cuando esté disponible.');
+      return false;
+    } finally {
+      setLogoutInFlight(false);
+    }
+  };
+
   useEffect(() => {
     let alive = true;
-    let logoutObserved = false;
 
     const verifyStoredSession = async () => {
       removeLegacySessionStorage();
@@ -109,12 +132,13 @@ export function AuthProvider({ children }) {
       try {
         if (isAdminLogoutPending()) {
           if (alive) clearClientSession();
-          void finishPendingAdminLogout().catch(() => {});
+          if (alive) setLogoutPending(true);
+          void retryPendingLogout();
           return;
         }
         const response = await verifyInitialAdminSession();
         if (!alive) return;
-        if (logoutObserved || isAdminLogoutPending()) {
+        if (logoutObserved.current || isAdminLogoutPending()) {
           clearClientSession();
           return;
         }
@@ -142,16 +166,17 @@ export function AuthProvider({ children }) {
       if (event.type === 'storage' &&
         (event.key !== PENDING_LOGOUT_KEY || event.newValue !== '1')) return;
       if (isAdminLogoutPending() || event.type === 'storage') {
-        logoutObserved = true;
+        logoutObserved.current = true;
         clearClientSession();
-        void finishPendingAdminLogout().catch(() => {});
+        setLogoutPending(true);
+        void retryPendingLogout();
       }
     };
 
     const handleTwoFactorPolicyUpdated = async () => {
       try {
         const response = await requestAdminSessionVerification();
-        if (!alive || logoutObserved || isAdminLogoutPending()) return;
+        if (!alive || logoutObserved.current || isAdminLogoutPending()) return;
         const verifiedUser = normalizeAdminUser(response?.data?.user);
         if (response?.data?.authenticated === false || !verifiedUser) {
           clearClientSession();
@@ -185,7 +210,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (user = null) => {
+    if (isAdminLogoutPending()) return;
     const normalizedUser = normalizeAdminUser(user);
+    logoutObserved.current = false;
     setAdminSessionActive(true);
     setIsAuthenticated(true);
     setAdminUser(normalizedUser);
@@ -195,8 +222,8 @@ export function AuthProvider({ children }) {
   const logout = () => {
     markAdminLogoutPending();
     clearClientSession();
-    // La salida visual no depende de la red; el cierre pendiente impide restaurar la sesión.
-    void finishPendingAdminLogout().catch(() => {});
+    setLogoutPending(true);
+    void retryPendingLogout();
   };
 
   const refreshAdminUser = async () => {
@@ -221,6 +248,10 @@ export function AuthProvider({ children }) {
         adminUser,
         currentAdminUser: adminUser,
         authLoading,
+        logoutPending,
+        logoutInFlight,
+        logoutError,
+        retryPendingLogout,
         login,
         logout,
         refreshAdminUser,

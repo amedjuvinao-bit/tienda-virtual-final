@@ -7,7 +7,7 @@ import Login from './Login';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 
 vi.mock('../context/AuthContext', () => ({
-  useAuth: () => ({ login: vi.fn() }),
+  useAuth: () => ({ login: vi.fn(), logout: vi.fn() }),
 }));
 
 vi.mock('../lib/siteSettingsApi', () => ({

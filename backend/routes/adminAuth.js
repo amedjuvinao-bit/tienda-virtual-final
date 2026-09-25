@@ -2390,9 +2390,8 @@ router.post('/logout', async (req, res) => {
     return res.json({ ok: true, message: 'Sesión cerrada correctamente.' });
   } catch (error) {
     console.error('❌ Error revocando sesión admin:', error.message);
-    // Una falla de base de datos no debe dejar credenciales reutilizables en el navegador.
-    clearSessionCookies(res);
-    clearTwoFactorChallengeCookie(res);
+    // Conservar la cookie HttpOnly permite reintentar la revocación real.
+    // El cliente bloquea el acceso al panel hasta recibir una confirmación.
     return res.status(503).json({ ok: false, message: 'No se pudo confirmar el cierre de sesión. Intenta nuevamente.' });
   }
 });

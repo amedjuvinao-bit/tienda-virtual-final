@@ -486,10 +486,13 @@ async function issueRotatedSession(res, { session, refreshToken, tokenPayload })
 
 async function revokeSessionById(sessionId, reason = 'logout') {
   if (!sessionId) return;
-  await AdminSession.updateOne(
+  const result = await AdminSession.updateOne(
     { sessionId, revokedAt: null },
     { $set: { revokedAt: new Date(), revokeReason: reason } }
   );
+  if (result?.acknowledged === false) {
+    throw new Error('La base de datos no confirmó la revocación de la sesión.');
+  }
 }
 
 async function revokeUserSessionByRecordId(

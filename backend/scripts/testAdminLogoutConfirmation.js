@@ -16,6 +16,7 @@ async function main() {
   const originalUpdateOne = AdminSession.updateOne;
   const originalError = console.error;
   let shouldFail = false;
+  let unacknowledged = false;
   let revocations = 0;
   AdminSession.updateOne = async (query, update) => {
     assert.equal(query.sessionId, 's'.repeat(32));
@@ -23,6 +24,7 @@ async function main() {
     assert.equal(update.$set.revokeReason, 'logout');
     revocations += 1;
     if (shouldFail) throw new Error('database temporarily unavailable');
+    if (unacknowledged) return { acknowledged: false, modifiedCount: 0 };
     return { acknowledged: true, modifiedCount: 1 };
   };
   console.error = () => {};
@@ -40,21 +42,27 @@ async function main() {
     const failed = await logout();
     assert.equal(failed.status, 503);
     assert.equal((await failed.json()).ok, false);
-    assert.match(failed.headers.get('set-cookie') || '', /rb_admin_access=.*Expires=/,
-      'must remove browser credentials even when database revocation fails');
+    assert.equal(failed.headers.get('set-cookie'), null,
+      'must retain HttpOnly cookie to retry server revocation');
 
     shouldFail = false;
+    unacknowledged = true;
+    const notConfirmed = await logout();
+    assert.equal(notConfirmed.status, 503);
+    assert.equal(notConfirmed.headers.get('set-cookie'), null);
+
+    unacknowledged = false;
     const success = await logout();
     assert.equal(success.status, 200);
     assert.equal((await success.json()).ok, true);
     assert.match(success.headers.get('set-cookie') || '', /rb_admin_access=.*Expires=/);
-    assert.equal(revocations, 2);
+    assert.equal(revocations, 3);
 
     const noSession = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/auth/logout`, {
       method: 'POST', headers: { origin: 'http://localhost:5173' },
     });
     assert.equal(noSession.status, 200, 'already expired sessions can finish logout');
-    assert.equal(revocations, 2);
+    assert.equal(revocations, 3);
     console.log('Admin logout confirmation: failure, retry, and expired cookie passed');
   } finally {
     AdminSession.updateOne = originalUpdateOne;

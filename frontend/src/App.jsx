@@ -22,6 +22,7 @@ import { CartProvider } from './context/CartContext.jsx';
 import { FavoritesProvider } from './context/FavoritesContext.jsx';
 import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAdmin } from './admin/adminRoutePreload';
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
+import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
@@ -245,6 +246,7 @@ export default function App() {
                 <GlobalFloatingButtons theme={themeFromServer} />
                 {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
 
+                <AdminLogoutGate>
                 {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
@@ -310,6 +312,7 @@ export default function App() {
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>}
+                </AdminLogoutGate>
 
                 <AppToastContainer />
               </Suspense>

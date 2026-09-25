@@ -54,9 +54,9 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
     expect(layoutSource).toContain('role="alert"');
   });
 
-  it('sale del panel inmediatamente y no queda bloqueado por la red', () => {
+  it('bloquea el panel durante el cierre y espera la revocación real', () => {
     expect(layoutSource).toMatch(
-      /const handleLogout = \(\) => \{[\s\S]*?logout\(\);[\s\S]*?navigate\('\/admin\/login', \{ replace: true \}\);/,
+      /const handleLogout = \(\) => \{[\s\S]*?logout\(\);[\s\S]*?navigate\('\/admin\/logout-pending', \{ replace: true \}\);/,
     );
     expect(layoutSource).not.toContain('admin-logout-error');
     expect(layoutSource).not.toContain("window.location.replace('/admin/login')");

@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
-import { loginAdmin, logoutAdminSession } from "./api/adminAuthApi";
+import { loginAdmin } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import TwoFactorChallengeModal from "./login/TwoFactorChallengeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
@@ -73,11 +73,11 @@ function clearLoginSecurityState() {
   } catch {}
 }
 
-function clearTemporaryAdminSession() {
+function clearTemporaryAdminSession(logout) {
   try {
     localStorage.removeItem("admin_token");
   } catch {}
-  void logoutAdminSession().catch(() => {});
+  logout();
 }
 
 function getLockUntil() {
@@ -940,7 +940,7 @@ export default function Login({ initialSettings, loaderModel }) {
   const [twoFactorUser, setTwoFactorUser] = useState(null);
   const [pendingLoginName, setPendingLoginName] = useState('');
 
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
 
   const activeTheme = useMemo(() => {
@@ -1053,7 +1053,7 @@ export default function Login({ initialSettings, loaderModel }) {
 
   const completeAuthenticatedLogin = (response, loginName) => {
     if (!response?.user) {
-      clearTemporaryAdminSession();
+      clearTemporaryAdminSession(logout);
       setError(
         "No se recibió una sesión válida. Inicia sesión nuevamente."
       );
@@ -1086,7 +1086,7 @@ export default function Login({ initialSettings, loaderModel }) {
   };
 
   const handleRequiredPasswordCancel = () => {
-    clearTemporaryAdminSession();
+    clearTemporaryAdminSession(logout);
     setShowRequiredPasswordChange(false);
     setRequiredPasswordUser(null);
     setPendingLoginName('');

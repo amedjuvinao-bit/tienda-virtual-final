@@ -244,7 +244,7 @@ export default function AdminLayout({ initialSettings }) {
     if (logoutInFlight.current) return;
     logoutInFlight.current = true;
     logout();
-    navigate('/admin/login', { replace: true });
+    navigate('/admin/logout-pending', { replace: true });
   };
 
   const handleConfigMenuClick = () => {
