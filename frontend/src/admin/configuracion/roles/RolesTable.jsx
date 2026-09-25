@@ -135,11 +135,11 @@ function StatusBadge({ role }) {
     <span
       className="inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-black"
       style={{
-        background: isSuccess ? 'rgba(34, 197, 94, 0.12)' : 'rgba(244, 63, 94, 0.12)',
-        color: isSuccess ? '#15803d' : '#be123c',
+        background: isSuccess ? 'var(--admin-success-soft-bg)' : 'var(--admin-danger-soft-bg)',
+        color: isSuccess ? 'var(--admin-success-text)' : 'var(--admin-danger-text)',
         border: isSuccess
-          ? '1px solid rgba(34, 197, 94, 0.24)'
-          : '1px solid rgba(244, 63, 94, 0.24)',
+          ? '1px solid var(--admin-success-border)'
+          : '1px solid var(--admin-danger-border)',
       }}
     >
       {status.label}
@@ -255,9 +255,9 @@ function ActionButton({
 
   if (variant === 'danger') {
     style = {
-      background: 'rgba(244, 63, 94, 0.10)',
-      color: '#be123c',
-      borderColor: 'rgba(244, 63, 94, 0.24)',
+      background: 'var(--admin-danger-soft-bg)',
+      color: 'var(--admin-danger-text)',
+      borderColor: 'var(--admin-danger-border)',
     };
   }
 

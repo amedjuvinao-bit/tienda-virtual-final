@@ -225,6 +225,28 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-card-text')).toBe('#ffffff');
   });
 
+  it('sincroniza texto y superficie de botones y menús al cambiar entre vidrio oscuro y tema claro', () => {
+    applyAdminTheme({
+      pageBg: '#030712', sidebarBg: '#09090b', headerBg: '#18181b',
+      cardBg: '#111827', modalBg: '#111827',
+    });
+    applyAdminWidgetTexture('liquidGlass');
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--admin-light-panel-bg')).toContain('rgba(8, 13, 27');
+    expect(root.style.getPropertyValue('--admin-light-panel-text')).toBe('var(--admin-card-text)');
+    expect(root.style.getPropertyValue('--admin-light-panel-muted-text')).toBe('var(--admin-card-muted-text)');
+
+    applyAdminWidgetTexture('softGlass');
+    expect(root.style.getPropertyValue('--admin-light-panel-bg')).toBe('#ffffff');
+    expect(root.style.getPropertyValue('--admin-light-panel-text')).toBe('#111827');
+
+    applyAdminTheme({ cardBg: '#ffffff', pageBg: '#ffffff' });
+    applyAdminWidgetTexture('liquidGlass');
+    expect(root.style.getPropertyValue('--admin-light-panel-bg')).toContain('rgba(255, 255, 255');
+    expect(root.style.getPropertyValue('--admin-light-panel-text')).toBe('#111827');
+  });
+
   it('evita que una imagen clara atraviese el lienzo del vidrio oscuro', () => {
     applyAdminGlobalStyles();
 

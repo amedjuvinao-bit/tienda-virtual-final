@@ -939,6 +939,12 @@ export function applyAdminGlobalStyles() {
       transform: none !important;
     }
 
+    html.admin-theme-dark .admin-area button:is(:disabled, [disabled], .disabled, [aria-disabled="true"]) {
+      color: var(--admin-card-muted-text) !important;
+      background: color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 12%) !important;
+      border-color: var(--admin-card-border) !important;
+    }
+
     /* Hover / active / focus — shared across all enabled buttons */
     .admin-area button:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
       transform: translateY(-2px);

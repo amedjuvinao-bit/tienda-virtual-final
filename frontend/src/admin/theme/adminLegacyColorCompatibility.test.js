@@ -64,5 +64,7 @@ describe('admin legacy color compatibility', () => {
     expect(css).toContain('.bg-rose-50');
     expect(css).toContain('background: var(--admin-danger-soft-bg) !important');
     expect(css).toContain('border-color: var(--admin-danger-border) !important');
+    expect(css).toContain('html.admin-theme-dark .admin-area button:is(:disabled, [disabled], .disabled, [aria-disabled="true"])');
+    expect(css).toContain('color: var(--admin-card-muted-text) !important');
   });
 });

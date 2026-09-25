@@ -553,6 +553,10 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-card-muted-text', cardMutedTextAuto);
 
   root.style.setProperty('--admin-theme-light-panel-bg', '#ffffff');
+  root.style.setProperty('--admin-theme-light-panel-soft-bg', lightPanelSoftBgAuto);
+  root.style.setProperty('--admin-theme-light-panel-border', lightPanelBorderAuto);
+  root.style.setProperty('--admin-theme-light-panel-text', lightPanelTextAuto);
+  root.style.setProperty('--admin-theme-light-panel-muted-text', lightPanelMutedTextAuto);
   root.style.setProperty('--admin-light-panel-bg', '#ffffff');
   root.style.setProperty('--admin-light-panel-soft-bg', lightPanelSoftBgAuto);
   root.style.setProperty('--admin-light-panel-border', lightPanelBorderAuto);

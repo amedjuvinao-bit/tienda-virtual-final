@@ -199,6 +199,10 @@ function restoreThemeSurfaceTokens(root) {
   restore('--admin-card-header-bg', '--admin-theme-card-header-bg', '#fdf2f8');
   restore('--admin-card-border', '--admin-theme-card-border', '#fbcfe8');
   restore('--admin-light-panel-bg', '--admin-theme-light-panel-bg', '#ffffff');
+  restore('--admin-light-panel-soft-bg', '--admin-theme-light-panel-soft-bg', '#f9fafb');
+  restore('--admin-light-panel-border', '--admin-theme-light-panel-border', '#e5e7eb');
+  restore('--admin-light-panel-text', '--admin-theme-light-panel-text', '#111827');
+  restore('--admin-light-panel-muted-text', '--admin-theme-light-panel-muted-text', '#6b7280');
   restore('--admin-table-head-bg', '--admin-theme-table-head-bg', '#f9fafb');
   restore('--admin-table-border', '--admin-theme-table-border', '#e5e7eb');
   restore('--admin-input-bg', '--admin-theme-input-bg', '#ffffff');
@@ -215,6 +219,12 @@ function applyLiquidGlassCompatibilityTokens(root) {
   root.style.setProperty('--admin-card-header-bg', dark ? 'rgba(15, 23, 42, 0.62)' : 'rgba(255, 255, 255, 0.54)');
   root.style.setProperty('--admin-card-border', dark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.62)');
   root.style.setProperty('--admin-light-panel-bg', dark ? 'rgba(8, 13, 27, 0.54)' : 'rgba(255, 255, 255, 0.44)');
+  if (dark) {
+    root.style.setProperty('--admin-light-panel-soft-bg', 'rgba(15, 23, 42, 0.76)');
+    root.style.setProperty('--admin-light-panel-border', 'var(--admin-card-border)');
+    root.style.setProperty('--admin-light-panel-text', 'var(--admin-card-text)');
+    root.style.setProperty('--admin-light-panel-muted-text', 'var(--admin-card-muted-text)');
+  }
   root.style.setProperty('--admin-table-head-bg', dark ? 'rgba(15, 23, 42, 0.64)' : 'rgba(255, 255, 255, 0.52)');
   root.style.setProperty('--admin-table-border', dark ? 'rgba(255, 255, 255, 0.17)' : 'rgba(255, 255, 255, 0.58)');
   root.style.setProperty('--admin-input-bg', dark ? 'rgba(8, 13, 27, 0.68)' : 'rgba(255, 255, 255, 0.58)');
