@@ -907,22 +907,31 @@ function CuratedCredentialsForm({
 
 export default function Login({ initialSettings, loaderModel }) {
   const rememberedLogin = useMemo(() => getRememberedLogin(), []);
+  const initialLogin = useMemo(
+    () => initialSettings ? normalizeLoginSettings(initialSettings.loginAdmin) : null,
+    [initialSettings],
+  );
 
   const [username, setUsername] = useState(rememberedLogin.username);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [activeThemeId, setActiveThemeId] = useState(DEFAULT_LOGIN_THEME_ID);
-  const [activeLayoutId, setActiveLayoutId] = useState(DEFAULT_LOGIN_LAYOUT_ID);
+  const [activeThemeId, setActiveThemeId] = useState(initialLogin?.theme || DEFAULT_LOGIN_THEME_ID);
+  const [activeLayoutId, setActiveLayoutId] = useState(initialLogin?.layout || DEFAULT_LOGIN_LAYOUT_ID);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lockRemaining, setLockRemaining] = useState(0);
   const [rememberMe, setRememberMe] = useState(rememberedLogin.remember);
-  const [loginBg, setLoginBg] = useState(DEFAULT_LOGIN_SETTINGS.background);
+  const [loginBg, setLoginBg] = useState(initialLogin?.background || DEFAULT_LOGIN_SETTINGS.background);
   const [loginCustomizations, setLoginCustomizations] = useState(
-    DEFAULT_LOGIN_SETTINGS.customizations
+    initialLogin?.customizations || DEFAULT_LOGIN_SETTINGS.customizations
   );
-  const [storeName, setStoreName] = useState('tu tienda');
-  const [storeLogo, setStoreLogo] = useState('');
-  const [loginSettingsReady, setLoginSettingsReady] = useState(false);
+  const [storeName, setStoreName] = useState(() => String(initialSettings?.store?.name || 'tu tienda').trim());
+  const [storeLogo, setStoreLogo] = useState(() =>
+    initialSettings?.theme?.header?.logoLight ||
+    initialSettings?.theme?.logo?.light ||
+    initialSettings?.theme?.header?.logoDark ||
+    ''
+  );
+  const [loginSettingsReady, setLoginSettingsReady] = useState(Boolean(initialLogin));
   const [loginSettingsError, setLoginSettingsError] = useState(false);
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);

@@ -56,9 +56,9 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
 
   it('sale del panel aunque el servidor rechace una cookie vencida', () => {
     expect(layoutSource).toMatch(
-      /const handleLogout = \(\) => \{[\s\S]*?void logout\(\);[\s\S]*?window\.location\.replace\('\/admin\/login'\);[\s\S]*?\};/,
+      /const handleLogout = \(\) => \{[\s\S]*?void logout\(\);[\s\S]*?navigate\('\/admin\/login', \{ replace: true \}\);[\s\S]*?\};/,
     );
-    expect(layoutSource).not.toContain("navigate('/admin/login');");
+    expect(layoutSource).not.toContain("window.location.replace('/admin/login')");
   });
 
   it('mantiene navegación y contenido utilizables en pantallas estrechas', () => {

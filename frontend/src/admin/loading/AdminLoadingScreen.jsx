@@ -7,12 +7,6 @@ export default function AdminLoadingScreen({ model, message = 'Preparando tu pan
 
   return (
     <div className={`admin-loading admin-loading--${selected} admin-loading--${context}${compact ? ' admin-loading--compact' : ''}`} role={preview ? undefined : 'status'} aria-hidden={preview ? 'true' : undefined} aria-live={preview ? undefined : 'polite'} aria-label={preview ? undefined : message}>
-      {!compact && <div className={`admin-loading__skeleton admin-loading__skeleton--${context}`} aria-hidden="true">
-        <span className="admin-loading__skeleton-header" />
-        <span className="admin-loading__skeleton-sidebar" />
-        <span className="admin-loading__skeleton-title" />
-        <span className="admin-loading__skeleton-card" />
-      </div>}
       <div className="admin-loading__content">
         <div className="admin-loading__visual" aria-hidden="true">
           {selected === 'halo' && <i className="admin-loading__halo" />}

@@ -74,7 +74,7 @@ describe('Login durante la carga inicial', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(container.querySelector('[data-login-theme="smokeGlass"]')).toBeInTheDocument());
+    expect(container.querySelector('[data-login-theme="smokeGlass"]')).toBeInTheDocument();
     expect(fetchSiteSettings).not.toHaveBeenCalled();
   });
 

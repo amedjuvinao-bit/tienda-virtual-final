@@ -241,11 +241,9 @@ export default function AdminLayout({ initialSettings }) {
 
   const handleLogout = () => {
     void logout();
-    // El cierre visual no puede depender de la respuesta del servidor: una
-    // cookie vencida puede hacer que /logout responda 400 aunque la sesión
-    // local ya deba terminar. La navegación completa también reinicia el
-    // estado en memoria del panel y evita que la vista protegida permanezca.
-    window.location.replace('/admin/login');
+    // La sesión local se borra inmediatamente y el panel se desmonta sin
+    // recargar la página ni mostrar de nuevo el indicador de arranque.
+    navigate('/admin/login', { replace: true });
   };
 
   const handleConfigMenuClick = () => {

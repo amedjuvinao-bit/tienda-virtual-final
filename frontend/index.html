@@ -51,16 +51,6 @@
       .admin-preload { display: none; }
       html[data-admin-entry="true"] .admin-preload { position: relative; box-sizing: border-box; display: grid; min-height: 100dvh; place-items: center; overflow: hidden; color: var(--rb-loader-panel-color, #506477); font-family: system-ui, sans-serif; }
       html[data-admin-context="login"] .admin-preload { color: var(--rb-loader-login-color, #506477); }
-      .admin-preload__skeleton { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-      .admin-preload__skeleton i { position: absolute; display: block; border-radius: 12px; background: color-mix(in srgb, currentColor 8%, transparent); }
-      .admin-preload__skeleton i:nth-child(1) { top: 0; left: 0; right: 0; height: 64px; border-radius: 0; }
-      .admin-preload__skeleton i:nth-child(2) { top: 64px; bottom: 0; left: 0; width: min(18%, 200px); border-radius: 0; }
-      .admin-preload__skeleton i:nth-child(3) { top: 104px; left: max(23%, 235px); width: min(34%, 270px); height: 23px; }
-      .admin-preload__skeleton i:nth-child(4) { top: 170px; left: max(23%, 235px); right: 5%; height: 175px; }
-      html[data-admin-context="login"] .admin-preload__skeleton i:nth-child(1) { top: 9%; left: calc(50% - 65px); right: auto; width: 130px; height: 17px; border-radius: 12px; }
-      html[data-admin-context="login"] .admin-preload__skeleton i:nth-child(2) { top: 23%; bottom: auto; left: calc(50% - 205px); width: min(410px, 90%); height: min(480px, 67vh); border: 1px solid color-mix(in srgb, currentColor 13%, transparent); border-radius: 26px; background: color-mix(in srgb, currentColor 5%, transparent); }
-      html[data-admin-context="login"] .admin-preload__skeleton i:nth-child(3) { top: 31%; left: calc(50% - 115px); width: 230px; height: 14px; }
-      html[data-admin-context="login"] .admin-preload__skeleton i:nth-child(4) { top: 62%; left: calc(50% - 125px); right: auto; width: 250px; height: 38px; }
       .admin-preload__content { position: relative; display: grid; justify-items: center; gap: 9px; padding: 20px; text-align: center; }
       .admin-preload__visual { display: grid; width: 56px; height: 42px; place-items: center; }
       .admin-preload__visual > * { display: none; }
@@ -90,7 +80,6 @@
       @keyframes adminLoaderPulse { 50% { transform: translateY(-4px); opacity: .4; } }
       @keyframes adminLoaderWave { from { transform: scaleY(.45); } to { transform: scaleY(1.3); } }
       @keyframes adminLoaderSlide { to { transform: translateX(135%); } }
-      @media (max-width: 570px) { html[data-admin-context="login"] .admin-preload__skeleton i:nth-child(2) { left: 5%; } }
       @media (prefers-reduced-motion: reduce) { .admin-preload__halo, .admin-preload__pulse i, .admin-preload__orbit, .admin-preload__wave i, .admin-preload__linear i { animation: none; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -102,7 +91,7 @@
     <title>Tienda Virtual</title>
   </head>
   <body>
-    <div id="root"><div class="admin-preload" role="status" aria-label="Preparando tu panel"><div class="admin-preload__skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="admin-preload__content"><div class="admin-preload__visual" aria-hidden="true"><i class="admin-preload__halo"></i><span class="admin-preload__pulse"><i></i><i></i><i></i></span><span class="admin-preload__orbit"><i></i><i></i><i></i></span><span class="admin-preload__wave"><i></i><i></i><i></i><i></i><i></i></span><span class="admin-preload__linear"><i></i></span></div><span class="admin-preload__message">Preparando tu panel…</span></div></div></div>
+    <div id="root"><div class="admin-preload" role="status" aria-label="Preparando tu panel"><div class="admin-preload__content"><div class="admin-preload__visual" aria-hidden="true"><i class="admin-preload__halo"></i><span class="admin-preload__pulse"><i></i><i></i><i></i></span><span class="admin-preload__orbit"><i></i><i></i><i></i></span><span class="admin-preload__wave"><i></i><i></i><i></i><i></i><i></i></span><span class="admin-preload__linear"><i></i></span></div><span class="admin-preload__message">Preparando tu panel…</span></div></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
