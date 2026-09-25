@@ -28,6 +28,8 @@ describe('configuración del indicador desde el arranque', () => {
     await page.window.__adminInitialSettingsPromise;
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(page.window.document.documentElement.dataset.adminLoader).toBe('pulse');
+    expect(page.window.getComputedStyle(page.window.document.querySelector('.admin-preload__pulse')).display).toBe('flex');
+    expect(page.window.getComputedStyle(page.window.document.querySelector('.admin-preload__halo')).display).toBe('none');
     expect(page.window.document.documentElement.style.getPropertyValue('--rb-loader-login-color')).toBe('#DD4488');
     expect(page.window.localStorage.getItem('rb_admin_loader_panel_color')).toBe('#2244AA');
     page.window.close();
