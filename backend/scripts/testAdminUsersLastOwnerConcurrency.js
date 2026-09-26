@@ -3,15 +3,19 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const path = require('node:path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
+dotenv.config({ path: path.join(__dirname, '..', '..', '.env'), quiet: true });
 const mongoose = require('mongoose');
 const AdminUser = require('../models/AdminUser');
 const { saveRemovingOwner } = require('../security/adminLastOwnerGuard');
 
 function isolatedUri() {
-  const source = process.env.ADMIN_USERS_OWNER_E2E_MONGO_URI || process.env.MONGO_URI;
+  const source = process.env.ADMIN_USERS_OWNER_E2E_MONGO_URI ||
+    process.env.MONGO_URI || process.env.MONGODB_URI ||
+    process.env.MONGO_URL || process.env.DATABASE_URL;
   assert.match(source || '', /^mongodb(?:\+srv)?:\/\//i,
-    'Se requiere ADMIN_USERS_OWNER_E2E_MONGO_URI o MONGO_URI para la prueba aislada.');
+    'No se encontró una URI MongoDB en backend/.env, .env de la raíz ni en las variables del sistema. Se aceptan MONGO_URI, MONGODB_URI, MONGO_URL o DATABASE_URL.');
   const uri = new URL(source);
   uri.pathname = `/users_owner_e2e_${crypto.randomBytes(6).toString('hex')}`;
   assert.match(decodeURIComponent(uri.pathname), /^\/users_owner_e2e_[a-z0-9]+$/,
