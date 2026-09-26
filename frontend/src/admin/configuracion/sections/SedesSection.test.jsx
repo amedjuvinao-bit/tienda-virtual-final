@@ -118,3 +118,31 @@ it('guarda los datos de una sede inactiva sin volver a solicitar su desactivaci�
   expect(confirmation).toHaveTextContent('Sede actualizada correctamente.');
   expect(confirmation).toHaveClass('fixed');
 });
+
+it('muestra inmediatamente la sede devuelta al guardar y reabre sus datos actualizados', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  const original = {
+    _id: '1', name: 'Sede anterior', code: 'ANTERIOR',
+    type: 'store', status: 'active', active: true,
+  };
+  getAdminBranches.mockResolvedValue({ total: 1, data: [original] });
+  updateAdminBranch.mockResolvedValue({
+    data: { ...original, name: 'Sede actualizada', code: 'NUEVA' },
+  });
+
+  render(<SedesSection />);
+  await user.click(await screen.findByRole('button', { name: 'Editar Sede anterior' }));
+  const modal = within(screen.getByRole('dialog', { name: 'Editar sede' }));
+  await user.clear(modal.getByRole('textbox', { name: 'Nombre' }));
+  await user.type(modal.getByRole('textbox', { name: 'Nombre' }), 'Sede actualizada');
+  await user.click(modal.getByRole('button', { name: '3. Operación' }));
+  await user.click(modal.getByRole('button', { name: 'Guardar sede' }));
+
+  expect(await screen.findByRole('button', { name: 'Editar Sede actualizada' })).toBeInTheDocument();
+  expect(screen.getByText('Código: NUEVA')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Sede actualizada correctamente.');
+  await user.click(screen.getByRole('button', { name: 'Editar Sede actualizada' }));
+  expect(within(screen.getByRole('dialog', { name: 'Editar sede' }))
+    .getByRole('textbox', { name: 'Nombre' })).toHaveValue('Sede actualizada');
+});

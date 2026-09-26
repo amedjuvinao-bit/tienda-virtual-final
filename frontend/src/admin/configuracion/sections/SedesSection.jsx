@@ -1,6 +1,6 @@
 // frontend/src/admin/configuracion/sections/SedesSection.jsx
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus,
@@ -225,6 +225,7 @@ export default function SedesSection() {
   const canEdit = hasAdminPermission(adminUser, 'branches:update');
   const canDisable = hasAdminPermission(adminUser, 'branches:disable');
   const [branches, setBranches] = useState([]);
+  const branchesRequestId = useRef(0);
   const [meta, setMeta] = useState({
     types: ['store', 'warehouse', 'office', 'pickup_point', 'virtual'],
     statuses: ['active', 'inactive', 'closed', 'maintenance'],
@@ -362,6 +363,7 @@ export default function SedesSection() {
   };
 
   const loadBranches = useCallback(async () => {
+    const requestId = ++branchesRequestId.current;
     try {
       setLoading(true);
       setError('');
@@ -377,16 +379,18 @@ export default function SedesSection() {
 
       const list = resolveBranchesList(response);
 
+      if (requestId !== branchesRequestId.current) return;
       setBranches(list);
       setTotal(resolveTotal(response, list.length));
     } catch (loadError) {
+      if (requestId !== branchesRequestId.current) return;
       setError(
         loadError?.response?.data?.message ||
           loadError?.message ||
           'No fue posible cargar las sedes.'
       );
     } finally {
-      setLoading(false);
+      if (requestId === branchesRequestId.current) setLoading(false);
     }
   }, [search, statusFilter, typeFilter, page]);
 
@@ -628,7 +632,25 @@ export default function SedesSection() {
           delete payload.status;
           delete payload.active;
         }
-        await updateAdminBranch(editingBranchId, payload);
+        const response = await updateAdminBranch(editingBranchId, payload);
+        const updatedBranch = response?.data || {
+          ...editingBranch,
+          ...payload,
+        };
+        // Mostrar la versión confirmada por el servidor y descartar lecturas
+        // anteriores que aún puedan llegar después de guardar.
+        branchesRequestId.current += 1;
+        setLoading(false);
+        setBranches((currentBranches) => currentBranches.map((branch) => {
+          if (getBranchId(branch) === editingBranchId) return updatedBranch;
+          return {
+            ...branch,
+            isMain: updatedBranch.isMain ? false : branch.isMain,
+            isDefaultForOnlineOrders: updatedBranch.isDefaultForOnlineOrders
+              ? false
+              : branch.isDefaultForOnlineOrders,
+          };
+        }));
         setMessage('Sede actualizada correctamente.');
       } else {
         await createAdminBranch(payload);
@@ -636,8 +658,10 @@ export default function SedesSection() {
       }
 
       resetForm();
-      if (page !== 1) setPage(1);
-      else await loadBranches();
+      if (!editingBranchId) {
+        if (page !== 1) setPage(1);
+        else await loadBranches();
+      }
     } catch (saveError) {
       setError(
         saveError?.response?.data?.message ||
