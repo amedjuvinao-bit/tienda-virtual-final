@@ -28,6 +28,8 @@ import {
   updateAdminBranchStatus,
 } from '../../api/adminBranchesApi';
 import api from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
+import { hasAdminPermission } from '../../security/adminPermissions';
 
 const EMPTY_FORM = {
   name: '',
@@ -261,6 +263,10 @@ function getStatusBadgeStyle(status, active) {
 }
 
 export default function SedesSection() {
+  const { adminUser } = useAuth();
+  const canCreate = hasAdminPermission(adminUser, 'branches:create');
+  const canEdit = hasAdminPermission(adminUser, 'branches:update');
+  const canDisable = hasAdminPermission(adminUser, 'branches:disable');
   const [branches, setBranches] = useState([]);
   const [meta, setMeta] = useState({
     types: ['store', 'warehouse', 'office', 'pickup_point', 'virtual'],
@@ -286,6 +292,9 @@ export default function SedesSection() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const editingBranchId = getBranchId(editingBranch);
 
@@ -409,8 +418,8 @@ export default function SedesSection() {
         q: search,
         status: statusFilter,
         type: typeFilter,
-        page: 1,
-        limit: 100,
+        page,
+        limit: pageSize,
         sort: '-createdAt',
       });
 
@@ -427,7 +436,7 @@ export default function SedesSection() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, typeFilter]);
+  }, [search, statusFilter, typeFilter, page]);
 
   const loadMeta = useCallback(async () => {
     try {
@@ -645,6 +654,10 @@ export default function SedesSection() {
       const payload = buildBranchPayload(form);
 
       if (editingBranchId) {
+        if (!canDisable) {
+          delete payload.status;
+          delete payload.active;
+        }
         await updateAdminBranch(editingBranchId, payload);
         setMessage('Sede actualizada correctamente.');
       } else {
@@ -653,7 +666,8 @@ export default function SedesSection() {
       }
 
       resetForm();
-      await loadBranches();
+      if (page !== 1) setPage(1);
+      else await loadBranches();
     } catch (saveError) {
       setError(
         saveError?.response?.data?.message ||
@@ -683,7 +697,8 @@ export default function SedesSection() {
 
       await deleteAdminBranch(branchId);
       setMessage('Sede eliminada correctamente.');
-      await loadBranches();
+      if (branches.length === 1 && page > 1) setPage(page - 1);
+      else await loadBranches();
     } catch (deleteError) {
       setError(
         deleteError?.response?.data?.message ||
@@ -884,6 +899,7 @@ export default function SedesSection() {
                         <span className="text-xs font-semibold">Estado</span>
                         <select
                           value={form.status}
+                          disabled={Boolean(editingBranchId) && !canDisable}
                           onChange={(event) => {
                             const nextStatus = event.target.value;
 
@@ -1421,7 +1437,7 @@ export default function SedesSection() {
               </p>
             </div>
 
-            <button
+            {canCreate && <button
               type="button"
               onClick={openCreateForm}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-sm transition hover:scale-[1.01] active:scale-[0.99]"
@@ -1429,7 +1445,7 @@ export default function SedesSection() {
             >
               <Plus className="h-4 w-4" />
               Nueva sede
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -1457,7 +1473,11 @@ export default function SedesSection() {
               />
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Buscar sedes"
                 placeholder="Buscar por nombre, código, ciudad, correo..."
                 className="w-full border-0 bg-transparent text-sm outline-none"
                 style={{ color: 'var(--admin-input-text)' }}
@@ -1466,7 +1486,11 @@ export default function SedesSection() {
 
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
+              aria-label="Filtrar sedes por estado"
               className="rounded-2xl border px-3 py-2 text-sm outline-none"
               style={inputStyle}
             >
@@ -1480,7 +1504,11 @@ export default function SedesSection() {
 
             <select
               value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
+              onChange={(event) => {
+                setTypeFilter(event.target.value);
+                setPage(1);
+              }}
+              aria-label="Filtrar sedes por tipo"
               className="rounded-2xl border px-3 py-2 text-sm outline-none"
               style={inputStyle}
             >
@@ -1648,15 +1676,16 @@ export default function SedesSection() {
                         </td>
 
                         <td className="px-4 py-4">
-                          <button
+                          {canDisable ? <button
                             type="button"
                             onClick={() => handleToggleStatus(branch)}
+                            aria-label={`${branch.active ? 'Desactivar' : 'Activar'} ${branch.name}`}
                             className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold"
                             style={statusBadgeStyle}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             {STATUS_LABELS[branch.status] || branch.status}
-                          </button>
+                          </button> : <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold" style={statusBadgeStyle}>{STATUS_LABELS[branch.status] || branch.status}</span>}
                         </td>
 
                         <td className="px-4 py-4">
@@ -1693,49 +1722,53 @@ export default function SedesSection() {
 
                         <td className="px-4 py-4">
                           <div className="flex justify-end gap-2">
-                            {!branch.isMain && (
+                            {canEdit && !branch.isMain && (
                               <button
                                 type="button"
                                 onClick={() => handleMarkAsMain(branch)}
                                 className="rounded-xl border p-2"
                                 title="Marcar como principal"
+                                aria-label={`Marcar ${branch.name} como sede principal`}
                                 style={softButtonStyle}
                               >
                                 <Star className="h-4 w-4" />
                               </button>
                             )}
 
-                            {!branch.isDefaultForOnlineOrders && (
+                            {canEdit && !branch.isDefaultForOnlineOrders && (
                               <button
                                 type="button"
                                 onClick={() => handleMarkAsOnlineDefault(branch)}
                                 className="rounded-xl border p-2"
                                 title="Marcar para pedidos online"
+                                aria-label={`Marcar ${branch.name} para pedidos online`}
                                 style={warningBadgeStyle}
                               >
                                 <CheckCircle2 className="h-4 w-4" />
                               </button>
                             )}
 
-                            <button
+                            {canEdit && <button
                               type="button"
                               onClick={() => openEditForm(branch)}
                               className="rounded-xl border p-2"
                               title="Editar"
+                              aria-label={`Editar ${branch.name}`}
                               style={borderOnlyButtonStyle}
                             >
                               <Edit3 className="h-4 w-4" />
-                            </button>
+                            </button>}
 
-                            <button
+                            {canDisable && <button
                               type="button"
                               onClick={() => handleDelete(branch)}
                               className="rounded-xl border p-2"
                               title="Eliminar"
+                              aria-label={`Eliminar ${branch.name}`}
                               style={dangerButtonStyle}
                             >
                               <Trash2 className="h-4 w-4" />
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>
@@ -1745,6 +1778,15 @@ export default function SedesSection() {
             </table>
           </div>
         </div>
+        {totalPages > 1 && (
+          <nav aria-label="Páginas de sedes" className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm" style={cardStyle}>
+            <span>Página {page} de {totalPages} · {total} sedes</span>
+            <div className="flex gap-2">
+              <button type="button" disabled={page === 1 || loading} onClick={() => setPage((current) => current - 1)} className="rounded-xl border px-3 py-2 disabled:opacity-40" style={borderOnlyButtonStyle}>Anterior</button>
+              <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((current) => current + 1)} className="rounded-xl border px-3 py-2 disabled:opacity-40" style={borderOnlyButtonStyle}>Siguiente</button>
+            </div>
+          </nav>
+        )}
       </div>
 
       {modalContent}

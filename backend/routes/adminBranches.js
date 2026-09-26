@@ -779,6 +779,14 @@ router.put(
       }
 
       if (body.status !== undefined || body.active !== undefined) {
+        const changesStatus =
+          (body.status !== undefined && cleanLower(body.status) !== branch.status) ||
+          (body.active !== undefined && (body.active === true) !== branch.active);
+
+        if (changesStatus && !await requirePermission.hasEffectivePermission(req, 'branches:disable')) {
+          return sendError(res, 403, 'No tienes permiso para cambiar el estado de esta sede.');
+        }
+
         const wantsDisable =
           body.active === false ||
           (body.status !== undefined && cleanLower(body.status) !== 'active');
