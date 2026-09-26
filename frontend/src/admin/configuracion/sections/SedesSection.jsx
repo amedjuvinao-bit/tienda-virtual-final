@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  AlertCircle,
+  CheckCircle2,
   Plus,
   RefreshCw,
   Save,
@@ -419,6 +421,12 @@ export default function SedesSection() {
   useEffect(() => {
     loadBranches();
   }, [loadBranches]);
+
+  useEffect(() => {
+    if (!message || showForm) return undefined;
+    const timeoutId = window.setTimeout(() => setMessage(''), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [message, showForm]);
 
   useEffect(() => {
     let active = true;
@@ -1566,15 +1574,30 @@ export default function SedesSection() {
       {!showForm && (message || error) && typeof document !== 'undefined' && createPortal(
         <div
           role={error ? 'alert' : 'status'}
-          className="fixed left-1/2 top-5 z-[99998] flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl backdrop-blur-xl"
-          style={error ? dangerButtonStyle : primaryBadgeStyle}
+          className="fixed bottom-24 right-4 z-[99998] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-xl backdrop-blur-2xl sm:bottom-6 sm:right-6"
+          style={{
+            background: 'var(--admin-modal-glass-bg, var(--admin-modal-bg))',
+            borderColor: error ? 'var(--admin-danger-border)' : 'var(--admin-success-border)',
+            color: 'var(--admin-modal-text)',
+            boxShadow: '0 18px 48px rgba(15, 23, 42, 0.22)',
+          }}
         >
-          <span>{error || message}</span>
+          <span
+            className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+            style={{
+              background: error ? 'var(--admin-danger-soft-bg)' : 'var(--admin-success-soft-bg)',
+              color: error ? 'var(--admin-danger-text)' : 'var(--admin-success-text)',
+            }}
+          >
+            {error ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          </span>
+          <span className="min-w-0 flex-1 pt-0.5 font-semibold leading-5">{error || message}</span>
           <button
             type="button"
             onClick={() => { setMessage(''); setError(''); }}
             aria-label="Cerrar aviso de sedes"
-            className="shrink-0 rounded-lg p-1"
+            className="shrink-0 rounded-lg p-1 transition-opacity hover:opacity-60"
+            style={{ color: 'var(--admin-modal-muted-text)' }}
           >
             <X className="h-4 w-4" />
           </button>

@@ -116,7 +116,7 @@ it('guarda los datos de una sede inactiva sin volver a solicitar su desactivaciÃ
   expect(payload).not.toHaveProperty('active');
   const confirmation = await screen.findByRole('status');
   expect(confirmation).toHaveTextContent('Sede actualizada correctamente.');
-  expect(confirmation).toHaveClass('fixed');
+  expect(confirmation).toHaveClass('fixed', 'right-4', 'sm:right-6', 'sm:bottom-6');
 });
 
 it('muestra inmediatamente la sede devuelta al guardar y reabre sus datos actualizados', async () => {
