@@ -8,11 +8,12 @@ const statusRoute = usersRouter.stack.find((layer) =>
 );
 assert.ok(statusRoute, 'Falta la ruta de cambio de estado');
 
-async function checkStatus(body, expectedStatus) {
+async function checkStatus(body, expectedStatus, initialStatus = 'active') {
   const id = '507f1f77bcf86cd799439011';
   let invalidations = 0;
   const target = {
-    _id: id, role: 'seller', status: 'active', active: true,
+    _id: id, role: 'seller', status: initialStatus, active: initialStatus === 'active',
+    lockedUntil: new Date(Date.now() + 60_000), failedLoginAttempts: 5,
     branches: [{ branch: id }],
     async invalidateSessions() { invalidations += 1; },
     async save() {},
@@ -32,8 +33,10 @@ async function checkStatus(body, expectedStatus) {
     assert.equal(res.statusCode, expectedStatus);
     assert.equal(invalidations, expectedStatus === 200 ? 1 : 0);
     if (expectedStatus === 200) {
-      assert.equal(target.status, 'pending');
-      assert.equal(target.active, false);
+      assert.equal(target.status, body.status);
+      assert.equal(target.active, body.active);
+      assert.equal(target.lockedUntil, null);
+      assert.equal(target.failedLoginAttempts, 0);
     }
   } finally {
     AdminUser.findOne = originalFindOne;
@@ -47,6 +50,7 @@ async function main() {
   }), false);
   await checkStatus({ status: 'pending', active: true }, 400);
   await checkStatus({ status: 'pending', active: false }, 200);
+  await checkStatus({ status: 'active', active: true }, 200, 'blocked');
   console.log('✅ Estados coherentes y alcance de sedes verificados.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

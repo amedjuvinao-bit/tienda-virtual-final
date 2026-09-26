@@ -416,7 +416,9 @@ export default function AdminUsersPage() {
 
     const currentStatus = String(user.status || '').toLowerCase();
     const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    const actionText = nextStatus === 'active' ? 'activar' : 'desactivar';
+    const actionText = nextStatus === 'active'
+      ? (currentStatus === 'blocked' ? 'desbloquear y activar' : 'activar')
+      : 'desactivar';
 
     setConfirmModal({
       open: true,

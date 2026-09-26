@@ -1145,6 +1145,9 @@ router.put(
 
         user.status = nextStatus.status;
         user.active = nextStatus.active;
+        // Una decisión administrativa reemplaza cualquier bloqueo temporal previo.
+        user.lockedUntil = null;
+        user.failedLoginAttempts = 0;
       }
 
       user.emailVerified =
@@ -1236,6 +1239,9 @@ router.patch(
 
       user.status = nextStatus.status;
       user.active = nextStatus.active;
+      // Sin esto, "activar" deja vigente el bloqueo por intentos fallidos.
+      user.lockedUntil = null;
+      user.failedLoginAttempts = 0;
 
       user.updatedBy = getCurrentAdminId(req);
 

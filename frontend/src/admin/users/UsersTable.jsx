@@ -515,7 +515,9 @@ export default function UsersTable({
                           ? 'Guardando...'
                           : isActive
                             ? 'Desactivar usuario'
-                            : 'Activar usuario'}
+                            : user.status === 'blocked'
+                              ? 'Desbloquear y activar'
+                              : 'Activar usuario'}
                       </button>}
 
                       {canDeleteTarget && <button
