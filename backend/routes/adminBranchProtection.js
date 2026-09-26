@@ -7,9 +7,10 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 
 const Branch = require('../models/Branch');
-const InventoryStock = require('../models/InventoryStock');
-const InventoryReservation = require('../models/InventoryReservation');
-const InventoryMovement = require('../models/InventoryMovement');
+const {
+  getBranchOperationSummary,
+  hasBranchOperation,
+} = require('../services/branchOperationProtectionService');
 
 const router = express.Router();
 
@@ -33,63 +34,12 @@ function wantsDisableFromBody(body = {}) {
   );
 }
 
-async function getBranchOperationSummary(branchId) {
-  const objectId = toObjectId(branchId);
-
-  if (!objectId) {
-    return {
-      activeStockCount: 0,
-      reservedStockCount: 0,
-      pendingReservationsCount: 0,
-      movementsCount: 0,
-    };
-  }
-
-  const [activeStockCount, reservedStockCount, pendingReservationsCount, movementsCount] =
-    await Promise.all([
-      InventoryStock.countDocuments({
-        branch: objectId,
-        deletedAt: null,
-        active: true,
-        stock: { $gt: 0 },
-      }),
-      InventoryStock.countDocuments({
-        branch: objectId,
-        deletedAt: null,
-        active: true,
-        reservedStock: { $gt: 0 },
-      }),
-      InventoryReservation.countDocuments({
-        status: 'pending',
-        'items.branch': objectId,
-      }),
-      InventoryMovement.countDocuments({
-        deletedAt: null,
-        $or: [{ branchFrom: objectId }, { branchTo: objectId }],
-      }),
-    ]);
-
-  return {
-    activeStockCount,
-    reservedStockCount,
-    pendingReservationsCount,
-    movementsCount,
-  };
-}
-
-function hasBranchOperation(summary = {}) {
-  return (
-    Number(summary.activeStockCount || 0) > 0 ||
-    Number(summary.reservedStockCount || 0) > 0 ||
-    Number(summary.pendingReservationsCount || 0) > 0 ||
-    Number(summary.movementsCount || 0) > 0
-  );
-}
-
 function buildBlockedMessage(action = 'desactivar') {
   const verb = action === 'delete' ? 'eliminar' : 'desactivar';
 
-  return `No puedes ${verb} esta sede porque tiene inventario, reservas o movimientos asociados.`;
+  return action === 'delete'
+    ? `No puedes ${verb} esta sede porque tiene operaciones o historial asociados. Puedes desactivarla cuando cierre sus operaciones pendientes.`
+    : `No puedes ${verb} esta sede porque tiene operaciones pendientes. Revisa el detalle para saber qué debes cerrar.`;
 }
 
 async function protectBranchWithoutOperations(req, res, next, action = 'disable') {
@@ -100,7 +50,7 @@ async function protectBranchWithoutOperations(req, res, next, action = 'disable'
       return next();
     }
 
-    const summary = await getBranchOperationSummary(branchId);
+    const summary = await getBranchOperationSummary(branchId, { action });
 
     if (!hasBranchOperation(summary)) {
       return next();

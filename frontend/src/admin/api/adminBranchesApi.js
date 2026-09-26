@@ -12,10 +12,19 @@ import api from '../../lib/api';
 const BASE_URL = '/api/admin/branches';
 
 const OPERATION_LABELS = {
-  activeStockCount: 'stock activo',
+  activeStockCount: 'productos con stock',
   reservedStockCount: 'stock reservado',
   pendingReservationsCount: 'reservas pendientes',
-  movementsCount: 'movimientos de inventario',
+  pendingMovementsCount: 'movimientos de inventario pendientes',
+  openCashSessionsCount: 'cajas abiertas',
+  pendingOrdersCount: 'pedidos pendientes',
+  heldSalesCount: 'ventas POS en espera',
+  historicalStockRowsCount: 'registros de inventario en el historial',
+  historicalReservationsCount: 'reservas en el historial',
+  historicalMovementsCount: 'movimientos en el historial',
+  historicalCashSessionsCount: 'sesiones de caja en el historial',
+  historicalOrdersCount: 'pedidos en el historial',
+  historicalHeldSalesCount: 'ventas POS en el historial',
 };
 
 function buildQueryParams(params = {}) {
