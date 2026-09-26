@@ -20,6 +20,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { loginAdmin } from "./api/adminAuthApi";
+import { getAdminLandingPath } from './security/adminPermissions';
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import TwoFactorChallengeModal from "./login/TwoFactorChallengeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
@@ -1069,7 +1070,7 @@ export default function Login({ initialSettings, loaderModel }) {
     navigate(
       response.user.twoFactorSetupRequired
         ? "/admin/configuracion/seguridad"
-        : "/admin/dashboard"
+        : getAdminLandingPath(response.user)
     );
     return true;
   };
