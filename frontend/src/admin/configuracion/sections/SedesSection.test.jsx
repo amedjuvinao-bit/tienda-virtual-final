@@ -1,9 +1,9 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import SedesSection from './SedesSection';
-import { getAdminBranches, getAdminBranchesMeta } from '../../api/adminBranchesApi';
+import { createAdminBranch, getAdminBranches, getAdminBranchesMeta } from '../../api/adminBranchesApi';
 
 const auth = vi.hoisted(() => ({ user: { role: 'viewer', permissions: ['branches:view'] } }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ adminUser: auth.user }) }));
@@ -63,4 +63,31 @@ it('muestra las acciones poco frecuentes solo cuando se abren las opciones', asy
   expect(screen.getByRole('button', { name: 'Desactivar Sede 1' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Eliminar Sede 1' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Hacer sede principal' })).toBeVisible();
+});
+
+it('guía la creación por secciones, conserva los datos y muestra los errores dentro del modal', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  render(<SedesSection />);
+  await screen.findByText('Sede 1');
+  await user.click(screen.getByRole('button', { name: 'Nueva sede' }));
+  const modal = within(screen.getByRole('dialog', { name: 'Crear nueva sede' }));
+
+  await user.click(modal.getByRole('button', { name: 'Siguiente' }));
+  expect(modal.getByRole('alert')).toHaveTextContent('El nombre de la sede es obligatorio.');
+  await user.type(modal.getByRole('textbox', { name: 'Nombre' }), 'Sede Centro');
+  await user.type(modal.getByRole('textbox', { name: 'Código' }), 'centro');
+  await user.click(modal.getByRole('button', { name: 'Siguiente' }));
+  expect(modal.getByRole('button', { name: '2. Ubicación' })).toHaveAttribute('aria-current', 'step');
+  await user.click(modal.getByRole('button', { name: 'Siguiente' }));
+  expect(modal.getByRole('button', { name: '3. Operación' })).toHaveAttribute('aria-current', 'step');
+  await user.click(modal.getByRole('button', { name: 'Anterior' }));
+  await user.click(modal.getByRole('button', { name: '1. Datos' }));
+  expect(modal.getByRole('textbox', { name: 'Nombre' })).toHaveValue('Sede Centro');
+  expect(modal.getByRole('textbox', { name: 'Código' })).toHaveValue('CENTRO');
+  await user.click(modal.getByRole('button', { name: '3. Operación' }));
+  await user.click(modal.getByRole('button', { name: 'Guardar sede' }));
+  await waitFor(() => expect(createAdminBranch).toHaveBeenCalledWith(
+    expect.objectContaining({ name: 'Sede Centro', code: 'CENTRO' })
+  ));
 });

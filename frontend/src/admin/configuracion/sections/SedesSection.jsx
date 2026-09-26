@@ -234,6 +234,7 @@ export default function SedesSection() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingBranch, setEditingBranch] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [formStep, setFormStep] = useState('general');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -565,7 +566,9 @@ export default function SedesSection() {
     setForm(EMPTY_FORM);
     setEditingBranch(null);
     setShowForm(false);
+    setFormStep('general');
     setSaving(false);
+    setError('');
   };
 
   const openCreateForm = () => {
@@ -573,6 +576,7 @@ export default function SedesSection() {
     setError('');
     setEditingBranch(null);
     setForm(EMPTY_FORM);
+    setFormStep('general');
     setShowForm(true);
   };
 
@@ -581,6 +585,7 @@ export default function SedesSection() {
     setError('');
     setEditingBranch(branch);
     setForm(normalizeBranchToForm(branch));
+    setFormStep('general');
     setShowForm(true);
   };
 
@@ -589,11 +594,19 @@ export default function SedesSection() {
 
     if (!form.name.trim()) {
       setError('El nombre de la sede es obligatorio.');
+      setFormStep('general');
       return;
     }
 
     if (!form.code.trim()) {
       setError('El código de la sede es obligatorio.');
+      setFormStep('general');
+      return;
+    }
+
+    if (formStep !== 'operation') {
+      setError('');
+      setFormStep(formStep === 'general' ? 'location' : 'operation');
       return;
     }
 
@@ -746,14 +759,14 @@ export default function SedesSection() {
             <button
               type="button"
               aria-label="Cerrar formulario de sede"
-              className="absolute inset-0 cursor-default backdrop-blur-sm"
-              style={{ backgroundColor: 'var(--admin-modal-overlay)' }}
+              className="absolute inset-0 cursor-default backdrop-blur-xl"
+              style={{ backgroundColor: 'rgba(24, 22, 34, 0.12)' }}
               onClick={resetForm}
             />
 
             <form
               onSubmit={handleSubmit}
-              className="relative z-10 flex max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border shadow-2xl"
+              className="relative z-10 flex max-h-[min(760px,88vh)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border backdrop-blur-2xl shadow-2xl"
               style={{
                 backgroundColor: 'var(--admin-modal-bg)',
                 borderColor: 'var(--admin-glass-border)',
@@ -775,8 +788,9 @@ export default function SedesSection() {
                   </h3>
 
                   <p className="mt-1 text-sm" style={modalMutedTextStyle}>
-                    Completa la información básica, ubicación, contacto y permisos
-                    operativos.
+                    {formStep === 'general' && 'Identifica la sede y añade sus datos de contacto.'}
+                    {formStep === 'location' && 'Indica dónde se encuentra esta sede.'}
+                    {formStep === 'operation' && 'Configura los servicios que prestará la sede.'}
                   </p>
                 </div>
 
@@ -791,19 +805,40 @@ export default function SedesSection() {
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-6">
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <div className="space-y-4">
+              <nav aria-label="Secciones del formulario de sede" className="flex shrink-0 gap-2 border-b px-5 py-3 md:px-6" style={{ borderColor: 'var(--admin-card-border)' }}>
+                {[
+                  ['general', '1. Datos'],
+                  ['location', '2. Ubicación'],
+                  ['operation', '3. Operación'],
+                ].map(([step, label]) => (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => { setFormStep(step); setError(''); }}
+                    aria-current={formStep === step ? 'step' : undefined}
+                    className="min-w-0 flex-1 rounded-xl border px-2 py-2 text-center text-xs font-semibold sm:text-sm"
+                    style={formStep === step ? primaryBadgeStyle : borderOnlyButtonStyle}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </nav>
+
+              {error && <div role="alert" className="mx-5 mt-3 rounded-xl border px-3 py-2 text-sm font-semibold md:mx-6" style={dangerButtonStyle}>{error}</div>}
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 md:px-6">
+                <div>
+                  <div className={formStep === 'general' ? 'space-y-4' : 'hidden'}>
                     <h4
-                      className="text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Información general
                     </h4>
 
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Nombre</span>
+                        <span className="text-sm font-semibold">Nombre</span>
                         <input
                           value={form.name}
                           onChange={(event) =>
@@ -816,7 +851,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Código</span>
+                        <span className="text-sm font-semibold">Código</span>
                         <input
                           value={form.code}
                           onChange={(event) =>
@@ -829,7 +864,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Tipo de sede</span>
+                        <span className="text-sm font-semibold">Tipo de sede</span>
                         <select
                           value={form.type}
                           onChange={(event) =>
@@ -847,7 +882,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Estado</span>
+                        <span className="text-sm font-semibold">Estado</span>
                         <select
                           value={form.status}
                           disabled={Boolean(editingBranchId) && !canDisable}
@@ -869,7 +904,7 @@ export default function SedesSection() {
                       </label>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <label
                         className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm"
                         style={inputStyle}
@@ -903,15 +938,15 @@ export default function SedesSection() {
                     </div>
 
                     <h4
-                      className="pt-2 text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Contacto
                     </h4>
 
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Teléfono</span>
+                        <span className="text-sm font-semibold">Teléfono</span>
                         <input
                           value={form.contact.phone}
                           onChange={(event) =>
@@ -927,7 +962,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">WhatsApp</span>
+                        <span className="text-sm font-semibold">WhatsApp</span>
                         <input
                           value={form.contact.whatsapp}
                           onChange={(event) =>
@@ -943,7 +978,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Correo</span>
+                        <span className="text-sm font-semibold">Correo</span>
                         <input
                           value={form.contact.email}
                           onChange={(event) =>
@@ -960,9 +995,9 @@ export default function SedesSection() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className={formStep === 'location' ? 'space-y-4' : 'hidden'}>
                     <h4
-                      className="text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Ubicación
@@ -970,7 +1005,7 @@ export default function SedesSection() {
 
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">País</span>
+                        <span className="text-sm font-semibold">País</span>
                         {countries.length ? (
                           <select
                             value={selectedCountryCode}
@@ -1015,7 +1050,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">
+                        <span className="text-sm font-semibold">
                           {selectedCountryCode === 'CO'
                             ? 'Departamento'
                             : 'Estado / provincia'}
@@ -1074,7 +1109,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Ciudad</span>
+                        <span className="text-sm font-semibold">Ciudad</span>
                         {cities.length ? (
                           <select
                             value={
@@ -1131,7 +1166,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Barrio</span>
+                        <span className="text-sm font-semibold">Barrio</span>
                         <input
                           value={form.address.neighborhood}
                           onChange={(event) =>
@@ -1147,7 +1182,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1 md:col-span-2">
-                        <span className="text-xs font-semibold">Dirección</span>
+                        <span className="text-sm font-semibold">Dirección</span>
                         <input
                           value={form.address.addressLine}
                           onChange={(event) =>
@@ -1163,7 +1198,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1 md:col-span-2">
-                        <span className="text-xs font-semibold">Código postal</span>
+                        <span className="text-sm font-semibold">Código postal</span>
                         <input
                           value={form.address.postalCode}
                           onChange={(event) =>
@@ -1179,9 +1214,11 @@ export default function SedesSection() {
                         />
                       </label>
                     </div>
+                  </div>
 
+                  <div className={formStep === 'operation' ? 'space-y-4' : 'hidden'}>
                     <h4
-                      className="pt-2 text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Operación
@@ -1263,7 +1300,7 @@ export default function SedesSection() {
 
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">
+                        <span className="text-sm font-semibold">
                           Método de pago base
                         </span>
                         <select
@@ -1287,7 +1324,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">
+                        <span className="text-sm font-semibold">
                           Cliente por defecto
                         </span>
                         <input
@@ -1304,25 +1341,23 @@ export default function SedesSection() {
                         />
                       </label>
                     </div>
-                  </div>
-                </div>
 
-                <div className="mt-5">
-                  <label className="space-y-1">
-                    <span className="text-xs font-semibold">Observaciones</span>
-                    <textarea
-                      value={form.notes}
-                      onChange={(event) => updateField('notes', event.target.value)}
-                      rows={3}
-                      className="w-full resize-none rounded-2xl border px-3 py-2 text-sm outline-none"
-                      style={inputStyle}
-                    />
-                  </label>
+                    <label className="block space-y-1">
+                      <span className="text-sm font-semibold">Observaciones</span>
+                      <textarea
+                        value={form.notes}
+                        onChange={(event) => updateField('notes', event.target.value)}
+                        rows={2}
+                        className="w-full resize-none rounded-2xl border px-3 py-2 text-sm outline-none"
+                        style={inputStyle}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
               <div
-                className="flex shrink-0 flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:justify-end md:px-6"
+                className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t px-5 py-3 md:px-6"
                 style={{
                   borderColor: 'var(--admin-card-border)',
                   backgroundColor: 'var(--admin-modal-bg)',
@@ -1331,21 +1366,30 @@ export default function SedesSection() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold"
+                  className="mr-auto inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold"
                   style={borderOnlyButtonStyle}
                 >
                   <X className="h-4 w-4" />
                   Cancelar
                 </button>
 
+                {formStep !== 'general' && <button
+                  type="button"
+                  onClick={() => { setFormStep(formStep === 'operation' ? 'location' : 'general'); setError(''); }}
+                  className="rounded-xl border px-3 py-2 text-sm font-semibold"
+                  style={borderOnlyButtonStyle}
+                >
+                  Anterior
+                </button>}
+
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-sm disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-60"
                   style={primaryButtonStyle}
                 >
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Guardando...' : 'Guardar sede'}
+                  {formStep === 'operation' && <Save className="h-4 w-4" />}
+                  {saving ? 'Guardando...' : formStep === 'operation' ? 'Guardar sede' : 'Siguiente'}
                 </button>
               </div>
             </form>
