@@ -1443,6 +1443,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Ver usuario administrativo.',
   },
   {
+    method: 'GET',
+    path: '/api/admin/users/:id/activity',
+    permission: 'admin-users:view',
+    additionalPermissions: ['logs:view'],
+    description: 'Ver actividad administrativa de un usuario.',
+  },
+  {
     method: 'POST',
     path: '/api/admin/users',
     permission: 'admin-users:create',

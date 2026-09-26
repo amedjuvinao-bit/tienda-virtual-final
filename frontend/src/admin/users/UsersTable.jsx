@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
+  History,
   Building2,
   KeyRound,
   Mail,
@@ -187,6 +188,7 @@ export default function UsersTable({
   canEdit,
   canChangePassword,
   canDisable,
+  canViewActivity,
   currentUserId,
   currentRole,
   currentBranches,
@@ -196,6 +198,7 @@ export default function UsersTable({
   onManageTwoFactor,
   onToggleStatus,
   onDeleteUser,
+  onViewActivity,
 }) {
   const [openActionsId, setOpenActionsId] = useState('');
   const actionsRef = useRef(null);
@@ -252,7 +255,7 @@ export default function UsersTable({
         const canToggleStatus = canDisable && canManageTarget &&
           String(currentUserId) !== String(user._id);
         const canDeleteTarget = canToggleStatus && !isOwnerUser;
-        const hasMoreActions = canResetPassword || canManageTwoFactor ||
+        const hasMoreActions = canViewActivity || canResetPassword || canManageTwoFactor ||
           canToggleStatus || canDeleteTarget;
         const isActionsOpen = openActionsId === user._id;
         const primaryBranch = getPrimaryBranchLabel(user, branches);
@@ -461,6 +464,13 @@ export default function UsersTable({
                         backdropFilter: 'blur(var(--admin-glass-blur))',
                       }}
                     >
+                      {canViewActivity && <button type="button" onClick={() => {
+                        closeActions(); onViewActivity(user);
+                      }} className="mb-1 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-xs font-black transition hover:opacity-90"
+                        style={{ borderColor: 'var(--admin-light-panel-border)', background: 'var(--admin-light-panel-soft-bg)', color: 'var(--admin-light-panel-text)' }}>
+                        <History className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} />
+                        Ver actividad
+                      </button>}
                       {canResetPassword && <button
                         type="button"
                         onClick={() => {

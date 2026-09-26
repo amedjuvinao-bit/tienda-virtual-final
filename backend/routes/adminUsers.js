@@ -765,6 +765,53 @@ router.get(
  * ============================ */
 
 router.get(
+  '/:id/activity',
+  requireAdmin,
+  requirePermission.all(['admin-users:view', 'logs:view']),
+  async (req, res) => {
+    try {
+      if (!isValidObjectId(req.params.id)) {
+        return sendError(res, 400, 'ID de usuario inválido.');
+      }
+
+      const user = await AdminUser.findOne({
+        _id: toObjectId(req.params.id), deletedAt: null,
+      }).select('_id username branches role');
+      const allowed = await ensureCanManageTargetUser(req, user, 'view');
+      if (!allowed.ok) return sendError(res, allowed.status, allowed.message);
+
+      const page = Math.min(parsePagination(req.query).page, 10000);
+      const limit = 10;
+      const filter = {
+        resourceId: String(user._id),
+        $or: [
+          { module: 'admin-users' },
+          { module: 'seguridad', permission: 'seguridad:2fa:owner' },
+        ],
+      };
+      const [events, total] = await Promise.all([
+        AdminAuditLog.find(filter)
+          .sort({ createdAt: -1, _id: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .select('createdAt adminUsername action description success')
+          .lean(),
+        AdminAuditLog.countDocuments(filter),
+      ]);
+
+      return res.json({
+        ok: true,
+        data: events,
+        pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+      });
+    } catch (error) {
+      console.error('❌ Error consultando actividad del usuario:', error.message);
+      return sendError(res, 500, 'No se pudo consultar la actividad del usuario.');
+    }
+  }
+);
+
+router.get(
   '/:id',
   requireAdmin,
   requirePermission('admin-users:view'),
@@ -926,6 +973,9 @@ router.post(
       });
 
       await user.save();
+      // The global audit hook runs when the response finishes; attach the new ID.
+      res.locals = res.locals || {};
+      res.locals.adminAuditResourceId = String(user._id);
 
       return res.status(201).json({
         ok: true,

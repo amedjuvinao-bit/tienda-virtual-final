@@ -12,6 +12,7 @@
     "test:admin-users-stage1": "node scripts/testAdminUsersStage1.js",
     "test:admin-users-stage2": "node scripts/testAdminUsersStage2.js",
     "test:admin-users-owner-guard": "node scripts/testAdminUsersLastOwnerGuard.js",
+    "test:admin-users-activity": "node scripts/testAdminUsersActivity.js",
     "test:admin-users-owner-concurrency": "node scripts/testAdminUsersLastOwnerConcurrency.js",
     "test:admin-2fa-security": "node scripts/testAdminTwoFactorSecurity.js",
     "test:admin-security-stage4": "node scripts/testAdminSecurityStage4.js",

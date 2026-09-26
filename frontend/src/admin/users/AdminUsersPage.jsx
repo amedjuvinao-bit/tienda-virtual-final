@@ -6,6 +6,7 @@ import {
   deleteAdminUser,
   getAdminUsers,
   getAdminUsersMeta,
+  getAdminUserActivity,
   updateAdminUser,
   updateAdminUserPassword,
   updateAdminUserStatus,
@@ -13,7 +14,7 @@ import {
 } from '../api/adminUsersApi';
 import { useAuth } from '../../context/AuthContext';
 import { hasAdminPermission } from '../security/adminPermissions';
-import { Activity, CheckCircle2, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
+import { Activity, CheckCircle2, LockKeyhole, UsersRound } from 'lucide-react';
 import './adminUsersPage.css';
 
 import UserFormModal from './UserFormModal';
@@ -21,6 +22,7 @@ import UserPasswordModal from './UserPasswordModal';
 import UserConfirmModal from './UserConfirmModal';
 import UserTwoFactorModal from './UserTwoFactorModal';
 import UsersTable from './UsersTable';
+import UserActivityModal from './UserActivityModal';
 
 import {
   EMPTY_FORM,
@@ -69,10 +71,18 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const requestId = useRef(0);
+  const activityRequestId = useRef(0);
+  const [activityUser, setActivityUser] = useState(null);
+  const [activityEvents, setActivityEvents] = useState([]);
+  const [activityPagination, setActivityPagination] = useState({ page: 1, pages: 1 });
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
   const [showUserModal, setShowUserModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
@@ -97,6 +107,7 @@ export default function AdminUsersPage() {
   const canAssign = hasAdminPermission(adminUser, 'admin-users:assign_role');
   const canChangePassword = hasAdminPermission(adminUser, 'admin-users:password');
   const canDisable = hasAdminPermission(adminUser, 'admin-users:disable');
+  const canViewActivity = hasAdminPermission(adminUser, 'logs:view');
   const visibleActive = users.filter((user) => user.status === 'active').length;
   const visibleAttention = users.filter((user) => ['blocked', 'pending'].includes(user.status)).length;
   const visibleTwoFactor = users.filter((user) => user.twoFactorEnabled).length;
@@ -197,6 +208,8 @@ export default function AdminUsersPage() {
         sort: '-createdAt',
         q: debouncedSearch.trim(),
         status: statusFilter,
+        role: roleFilter,
+        branchId: branchFilter === 'all' ? '' : branchFilter,
       });
 
       if (currentRequest !== requestId.current) return;
@@ -211,7 +224,31 @@ export default function AdminUsersPage() {
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, roleFilter, branchFilter]);
+
+  const loadActivity = async (user, activityPage = 1) => {
+    const currentRequest = ++activityRequestId.current;
+    setActivityUser(user);
+    setActivityLoading(true);
+    setActivityError('');
+    try {
+      const response = await getAdminUserActivity(user._id, activityPage);
+      if (currentRequest !== activityRequestId.current) return;
+      setActivityEvents(response.data || []);
+      setActivityPagination(response.pagination || { page: activityPage, pages: 1 });
+    } catch (err) {
+      if (currentRequest !== activityRequestId.current) return;
+      setActivityError(err?.userMessage || 'No se pudo cargar la actividad.');
+    } finally {
+      if (currentRequest === activityRequestId.current) setActivityLoading(false);
+    }
+  };
+
+  const closeActivity = () => {
+    activityRequestId.current += 1;
+    setActivityUser(null);
+    setActivityEvents([]);
+  };
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -570,8 +607,7 @@ export default function AdminUsersPage() {
               className="mt-2 max-w-2xl text-sm leading-6"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Revisa quién puede entrar al panel, desde qué sedes y con qué protección.
-              Administra perfiles y accesos desde cada usuario.
+              Revisa el acceso, perfil, sedes y seguridad de cada cuenta.
             </p>
           </div>
 
@@ -649,10 +685,6 @@ export default function AdminUsersPage() {
             <span>Pendientes o bloqueados</span>
           </div>
         </div>
-        <p className="admin-users-plus__overview-note">
-          <ShieldCheck aria-hidden="true" size={15} />
-          Cada ficha muestra el perfil, las sedes asignadas, el estado de acceso y la protección 2FA.
-        </p>
       </section>
 
       <section
@@ -720,6 +752,31 @@ export default function AdminUsersPage() {
           </select>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Refinar por</span>
+          <select aria-label="Filtrar usuarios por perfil" value={roleFilter}
+            onChange={(event) => { setRoleFilter(event.target.value); setPage(1); }}
+            className="rounded-xl border px-3 py-2 text-sm"
+            style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }}>
+            <option value="all">Todos los perfiles</option>
+            {roles.map((role) => <option key={role.code} value={role.code}>{role.name}</option>)}
+          </select>
+          <select aria-label="Filtrar usuarios por sede" value={branchFilter}
+            onChange={(event) => { setBranchFilter(event.target.value); setPage(1); }}
+            className="rounded-xl border px-3 py-2 text-sm"
+            style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }}>
+            <option value="all">Todas las sedes</option>
+            {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+          </select>
+          {(roleFilter !== 'all' || branchFilter !== 'all' || statusFilter !== 'all' || search) &&
+            <button type="button" onClick={() => {
+              setRoleFilter('all'); setBranchFilter('all'); setStatusFilter('all'); setSearch(''); setPage(1);
+            }} className="rounded-xl border px-3 py-2 text-xs font-bold"
+              style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+              Limpiar filtros
+            </button>}
+        </div>
+
         {successMessage && (
           <div
             className="mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold"
@@ -781,6 +838,7 @@ export default function AdminUsersPage() {
             canEdit={canEdit}
             canChangePassword={canChangePassword}
             canDisable={canDisable}
+            canViewActivity={canViewActivity}
             currentUserId={adminUser?.id || adminUser?._id || ''}
             currentRole={currentRole}
             currentBranches={adminUser?.branches || adminUser?.profile?.branches || []}
@@ -789,6 +847,7 @@ export default function AdminUsersPage() {
             onManageTwoFactor={openTwoFactorModal}
             onToggleStatus={handleToggleUserStatus}
             onDeleteUser={handleDeleteUser}
+            onViewActivity={(user) => loadActivity(user)}
           />
         )}
         {!loading && totalPages > 1 && (
@@ -803,6 +862,11 @@ export default function AdminUsersPage() {
           </nav>
         )}
       </section>
+
+      <UserActivityModal user={activityUser} events={activityEvents}
+        pagination={activityPagination} loading={activityLoading} error={activityError}
+        onPageChange={(nextPage) => loadActivity(activityUser, nextPage)}
+        onClose={closeActivity} />
 
       <UserFormModal
         open={showUserModal}
