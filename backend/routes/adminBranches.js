@@ -791,7 +791,7 @@ router.put(
           body.active === false ||
           (body.status !== undefined && cleanLower(body.status) !== 'active');
 
-        if (wantsDisable) {
+        if (wantsDisable && changesStatus) {
           const allowed = await ensureCanDisableOrDeleteBranch(branch, 'disable');
 
           if (!allowed.ok) {

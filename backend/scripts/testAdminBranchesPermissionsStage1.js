@@ -3,10 +3,14 @@ const mongoose = require('mongoose');
 const Branch = require('../models/Branch');
 const requirePermission = require('../middleware/requirePermission');
 const router = require('../routes/adminBranches');
+const protectionRouter = require('../routes/adminBranchProtection');
 
 const route = router.stack.find((entry) => entry.route?.path === '/:id' && entry.route.methods?.put);
 assert.ok(route, 'Falta la ruta de edición de sedes');
 const editBranch = route.route.stack.at(-1).handle;
+const protectionRoute = protectionRouter.stack.find((entry) => entry.route?.path === '/:id' && entry.route.methods?.put);
+assert.ok(protectionRoute, 'Falta la protección de edición de sedes');
+const protectEdit = protectionRoute.route.stack.at(-1).handle;
 
 const branchId = new mongoose.Types.ObjectId();
 const userId = new mongoose.Types.ObjectId();
@@ -58,6 +62,27 @@ async function main() {
     assert.equal(authorized.statusCode, 200);
     assert.equal(branch.status, 'active');
     assert.equal(saved, true);
+
+    canDisable = false;
+    saved = false;
+    branch.status = 'inactive';
+    branch.active = false;
+    const editInactive = response();
+    await editBranch({ ...req, body: { name: 'Sede inactiva editada', status: 'inactive', active: false } }, editInactive);
+    assert.equal(editInactive.statusCode, 200);
+    assert.equal(editInactive.body.data.name, 'Sede inactiva editada');
+    assert.equal(saved, true);
+    assert.equal(branch.status, 'inactive');
+
+    // Reenviar el estado actual no debe convertir una edición en una desactivación.
+    Branch.findOne = () => ({ select: () => ({ lean: async () => ({ status: 'inactive', active: false }) }) });
+    let passedToEdit = false;
+    await protectEdit(
+      { params: { id: String(branchId) }, body: { name: 'Editada', status: 'inactive', active: false } },
+      response(),
+      () => { passedToEdit = true; }
+    );
+    assert.equal(passedToEdit, true);
 
     console.log('Sedes: cambios de estado protegidos y edición normal permitida.');
   } finally {

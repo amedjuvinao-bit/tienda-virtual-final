@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import SedesSection from './SedesSection';
-import { createAdminBranch, getAdminBranches, getAdminBranchesMeta } from '../../api/adminBranchesApi';
+import { createAdminBranch, getAdminBranches, getAdminBranchesMeta, updateAdminBranch } from '../../api/adminBranchesApi';
 
 const auth = vi.hoisted(() => ({ user: { role: 'viewer', permissions: ['branches:view'] } }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ adminUser: auth.user }) }));
@@ -90,4 +90,28 @@ it('guía la creación por secciones, conserva los datos y muestra los errores d
   await waitFor(() => expect(createAdminBranch).toHaveBeenCalledWith(
     expect.objectContaining({ name: 'Sede Centro', code: 'CENTRO' })
   ));
+});
+
+it('guarda los datos de una sede inactiva sin volver a solicitar su desactivación', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  getAdminBranches.mockResolvedValue({
+    total: 1,
+    data: [{
+      _id: '1', name: 'Sede inactiva', code: 'INACTIVA',
+      type: 'warehouse', status: 'inactive', active: false,
+    }],
+  });
+  render(<SedesSection />);
+  await user.click(await screen.findByRole('button', { name: 'Editar Sede inactiva' }));
+  const modal = within(screen.getByRole('dialog', { name: 'Editar sede' }));
+  await user.clear(modal.getByRole('textbox', { name: 'Nombre' }));
+  await user.type(modal.getByRole('textbox', { name: 'Nombre' }), 'Sede inactiva actualizada');
+  await user.click(modal.getByRole('button', { name: '3. Operación' }));
+  await user.click(modal.getByRole('button', { name: 'Guardar sede' }));
+  await waitFor(() => expect(updateAdminBranch).toHaveBeenCalled());
+  const payload = updateAdminBranch.mock.calls[0][1];
+  expect(payload.name).toBe('Sede inactiva actualizada');
+  expect(payload).not.toHaveProperty('status');
+  expect(payload).not.toHaveProperty('active');
 });

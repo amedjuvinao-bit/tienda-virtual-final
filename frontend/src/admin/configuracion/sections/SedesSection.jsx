@@ -618,7 +618,13 @@ export default function SedesSection() {
       const payload = buildBranchPayload(form);
 
       if (editingBranchId) {
-        if (!canDisable) {
+        if (
+          !canDisable ||
+          (
+            payload.status === (editingBranch.status || 'active') &&
+            payload.active === (editingBranch.active !== false)
+          )
+        ) {
           delete payload.status;
           delete payload.active;
         }
