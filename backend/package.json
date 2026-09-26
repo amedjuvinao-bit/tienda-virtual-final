@@ -16,6 +16,7 @@
     "test:admin-users-owner-concurrency": "node scripts/testAdminUsersLastOwnerConcurrency.js",
     "test:admin-roles-stage1": "node scripts/testAdminRolesLevelPlusStage1.js",
     "test:admin-branches-stage1": "node scripts/testAdminBranchesPermissionsStage1.js",
+    "test:admin-branches-inventory-policy": "node scripts/testBranchInventoryOperationPolicy.js",
     "test:admin-2fa-security": "node scripts/testAdminTwoFactorSecurity.js",
     "test:admin-security-stage4": "node scripts/testAdminSecurityStage4.js",
     "test:admin-security-stage5": "node scripts/testAdminSecurityStage5.js",

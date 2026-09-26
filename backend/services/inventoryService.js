@@ -190,6 +190,15 @@ async function getBranchOrFail(branchId, { session, fieldName = 'La sede' } = {}
     throw new Error(`${fieldName} no existe o no está activa.`);
   }
 
+  if (branch.settings?.allowInventoryMovements === false) {
+    const error = new Error(
+      `${fieldName} tiene desactivada la gestión de inventario. Actívala en Configuración > Sedes para continuar.`
+    );
+    error.code = 'BRANCH_INVENTORY_DISABLED';
+    error.statusCode = 409;
+    throw error;
+  }
+
   return branch;
 }
 
@@ -708,6 +717,7 @@ async function getBranchStockSummary(branchId, { session = null } = {}) {
 module.exports = {
   approveInventoryMovement,
   createInventoryMovement,
+  getBranchOrFail,
   getBranchStockSummary,
   rejectInventoryMovement,
   syncProductTotalStock,
