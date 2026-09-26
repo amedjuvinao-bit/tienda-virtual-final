@@ -83,6 +83,14 @@ it('filtra por perfil y sede, y muestra la trazabilidad de la cuenta', async () 
   expect(getAdminUserActivity).toHaveBeenCalledWith('user-a', 'account', 1);
 });
 
+it('respeta el perfil recibido al abrir Usuarios desde Perfiles', async () => {
+  render(<AdminUsersPage initialRole="seller" />);
+  await waitFor(() => expect(getAdminUsers).toHaveBeenCalledWith(
+    expect.objectContaining({ page: 1, role: 'seller' })
+  ));
+  expect(await screen.findByRole('combobox', { name: /filtrar usuarios por perfil/i })).toHaveValue('seller');
+});
+
 it('al cambiar la sede principal conserva permisos individuales de ambas sedes', () => {
   const form = buildFormFromUser(user, branches);
   expect(buildUserEditPayload({ ...form, branchId: 'branch-b' }, user, branches))

@@ -1,12 +1,13 @@
 import React from 'react';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import PerfilesSection from './PerfilesSection';
 import { getAdminRoles, getAdminRolesMeta } from '../../api/adminRolesApi';
 
 const auth = vi.hoisted(() => ({
-  user: { adminRole: 'manager', roleRef: { level: 30, scope: 'branch' }, permissions: ['roles:view', 'roles:create', 'roles:update', 'roles:disable'] },
+  user: { adminRole: 'manager', roleRef: { level: 30, scope: 'branch' }, permissions: ['roles:view', 'roles:create', 'roles:update', 'roles:disable', 'admin-users:view'] },
 }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ adminUser: auth.user }) }));
 vi.mock('../../api/adminRolesApi', () => ({
@@ -17,7 +18,7 @@ vi.mock('../../api/adminRolesApi', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  auth.user = { adminRole: 'manager', roleRef: { level: 30, scope: 'branch' }, permissions: ['roles:view', 'roles:create', 'roles:update', 'roles:disable'] };
+  auth.user = { adminRole: 'manager', roleRef: { level: 30, scope: 'branch' }, permissions: ['roles:view', 'roles:create', 'roles:update', 'roles:disable', 'admin-users:view'] };
   getAdminRolesMeta.mockResolvedValue({ data: { permissions: ['roles:view'] } });
   getAdminRoles.mockImplementation(async ({ page, q }) => ({
     total: q ? 1 : 21, totalPages: q ? 1 : 2,
@@ -27,10 +28,22 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+function CurrentPath() {
+  const location = useLocation();
+  return <output data-testid="route">{location.pathname}{location.search}</output>;
+}
+
+function renderPage() {
+  return render(<MemoryRouter initialEntries={['/admin/configuracion/perfiles']}>
+    <PerfilesSection />
+    <CurrentPath />
+  </MemoryRouter>);
+}
+
 it('muestra ocupación real y bloquea eliminación y desactivación de un perfil asignado', async () => {
-  render(<PerfilesSection />);
+  renderPage();
   const card = (await screen.findByText('Cajero')).closest('article');
-  expect(within(card).getByText('2')).toBeInTheDocument();
+  expect(within(card).getByRole('button', { name: 'Ver 2 usuarios de Cajero' })).toBeEnabled();
   expect(within(card).getByRole('button', { name: 'Eliminar' })).toBeDisabled();
   expect(within(card).getByRole('button', { name: 'Desactivar' })).toBeDisabled();
   expect(within(card).getByRole('button', { name: 'Editar' })).toBeEnabled();
@@ -38,7 +51,7 @@ it('muestra ocupación real y bloquea eliminación y desactivación de un perfil
 
 it('consulta las demás páginas y busca desde el servidor', async () => {
   const user = userEvent.setup();
-  render(<PerfilesSection />);
+  renderPage();
   await screen.findByText('Cajero');
   await user.click(screen.getByRole('button', { name: 'Siguiente' }));
   expect(await screen.findByText('Perfil segundo')).toBeInTheDocument();
@@ -53,7 +66,14 @@ it('no trata a un encargado como propietario', async () => {
   getAdminRoles.mockResolvedValueOnce({ total: 1, totalPages: 1, data: [
     { _id: 'system', name: 'Sistema', code: 'admin', isSystem: true, usersCount: 0 },
   ] });
-  render(<PerfilesSection />);
+  renderPage();
   const card = (await screen.findByRole('heading', { name: 'Sistema' })).closest('article');
   expect(within(card).getByRole('button', { name: 'Editar' })).toBeDisabled();
+});
+
+it('abre Usuarios con el perfil seleccionado', async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByRole('button', { name: 'Ver 2 usuarios de Cajero' }));
+  expect(screen.getByTestId('route')).toHaveTextContent('/admin/configuracion/usuarios?role=cashier');
 });

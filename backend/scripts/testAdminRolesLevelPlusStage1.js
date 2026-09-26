@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const AdminRole = require('../models/AdminRole');
 const AdminUser = require('../models/AdminUser');
 const router = require('../routes/adminRoles');
+const { findAdminRoutePermission } = require('../security/adminRoutePermissionMap');
 
 const id = new mongoose.Types.ObjectId();
 const owner = { adminRole: 'owner', adminUserId: String(new mongoose.Types.ObjectId()) };
@@ -22,6 +23,11 @@ function response() {
 }
 
 async function main() {
+  const statusAudit = findAdminRoutePermission(
+    'PATCH', '/api/admin/roles/507f1f77bcf86cd799439011/status'
+  );
+  assert.equal(statusAudit?.permission, 'roles:disable');
+  assert.equal(statusAudit?.audit, true);
   const original = {
     find: AdminRole.find, findOne: AdminRole.findOne,
     countRoles: AdminRole.countDocuments, countUsers: AdminUser.countDocuments,

@@ -53,7 +53,7 @@ const EMPTY_TWO_FACTOR_FORM = {
   currentUserId: '',
 };
 
-export default function AdminUsersPage() {
+export default function AdminUsersPage({ initialRole = 'all' }) {
   const { adminUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState(initialRole);
   const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);

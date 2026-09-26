@@ -515,6 +515,8 @@ router.post(
       });
 
       await role.save();
+      res.locals = res.locals || {};
+      res.locals.adminAuditResourceId = String(role._id);
 
       if (role.isDefault) {
         await AdminRole.updateMany(

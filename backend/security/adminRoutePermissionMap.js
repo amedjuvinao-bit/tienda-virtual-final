@@ -1538,9 +1538,9 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'PATCH',
-    path: '/api/admin/roles/:id',
-    permission: 'roles:update',
-    description: 'Editar parcialmente perfil administrativo.',
+    path: '/api/admin/roles/:id/status',
+    permission: 'roles:disable',
+    description: 'Cambiar estado de perfil administrativo.',
     audit: true,
     danger: true,
   },

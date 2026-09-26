@@ -1,6 +1,7 @@
 // frontend/src/admin/configuracion/sections/PerfilesSection.jsx
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -124,6 +125,7 @@ function CompactMetricCard({ icon: Icon, label, value }) {
   );
 }
 export default function PerfilesSection() {
+  const navigate = useNavigate();
   const { adminUser } = useAuth();
   const currentAdminRole = String(
     adminUser?.adminRole || adminUser?.actualRole || adminUser?.role || ''
@@ -131,6 +133,7 @@ export default function PerfilesSection() {
   const canCreate = hasAdminPermission(adminUser, 'roles:create');
   const canEdit = hasAdminPermission(adminUser, 'roles:update');
   const canDisable = hasAdminPermission(adminUser, 'roles:disable');
+  const canViewUsers = hasAdminPermission(adminUser, 'admin-users:view');
   const canManageTarget = (role) => {
     if (currentAdminRole === 'owner' || currentAdminRole === 'admin') return true;
     const actorRole = adminUser?.roleRef;
@@ -595,8 +598,10 @@ export default function PerfilesSection() {
                   currentAdminRole={currentAdminRole}
                   canEdit={canEdit}
                   canDisable={canDisable}
+                  canViewUsers={canViewUsers}
                   canManageTarget={canManageTarget}
-                onViewPermissions={openPermissionsModal}
+                  onViewPermissions={openPermissionsModal}
+                  onViewUsers={(role) => navigate(`/admin/configuracion/usuarios?role=${encodeURIComponent(role.code)}`)}
                 onEdit={openEditModal}
                 onToggleStatus={openToggleStatusModal}
                 onDelete={openDeleteModal}

@@ -17,3 +17,10 @@ cd frontend && npm run test:admin-roles-stage1 && npm run build
 ```
 
 La prueba funcional en el panel con el usuario real y el diseño final de Perfiles corresponden a las próximas etapas. Este documento registra una primera mejora y no constituye el cierre del módulo.
+
+## Etapa 2 — navegación y trazabilidad
+
+- Se sustituyeron las tarjetas altas por filas compactas adaptables al ancho de pantalla, con estado, alcance, nivel, permisos y acciones en un mismo bloque.
+- El número de usuarios lleva al módulo Usuarios con el perfil seleccionado como filtro, siempre que el administrador tenga permiso para ver usuarios.
+- La ruta real de activación y desactivación (`PATCH /api/admin/roles/:id/status`) queda asociada a la auditoría de `roles:disable`. Al crear un perfil, el registro de auditoría incluye el ID del nuevo perfil.
+- La integración se comprueba con pruebas de navegación Perfiles → Usuarios y del filtro recibido por Usuarios.
