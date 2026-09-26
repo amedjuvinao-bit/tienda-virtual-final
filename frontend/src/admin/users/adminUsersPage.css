@@ -1,0 +1,108 @@
+/* The access directory stays legible over decorative admin backgrounds. */
+.admin-area .admin-users-plus .admin-users-plus__hero {
+  padding: 18px 24px !important;
+  background: color-mix(in srgb, var(--admin-card-bg) 86%, var(--admin-primary) 14%) !important;
+  border-color: color-mix(in srgb, var(--admin-primary) 42%, var(--admin-card-border)) !important;
+  box-shadow: var(--admin-glass-shadow-hover) !important;
+  backdrop-filter: none !important;
+}
+
+.admin-users-plus__overview {
+  padding: 14px 18px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 26px;
+  color: var(--admin-card-text);
+  background: var(--admin-card-bg);
+  box-shadow: var(--admin-glass-shadow);
+}
+
+.admin-users-plus__overview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-users-plus__eyebrow {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .18em;
+  color: var(--admin-primary);
+}
+
+.admin-users-plus__overview-heading h2 {
+  margin-top: 3px;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.admin-users-plus__overview-heading > span,
+.admin-users-plus__overview-note {
+  color: var(--admin-card-muted-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-users-plus__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-users-plus__metric {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--admin-primary) 24%, var(--admin-card-border));
+  border-left: 4px solid var(--admin-primary);
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%);
+}
+
+.admin-users-plus__metric svg { color: var(--admin-primary); }
+.admin-users-plus__metric strong { font-size: 23px; line-height: 1; font-weight: 900; }
+.admin-users-plus__metric span { font-size: 12px; font-weight: 750; }
+.admin-users-plus__metric--attention { border-left-color: var(--admin-warning); }
+.admin-users-plus__metric--attention svg { color: var(--admin-warning); }
+
+.admin-area .admin-users-plus .admin-users-plus__list[style*="--admin-card-bg"][class*="rounded"] {
+  background: var(--admin-card-bg) !important;
+  border-color: var(--admin-card-border) !important;
+  backdrop-filter: none !important;
+}
+
+.admin-area .admin-users-plus .admin-users-plus__person {
+  background: color-mix(in srgb, var(--admin-card-bg) 95%, var(--admin-primary) 5%) !important;
+  border-color: color-mix(in srgb, var(--admin-primary) 24%, var(--admin-card-border)) !important;
+  border-left: 4px solid var(--admin-primary) !important;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--admin-card-text) 8%, transparent) !important;
+  backdrop-filter: none !important;
+}
+
+.admin-area .admin-users-plus .admin-users-plus__person:hover {
+  border-color: var(--admin-primary) !important;
+  box-shadow: var(--admin-glass-shadow-hover) !important;
+}
+
+.admin-area .admin-users-plus .admin-users-plus__detail {
+  background: color-mix(in srgb, var(--admin-card-bg) 87%, var(--admin-primary) 13%) !important;
+  border-color: color-mix(in srgb, var(--admin-primary) 22%, var(--admin-card-border)) !important;
+  backdrop-filter: none !important;
+}
+
+.admin-users-plus__avatar { font-size: 15px; }
+
+@media (max-width: 900px) {
+  .admin-users-plus__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .admin-area .admin-users-plus .admin-users-plus__hero { padding: 16px !important; }
+  .admin-users-plus__overview { padding: 12px; }
+  .admin-users-plus__metrics { gap: 7px; }
+  .admin-users-plus__metric { padding: 12px; }
+  .admin-users-plus__metric span { font-size: 11px; }
+}

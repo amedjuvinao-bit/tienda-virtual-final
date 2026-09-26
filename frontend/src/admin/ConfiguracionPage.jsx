@@ -112,7 +112,7 @@ export default function ConfiguracionPage() {
       case 'panel-admin':
         return <PanelAdminSection />;
       case 'usuarios':
-        return <UsuariosSection />;
+        return <UsuariosSection initialRole={new URLSearchParams(location.search).get('role') || 'all'} />;
       case 'perfiles':
         return <PerfilesSection />;
       case 'seguridad':

@@ -882,9 +882,9 @@ AdminUserSchema.methods.resetLoginSecurity = async function resetLoginSecurity({
   return this;
 };
 
-AdminUserSchema.methods.invalidateSessions = async function invalidateSessions() {
+AdminUserSchema.methods.invalidateSessions = async function invalidateSessions({ session } = {}) {
   this.tokenVersion = Number(this.tokenVersion || 0) + 1;
-  await this.save();
+  await this.save(session ? { session } : undefined);
 
   return this;
 };

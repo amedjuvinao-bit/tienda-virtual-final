@@ -148,9 +148,10 @@ function buildAdminResetPasswordUrl(rawToken) {
   return `${baseUrl}/admin/reset-password?token=${cleanToken}`;
 }
 
-async function saveLoginAudit(req, { username = '', status, reason = '' }) {
+async function saveLoginAudit(req, { username = '', adminUserId = null, status, reason = '' }) {
   try {
     const audit = await AdminLoginAudit.create({
+      adminUserId,
       username,
       ip: getClientIp(req),
       status,
@@ -1030,6 +1031,7 @@ router.post('/login', async (req, res) => {
         );
 
         await saveLoginAudit(req, {
+          adminUserId: dbLoginResult.adminUser._id,
           username: dbLoginResult.user.username,
           status: 'pending',
           reason: 'password_verified_2fa_required',
@@ -1067,6 +1069,7 @@ router.post('/login', async (req, res) => {
       });
 
       await saveLoginAudit(req, {
+        adminUserId: dbLoginResult.adminUser._id,
         username: dbLoginResult.user.username,
         status: 'success',
         reason: 'db_login_success',
@@ -1242,6 +1245,7 @@ router.post('/2fa/verify', async (req, res) => {
     });
 
     await saveLoginAudit(req, {
+      adminUserId: adminUser._id,
       username: adminUser.username,
       status: 'success',
       reason: verification.recoveryCodeUsed
@@ -2113,6 +2117,7 @@ router.post('/reset-password', async (req, res) => {
       clearTwoFactorChallengeCookie(res);
 
       await saveLoginAudit(req, {
+        adminUserId: adminUser._id,
         username: adminUser.username,
         status: 'success',
         reason: 'reset_password_success_2fa_login_required',
@@ -2138,6 +2143,7 @@ router.post('/reset-password', async (req, res) => {
     });
 
     await saveLoginAudit(req, {
+      adminUserId: adminUser._id,
       username: adminUser.username,
       status: 'success',
       reason: 'reset_password_success',
@@ -2263,6 +2269,7 @@ router.post('/change-password-required', async (req, res) => {
     });
 
     await saveLoginAudit(req, {
+      adminUserId: adminUser._id,
       username: adminUser.username,
       status: 'success',
       reason: 'required_password_change_success',

@@ -167,70 +167,6 @@ function TypeBadge({ role }) {
   );
 }
 
-function InfoChip({ label, value }) {
-  return (
-    <div
-      className="rounded-2xl border px-4 py-3"
-      style={{
-        background: THEME.softBg,
-        borderColor: THEME.border,
-      }}
-    >
-      <p
-        className="text-[10px] font-black uppercase tracking-[0.18em]"
-        style={{ color: THEME.mutedText }}
-      >
-        {label}
-      </p>
-
-      <p className="mt-1 text-sm font-black" style={{ color: THEME.cardText }}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function PermissionMeter({ count = 0, max = 1 }) {
-  const width = Math.max(10, Math.min(100, Math.round((count / max) * 100)));
-
-  return (
-    <div
-      className="rounded-[1.5rem] border p-4"
-      style={{
-        background: THEME.softBg,
-        borderColor: THEME.border,
-      }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p
-          className="text-[10px] font-black uppercase tracking-[0.2em]"
-          style={{ color: THEME.mutedText }}
-        >
-          Potencia del perfil
-        </p>
-
-        <p className="text-xs font-black" style={{ color: THEME.cardText }}>
-          {count} permisos
-        </p>
-      </div>
-
-      <div
-        className="mt-3 h-2 overflow-hidden rounded-full"
-        style={{ background: 'rgba(148, 163, 184, 0.18)' }}
-      >
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${width}%`,
-            background:
-              'linear-gradient(90deg, var(--admin-primary, #06b6d4), rgba(212, 175, 55, 0.95))',
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function ActionButton({
   title,
   label,
@@ -267,7 +203,7 @@ function ActionButton({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-45"
+      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black transition hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-45"
       style={style}
     >
       {children}
@@ -278,148 +214,101 @@ function ActionButton({
 
 function RoleCard({
   role,
-  maxPermissions,
   currentAdminRole,
+  canEdit,
+  canDisable,
+  canManageTarget,
+  canViewUsers,
   onViewPermissions,
+  onViewUsers,
   onEdit,
   onToggleStatus,
   onDelete,
 }) {
   const permissionsCount = Array.isArray(role?.permissions) ? role.permissions.length : 0;
-  const isActive = role?.active !== false && String(role?.status || '').toLowerCase() !== 'inactive';
-
-  const editable = canEditRole(role, currentAdminRole);
-  const disableable = canDisableRole(role, currentAdminRole);
-  const deletable = canDeleteRole(role, currentAdminRole);
+  const isActive = role?.active !== false && role?.status !== 'inactive';
+  const usersCount = Number(role?.usersCount || 0);
+  const manageable = canManageTarget?.(role) === true;
+  const editable = canEdit && manageable && canEditRole(role, currentAdminRole);
+  const disableable = canDisable && manageable && canDisableRole(role, currentAdminRole) && (!isActive || usersCount === 0);
+  const deletable = canDisable && manageable && canDeleteRole(role, currentAdminRole) && usersCount === 0;
 
   return (
     <article
-      className="overflow-hidden rounded-[2rem] border shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-      style={{
-        background: THEME.cardBg,
-        borderColor: THEME.border,
-      }}
+      className="rounded-2xl border px-4 py-3 shadow-sm"
+      style={{ background: THEME.cardBg, borderColor: THEME.border, color: THEME.cardText }}
     >
-      <div
-        className="h-[4px]"
-        style={{
-          background: role?.isDefault
-            ? 'linear-gradient(90deg, rgba(212,175,55,0.95), var(--admin-primary, #06b6d4))'
-            : 'linear-gradient(90deg, var(--admin-primary, #06b6d4), rgba(212,175,55,0.65))',
-        }}
-      />
-
-      <div className="p-5">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0">
-            <div className="flex items-start gap-4">
-              <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl"
-                style={{
-                  background: 'rgba(6, 182, 212, 0.10)',
-                  color: 'var(--admin-primary, #06b6d4)',
-                }}
-              >
-                <ShieldCheck size={24} />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3
-                    className="text-xl font-black leading-tight"
-                    style={{ color: THEME.cardText }}
-                  >
-                    {role?.name || 'Sin nombre'}
-                  </h3>
-
-                  {role?.isDefault ? (
-                    <span
-                      className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
-                      style={{
-                        background: 'rgba(212, 175, 55, 0.12)',
-                        color: THEME.cardText,
-                        border: '1px solid rgba(212, 175, 55, 0.28)',
-                      }}
-                    >
-                      Predeterminado
-                    </span>
-                  ) : null}
-                </div>
-
-                <p
-                  className="mt-1 text-sm font-bold"
-                  style={{ color: THEME.mutedText }}
-                >
-                  Código interno: {role?.code || 'sin-codigo'}
-                </p>
-
-                {role?.description ? (
-                  <p
-                    className="mt-3 max-w-3xl text-sm font-semibold leading-7"
-                    style={{ color: THEME.mutedText }}
-                  >
-                    {role.description}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <TypeBadge role={role} />
-                  <StatusBadge role={role} />
-                </div>
-              </div>
-            </div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: 'rgba(6, 182, 212, 0.10)', color: 'var(--admin-primary, #06b6d4)' }}
+          >
+            <ShieldCheck size={19} />
           </div>
-
-          <div className="space-y-3">
-            <PermissionMeter count={permissionsCount} max={maxPermissions} />
-
-            <div className="grid grid-cols-3 gap-3">
-              <InfoChip label="Alcance" value={getRoleScopeLabel(role?.scope)} />
-              <InfoChip label="Nivel" value={role?.level ?? 50} />
-              <InfoChip label="Permisos" value={permissionsCount} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-black">{role?.name || 'Sin nombre'}</h3>
+              <StatusBadge role={role} />
+              <TypeBadge role={role} />
+              {role?.isDefault && (
+                <span className="rounded-full border px-2 py-1 text-[10px] font-black" style={{ borderColor: 'rgba(212, 175, 55, 0.45)' }}>
+                  Predeterminado
+                </span>
+              )}
             </div>
+            <p className="mt-1 break-all text-xs font-semibold" style={{ color: THEME.mutedText }}>
+              {role?.code || 'sin-codigo'}
+              {role?.description ? ` · ${role.description}` : ''}
+            </p>
           </div>
         </div>
-
-        <div
-          className="mt-5 flex flex-wrap gap-3 border-t pt-4"
-          style={{ borderColor: THEME.border }}
+        <button
+          type="button"
+          onClick={() => onViewUsers?.(role)}
+          disabled={!canViewUsers || usersCount === 0}
+          className="rounded-xl border px-3 py-2 text-left text-xs font-black transition hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ borderColor: THEME.border, background: THEME.softBg }}
+          aria-label={`Ver ${usersCount} usuarios de ${role?.name || 'este perfil'}`}
+          title={!canViewUsers ? 'No tienes acceso al listado de usuarios' : usersCount === 0 ? 'Aún no tiene usuarios' : 'Abrir usuarios de este perfil'}
         >
-          <ActionButton
-            title="Ver permisos"
-            label="Ver permisos"
-            onClick={() => onViewPermissions?.(role)}
-          >
-            <Eye size={16} />
+          {usersCount} {usersCount === 1 ? 'usuario' : 'usuarios'} →
+        </button>
+      </div>
+      <div
+        className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3"
+        style={{ borderColor: THEME.border }}
+      >
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold" style={{ color: THEME.mutedText }}>
+          <span>Alcance: {getRoleScopeLabel(role?.scope)}</span>
+          <span aria-hidden="true">·</span>
+          <span>Nivel {role?.level ?? 50}</span>
+          <span aria-hidden="true">·</span>
+          <span>{permissionsCount} permisos</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton title="Ver permisos" label="Permisos" onClick={() => onViewPermissions?.(role)}>
+            <Eye size={14} />
           </ActionButton>
-
-          <ActionButton
-            title="Editar perfil"
-            label="Editar"
-            variant="primary"
-            disabled={!editable}
-            onClick={() => onEdit?.(role)}
-          >
-            <Edit3 size={16} />
+          <ActionButton title="Editar perfil" label="Editar" variant="primary" disabled={!editable} onClick={() => onEdit?.(role)}>
+            <Edit3 size={14} />
           </ActionButton>
-
           <ActionButton
-            title={isActive ? 'Desactivar perfil' : 'Activar perfil'}
+            title={isActive && usersCount ? `Tiene ${usersCount} usuarios asignados` : isActive ? 'Desactivar perfil' : 'Activar perfil'}
             label={isActive ? 'Desactivar' : 'Activar'}
             disabled={!disableable}
             onClick={() => onToggleStatus?.(role)}
           >
-            <Power size={16} />
+            <Power size={14} />
           </ActionButton>
-
           <ActionButton
-            title="Eliminar perfil"
+            title={usersCount ? `Tiene ${usersCount} usuarios asignados` : 'Eliminar perfil'}
             label="Eliminar"
             variant="danger"
             disabled={!deletable}
             onClick={() => onDelete?.(role)}
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </ActionButton>
         </div>
       </div>
@@ -431,7 +320,12 @@ export default function RolesTable({
   roles = [],
   loading = false,
   currentAdminRole = '',
+  canEdit = false,
+  canDisable = false,
+  canManageTarget,
+  canViewUsers = false,
   onViewPermissions,
+  onViewUsers,
   onEdit,
   onToggleStatus,
   onDelete,
@@ -444,22 +338,19 @@ export default function RolesTable({
     return <EmptyState />;
   }
 
-  const maxPermissions = Math.max(
-    1,
-    ...roles.map((role) =>
-      Array.isArray(role?.permissions) ? role.permissions.length : 0
-    )
-  );
-
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-2">
       {roles.map((role) => (
         <RoleCard
           key={role?._id || role?.id || role?.code}
           role={role}
-          maxPermissions={maxPermissions}
           currentAdminRole={currentAdminRole}
+          canEdit={canEdit}
+          canDisable={canDisable}
+          canManageTarget={canManageTarget}
+          canViewUsers={canViewUsers}
           onViewPermissions={onViewPermissions}
+          onViewUsers={onViewUsers}
           onEdit={onEdit}
           onToggleStatus={onToggleStatus}
           onDelete={onDelete}

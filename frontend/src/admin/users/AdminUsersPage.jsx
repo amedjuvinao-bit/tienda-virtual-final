@@ -1,31 +1,38 @@
 // frontend/src/admin/users/AdminUsersPage.jsx
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createAdminUser,
   deleteAdminUser,
   getAdminUsers,
   getAdminUsersMeta,
+  getAdminUserActivity,
   updateAdminUser,
   updateAdminUserPassword,
   updateAdminUserStatus,
   updateAdminUserTwoFactor,
 } from '../api/adminUsersApi';
 import { useAuth } from '../../context/AuthContext';
+import { hasAdminPermission } from '../security/adminPermissions';
+import { Activity, CheckCircle2, LockKeyhole, UsersRound } from 'lucide-react';
+import './adminUsersPage.css';
 
 import UserFormModal from './UserFormModal';
 import UserPasswordModal from './UserPasswordModal';
 import UserConfirmModal from './UserConfirmModal';
 import UserTwoFactorModal from './UserTwoFactorModal';
 import UsersTable from './UsersTable';
+import UserActivityModal from './UserActivityModal';
 
 import {
   EMPTY_FORM,
   EMPTY_PASSWORD_FORM,
   buildFormFromUser,
+  buildUserEditPayload,
   buildPasswordPayload,
   buildUserPayload,
   getDefaultBranchId,
+  getNewBranchAssignment,
   validatePasswordForm,
   validateUserForm,
 } from './adminUsersHelpers';
@@ -46,7 +53,7 @@ const EMPTY_TWO_FACTOR_FORM = {
   currentUserId: '',
 };
 
-export default function AdminUsersPage() {
+export default function AdminUsersPage({ initialRole = 'all' }) {
   const { adminUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -62,10 +69,26 @@ export default function AdminUsersPage() {
   const [passwordError, setPasswordError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState(initialRole);
+  const [branchFilter, setBranchFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const requestId = useRef(0);
+  const activityRequestId = useRef(0);
+  const [activityUser, setActivityUser] = useState(null);
+  const [activityEvents, setActivityEvents] = useState([]);
+  const [activityScope, setActivityScope] = useState('actions');
+  const [activityPagination, setActivityPagination] = useState({ page: 1, pages: 1 });
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
   const [showUserModal, setShowUserModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [editingUserId, setEditingUserId] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
   const [passwordUser, setPasswordUser] = useState(null);
   const [confirmModal, setConfirmModal] = useState(EMPTY_CONFIRM_MODAL);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -79,29 +102,28 @@ export default function AdminUsersPage() {
     adminUser?.adminRole || adminUser?.actualRole || adminUser?.role || ''
   ).toLowerCase();
   const isOwner = currentRole === 'owner';
+  const canCreate = hasAdminPermission(adminUser, 'admin-users:create') &&
+    hasAdminPermission(adminUser, 'admin-users:assign_role');
+  const canEdit = hasAdminPermission(adminUser, 'admin-users:update');
+  const canAssign = hasAdminPermission(adminUser, 'admin-users:assign_role');
+  const canChangePassword = hasAdminPermission(adminUser, 'admin-users:password');
+  const canDisable = hasAdminPermission(adminUser, 'admin-users:disable');
+  const canViewActivity = hasAdminPermission(adminUser, 'logs:view');
+  const visibleActive = users.filter((user) => user.status === 'active').length;
+  const visibleAttention = users.filter((user) => ['blocked', 'pending'].includes(user.status)).length;
+  const visibleTwoFactor = users.filter((user) => user.twoFactorEnabled).length;
 
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-
-    if (!q) return users;
-
-    return users.filter((user) => {
-      const text = [
-        user.username,
-        user.email,
-        user.displayName,
-        user.firstName,
-        user.lastName,
-        user.role,
-        user.status,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return text.includes(q);
-    });
-  }, [users, search]);
+  const assignableRoles = roles.filter((role) => {
+    if (isOwner) return true;
+    if (role.code === 'owner') return false;
+    if (currentRole === 'admin') return true;
+    const ownLevel = Number(adminUser?.roleRef?.level);
+    return role.code !== 'admin' && Number.isFinite(ownLevel) &&
+      Number(role.level) >= ownLevel &&
+      (adminUser?.roleRef?.scope === 'global' || role.scope !== 'global') &&
+      Array.isArray(role.permissions) &&
+      role.permissions.every((permission) => hasAdminPermission(adminUser, permission));
+  });
 
   const confirmModalLoading =
     (confirmModal.type === 'status' && Boolean(statusSavingId)) ||
@@ -152,15 +174,21 @@ export default function AdminUsersPage() {
       setRoles(loadedRoles);
       setBranches(loadedBranches);
 
-      setForm((current) => ({
+      setForm((current) => {
+        const selectedBranch = current.branchId || getDefaultBranchId(loadedBranches);
+        return ({
         ...current,
         role:
           current.role ||
           loadedRoles.find((role) => role.code === 'cashier')?.code ||
           loadedRoles[0]?.code ||
           'cashier',
-        branchId: current.branchId || getDefaultBranchId(loadedBranches),
-      }));
+        branchId: selectedBranch,
+        assignedBranches: current.assignedBranches?.length ? current.assignedBranches :
+          selectedBranch ? [{ branch: selectedBranch, canSell: true,
+            canManageInventory: false, canInvoice: false }] : [],
+      });
+      });
     } catch (err) {
       console.error('❌ Error cargando meta usuarios:', err);
       setError(err?.userMessage || 'No se pudo cargar la información base.');
@@ -169,39 +197,77 @@ export default function AdminUsersPage() {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
       setError('');
 
       const response = await getAdminUsers({
-        page: 1,
-        limit: 50,
+        page,
+        limit: 20,
         sort: '-createdAt',
+        q: debouncedSearch.trim(),
+        status: statusFilter,
+        role: roleFilter,
+        branchId: branchFilter === 'all' ? '' : branchFilter,
       });
 
+      if (currentRequest !== requestId.current) return;
       setUsers(response?.data || []);
+      setTotal(Number(response?.total || 0));
+      setTotalPages(Math.max(Number(response?.totalPages || 1), 1));
+      if (page > Number(response?.totalPages || 1)) setPage(Math.max(Number(response?.totalPages || 1), 1));
     } catch (err) {
+      if (currentRequest !== requestId.current) return;
       console.error('❌ Error cargando usuarios administrativos:', err);
       setError(err?.userMessage || 'No se pudieron cargar los usuarios.');
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
+  }, [page, debouncedSearch, statusFilter, roleFilter, branchFilter]);
+
+  const loadActivity = async (user, scope = 'actions', activityPage = 1) => {
+    const currentRequest = ++activityRequestId.current;
+    setActivityUser(user);
+    setActivityScope(scope);
+    setActivityLoading(true);
+    setActivityError('');
+    try {
+      const response = await getAdminUserActivity(user._id, scope, activityPage);
+      if (currentRequest !== activityRequestId.current) return;
+      setActivityEvents(response.data || []);
+      setActivityPagination(response.pagination || { page: activityPage, pages: 1 });
+    } catch (err) {
+      if (currentRequest !== activityRequestId.current) return;
+      setActivityError(err?.userMessage || 'No se pudo cargar la actividad.');
+    } finally {
+      if (currentRequest === activityRequestId.current) setActivityLoading(false);
+    }
+  };
+
+  const closeActivity = () => {
+    activityRequestId.current += 1;
+    setActivityUser(null);
+    setActivityEvents([]);
   };
 
   const openCreateModal = () => {
     setModalMode('create');
     setEditingUserId('');
+    setEditingUser(null);
     setModalError('');
     setSuccessMessage('');
 
+    const selectedBranch = getDefaultBranchId(branches);
+    const selectedRole = assignableRoles.find((role) => role.code === 'cashier')?.code ||
+      assignableRoles[0]?.code || 'cashier';
     setForm({
       ...EMPTY_FORM,
-      role:
-        roles.find((role) => role.code === 'cashier')?.code ||
-        roles[0]?.code ||
-        'cashier',
-      branchId: getDefaultBranchId(branches),
+      role: selectedRole,
+      branchId: selectedBranch,
+      assignedBranches: selectedBranch ? [getNewBranchAssignment(selectedBranch, selectedRole,
+        adminUser?.branches || [], isOwner || currentRole === 'admin')] : [],
     });
 
     setShowUserModal(true);
@@ -210,6 +276,7 @@ export default function AdminUsersPage() {
   const openEditModal = (user) => {
     setModalMode('edit');
     setEditingUserId(user?._id || '');
+    setEditingUser(user || null);
     setModalError('');
     setSuccessMessage('');
     setForm(buildFormFromUser(user, branches, roles));
@@ -229,6 +296,7 @@ export default function AdminUsersPage() {
     setShowUserModal(false);
     setModalError('');
     setEditingUserId('');
+    setEditingUser(null);
   };
 
   const closePasswordModal = () => {
@@ -320,7 +388,10 @@ export default function AdminUsersPage() {
           return;
         }
 
-        await updateAdminUser(editingUserId, buildUserPayload(form));
+        await updateAdminUser(
+          editingUserId,
+          buildUserEditPayload(form, editingUser, branches, roles)
+        );
 
         setSuccessMessage('Usuario administrativo actualizado correctamente.');
       } else {
@@ -389,7 +460,9 @@ export default function AdminUsersPage() {
 
     const currentStatus = String(user.status || '').toLowerCase();
     const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    const actionText = nextStatus === 'active' ? 'activar' : 'desactivar';
+    const actionText = nextStatus === 'active'
+      ? (currentStatus === 'blocked' ? 'desbloquear y activar' : 'activar')
+      : 'desactivar';
 
     setConfirmModal({
       open: true,
@@ -480,13 +553,22 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadMeta();
-    loadUsers();
   }, []);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    loadUsers();
+    return () => { requestId.current += 1; };
+  }, [loadUsers]);
+
   return (
-    <div className="space-y-5">
+    <div className="admin-users-plus space-y-5">
       <section
-        className="rounded-[28px] border px-5 py-5 shadow-sm md:px-6"
+        className="admin-users-plus__hero rounded-[28px] border px-5 py-6 shadow-sm md:px-7 md:py-7"
         style={{
           background: 'var(--admin-glass-bg)',
           borderColor: 'var(--admin-glass-border)',
@@ -501,7 +583,7 @@ export default function AdminUsersPage() {
                 className="text-xs font-black uppercase tracking-[0.24em]"
                 style={{ color: 'var(--admin-card-muted-text)' }}
               >
-                Administración
+                CONFIGURACIÓN / ACCESOS
               </p>
 
               <span
@@ -512,7 +594,7 @@ export default function AdminUsersPage() {
                   color: 'var(--admin-primary-soft-text)',
                 }}
               >
-                {users.length} usuarios registrados
+                Usuarios · Nivel Plus
               </span>
             </div>
 
@@ -520,15 +602,14 @@ export default function AdminUsersPage() {
               className="mt-3 text-2xl font-black leading-tight md:text-3xl"
               style={{ color: 'var(--admin-card-text)' }}
             >
-              Usuarios administrativos
+              Control de usuarios
             </h1>
 
             <p
               className="mt-2 max-w-2xl text-sm leading-6"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Gestiona accesos internos, roles, sedes, estados de usuario y
-              seguridad del panel administrativo.
+              Revisa el acceso, perfil, sedes y seguridad de cada cuenta.
             </p>
           </div>
 
@@ -539,23 +620,23 @@ export default function AdminUsersPage() {
               background: 'var(--admin-glass-soft-bg)',
             }}
           >
-            <button
+            {canCreate && <button
               type="button"
               onClick={openCreateModal}
-              disabled={metaLoading || branches.length === 0 || roles.length === 0}
+              disabled={metaLoading || branches.length === 0 || assignableRoles.length === 0}
               className="rounded-2xl px-4 py-2.5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed"
               style={{
                 background: 'var(--admin-button-bg)',
                 color: 'var(--admin-button-text)',
                 border: '1px solid var(--admin-button-bg)',
                 opacity:
-                  metaLoading || branches.length === 0 || roles.length === 0
+                  metaLoading || branches.length === 0 || assignableRoles.length === 0
                     ? 0.75
                     : 1,
               }}
             >
-              Nuevo usuario
-            </button>
+              + Nuevo usuario
+            </button>}
 
             <button
               type="button"
@@ -576,8 +657,40 @@ export default function AdminUsersPage() {
         </div>
       </section>
 
+      <section aria-label="Resumen de usuarios en esta página" className="admin-users-plus__overview">
+        <div className="admin-users-plus__overview-heading">
+          <div>
+            <p className="admin-users-plus__eyebrow">PANEL DE ACCESOS</p>
+            <h2>Estado de los usuarios</h2>
+          </div>
+          <span>En esta página · {loading ? 'Cargando' : `${users.length} visibles`}</span>
+        </div>
+        <div className="admin-users-plus__metrics">
+          <div className="admin-users-plus__metric">
+            <UsersRound aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : users.length}</strong>
+            <span>Usuarios visibles</span>
+          </div>
+          <div className="admin-users-plus__metric">
+            <CheckCircle2 aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : visibleActive}</strong>
+            <span>Con acceso activo</span>
+          </div>
+          <div className="admin-users-plus__metric">
+            <LockKeyhole aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : visibleTwoFactor}</strong>
+            <span>Con 2FA activo</span>
+          </div>
+          <div className="admin-users-plus__metric admin-users-plus__metric--attention">
+            <Activity aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : visibleAttention}</strong>
+            <span>Pendientes o bloqueados</span>
+          </div>
+        </div>
+      </section>
+
       <section
-        className="rounded-[28px] border p-5 shadow-sm"
+        className="admin-users-plus__list rounded-[28px] border p-5 shadow-sm"
         style={{
           background: 'var(--admin-card-bg)',
           borderColor: 'var(--admin-card-border)',
@@ -590,14 +703,14 @@ export default function AdminUsersPage() {
               className="text-lg font-black"
               style={{ color: 'var(--admin-card-text)' }}
             >
-              Listado de usuarios
+              Directorio de usuarios
             </h2>
 
             <p
               className="mt-1 text-sm"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Mostrando {filteredUsers.length} de {users.length} usuarios.
+              {total} resultados · Mostrando {users.length} · Página {page} de {totalPages}
             </p>
           </div>
 
@@ -619,14 +732,51 @@ export default function AdminUsersPage() {
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Nombre, usuario, correo o rol..."
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              placeholder="Nombre, usuario, correo o documento..."
               className="w-full bg-transparent text-sm outline-none"
               style={{
                 color: 'var(--admin-input-text)',
               }}
             />
           </div>
+          <select aria-label="Filtrar usuarios por estado" value={statusFilter}
+            onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
+            className="rounded-2xl border px-4 py-2.5 text-sm" style={{
+              background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)',
+              color: 'var(--admin-input-text)',
+            }}>
+            <option value="all">Todos los estados</option>
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+            <option value="pending">Pendientes</option>
+            <option value="blocked">Bloqueados</option>
+          </select>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Refinar por</span>
+          <select aria-label="Filtrar usuarios por perfil" value={roleFilter}
+            onChange={(event) => { setRoleFilter(event.target.value); setPage(1); }}
+            className="rounded-xl border px-3 py-2 text-sm"
+            style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }}>
+            <option value="all">Todos los perfiles</option>
+            {roles.map((role) => <option key={role.code} value={role.code}>{role.name}</option>)}
+          </select>
+          <select aria-label="Filtrar usuarios por sede" value={branchFilter}
+            onChange={(event) => { setBranchFilter(event.target.value); setPage(1); }}
+            className="rounded-xl border px-3 py-2 text-sm"
+            style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }}>
+            <option value="all">Todas las sedes</option>
+            {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+          </select>
+          {(roleFilter !== 'all' || branchFilter !== 'all' || statusFilter !== 'all' || search) &&
+            <button type="button" onClick={() => {
+              setRoleFilter('all'); setBranchFilter('all'); setStatusFilter('all'); setSearch(''); setPage(1);
+            }} className="rounded-xl border px-3 py-2 text-xs font-bold"
+              style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+              Limpiar filtros
+            </button>}
         </div>
 
         {successMessage && (
@@ -667,7 +817,7 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        {!loading && !metaLoading && filteredUsers.length === 0 && (
+        {!loading && !metaLoading && users.length === 0 && (
           <div
             className="mt-6 rounded-2xl border px-4 py-6 text-center text-sm font-semibold"
             style={{
@@ -679,28 +829,64 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        {!loading && !metaLoading && filteredUsers.length > 0 && (
+        {!loading && !metaLoading && users.length > 0 && (
           <UsersTable
-            users={filteredUsers}
+            users={users}
             roles={roles}
             branches={branches}
             statusSavingId={statusSavingId}
             deleteSavingId={deleteSavingId}
             onEditUser={openEditModal}
+            canEdit={canEdit}
+            canChangePassword={canChangePassword}
+            canDisable={canDisable}
+            canViewActivity={canViewActivity}
+            currentUserId={adminUser?.id || adminUser?._id || ''}
+            currentRole={currentRole}
+            currentBranches={adminUser?.branches || adminUser?.profile?.branches || []}
             onChangePassword={openPasswordModal}
             canManageTwoFactor={isOwner}
             onManageTwoFactor={openTwoFactorModal}
             onToggleStatus={handleToggleUserStatus}
             onDeleteUser={handleDeleteUser}
+            onViewActivity={(user) => loadActivity(user)}
           />
         )}
+        {!loading && totalPages > 1 && (
+          <nav aria-label="Páginas de usuarios" className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}
+              className="rounded-2xl border px-4 py-2 text-sm font-bold disabled:opacity-50"
+              style={{ borderColor: 'var(--admin-light-panel-border)', background: 'var(--admin-light-panel-bg)', color: 'var(--admin-light-panel-text)' }}>Anterior</button>
+            <span className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {totalPages}</span>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}
+              className="rounded-2xl border px-4 py-2 text-sm font-bold disabled:opacity-50"
+              style={{ borderColor: 'var(--admin-light-panel-border)', background: 'var(--admin-light-panel-bg)', color: 'var(--admin-light-panel-text)' }}>Siguiente</button>
+          </nav>
+        )}
       </section>
+
+      <UserActivityModal user={activityUser} scope={activityScope} events={activityEvents}
+        pagination={activityPagination} loading={activityLoading} error={activityError}
+        onScopeChange={(nextScope) => loadActivity(activityUser, nextScope)}
+        onPageChange={(nextPage) => loadActivity(activityUser, activityScope, nextPage)}
+        onClose={closeActivity} />
 
       <UserFormModal
         open={showUserModal}
         mode={modalMode}
-        roles={roles}
+        roles={modalMode === 'create'
+          ? assignableRoles
+          : roles.filter((role) => role.code === editingUser?.role ||
+              assignableRoles.some((allowed) => allowed.code === role.code))}
         branches={branches}
+        canAssign={canAssign && String(editingUserId) !== String(adminUser?.id || adminUser?._id)}
+        canDisable={canDisable && String(editingUserId) !== String(adminUser?.id || adminUser?._id)}
+        canChangePassword={canChangePassword}
+        actorBranches={adminUser?.branches || []}
+        globalBranchAccess={isOwner || currentRole === 'admin'}
+        hasUnavailableBranches={Boolean(editingUser?.branches?.some((item) =>
+          !branches.some((branch) => String(branch._id) === String(item.branch?._id || item.branch))
+        ))}
         form={form}
         setForm={setForm}
         saving={saving}

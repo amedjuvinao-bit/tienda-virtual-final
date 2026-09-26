@@ -1,19 +1,14 @@
 // frontend/src/admin/configuracion/sections/SedesSection.jsx
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2,
+  AlertCircle,
   CheckCircle2,
-  Edit3,
-  MapPin,
   Plus,
   RefreshCw,
   Save,
   Search,
-  Star,
-  Trash2,
-  Warehouse,
   X,
 } from 'lucide-react';
 
@@ -28,6 +23,9 @@ import {
   updateAdminBranchStatus,
 } from '../../api/adminBranchesApi';
 import api from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
+import { hasAdminPermission } from '../../security/adminPermissions';
+import SedesList from './SedesList';
 
 const EMPTY_FORM = {
   name: '',
@@ -98,19 +96,6 @@ const PAYMENT_METHOD_LABELS = {
 
 function getBranchId(branch) {
   return branch?._id || branch?.id || '';
-}
-
-function getInitials(text) {
-  const value = String(text || '').trim();
-
-  if (!value) return 'S';
-
-  return value
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
 }
 
 function normalizeGeoText(value) {
@@ -236,32 +221,13 @@ function buildBranchPayload(form) {
   };
 }
 
-function getStatusBadgeStyle(status, active) {
-  if (status === 'maintenance') {
-    return {
-      backgroundColor: 'var(--admin-warning-soft-bg)',
-      borderColor: 'var(--admin-warning)',
-      color: 'var(--admin-warning-text)',
-    };
-  }
-
-  if (active === true && status === 'active') {
-    return {
-      backgroundColor: 'var(--admin-primary-soft-bg)',
-      borderColor: 'var(--admin-primary-soft-border)',
-      color: 'var(--admin-primary-soft-text)',
-    };
-  }
-
-  return {
-    backgroundColor: 'var(--admin-danger-soft-bg)',
-    borderColor: 'var(--admin-danger)',
-    color: 'var(--admin-danger-text)',
-  };
-}
-
 export default function SedesSection() {
+  const { adminUser } = useAuth();
+  const canCreate = hasAdminPermission(adminUser, 'branches:create');
+  const canEdit = hasAdminPermission(adminUser, 'branches:update');
+  const canDisable = hasAdminPermission(adminUser, 'branches:disable');
   const [branches, setBranches] = useState([]);
+  const branchesRequestId = useRef(0);
   const [meta, setMeta] = useState({
     types: ['store', 'warehouse', 'office', 'pickup_point', 'virtual'],
     statuses: ['active', 'inactive', 'closed', 'maintenance'],
@@ -271,6 +237,7 @@ export default function SedesSection() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingBranch, setEditingBranch] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [formStep, setFormStep] = useState('general');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -286,6 +253,9 @@ export default function SedesSection() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const editingBranchId = getBranchId(editingBranch);
 
@@ -388,12 +358,6 @@ export default function SedesSection() {
     borderColor: 'var(--admin-danger)',
   };
 
-  const warningBadgeStyle = {
-    backgroundColor: 'var(--admin-warning-soft-bg)',
-    color: 'var(--admin-warning-text)',
-    borderColor: 'var(--admin-warning)',
-  };
-
   const primaryBadgeStyle = {
     backgroundColor: 'var(--admin-primary-soft-bg)',
     color: 'var(--admin-primary-soft-text)',
@@ -401,6 +365,7 @@ export default function SedesSection() {
   };
 
   const loadBranches = useCallback(async () => {
+    const requestId = ++branchesRequestId.current;
     try {
       setLoading(true);
       setError('');
@@ -409,25 +374,27 @@ export default function SedesSection() {
         q: search,
         status: statusFilter,
         type: typeFilter,
-        page: 1,
-        limit: 100,
+        page,
+        limit: pageSize,
         sort: '-createdAt',
       });
 
       const list = resolveBranchesList(response);
 
+      if (requestId !== branchesRequestId.current) return;
       setBranches(list);
       setTotal(resolveTotal(response, list.length));
     } catch (loadError) {
+      if (requestId !== branchesRequestId.current) return;
       setError(
         loadError?.response?.data?.message ||
           loadError?.message ||
           'No fue posible cargar las sedes.'
       );
     } finally {
-      setLoading(false);
+      if (requestId === branchesRequestId.current) setLoading(false);
     }
-  }, [search, statusFilter, typeFilter]);
+  }, [search, statusFilter, typeFilter, page]);
 
   const loadMeta = useCallback(async () => {
     try {
@@ -454,6 +421,12 @@ export default function SedesSection() {
   useEffect(() => {
     loadBranches();
   }, [loadBranches]);
+
+  useEffect(() => {
+    if (!message || showForm) return undefined;
+    const timeoutId = window.setTimeout(() => setMessage(''), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [message, showForm]);
 
   useEffect(() => {
     let active = true;
@@ -605,7 +578,9 @@ export default function SedesSection() {
     setForm(EMPTY_FORM);
     setEditingBranch(null);
     setShowForm(false);
+    setFormStep('general');
     setSaving(false);
+    setError('');
   };
 
   const openCreateForm = () => {
@@ -613,6 +588,7 @@ export default function SedesSection() {
     setError('');
     setEditingBranch(null);
     setForm(EMPTY_FORM);
+    setFormStep('general');
     setShowForm(true);
   };
 
@@ -621,6 +597,7 @@ export default function SedesSection() {
     setError('');
     setEditingBranch(branch);
     setForm(normalizeBranchToForm(branch));
+    setFormStep('general');
     setShowForm(true);
   };
 
@@ -629,11 +606,19 @@ export default function SedesSection() {
 
     if (!form.name.trim()) {
       setError('El nombre de la sede es obligatorio.');
+      setFormStep('general');
       return;
     }
 
     if (!form.code.trim()) {
       setError('El código de la sede es obligatorio.');
+      setFormStep('general');
+      return;
+    }
+
+    if (formStep !== 'operation') {
+      setError('');
+      setFormStep(formStep === 'general' ? 'location' : 'operation');
       return;
     }
 
@@ -645,7 +630,35 @@ export default function SedesSection() {
       const payload = buildBranchPayload(form);
 
       if (editingBranchId) {
-        await updateAdminBranch(editingBranchId, payload);
+        if (
+          !canDisable ||
+          (
+            payload.status === (editingBranch.status || 'active') &&
+            payload.active === (editingBranch.active !== false)
+          )
+        ) {
+          delete payload.status;
+          delete payload.active;
+        }
+        const response = await updateAdminBranch(editingBranchId, payload);
+        const updatedBranch = response?.data || {
+          ...editingBranch,
+          ...payload,
+        };
+        // Mostrar la versión confirmada por el servidor y descartar lecturas
+        // anteriores que aún puedan llegar después de guardar.
+        branchesRequestId.current += 1;
+        setLoading(false);
+        setBranches((currentBranches) => currentBranches.map((branch) => {
+          if (getBranchId(branch) === editingBranchId) return updatedBranch;
+          return {
+            ...branch,
+            isMain: updatedBranch.isMain ? false : branch.isMain,
+            isDefaultForOnlineOrders: updatedBranch.isDefaultForOnlineOrders
+              ? false
+              : branch.isDefaultForOnlineOrders,
+          };
+        }));
         setMessage('Sede actualizada correctamente.');
       } else {
         await createAdminBranch(payload);
@@ -653,7 +666,10 @@ export default function SedesSection() {
       }
 
       resetForm();
-      await loadBranches();
+      if (!editingBranchId) {
+        if (page !== 1) setPage(1);
+        else await loadBranches();
+      }
     } catch (saveError) {
       setError(
         saveError?.response?.data?.message ||
@@ -683,7 +699,8 @@ export default function SedesSection() {
 
       await deleteAdminBranch(branchId);
       setMessage('Sede eliminada correctamente.');
-      await loadBranches();
+      if (branches.length === 1 && page > 1) setPage(page - 1);
+      else await loadBranches();
     } catch (deleteError) {
       setError(
         deleteError?.response?.data?.message ||
@@ -780,14 +797,14 @@ export default function SedesSection() {
             <button
               type="button"
               aria-label="Cerrar formulario de sede"
-              className="absolute inset-0 cursor-default backdrop-blur-sm"
-              style={{ backgroundColor: 'var(--admin-modal-overlay)' }}
+              className="absolute inset-0 cursor-default backdrop-blur-xl"
+              style={{ backgroundColor: 'rgba(24, 22, 34, 0.12)' }}
               onClick={resetForm}
             />
 
             <form
               onSubmit={handleSubmit}
-              className="relative z-10 flex max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border shadow-2xl"
+              className="relative z-10 flex max-h-[min(760px,88vh)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border backdrop-blur-2xl shadow-2xl"
               style={{
                 backgroundColor: 'var(--admin-modal-bg)',
                 borderColor: 'var(--admin-glass-border)',
@@ -809,8 +826,9 @@ export default function SedesSection() {
                   </h3>
 
                   <p className="mt-1 text-sm" style={modalMutedTextStyle}>
-                    Completa la información básica, ubicación, contacto y permisos
-                    operativos.
+                    {formStep === 'general' && 'Identifica la sede y añade sus datos de contacto.'}
+                    {formStep === 'location' && 'Indica dónde se encuentra esta sede.'}
+                    {formStep === 'operation' && 'Configura los servicios que prestará la sede.'}
                   </p>
                 </div>
 
@@ -825,19 +843,40 @@ export default function SedesSection() {
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-6">
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <div className="space-y-4">
+              <nav aria-label="Secciones del formulario de sede" className="flex shrink-0 gap-2 border-b px-5 py-3 md:px-6" style={{ borderColor: 'var(--admin-card-border)' }}>
+                {[
+                  ['general', '1. Datos'],
+                  ['location', '2. Ubicación'],
+                  ['operation', '3. Operación'],
+                ].map(([step, label]) => (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => { setFormStep(step); setError(''); }}
+                    aria-current={formStep === step ? 'step' : undefined}
+                    className="min-w-0 flex-1 rounded-xl border px-2 py-2 text-center text-xs font-semibold sm:text-sm"
+                    style={formStep === step ? primaryBadgeStyle : borderOnlyButtonStyle}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </nav>
+
+              {error && <div role="alert" className="mx-5 mt-3 rounded-xl border px-3 py-2 text-sm font-semibold md:mx-6" style={dangerButtonStyle}>{error}</div>}
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 md:px-6">
+                <div>
+                  <div className={formStep === 'general' ? 'space-y-4' : 'hidden'}>
                     <h4
-                      className="text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Información general
                     </h4>
 
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Nombre</span>
+                        <span className="text-sm font-semibold">Nombre</span>
                         <input
                           value={form.name}
                           onChange={(event) =>
@@ -850,7 +889,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Código</span>
+                        <span className="text-sm font-semibold">Código</span>
                         <input
                           value={form.code}
                           onChange={(event) =>
@@ -863,7 +902,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Tipo de sede</span>
+                        <span className="text-sm font-semibold">Tipo de sede</span>
                         <select
                           value={form.type}
                           onChange={(event) =>
@@ -881,9 +920,10 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Estado</span>
+                        <span className="text-sm font-semibold">Estado</span>
                         <select
                           value={form.status}
+                          disabled={Boolean(editingBranchId) && !canDisable}
                           onChange={(event) => {
                             const nextStatus = event.target.value;
 
@@ -902,7 +942,7 @@ export default function SedesSection() {
                       </label>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <label
                         className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm"
                         style={inputStyle}
@@ -936,15 +976,15 @@ export default function SedesSection() {
                     </div>
 
                     <h4
-                      className="pt-2 text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Contacto
                     </h4>
 
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Teléfono</span>
+                        <span className="text-sm font-semibold">Teléfono</span>
                         <input
                           value={form.contact.phone}
                           onChange={(event) =>
@@ -960,7 +1000,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">WhatsApp</span>
+                        <span className="text-sm font-semibold">WhatsApp</span>
                         <input
                           value={form.contact.whatsapp}
                           onChange={(event) =>
@@ -976,7 +1016,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Correo</span>
+                        <span className="text-sm font-semibold">Correo</span>
                         <input
                           value={form.contact.email}
                           onChange={(event) =>
@@ -993,9 +1033,9 @@ export default function SedesSection() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className={formStep === 'location' ? 'space-y-4' : 'hidden'}>
                     <h4
-                      className="text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Ubicación
@@ -1003,7 +1043,7 @@ export default function SedesSection() {
 
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">País</span>
+                        <span className="text-sm font-semibold">País</span>
                         {countries.length ? (
                           <select
                             value={selectedCountryCode}
@@ -1048,7 +1088,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">
+                        <span className="text-sm font-semibold">
                           {selectedCountryCode === 'CO'
                             ? 'Departamento'
                             : 'Estado / provincia'}
@@ -1107,7 +1147,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Ciudad</span>
+                        <span className="text-sm font-semibold">Ciudad</span>
                         {cities.length ? (
                           <select
                             value={
@@ -1164,7 +1204,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">Barrio</span>
+                        <span className="text-sm font-semibold">Barrio</span>
                         <input
                           value={form.address.neighborhood}
                           onChange={(event) =>
@@ -1180,7 +1220,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1 md:col-span-2">
-                        <span className="text-xs font-semibold">Dirección</span>
+                        <span className="text-sm font-semibold">Dirección</span>
                         <input
                           value={form.address.addressLine}
                           onChange={(event) =>
@@ -1196,7 +1236,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1 md:col-span-2">
-                        <span className="text-xs font-semibold">Código postal</span>
+                        <span className="text-sm font-semibold">Código postal</span>
                         <input
                           value={form.address.postalCode}
                           onChange={(event) =>
@@ -1212,9 +1252,11 @@ export default function SedesSection() {
                         />
                       </label>
                     </div>
+                  </div>
 
+                  <div className={formStep === 'operation' ? 'space-y-4' : 'hidden'}>
                     <h4
-                      className="pt-2 text-sm font-bold uppercase tracking-wide"
+                      className="text-sm font-bold"
                       style={{ color: 'var(--admin-primary)' }}
                     >
                       Operación
@@ -1296,7 +1338,7 @@ export default function SedesSection() {
 
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">
+                        <span className="text-sm font-semibold">
                           Método de pago base
                         </span>
                         <select
@@ -1320,7 +1362,7 @@ export default function SedesSection() {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-xs font-semibold">
+                        <span className="text-sm font-semibold">
                           Cliente por defecto
                         </span>
                         <input
@@ -1337,25 +1379,23 @@ export default function SedesSection() {
                         />
                       </label>
                     </div>
-                  </div>
-                </div>
 
-                <div className="mt-5">
-                  <label className="space-y-1">
-                    <span className="text-xs font-semibold">Observaciones</span>
-                    <textarea
-                      value={form.notes}
-                      onChange={(event) => updateField('notes', event.target.value)}
-                      rows={3}
-                      className="w-full resize-none rounded-2xl border px-3 py-2 text-sm outline-none"
-                      style={inputStyle}
-                    />
-                  </label>
+                    <label className="block space-y-1">
+                      <span className="text-sm font-semibold">Observaciones</span>
+                      <textarea
+                        value={form.notes}
+                        onChange={(event) => updateField('notes', event.target.value)}
+                        rows={2}
+                        className="w-full resize-none rounded-2xl border px-3 py-2 text-sm outline-none"
+                        style={inputStyle}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
               <div
-                className="flex shrink-0 flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:justify-end md:px-6"
+                className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t px-5 py-3 md:px-6"
                 style={{
                   borderColor: 'var(--admin-card-border)',
                   backgroundColor: 'var(--admin-modal-bg)',
@@ -1364,21 +1404,30 @@ export default function SedesSection() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold"
+                  className="mr-auto inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold"
                   style={borderOnlyButtonStyle}
                 >
                   <X className="h-4 w-4" />
                   Cancelar
                 </button>
 
+                {formStep !== 'general' && <button
+                  type="button"
+                  onClick={() => { setFormStep(formStep === 'operation' ? 'location' : 'general'); setError(''); }}
+                  className="rounded-xl border px-3 py-2 text-sm font-semibold"
+                  style={borderOnlyButtonStyle}
+                >
+                  Anterior
+                </button>}
+
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-sm disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-60"
                   style={primaryButtonStyle}
                 >
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Guardando...' : 'Guardar sede'}
+                  {formStep === 'operation' && <Save className="h-4 w-4" />}
+                  {saving ? 'Guardando...' : formStep === 'operation' ? 'Guardar sede' : 'Siguiente'}
                 </button>
               </div>
             </form>
@@ -1389,39 +1438,29 @@ export default function SedesSection() {
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="space-y-3">
         <div
-          className="rounded-[28px] border p-5 backdrop-blur-xl"
+          className="rounded-2xl border p-4 backdrop-blur-xl"
           style={glassCardStyle}
         >
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div
-                className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-                style={primaryBadgeStyle}
-              >
-                <Building2 className="h-4 w-4" />
-                Módulo de sedes
-              </div>
-
               <h3
-                className="mt-3 text-xl font-bold"
+                className="text-xl font-bold"
                 style={{ color: 'var(--admin-card-text)' }}
               >
-                Administra las sedes de la tienda
+                Sedes
               </h3>
 
               <p
                 className="mt-1 max-w-3xl text-sm leading-6"
                 style={mutedTextStyle}
               >
-                Crea sedes, bodegas, oficinas o puntos de recogida. Después estas
-                sedes podrán relacionarse con usuarios, inventario, ventas, caja y
-                facturación.
+                Administra tiendas, bodegas y puntos de recogida.
               </p>
             </div>
 
-            <button
+            {canCreate && <button
               type="button"
               onClick={openCreateForm}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-sm transition hover:scale-[1.01] active:scale-[0.99]"
@@ -1429,24 +1468,15 @@ export default function SedesSection() {
             >
               <Plus className="h-4 w-4" />
               Nueva sede
-            </button>
+            </button>}
           </div>
         </div>
 
-        {(message || error) && (
-          <div
-            className="rounded-2xl border px-4 py-3 text-sm font-semibold"
-            style={error ? dangerButtonStyle : primaryBadgeStyle}
-          >
-            {error || message}
-          </div>
-        )}
-
         <div
-          className="rounded-[28px] border p-4 backdrop-blur-xl"
+          className="rounded-2xl border p-3 backdrop-blur-xl"
           style={cardStyle}
         >
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px_auto]">
+          <div className="grid gap-2 lg:grid-cols-[1fr_180px_180px_auto]">
             <div
               className="flex items-center gap-2 rounded-2xl border px-3 py-2"
               style={inputStyle}
@@ -1457,7 +1487,11 @@ export default function SedesSection() {
               />
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Buscar sedes"
                 placeholder="Buscar por nombre, código, ciudad, correo..."
                 className="w-full border-0 bg-transparent text-sm outline-none"
                 style={{ color: 'var(--admin-input-text)' }}
@@ -1466,7 +1500,11 @@ export default function SedesSection() {
 
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
+              aria-label="Filtrar sedes por estado"
               className="rounded-2xl border px-3 py-2 text-sm outline-none"
               style={inputStyle}
             >
@@ -1480,7 +1518,11 @@ export default function SedesSection() {
 
             <select
               value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
+              onChange={(event) => {
+                setTypeFilter(event.target.value);
+                setPage(1);
+              }}
+              aria-label="Filtrar sedes por tipo"
               className="rounded-2xl border px-3 py-2 text-sm outline-none"
               style={inputStyle}
             >
@@ -1504,249 +1546,64 @@ export default function SedesSection() {
             </button>
           </div>
 
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <span style={mutedTextStyle}>
-              Total de sedes: <strong>{total}</strong>
-            </span>
-          </div>
         </div>
 
-        <div
-          className="overflow-hidden rounded-[28px] border backdrop-blur-xl"
-          style={cardStyle}
-        >
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead
-                style={{
-                  backgroundColor: 'var(--admin-table-head-bg)',
-                  color: 'var(--admin-table-head-text)',
-                }}
-              >
-                <tr>
-                  <th className="px-4 py-3 font-bold">Sede</th>
-                  <th className="px-4 py-3 font-bold">Tipo</th>
-                  <th className="px-4 py-3 font-bold">Ubicación</th>
-                  <th className="px-4 py-3 font-bold">Estado</th>
-                  <th className="px-4 py-3 font-bold">Marcadores</th>
-                  <th className="px-4 py-3 text-right font-bold">Acciones</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="px-4 py-8 text-center text-sm"
-                      style={{ color: 'var(--admin-table-muted-text)' }}
-                    >
-                      Cargando sedes...
-                    </td>
-                  </tr>
-                )}
-
-                {!loading && branches.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="px-4 py-10 text-center"
-                      style={{ color: 'var(--admin-table-muted-text)' }}
-                    >
-                      <Building2 className="mx-auto mb-3 h-8 w-8 opacity-60" />
-                      No hay sedes registradas todavía.
-                    </td>
-                  </tr>
-                )}
-
-                {!loading &&
-                  branches.map((branch) => {
-                    const branchId = getBranchId(branch);
-                    const statusBadgeStyle = getStatusBadgeStyle(
-                      branch.status,
-                      branch.active
-                    );
-
-                    return (
-                      <tr
-                        key={branchId}
-                        className="border-t transition"
-                        style={{
-                          borderColor: 'var(--admin-table-border)',
-                          color: 'var(--admin-table-text)',
-                        }}
-                      >
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-bold"
-                              style={primaryBadgeStyle}
-                            >
-                              {getInitials(branch.name)}
-                            </div>
-
-                            <div>
-                              <div className="font-bold">{branch.name}</div>
-                              <div
-                                className="text-xs"
-                                style={{ color: 'var(--admin-table-muted-text)' }}
-                              >
-                                Código: {branch.code || 'Sin código'}
-                              </div>
-                              {branch.contact?.email && (
-                                <div
-                                  className="text-xs"
-                                  style={{ color: 'var(--admin-table-muted-text)' }}
-                                >
-                                  {branch.contact.email}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div
-                            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-                            style={softButtonStyle}
-                          >
-                            {branch.type === 'warehouse' ? (
-                              <Warehouse className="h-3.5 w-3.5" />
-                            ) : (
-                              <Building2 className="h-3.5 w-3.5" />
-                            )}
-                            {TYPE_LABELS[branch.type] || branch.type}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex items-start gap-2">
-                            <MapPin
-                              className="mt-0.5 h-4 w-4"
-                              style={{ color: 'var(--admin-primary)' }}
-                            />
-                            <div>
-                              <div className="font-semibold">
-                                {branch.address?.city || 'Sin ciudad'}
-                              </div>
-                              <div
-                                className="text-xs"
-                                style={{ color: 'var(--admin-table-muted-text)' }}
-                              >
-                                {branch.address?.department || 'Sin departamento'}
-                              </div>
-                              {branch.address?.addressLine && (
-                                <div
-                                  className="text-xs"
-                                  style={{ color: 'var(--admin-table-muted-text)' }}
-                                >
-                                  {branch.address.addressLine}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(branch)}
-                            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold"
-                            style={statusBadgeStyle}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            {STATUS_LABELS[branch.status] || branch.status}
-                          </button>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            {branch.isMain && (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold"
-                                style={primaryBadgeStyle}
-                              >
-                                <Star className="h-3 w-3" />
-                                Principal
-                              </span>
-                            )}
-
-                            {branch.isDefaultForOnlineOrders && (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold"
-                                style={warningBadgeStyle}
-                              >
-                                Online
-                              </span>
-                            )}
-
-                            {!branch.isMain && !branch.isDefaultForOnlineOrders && (
-                              <span
-                                className="text-xs"
-                                style={{ color: 'var(--admin-table-muted-text)' }}
-                              >
-                                Sin marcador especial
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end gap-2">
-                            {!branch.isMain && (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkAsMain(branch)}
-                                className="rounded-xl border p-2"
-                                title="Marcar como principal"
-                                style={softButtonStyle}
-                              >
-                                <Star className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            {!branch.isDefaultForOnlineOrders && (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkAsOnlineDefault(branch)}
-                                className="rounded-xl border p-2"
-                                title="Marcar para pedidos online"
-                                style={warningBadgeStyle}
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => openEditForm(branch)}
-                              className="rounded-xl border p-2"
-                              title="Editar"
-                              style={borderOnlyButtonStyle}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(branch)}
-                              className="rounded-xl border p-2"
-                              title="Eliminar"
-                              style={dangerButtonStyle}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <SedesList
+          branches={branches}
+          total={total}
+          loading={loading}
+          canEdit={canEdit}
+          canDisable={canDisable}
+          onEdit={openEditForm}
+          onToggleStatus={handleToggleStatus}
+          onMarkAsMain={handleMarkAsMain}
+          onMarkAsOnlineDefault={handleMarkAsOnlineDefault}
+          onDelete={handleDelete}
+        />
+        {totalPages > 1 && (
+          <nav aria-label="Páginas de sedes" className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm" style={cardStyle}>
+            <span>Página {page} de {totalPages} · {total} sedes</span>
+            <div className="flex gap-2">
+              <button type="button" disabled={page === 1 || loading} onClick={() => setPage((current) => current - 1)} className="rounded-xl border px-3 py-2 disabled:opacity-40" style={borderOnlyButtonStyle}>Anterior</button>
+              <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((current) => current + 1)} className="rounded-xl border px-3 py-2 disabled:opacity-40" style={borderOnlyButtonStyle}>Siguiente</button>
+            </div>
+          </nav>
+        )}
       </div>
 
+      {!showForm && (message || error) && typeof document !== 'undefined' && createPortal(
+        <div
+          role={error ? 'alert' : 'status'}
+          className="fixed bottom-24 right-4 z-[99998] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-xl backdrop-blur-2xl sm:bottom-6 sm:right-6"
+          style={{
+            background: 'var(--admin-modal-glass-bg, var(--admin-modal-bg))',
+            borderColor: error ? 'var(--admin-danger-border)' : 'var(--admin-success-border)',
+            color: 'var(--admin-modal-text)',
+            boxShadow: '0 18px 48px rgba(15, 23, 42, 0.22)',
+          }}
+        >
+          <span
+            className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+            style={{
+              background: error ? 'var(--admin-danger-soft-bg)' : 'var(--admin-success-soft-bg)',
+              color: error ? 'var(--admin-danger-text)' : 'var(--admin-success-text)',
+            }}
+          >
+            {error ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          </span>
+          <span className="min-w-0 flex-1 pt-0.5 font-semibold leading-5">{error || message}</span>
+          <button
+            type="button"
+            onClick={() => { setMessage(''); setError(''); }}
+            aria-label="Cerrar aviso de sedes"
+            className="shrink-0 rounded-lg p-1 transition-opacity hover:opacity-60"
+            style={{ color: 'var(--admin-modal-muted-text)' }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>,
+        document.body
+      )}
       {modalContent}
     </>
   );

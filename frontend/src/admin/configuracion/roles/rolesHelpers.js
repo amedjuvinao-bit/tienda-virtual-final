@@ -252,33 +252,42 @@ export function formatPermissionLabel(permission) {
   ).toLowerCase()}`;
 }
 
-export function groupPermissionsByModule(permissions = []) {
+export function groupPermissionsByModule(permissions = [], catalog = []) {
   const normalizedPermissions = normalizePermissions(permissions);
+  const modules = new Map(
+    (Array.isArray(catalog) ? catalog : []).map((module) => [module.key, module])
+  );
 
   return normalizedPermissions.reduce((groups, permission) => {
     const moduleName = getPermissionModule(permission);
+    const moduleInfo = modules.get(moduleName);
+    const permissionInfo = moduleInfo?.permissions?.find((item) => item.key === permission);
 
     if (!groups[moduleName]) {
       groups[moduleName] = {
         module: moduleName,
-        label: getPermissionModuleLabel(moduleName),
+        label: moduleInfo?.label || getPermissionModuleLabel(moduleName),
+        description: moduleInfo?.description || '',
         permissions: [],
       };
     }
 
     groups[moduleName].permissions.push({
       value: permission,
-      label: formatPermissionLabel(permission),
+      label: permissionInfo?.label || formatPermissionLabel(permission),
+      description: permissionInfo?.description || '',
       action: getPermissionAction(permission),
-      actionLabel: getPermissionActionLabel(getPermissionAction(permission)),
+      actionLabel: permissionInfo?.label || getPermissionActionLabel(getPermissionAction(permission)),
+      sensitive: permissionInfo?.sensitive === true,
+      danger: permissionInfo?.danger === true,
     });
 
     return groups;
   }, {});
 }
 
-export function getPermissionGroupsArray(permissions = []) {
-  return Object.values(groupPermissionsByModule(permissions)).sort((a, b) =>
+export function getPermissionGroupsArray(permissions = [], catalog = []) {
+  return Object.values(groupPermissionsByModule(permissions, catalog)).sort((a, b) =>
     a.label.localeCompare(b.label, 'es')
   );
 }

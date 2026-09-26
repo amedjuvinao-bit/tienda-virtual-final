@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 
+const Branch = require('../models/Branch');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryReservation = require('../models/InventoryReservation');
 const InventoryMovement = require('../models/InventoryMovement');
@@ -127,11 +128,32 @@ router.put(
   requireAdmin,
   requirePermission('branches:update'),
   async (req, res, next) => {
-    if (!wantsDisableFromBody(req.body || {})) {
+    const body = req.body || {};
+    if (!wantsDisableFromBody(body) || !isValidObjectId(req.params.id)) {
       return next();
     }
 
-    return protectBranchWithoutOperations(req, res, next, 'disable');
+    try {
+      const current = await Branch.findOne({
+        _id: toObjectId(req.params.id),
+        deletedAt: null,
+      }).select('status active').lean();
+
+      if (!current || (
+        (body.status === undefined || cleanLower(body.status) === current.status) &&
+        (body.active === undefined || body.active === current.active)
+      )) {
+        return next();
+      }
+
+      return protectBranchWithoutOperations(req, res, next, 'disable');
+    } catch (error) {
+      console.error('❌ Error consultando el estado actual de la sede:', error.message);
+      return res.status(500).json({
+        ok: false,
+        message: 'No se pudo validar el estado actual de la sede.',
+      });
+    }
   }
 );
 

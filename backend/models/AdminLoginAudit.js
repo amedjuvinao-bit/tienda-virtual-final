@@ -3,6 +3,11 @@ const mongoose = require('mongoose');
 
 const AdminLoginAuditSchema = new mongoose.Schema(
   {
+    adminUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
     username: {
       type: String,
       trim: true,
@@ -40,6 +45,7 @@ const AdminLoginAuditSchema = new mongoose.Schema(
 
 AdminLoginAuditSchema.index({ createdAt: -1 });
 AdminLoginAuditSchema.index({ username: 1, createdAt: -1 });
+AdminLoginAuditSchema.index({ adminUserId: 1, createdAt: -1 });
 AdminLoginAuditSchema.index({ ip: 1, createdAt: -1 });
 AdminLoginAuditSchema.index({ status: 1, createdAt: -1 });
 AdminLoginAuditSchema.index({ username: 1, status: 1, createdAt: -1 });

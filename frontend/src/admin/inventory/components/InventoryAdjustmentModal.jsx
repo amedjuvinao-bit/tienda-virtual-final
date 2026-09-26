@@ -479,11 +479,20 @@ function buildMergedProducts(products = [], stockRows = []) {
 
 function buildMergedBranches(branches = [], stockRows = []) {
   const branchMap = new Map();
+  const unavailableIds = new Set(
+    branches
+      .filter((branch) =>
+        branch?.active === false ||
+        (branch?.status && branch.status !== 'active') ||
+        branch?.settings?.allowInventoryMovements === false
+      )
+      .map(getBranchId)
+  );
 
   branches.forEach((branch) => {
     const branchId = getBranchId(branch);
 
-    if (!branchId) return;
+    if (!branchId || unavailableIds.has(branchId)) return;
 
     branchMap.set(branchId, {
       ...branch,
@@ -497,7 +506,7 @@ function buildMergedBranches(branches = [], stockRows = []) {
   stockRows.forEach((row) => {
     const branchId = getBranchId(row);
 
-    if (!branchId || branchMap.has(branchId)) return;
+    if (!branchId || unavailableIds.has(branchId) || branchMap.has(branchId)) return;
 
     branchMap.set(branchId, {
       _id: branchId,
@@ -884,6 +893,11 @@ export default function InventoryAdjustmentModal({
         return false;
       }
 
+      if (!selectedBranch) {
+        setError('Esta sede no está habilitada para manejar inventario. Selecciona otra sede.');
+        return false;
+      }
+
       if (!form.variantKey && !cleanText(form.size) && !cleanText(form.color)) {
         setError('Selecciona la presentación o variante del producto.');
         return false;
@@ -937,6 +951,11 @@ export default function InventoryAdjustmentModal({
 
     if (!form.branchId) {
       setError('Selecciona una sede o bodega.');
+      return;
+    }
+
+    if (!selectedBranch) {
+      setError('Esta sede no está habilitada para manejar inventario. Selecciona otra sede.');
       return;
     }
 

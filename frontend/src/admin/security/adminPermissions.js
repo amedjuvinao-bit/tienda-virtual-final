@@ -3,7 +3,7 @@
 const PRIVILEGED_ROLES = new Set(['owner', 'admin']);
 
 export const ADMIN_ROUTE_PERMISSIONS = {
-  dashboard: [],
+  dashboard: ['dashboard:view'],
 
   productos: ['products:view'],
   'productos/nuevo': ['products:create'],
@@ -229,4 +229,15 @@ export function getRequiredPermissionsForAdminPath(pathname) {
 
 export function canAccessAdminPath(user, pathname) {
   return hasAnyAdminPermission(user, getRequiredPermissionsForAdminPath(pathname));
+}
+
+export function getAdminLandingPath(user) {
+  const firstAllowed = Object.keys(ADMIN_ROUTE_PERMISSIONS)
+    .filter((path) => !path.includes('/') || (
+      path.startsWith('configuracion/') && path !== 'configuracion/seguridad'
+    ))
+    .find((path) => path !== 'configuracion' && canAccessAdminPath(user, `/admin/${path}`));
+
+  // Every administrator can manage the security of their own account.
+  return firstAllowed ? `/admin/${firstAllowed}` : '/admin/configuracion/seguridad';
 }
