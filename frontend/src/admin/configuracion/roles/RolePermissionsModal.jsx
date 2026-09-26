@@ -6,9 +6,9 @@ import { getPermissionGroupsArray } from './rolesHelpers';
 const muted = 'var(--admin-card-muted, #6b7280)';
 const border = 'var(--admin-border, rgba(0,0,0,0.10))';
 
-export default function RolePermissionsModal({ open = false, role = null, onClose }) {
+export default function RolePermissionsModal({ open = false, role = null, permissionCatalog = [], onClose }) {
   const [selectedModule, setSelectedModule] = useState('');
-  const permissionGroups = getPermissionGroupsArray(role?.permissions || []);
+  const permissionGroups = getPermissionGroupsArray(role?.permissions || [], permissionCatalog);
   const selectedGroup = permissionGroups.find((group) => group.module === selectedModule)
     || permissionGroups[0];
   const permissionsCount = permissionGroups.reduce(

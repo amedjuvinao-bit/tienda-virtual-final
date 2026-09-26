@@ -9,6 +9,7 @@ const requirePermission = require('../middleware/requirePermission');
 const AdminRole = require('../models/AdminRole');
 const AdminUser = require('../models/AdminUser');
 const { canGrantRole } = require('../security/adminUserWritePolicy');
+const { getPublicPermissionCatalog } = require('../security/adminPermissionCatalog');
 
 const router = express.Router();
 
@@ -354,6 +355,7 @@ router.get(
         ok: true,
         data: {
           permissions: AdminRole.getAvailablePermissions(),
+          permissionCatalog: getPublicPermissionCatalog(),
           scopes: ['global', 'branch', 'own'],
           statuses: ['active', 'inactive'],
         },

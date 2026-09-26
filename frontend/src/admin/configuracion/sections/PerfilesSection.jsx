@@ -625,6 +625,7 @@ export default function PerfilesSection() {
         mode={formModal.mode}
         role={formModal.role}
         availablePermissions={availablePermissions}
+        permissionCatalog={meta?.permissionCatalog}
         loading={saving}
         error={formError}
         onClose={closeFormModal}
@@ -644,6 +645,7 @@ export default function PerfilesSection() {
       <RolePermissionsModal
         open={Boolean(selectedPermissionsRole)}
         role={selectedPermissionsRole}
+        permissionCatalog={meta?.permissionCatalog}
         onClose={closePermissionsModal}
       />
     </div>

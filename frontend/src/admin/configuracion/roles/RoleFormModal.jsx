@@ -1,6 +1,6 @@
 // frontend/src/admin/configuracion/roles/RoleFormModal.jsx
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Save, ShieldCheck, X } from 'lucide-react';
 
 import PermissionsSelector from './PermissionsSelector';
@@ -30,6 +30,7 @@ export default function RoleFormModal({
   mode = 'create',
   role = null,
   availablePermissions = [],
+  permissionCatalog = [],
   loading = false,
   error = '',
   onClose,
@@ -43,10 +44,6 @@ export default function RoleFormModal({
   const title = isEditMode ? 'Editar perfil' : 'Crear perfil';
   const submitLabel = isEditMode ? 'Guardar cambios' : 'Crear perfil';
 
-  const permissionCount = useMemo(
-    () => (Array.isArray(form.permissions) ? form.permissions.length : 0),
-    [form.permissions]
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -68,7 +65,8 @@ export default function RoleFormModal({
         [field]: value,
       };
 
-      if (field === 'name' && !isEditMode && !prevForm.code) {
+      if (field === 'name' && !isEditMode &&
+        (!prevForm.code || prevForm.code === normalizeRoleCode(prevForm.name))) {
         nextForm.code = normalizeRoleCode(value);
       }
 
@@ -117,7 +115,7 @@ export default function RoleFormModal({
   const visibleError = localError || error;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center px-4 py-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-3 py-3 sm:px-4">
       <div
         className="fixed inset-0"
         style={{
@@ -129,7 +127,7 @@ export default function RoleFormModal({
 
       <form
         onSubmit={handleSubmit}
-        className="relative z-10 mt-2 w-full max-w-7xl overflow-hidden rounded-[2rem] border shadow-2xl"
+        className="relative z-10 flex max-h-[94dvh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border shadow-2xl"
         style={{
           background: 'var(--admin-card-bg, #ffffff)',
           borderColor: 'var(--admin-border, rgba(0,0,0,0.12))',
@@ -162,7 +160,7 @@ export default function RoleFormModal({
                   color: 'var(--admin-card-muted, #6b7280)',
                 }}
               >
-                Define datos principales, alcance y permisos del perfil.
+                Define qué puede hacer y dónde puede trabajar.
               </p>
             </div>
           </div>
@@ -183,7 +181,7 @@ export default function RoleFormModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 sm:px-7">
+        <div className="min-h-0 overflow-y-auto px-5 py-4 sm:px-7">
           {visibleError ? (
             <div
               className="mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm font-bold"
@@ -198,21 +196,7 @@ export default function RoleFormModal({
             </div>
           ) : null}
 
-          {isEditMode && isSystemRole ? (
-            <div
-              className="mb-4 rounded-2xl border px-4 py-3 text-xs font-bold leading-relaxed"
-              style={{
-                background: 'rgba(212, 175, 55, 0.12)',
-                borderColor: 'rgba(212, 175, 55, 0.35)',
-                color: 'var(--admin-card-text, #1f2937)',
-              }}
-            >
-              Este es un perfil del sistema. Puedes ajustar datos permitidos y
-              permisos, pero el código interno no se modifica.
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 xl:grid-cols-[390px_minmax(0,1fr)]">
+          <div className="grid gap-4 lg:grid-cols-[310px_minmax(0,1fr)]">
             <section
               className="rounded-3xl border p-4"
               style={{
@@ -220,17 +204,16 @@ export default function RoleFormModal({
                 borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
               }}
             >
-              <h3 className="text-sm font-black uppercase tracking-[0.16em]">
-                Datos del perfil
-              </h3>
+              <h3 className="text-base font-black">Datos del perfil</h3>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4">
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-[0.12em]">
+                  <label htmlFor="role-name" className="block text-[11px] font-black uppercase tracking-[0.12em]">
                     Nombre
                   </label>
 
                   <input
+                    id="role-name"
                     type="text"
                     value={form.name}
                     disabled={loading}
@@ -246,36 +229,15 @@ export default function RoleFormModal({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-[0.12em]">
-                    Código
-                  </label>
-
-                  <input
-                    type="text"
-                    value={form.code}
-                    disabled={loading || (isEditMode && isSystemRole)}
-                    onChange={(event) =>
-                      updateField('code', normalizeRoleCode(event.target.value))
-                    }
-                    placeholder="auxiliar-ventas"
-                    className="mt-2 w-full rounded-2xl border px-4 py-2.5 text-sm font-semibold outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{
-                      background: 'var(--admin-input-bg, #ffffff)',
-                      color: 'var(--admin-card-text, #1f2937)',
-                      borderColor: 'var(--admin-border, rgba(0,0,0,0.12))',
-                      '--tw-ring-color': 'rgba(190, 24, 93, 0.22)',
-                    }}
-                  />
-                </div>
               </div>
 
               <div className="mt-3">
-                <label className="block text-[11px] font-black uppercase tracking-[0.12em]">
+                <label htmlFor="role-description" className="block text-[11px] font-black uppercase tracking-[0.12em]">
                   Descripción
                 </label>
 
                 <textarea
+                  id="role-description"
                   value={form.description}
                   disabled={loading}
                   onChange={(event) =>
@@ -293,13 +255,14 @@ export default function RoleFormModal({
                 />
               </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
-                    Alcance
+                  <label htmlFor="role-scope" className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
+                    Dónde puede trabajar
                   </label>
 
                   <select
+                    id="role-scope"
                     value={form.scope}
                     disabled={loading}
                     onChange={(event) => updateField('scope', event.target.value)}
@@ -320,33 +283,12 @@ export default function RoleFormModal({
                 </div>
 
                 <div>
-                  <label className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
-                    Nivel
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={form.level}
-                    disabled={loading}
-                    onChange={(event) => updateField('level', event.target.value)}
-                    className="mt-2 w-full rounded-2xl border px-3 py-2.5 text-sm font-bold outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{
-                      background: 'var(--admin-input-bg, #ffffff)',
-                      color: 'var(--admin-card-text, #1f2937)',
-                      borderColor: 'var(--admin-border, rgba(0,0,0,0.12))',
-                      '--tw-ring-color': 'rgba(190, 24, 93, 0.22)',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
+                  <label htmlFor="role-status" className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
                     Estado
                   </label>
 
                   <select
+                    id="role-status"
                     value={form.status}
                     disabled={loading}
                     onChange={(event) => updateField('status', event.target.value)}
@@ -367,20 +309,33 @@ export default function RoleFormModal({
                 </div>
               </div>
 
-              <div
-                className="mt-2 rounded-xl border px-3 py-2 text-[11px] font-bold leading-snug"
-                style={{
-                  background: 'rgba(6, 182, 212, 0.08)',
-                  borderColor: 'rgba(6, 182, 212, 0.22)',
-                  color: 'var(--admin-card-text, #1f2937)',
-                }}
-              >
-                <span className="font-black">Nivel:</span> menor número = más autoridad.
-                Ej: 1 propietario, 10 administrador, 30 encargado, 50 vendedor/cajero, 80 consulta.
-              </div>
+              <p className="mt-2 text-xs leading-snug" style={{ color: 'var(--admin-card-muted, #6b7280)' }}>
+                {ROLE_SCOPE_OPTIONS.find((option) => option.value === form.scope)?.description}
+              </p>
+
+              <details className="mt-4 rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--admin-border, rgba(0,0,0,0.10))' }}>
+                <summary className="cursor-pointer text-sm font-black">Configuración avanzada</summary>
+                <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted, #6b7280)' }}>Identificador interno y jerarquía de autoridad.</p>
+                <label className="mt-3 block text-xs font-bold">
+                  Código interno
+                  <input
+                    type="text"
+                    value={form.code}
+                    disabled={loading || (isEditMode && isSystemRole)}
+                    onChange={(event) => updateField('code', normalizeRoleCode(event.target.value))}
+                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
+                    style={{ background: 'var(--admin-input-bg, #fff)', borderColor: 'var(--admin-border, rgba(0,0,0,0.12))' }}
+                  />
+                </label>
+                {isEditMode && isSystemRole && <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted, #6b7280)' }}>El código de un perfil del sistema no se modifica.</p>}
+                <label className="mt-3 block text-xs font-bold">
+                  Nivel de autoridad
+                  <input type="number" min="1" max="100" value={form.level} disabled={loading} onChange={(event) => updateField('level', event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" style={{ background: 'var(--admin-input-bg, #fff)', borderColor: 'var(--admin-border, rgba(0,0,0,0.12))' }} />
+                </label>
+                <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted, #6b7280)' }}>1 es la mayor autoridad. Cajero: 50; solo consulta: 80.</p>
 
               <label
-                className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3"
+                className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-2"
                 style={{
                   background: 'var(--admin-card-bg, #ffffff)',
                   borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
@@ -412,17 +367,6 @@ export default function RoleFormModal({
                   </span>
                 </span>
               </label>
-
-              <details
-                className="mt-3 rounded-2xl border px-4 py-3"
-                style={{
-                  borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
-                  color: 'var(--admin-card-text, #1f2937)',
-                }}
-              >
-                <summary className="cursor-pointer text-sm font-black">
-                  Opciones avanzadas
-                </summary>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <input
@@ -457,23 +401,11 @@ export default function RoleFormModal({
                 </div>
               </details>
 
-              <div
-                className="mt-3 rounded-2xl border px-4 py-3 text-sm font-bold"
-                style={{
-                  background: 'rgba(190, 24, 93, 0.08)',
-                  borderColor: 'rgba(190, 24, 93, 0.18)',
-                  color: 'var(--admin-card-text, #1f2937)',
-                }}
-              >
-                Permisos seleccionados:{' '}
-                <span style={{ color: 'var(--admin-primary, #be185d)' }}>
-                  {permissionCount}
-                </span>
-              </div>
             </section>
 
             <PermissionsSelector
               availablePermissions={availablePermissions}
+              permissionCatalog={permissionCatalog}
               selectedPermissions={form.permissions}
               onChange={handlePermissionsChange}
               disabled={loading}

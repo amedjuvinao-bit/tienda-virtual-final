@@ -52,7 +52,7 @@
     "test:configuration-level-plus-stage0": "vitest run src/admin/configuracion/ConfigurationStage0.test.js",
     "test:admin-users-stage1": "vitest run src/admin/users/AdminUsersStage1.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
     "test:admin-users-stage2": "vitest run src/admin/users/AdminUsersStage1.test.jsx src/admin/users/AdminUsersStage2.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
-    "test:admin-roles-stage1": "vitest run src/admin/configuracion/sections/PerfilesSection.test.jsx src/admin/configuracion/roles/RolePermissionsModal.test.jsx",
+    "test:admin-roles-stage1": "vitest run src/admin/configuracion/sections/PerfilesSection.test.jsx src/admin/configuracion/roles/RolePermissionsModal.test.jsx src/admin/configuracion/roles/RoleFormModal.test.jsx",
     "test:configuration-level-plus-stage1": "vitest run src/admin/configuracion/sections/EmpresaSection.test.jsx src/admin/configuracion/api/storeSettingsApi.test.js",
     "test:configuration-level-plus-stage2": "vitest run src/admin/configuracion/sections/PagosSection.test.jsx src/admin/configuracion/api/paymentSettingsApi.test.js",
     "test:configuration-level-plus-stage3": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx src/admin/configuracion/api/shippingRatesApi.test.js src/lib/shippingRateRules.test.js",
