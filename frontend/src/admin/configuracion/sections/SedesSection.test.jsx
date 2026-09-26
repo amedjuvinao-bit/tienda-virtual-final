@@ -52,3 +52,15 @@ it('deja editar datos de la sede sin conceder cambio de estado', async () => {
   await waitFor(() => expect(screen.getByRole('dialog', { name: 'Editar sede' })).toBeInTheDocument());
   expect(screen.getByRole('combobox', { name: 'Estado' })).toBeDisabled();
 });
+
+it('muestra las acciones poco frecuentes solo cuando se abren las opciones', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  render(<SedesSection />);
+  await screen.findByText('Sede 1');
+  expect(screen.queryByRole('button', { name: 'Desactivar Sede 1' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Opciones de Sede 1' }));
+  expect(screen.getByRole('button', { name: 'Desactivar Sede 1' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Eliminar Sede 1' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Hacer sede principal' })).toBeVisible();
+});

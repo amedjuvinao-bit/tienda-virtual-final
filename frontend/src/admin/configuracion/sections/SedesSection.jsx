@@ -4,16 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Building2,
-  CheckCircle2,
-  Edit3,
-  MapPin,
   Plus,
   RefreshCw,
   Save,
   Search,
-  Star,
-  Trash2,
-  Warehouse,
   X,
 } from 'lucide-react';
 
@@ -30,6 +24,7 @@ import {
 import api from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { hasAdminPermission } from '../../security/adminPermissions';
+import SedesList from './SedesList';
 
 const EMPTY_FORM = {
   name: '',
@@ -100,19 +95,6 @@ const PAYMENT_METHOD_LABELS = {
 
 function getBranchId(branch) {
   return branch?._id || branch?.id || '';
-}
-
-function getInitials(text) {
-  const value = String(text || '').trim();
-
-  if (!value) return 'S';
-
-  return value
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
 }
 
 function normalizeGeoText(value) {
@@ -235,30 +217,6 @@ function buildBranchPayload(form) {
       defaultCustomerName: form.settings.defaultCustomerName,
     },
     notes: form.notes,
-  };
-}
-
-function getStatusBadgeStyle(status, active) {
-  if (status === 'maintenance') {
-    return {
-      backgroundColor: 'var(--admin-warning-soft-bg)',
-      borderColor: 'var(--admin-warning)',
-      color: 'var(--admin-warning-text)',
-    };
-  }
-
-  if (active === true && status === 'active') {
-    return {
-      backgroundColor: 'var(--admin-primary-soft-bg)',
-      borderColor: 'var(--admin-primary-soft-border)',
-      color: 'var(--admin-primary-soft-text)',
-    };
-  }
-
-  return {
-    backgroundColor: 'var(--admin-danger-soft-bg)',
-    borderColor: 'var(--admin-danger)',
-    color: 'var(--admin-danger-text)',
   };
 }
 
@@ -395,12 +353,6 @@ export default function SedesSection() {
     backgroundColor: 'var(--admin-danger-soft-bg)',
     color: 'var(--admin-danger-text)',
     borderColor: 'var(--admin-danger)',
-  };
-
-  const warningBadgeStyle = {
-    backgroundColor: 'var(--admin-warning-soft-bg)',
-    color: 'var(--admin-warning-text)',
-    borderColor: 'var(--admin-warning)',
   };
 
   const primaryBadgeStyle = {
@@ -1431,9 +1383,8 @@ export default function SedesSection() {
                 className="mt-1 max-w-3xl text-sm leading-6"
                 style={mutedTextStyle}
               >
-                Crea sedes, bodegas, oficinas o puntos de recogida. Después estas
-                sedes podrán relacionarse con usuarios, inventario, ventas, caja y
-                facturación.
+                Organiza tiendas, bodegas y puntos de recogida. Sus sedes ya se
+                utilizan en usuarios, inventario, ventas, caja y facturación.
               </p>
             </div>
 
@@ -1539,245 +1490,17 @@ export default function SedesSection() {
           </div>
         </div>
 
-        <div
-          className="overflow-hidden rounded-[28px] border backdrop-blur-xl"
-          style={cardStyle}
-        >
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead
-                style={{
-                  backgroundColor: 'var(--admin-table-head-bg)',
-                  color: 'var(--admin-table-head-text)',
-                }}
-              >
-                <tr>
-                  <th className="px-4 py-3 font-bold">Sede</th>
-                  <th className="px-4 py-3 font-bold">Tipo</th>
-                  <th className="px-4 py-3 font-bold">Ubicación</th>
-                  <th className="px-4 py-3 font-bold">Estado</th>
-                  <th className="px-4 py-3 font-bold">Marcadores</th>
-                  <th className="px-4 py-3 text-right font-bold">Acciones</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="px-4 py-8 text-center text-sm"
-                      style={{ color: 'var(--admin-table-muted-text)' }}
-                    >
-                      Cargando sedes...
-                    </td>
-                  </tr>
-                )}
-
-                {!loading && branches.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="px-4 py-10 text-center"
-                      style={{ color: 'var(--admin-table-muted-text)' }}
-                    >
-                      <Building2 className="mx-auto mb-3 h-8 w-8 opacity-60" />
-                      No hay sedes registradas todavía.
-                    </td>
-                  </tr>
-                )}
-
-                {!loading &&
-                  branches.map((branch) => {
-                    const branchId = getBranchId(branch);
-                    const statusBadgeStyle = getStatusBadgeStyle(
-                      branch.status,
-                      branch.active
-                    );
-
-                    return (
-                      <tr
-                        key={branchId}
-                        className="border-t transition"
-                        style={{
-                          borderColor: 'var(--admin-table-border)',
-                          color: 'var(--admin-table-text)',
-                        }}
-                      >
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-bold"
-                              style={primaryBadgeStyle}
-                            >
-                              {getInitials(branch.name)}
-                            </div>
-
-                            <div>
-                              <div className="font-bold">{branch.name}</div>
-                              <div
-                                className="text-xs"
-                                style={{ color: 'var(--admin-table-muted-text)' }}
-                              >
-                                Código: {branch.code || 'Sin código'}
-                              </div>
-                              {branch.contact?.email && (
-                                <div
-                                  className="text-xs"
-                                  style={{ color: 'var(--admin-table-muted-text)' }}
-                                >
-                                  {branch.contact.email}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div
-                            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-                            style={softButtonStyle}
-                          >
-                            {branch.type === 'warehouse' ? (
-                              <Warehouse className="h-3.5 w-3.5" />
-                            ) : (
-                              <Building2 className="h-3.5 w-3.5" />
-                            )}
-                            {TYPE_LABELS[branch.type] || branch.type}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex items-start gap-2">
-                            <MapPin
-                              className="mt-0.5 h-4 w-4"
-                              style={{ color: 'var(--admin-primary)' }}
-                            />
-                            <div>
-                              <div className="font-semibold">
-                                {branch.address?.city || 'Sin ciudad'}
-                              </div>
-                              <div
-                                className="text-xs"
-                                style={{ color: 'var(--admin-table-muted-text)' }}
-                              >
-                                {branch.address?.department || 'Sin departamento'}
-                              </div>
-                              {branch.address?.addressLine && (
-                                <div
-                                  className="text-xs"
-                                  style={{ color: 'var(--admin-table-muted-text)' }}
-                                >
-                                  {branch.address.addressLine}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          {canDisable ? <button
-                            type="button"
-                            onClick={() => handleToggleStatus(branch)}
-                            aria-label={`${branch.active ? 'Desactivar' : 'Activar'} ${branch.name}`}
-                            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold"
-                            style={statusBadgeStyle}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            {STATUS_LABELS[branch.status] || branch.status}
-                          </button> : <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold" style={statusBadgeStyle}>{STATUS_LABELS[branch.status] || branch.status}</span>}
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            {branch.isMain && (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold"
-                                style={primaryBadgeStyle}
-                              >
-                                <Star className="h-3 w-3" />
-                                Principal
-                              </span>
-                            )}
-
-                            {branch.isDefaultForOnlineOrders && (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold"
-                                style={warningBadgeStyle}
-                              >
-                                Online
-                              </span>
-                            )}
-
-                            {!branch.isMain && !branch.isDefaultForOnlineOrders && (
-                              <span
-                                className="text-xs"
-                                style={{ color: 'var(--admin-table-muted-text)' }}
-                              >
-                                Sin marcador especial
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end gap-2">
-                            {canEdit && !branch.isMain && (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkAsMain(branch)}
-                                className="rounded-xl border p-2"
-                                title="Marcar como principal"
-                                aria-label={`Marcar ${branch.name} como sede principal`}
-                                style={softButtonStyle}
-                              >
-                                <Star className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            {canEdit && !branch.isDefaultForOnlineOrders && (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkAsOnlineDefault(branch)}
-                                className="rounded-xl border p-2"
-                                title="Marcar para pedidos online"
-                                aria-label={`Marcar ${branch.name} para pedidos online`}
-                                style={warningBadgeStyle}
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            {canEdit && <button
-                              type="button"
-                              onClick={() => openEditForm(branch)}
-                              className="rounded-xl border p-2"
-                              title="Editar"
-                              aria-label={`Editar ${branch.name}`}
-                              style={borderOnlyButtonStyle}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>}
-
-                            {canDisable && <button
-                              type="button"
-                              onClick={() => handleDelete(branch)}
-                              className="rounded-xl border p-2"
-                              title="Eliminar"
-                              aria-label={`Eliminar ${branch.name}`}
-                              style={dangerButtonStyle}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <SedesList
+          branches={branches}
+          loading={loading}
+          canEdit={canEdit}
+          canDisable={canDisable}
+          onEdit={openEditForm}
+          onToggleStatus={handleToggleStatus}
+          onMarkAsMain={handleMarkAsMain}
+          onMarkAsOnlineDefault={handleMarkAsOnlineDefault}
+          onDelete={handleDelete}
+        />
         {totalPages > 1 && (
           <nav aria-label="Páginas de sedes" className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm" style={cardStyle}>
             <span>Página {page} de {totalPages} · {total} sedes</span>
