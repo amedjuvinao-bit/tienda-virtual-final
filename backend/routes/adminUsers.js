@@ -10,6 +10,7 @@ const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminUser = require('../models/AdminUser');
 const AdminRole = require('../models/AdminRole');
 const Branch = require('../models/Branch');
+const { saveRemovingOwner } = require('../security/adminLastOwnerGuard');
 const {
   revokeAllUserSessions,
   revokeOtherUserSessions,
@@ -980,6 +981,9 @@ router.put(
         deletedAt: null,
       }).select('+tokenVersion');
 
+      const wasActiveOwner = user && isOwnerRole(user.role) &&
+        user.active === true && user.status === 'active';
+
       const allowed = await ensureCanManageTargetUser(req, user, 'update');
 
       if (!allowed.ok) {
@@ -1162,7 +1166,10 @@ router.put(
 
       user.updatedBy = getCurrentAdminId(req);
 
-      if (nextStatus) {
+      if (wasActiveOwner && (user.role !== 'owner' ||
+          user.active !== true || user.status !== 'active')) {
+        await saveRemovingOwner(user, { invalidateSessions: Boolean(nextStatus) });
+      } else if (nextStatus) {
         await user.invalidateSessions();
       } else {
         await user.save();
@@ -1221,6 +1228,9 @@ router.patch(
         deletedAt: null,
       }).select('+tokenVersion');
 
+      const wasActiveOwner = user && isOwnerRole(user.role) &&
+        user.active === true && user.status === 'active';
+
       const allowed = await ensureCanManageTargetUser(req, user, 'disable');
 
       if (!allowed.ok) {
@@ -1245,8 +1255,11 @@ router.patch(
 
       user.updatedBy = getCurrentAdminId(req);
 
-      await user.invalidateSessions();
-      await user.save();
+      if (wasActiveOwner && !nextStatus.active) {
+        await saveRemovingOwner(user);
+      } else {
+        await user.invalidateSessions();
+      }
 
       return res.json({
         ok: true,
@@ -1504,6 +1517,9 @@ router.delete(
         deletedAt: null,
       }).select('+tokenVersion');
 
+      const wasActiveOwner = user && isOwnerRole(user.role) &&
+        user.active === true && user.status === 'active';
+
       const allowed = await ensureCanManageTargetUser(req, user, 'delete');
 
       if (!allowed.ok) {
@@ -1522,14 +1538,18 @@ router.delete(
       user.status = 'inactive';
       user.updatedBy = getCurrentAdminId(req);
 
-      await user.invalidateSessions();
-      await user.save();
+      if (wasActiveOwner) {
+        await saveRemovingOwner(user);
+      } else {
+        await user.invalidateSessions();
+      }
 
       return res.json({
         ok: true,
         message: 'Usuario administrativo eliminado correctamente.',
       });
     } catch (error) {
+      if (error?.status === 400) return sendError(res, 400, error.message);
       console.error('❌ Error eliminando usuario admin:', error.message);
 
       return sendError(
