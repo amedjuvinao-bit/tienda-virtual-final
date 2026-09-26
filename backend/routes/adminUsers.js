@@ -7,6 +7,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 
 const AdminAuditLog = require('../models/AdminAuditLog');
+const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminUser = require('../models/AdminUser');
 const AdminRole = require('../models/AdminRole');
 const Branch = require('../models/Branch');
@@ -780,28 +781,40 @@ router.get(
       const allowed = await ensureCanManageTargetUser(req, user, 'view');
       if (!allowed.ok) return sendError(res, allowed.status, allowed.message);
 
+      const scope = cleanLower(req.query.scope || 'actions');
+      if (!['actions', 'account', 'access'].includes(scope)) {
+        return sendError(res, 400, 'Selecciona un tipo de actividad válido.');
+      }
       const page = Math.min(parsePagination(req.query).page, 10000);
       const limit = 10;
-      const filter = {
-        resourceId: String(user._id),
-        $or: [
-          { module: 'admin-users' },
-          { module: 'seguridad', permission: 'seguridad:2fa:owner' },
-        ],
-      };
+      const filter = scope === 'actions'
+        ? { adminUserId: user._id }
+        : scope === 'access'
+          ? { adminUserId: user._id }
+          : {
+            resourceId: String(user._id),
+            $or: [
+              { module: 'admin-users' },
+              { module: 'seguridad', permission: 'seguridad:2fa:owner' },
+            ],
+          };
+      const model = scope === 'access' ? AdminLoginAudit : AdminAuditLog;
       const [events, total] = await Promise.all([
-        AdminAuditLog.find(filter)
+        model.find(filter)
           .sort({ createdAt: -1, _id: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
-          .select('createdAt adminUsername action description success')
+          .select(scope === 'access'
+            ? 'createdAt status reason ip'
+            : 'createdAt adminUsername action description success module resourceId')
           .lean(),
-        AdminAuditLog.countDocuments(filter),
+        model.countDocuments(filter),
       ]);
 
       return res.json({
         ok: true,
         data: events,
+        scope,
         pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
       });
     } catch (error) {

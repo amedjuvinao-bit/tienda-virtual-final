@@ -80,6 +80,7 @@ export default function AdminUsersPage() {
   const activityRequestId = useRef(0);
   const [activityUser, setActivityUser] = useState(null);
   const [activityEvents, setActivityEvents] = useState([]);
+  const [activityScope, setActivityScope] = useState('actions');
   const [activityPagination, setActivityPagination] = useState({ page: 1, pages: 1 });
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState('');
@@ -226,13 +227,14 @@ export default function AdminUsersPage() {
     }
   }, [page, debouncedSearch, statusFilter, roleFilter, branchFilter]);
 
-  const loadActivity = async (user, activityPage = 1) => {
+  const loadActivity = async (user, scope = 'actions', activityPage = 1) => {
     const currentRequest = ++activityRequestId.current;
     setActivityUser(user);
+    setActivityScope(scope);
     setActivityLoading(true);
     setActivityError('');
     try {
-      const response = await getAdminUserActivity(user._id, activityPage);
+      const response = await getAdminUserActivity(user._id, scope, activityPage);
       if (currentRequest !== activityRequestId.current) return;
       setActivityEvents(response.data || []);
       setActivityPagination(response.pagination || { page: activityPage, pages: 1 });
@@ -863,9 +865,10 @@ export default function AdminUsersPage() {
         )}
       </section>
 
-      <UserActivityModal user={activityUser} events={activityEvents}
+      <UserActivityModal user={activityUser} scope={activityScope} events={activityEvents}
         pagination={activityPagination} loading={activityLoading} error={activityError}
-        onPageChange={(nextPage) => loadActivity(activityUser, nextPage)}
+        onScopeChange={(nextScope) => loadActivity(activityUser, nextScope)}
+        onPageChange={(nextPage) => loadActivity(activityUser, activityScope, nextPage)}
         onClose={closeActivity} />
 
       <UserFormModal

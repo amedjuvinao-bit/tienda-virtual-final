@@ -60,11 +60,12 @@ it('consulta otra página y aplica búsqueda y estado en el servidor', async () 
 
 it('filtra por perfil y sede, y muestra la trazabilidad de la cuenta', async () => {
   const interaction = userEvent.setup();
-  getAdminUserActivity.mockResolvedValue({
-    data: [{ _id: 'event-1', description: 'Cambiar el estado de acceso de un usuario administrativo.',
-      adminUsername: 'owner', success: true, createdAt: '2026-09-25T10:00:00.000Z' }],
-    pagination: { page: 1, pages: 1 },
-  });
+  getAdminUserActivity.mockImplementation(async (_id, scope) => ({
+    data: scope === 'account'
+      ? [{ _id: 'event-2', description: 'Perfil actualizado por propietario', adminUsername: 'owner', success: true }]
+      : [{ _id: 'event-1', description: 'Crear orden administrativa', module: 'orders', success: true }],
+    pagination: { page: 1, pages: 1 }, scope,
+  }));
   render(<AdminUsersPage />);
   await screen.findByText('@ana');
   await interaction.selectOptions(screen.getByRole('combobox', { name: /filtrar usuarios por perfil/i }), 'seller');
@@ -75,8 +76,11 @@ it('filtra por perfil y sede, y muestra la trazabilidad de la cuenta', async () 
   await interaction.click(screen.getByRole('button', { name: 'Más' }));
   await interaction.click(screen.getByRole('button', { name: 'Ver actividad' }));
   expect(await screen.findByRole('dialog', { name: /Actividad de @ana/i })).toBeInTheDocument();
-  expect(await screen.findByText(/Cambiar el estado de acceso de un usuario administrativo/)).toBeInTheDocument();
-  expect(getAdminUserActivity).toHaveBeenCalledWith('user-a', 1);
+  expect(await screen.findByText(/Crear orden administrativa/)).toBeInTheDocument();
+  expect(getAdminUserActivity).toHaveBeenCalledWith('user-a', 'actions', 1);
+  await interaction.click(screen.getByRole('tab', { name: 'Cambios en la cuenta' }));
+  expect(await screen.findByText(/Perfil actualizado por propietario/)).toBeInTheDocument();
+  expect(getAdminUserActivity).toHaveBeenCalledWith('user-a', 'account', 1);
 });
 
 it('al cambiar la sede principal conserva permisos individuales de ambas sedes', () => {

@@ -118,10 +118,10 @@ export async function getAdminUserById(userId) {
   }
 }
 
-export async function getAdminUserActivity(userId, page = 1) {
+export async function getAdminUserActivity(userId, scope = 'actions', page = 1) {
   if (!userId) throw new Error('El ID del usuario administrativo es obligatorio.');
   try {
-    const response = await api.get(`${BASE_URL}/${userId}/activity?page=${page}`);
+    const response = await api.get(`${BASE_URL}/${userId}/activity${buildQueryParams({ scope, page })}`);
     return response.data;
   } catch (error) {
     throw normalizeApiError(error, 'No se pudo consultar la actividad del usuario.');
