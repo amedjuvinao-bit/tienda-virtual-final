@@ -1,261 +1,116 @@
-// frontend/src/admin/configuracion/roles/RolePermissionsModal.jsx
-
-import { Eye, ShieldCheck, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Eye, ShieldCheck, X } from 'lucide-react';
 
 import { getPermissionGroupsArray } from './rolesHelpers';
 
-/* ============================================================
- * MODAL PARA VER PERMISOS DE UN PERFIL
- * ------------------------------------------------------------
- * Solo muestra permisos agrupados por módulo.
- * No edita ni guarda.
- * ============================================================ */
+const muted = 'var(--admin-card-muted, #6b7280)';
+const border = 'var(--admin-border, rgba(0,0,0,0.10))';
 
-export default function RolePermissionsModal({
-  open = false,
-  role = null,
-  onClose,
-}) {
-  if (!open || !role) {
-    return null;
-  }
+export default function RolePermissionsModal({ open = false, role = null, onClose }) {
+  const [selectedModule, setSelectedModule] = useState('');
+  const permissionGroups = getPermissionGroupsArray(role?.permissions || []);
+  const selectedGroup = permissionGroups.find((group) => group.module === selectedModule)
+    || permissionGroups[0];
+  const permissionsCount = permissionGroups.reduce(
+    (total, group) => total + group.permissions.length, 0
+  );
 
-  const permissionGroups = getPermissionGroupsArray(role.permissions || []);
-  const permissionsCount = Array.isArray(role.permissions)
-    ? role.permissions.length
-    : 0;
+  useEffect(() => {
+    setSelectedModule('');
+  }, [role?._id, role?.code]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open, onClose]);
+
+  if (!open || !role) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-3 py-4 sm:px-5">
       <div
         className="absolute inset-0"
-        style={{
-          background: 'rgba(15, 23, 42, 0.52)',
-          backdropFilter: 'blur(8px)',
-        }}
+        style={{ background: 'rgba(15, 23, 42, 0.52)', backdropFilter: 'blur(8px)' }}
         onClick={onClose}
       />
-
       <div
-        className="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border shadow-2xl"
-        style={{
-          background: 'var(--admin-card-bg, #ffffff)',
-          borderColor: 'var(--admin-border, rgba(0,0,0,0.12))',
-          color: 'var(--admin-card-text, #1f2937)',
-        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="role-permissions-title"
+        className="relative z-10 flex max-h-[min(720px,92dvh)] w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-2xl"
+        style={{ background: 'var(--admin-card-bg, #ffffff)', borderColor: border, color: 'var(--admin-card-text, #1f2937)' }}
       >
-        <div
-          className="flex items-start justify-between gap-4 border-b px-5 py-4 sm:px-7"
-          style={{
-            borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-              style={{
-                background: 'rgba(190, 24, 93, 0.12)',
-                color: 'var(--admin-primary, #be185d)',
-              }}
-            >
-              <Eye size={22} />
-            </div>
-
-            <div>
-              <h2 className="text-lg font-black sm:text-xl">
-                Permisos del perfil
-              </h2>
-
-              <p
-                className="mt-1 text-xs font-semibold sm:text-sm"
-                style={{
-                  color: 'var(--admin-card-muted, #6b7280)',
-                }}
-              >
-                {role.name || 'Perfil sin nombre'} · {permissionsCount} permisos asignados
+        <header className="flex items-start justify-between gap-3 border-b px-5 py-4 sm:px-6" style={{ borderColor: border }}>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(190, 24, 93, 0.12)', color: 'var(--admin-primary, #be185d)' }}>
+              <Eye size={20} />
+            </span>
+            <div className="min-w-0">
+              <h2 id="role-permissions-title" className="truncate text-lg font-black">Permisos de {role.name || 'perfil sin nombre'}</h2>
+              <p className="text-xs font-semibold" style={{ color: muted }}>
+                {permissionsCount} permisos en {permissionGroups.length} módulos · {role.active === false || role.status === 'inactive' ? 'Inactivo' : 'Activo'} · {role.isSystem ? 'Sistema' : 'Personalizado'}
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition hover:scale-105"
-            style={{
-              borderColor: 'var(--admin-border, rgba(0,0,0,0.14))',
-              color: 'var(--admin-card-text, #1f2937)',
-              background: 'var(--admin-card-bg, #ffffff)',
-            }}
-            aria-label="Cerrar modal"
-          >
+          <button type="button" onClick={onClose} aria-label="Cerrar permisos" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition hover:scale-105" style={{ borderColor: border }}>
             <X size={18} />
           </button>
-        </div>
+        </header>
 
-        <div className="overflow-y-auto px-5 py-5 sm:px-7">
-          <div
-            className="mb-5 rounded-3xl border p-4"
-            style={{
-              background: 'var(--admin-soft-bg, rgba(248, 250, 252, 0.75))',
-              borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
-            }}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-base font-black">
-                  {role.name || 'Perfil sin nombre'}
-                </h3>
+        {permissionGroups.length === 0 ? (
+          <div className="px-6 py-12 text-center text-sm font-semibold" style={{ color: muted }}>
+            <ShieldCheck size={28} className="mx-auto mb-3" />
+            Este perfil no tiene permisos asignados.
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-col sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
+            <nav aria-label="Módulos del perfil" className="flex shrink-0 gap-1.5 overflow-x-auto border-b p-3 sm:max-h-[min(520px,65dvh)] sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:border-b-0 sm:border-r sm:p-4" style={{ borderColor: border }}>
+              {permissionGroups.map((group) => {
+                const active = group.module === selectedGroup?.module;
+                return (
+                  <button
+                    key={group.module}
+                    type="button"
+                    aria-current={active ? 'true' : undefined}
+                    onClick={() => setSelectedModule(group.module)}
+                    className="flex min-w-max items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold transition sm:w-full sm:min-w-0"
+                    style={{ background: active ? 'var(--admin-button-bg, var(--admin-primary, #be185d))' : 'transparent', color: active ? '#fff' : 'var(--admin-card-text, #1f2937)' }}
+                  >
+                    <span className="sm:truncate">{group.label}</span>
+                    <span className="shrink-0 opacity-80">{group.permissions.length}</span>
+                  </button>
+                );
+              })}
+            </nav>
 
-                <p
-                  className="mt-1 break-all text-xs font-bold"
-                  style={{
-                    color: 'var(--admin-card-muted, #6b7280)',
-                  }}
-                >
-                  Código: {role.code || 'sin-codigo'}
+            <section aria-label={`Permisos de ${selectedGroup.label}`} className="min-h-0 overflow-y-auto px-5 py-5 sm:max-h-[min(520px,65dvh)] sm:px-6">
+              <div className="mb-4">
+                <h3 className="text-base font-black">{selectedGroup.label}</h3>
+                <p className="mt-0.5 text-xs font-semibold" style={{ color: muted }}>
+                  {selectedGroup.permissions.length} {selectedGroup.permissions.length === 1 ? 'acción autorizada' : 'acciones autorizadas'}
                 </p>
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-black"
-                  style={{
-                    background:
-                      role.active === false || role.status === 'inactive'
-                        ? 'rgba(239, 68, 68, 0.10)'
-                        : 'rgba(22, 163, 74, 0.10)',
-                    color:
-                      role.active === false || role.status === 'inactive'
-                        ? '#b91c1c'
-                        : '#15803d',
-                    border:
-                      role.active === false || role.status === 'inactive'
-                        ? '1px solid rgba(239, 68, 68, 0.22)'
-                        : '1px solid rgba(22, 163, 74, 0.22)',
-                  }}
-                >
-                  {role.active === false || role.status === 'inactive'
-                    ? 'Inactivo'
-                    : 'Activo'}
-                </span>
-
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-black"
-                  style={{
-                    background: role.isSystem
-                      ? 'rgba(212, 175, 55, 0.14)'
-                      : 'rgba(190, 24, 93, 0.10)',
-                    color: 'var(--admin-card-text, #1f2937)',
-                    border: role.isSystem
-                      ? '1px solid rgba(212, 175, 55, 0.35)'
-                      : '1px solid rgba(190, 24, 93, 0.18)',
-                  }}
-                >
-                  {role.isSystem ? 'Sistema' : 'Personalizado'}
-                </span>
-              </div>
-            </div>
-
-            {role.description ? (
-              <p
-                className="mt-4 text-sm font-semibold leading-relaxed"
-                style={{
-                  color: 'var(--admin-card-muted, #6b7280)',
-                }}
-              >
-                {role.description}
-              </p>
-            ) : null}
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {selectedGroup.permissions.map((permission) => (
+                  <li key={permission.value} title={permission.value} className="flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: border, background: 'var(--admin-soft-bg, rgba(248, 250, 252, 0.75))' }}>
+                    <Check size={15} className="shrink-0" style={{ color: 'var(--admin-primary, #be185d)' }} aria-hidden="true" />
+                    <span className="break-words">{permission.actionLabel}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
+        )}
 
-          {permissionGroups.length === 0 ? (
-            <div
-              className="rounded-3xl border border-dashed px-6 py-10 text-center"
-              style={{
-                borderColor: 'var(--admin-border, rgba(0,0,0,0.16))',
-                color: 'var(--admin-card-muted, #6b7280)',
-              }}
-            >
-              <ShieldCheck size={28} className="mx-auto mb-3" />
-
-              <p className="text-sm font-bold">
-                Este perfil no tiene permisos asignados.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {permissionGroups.map((group) => (
-                <section
-                  key={group.module}
-                  className="rounded-3xl border p-4"
-                  style={{
-                    background: 'var(--admin-soft-bg, rgba(248, 250, 252, 0.75))',
-                    borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
-                  }}
-                >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-sm font-black">
-                      {group.label}
-                    </h3>
-
-                    <span
-                      className="text-xs font-black"
-                      style={{
-                        color: 'var(--admin-card-muted, #6b7280)',
-                      }}
-                    >
-                      {group.permissions.length} permisos
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {group.permissions.map((permission) => (
-                      <div
-                        key={permission.value}
-                        className="rounded-2xl border px-3 py-3"
-                        style={{
-                          background: 'var(--admin-card-bg, #ffffff)',
-                          borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
-                        }}
-                      >
-                        <p className="text-xs font-black">
-                          {permission.actionLabel}
-                        </p>
-
-                        <p
-                          className="mt-1 break-all text-[11px] font-semibold"
-                          style={{
-                            color: 'var(--admin-card-muted, #6b7280)',
-                          }}
-                        >
-                          {permission.value}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div
-          className="flex justify-end border-t px-5 py-4 sm:px-7"
-          style={{
-            borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
-          }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl px-5 py-3 text-sm font-black text-white transition hover:scale-[1.01]"
-            style={{
-              background: 'var(--admin-button-bg, var(--admin-primary, #be185d))',
-            }}
-          >
-            Entendido
+        <footer className="flex justify-end border-t px-5 py-3 sm:px-6" style={{ borderColor: border }}>
+          <button type="button" onClick={onClose} className="rounded-xl px-5 py-2.5 text-sm font-black text-white" style={{ background: 'var(--admin-button-bg, var(--admin-primary, #be185d))' }}>
+            Cerrar
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );
