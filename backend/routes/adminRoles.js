@@ -8,6 +8,7 @@ const requirePermission = require('../middleware/requirePermission');
 
 const AdminRole = require('../models/AdminRole');
 const AdminUser = require('../models/AdminUser');
+const { canGrantRole } = require('../security/adminUserWritePolicy');
 
 const router = express.Router();
 
@@ -128,6 +129,9 @@ function buildListFilter(query = {}) {
       { code: regex },
       { description: regex },
       { notes: regex },
+      { permissions: regex },
+      { status: regex },
+      { scope: regex },
     ];
   }
 
@@ -178,18 +182,40 @@ function buildRolePublicResponse(role) {
   return plain;
 }
 
-async function countUsersWithRole(roleIdOrCode) {
-  const filter = {
+function assignedUsersFilter(role) {
+  return {
     deletedAt: null,
+    $or: [
+      { roleRef: role._id },
+      // Older accounts may still use the role code without a reference.
+      { roleRef: null, role: role.code },
+    ],
   };
+}
 
-  if (isValidObjectId(roleIdOrCode)) {
-    filter.roleRef = toObjectId(roleIdOrCode);
-  } else {
-    filter.role = cleanLower(roleIdOrCode);
-  }
+async function countUsersWithRole(role) {
+  return AdminUser.countDocuments(assignedUsersFilter(role));
+}
 
-  return AdminUser.countDocuments(filter);
+async function getRoleUsageCounts(roles) {
+  if (!roles.length) return new Map();
+
+  const references = roles.map((role) => role._id);
+  const codes = roles.map((role) => role.code);
+  const assigned = await AdminUser.aggregate([
+    {
+      $match: {
+        deletedAt: null,
+        $or: [
+          { roleRef: { $in: references } },
+          { roleRef: null, role: { $in: codes } },
+        ],
+      },
+    },
+    { $group: { _id: { $ifNull: ['$roleRef', '$role'] }, count: { $sum: 1 } } },
+  ]);
+
+  return new Map(assigned.map(({ _id, count }) => [String(_id), count]));
 }
 
 async function ensureCanManageRole(req, role, action = 'update') {
@@ -241,8 +267,25 @@ async function ensureCanManageRole(req, role, action = 'update') {
   };
 }
 
+async function ensureCanGrantRole(req, candidate) {
+  if (isCurrentAdminOwner(req)) return { ok: true };
+
+  const actorFilter = {
+    code: cleanLower(req.adminRole), deletedAt: null, active: true, status: 'active',
+  };
+  if (req.adminUserDoc?.roleRef) actorFilter._id = req.adminUserDoc.roleRef;
+  const actorRole = await AdminRole.findOne(actorFilter).lean();
+  const actorPermissions = await requirePermission.getEffectivePermissions(req);
+
+  return canGrantRole({
+    actorCode: req.adminRole, actorRole, targetRole: candidate, actorPermissions,
+  })
+    ? { ok: true }
+    : { ok: false, status: 403, message: 'No puedes configurar un perfil con privilegios superiores a los tuyos.' };
+}
+
 async function ensureRoleCanBeDisabledOrDeleted(role) {
-  const usersCount = await countUsersWithRole(role._id);
+  const usersCount = await countUsersWithRole(role);
 
   if (usersCount > 0) {
     return {
@@ -347,13 +390,20 @@ router.get(
           .lean({ virtuals: true }),
       ]);
 
+      const usageCounts = await getRoleUsageCounts(roles);
+
       return res.json({
         ok: true,
         page,
         limit,
         total,
         totalPages: Math.max(Math.ceil(total / limit), 1),
-        data: roles,
+        data: roles.map((role) => ({
+          ...role,
+          usersCount:
+            (usageCounts.get(String(role._id)) || 0) +
+            (usageCounts.get(role.code) || 0),
+        })),
       });
     } catch (error) {
       console.error('❌ Error listando roles admin:', error.message);
@@ -388,7 +438,7 @@ router.get(
         return sendError(res, 404, 'Rol administrativo no encontrado.');
       }
 
-      const usersCount = await countUsersWithRole(role._id);
+      const usersCount = await countUsersWithRole(role);
 
       return res.json({
         ok: true,
@@ -437,6 +487,14 @@ router.post(
       }
 
       const permissions = normalizePermissions(body.permissions || []);
+      const proposedRole = {
+        code, permissions, scope: cleanLower(body.scope || 'branch'), level: Number(body.level || 50),
+      };
+      const grantAllowed = await ensureCanGrantRole(req, proposedRole);
+      if (!grantAllowed.ok) return sendError(res, grantAllowed.status, grantAllowed.message);
+      if (body.isDefault === true && !isCurrentAdminOwner(req)) {
+        return sendError(res, 403, 'Solo el propietario puede elegir el perfil predeterminado.');
+      }
 
       const role = new AdminRole({
         name: cleanText(body.name),
@@ -456,21 +514,14 @@ router.post(
         updatedBy: getCurrentAdminId(req),
       });
 
+      await role.save();
+
       if (role.isDefault) {
         await AdminRole.updateMany(
-          {
-            deletedAt: null,
-            isDefault: true,
-          },
-          {
-            $set: {
-              isDefault: false,
-            },
-          }
+          { _id: { $ne: role._id }, deletedAt: null, isDefault: true },
+          { $set: { isDefault: false } }
         );
       }
-
-      await role.save();
 
       return res.status(201).json({
         ok: true,
@@ -517,6 +568,12 @@ router.put(
         return sendError(res, allowed.status, allowed.message);
       }
 
+      const originalAllowed = await ensureCanGrantRole(req, role);
+      if (!originalAllowed.ok) return sendError(res, originalAllowed.status, originalAllowed.message);
+      if (body.isDefault === true && !isCurrentAdminOwner(req)) {
+        return sendError(res, 403, 'Solo el propietario puede elegir el perfil predeterminado.');
+      }
+
       const validation = validateRolePayload(body, { isCreate: false });
 
       if (!validation.ok) {
@@ -535,6 +592,10 @@ router.put(
         }
 
         const newCode = normalizeRoleCode(body.code);
+
+        if (newCode !== role.code && (await countUsersWithRole(role)) > 0) {
+          return sendError(res, 400, 'No se puede cambiar el código de un perfil con usuarios asignados.');
+        }
 
         const duplicatedRole = await AdminRole.findOne({
           _id: { $ne: role._id },
@@ -570,10 +631,19 @@ router.put(
       }
 
       if (body.status !== undefined || body.active !== undefined) {
-        const action =
-          body.active === false || cleanLower(body.status) !== 'active'
-            ? 'disable'
-            : 'update';
+        const nextActive = body.active !== undefined
+          ? body.active === true
+          : cleanLower(body.status) === 'active';
+        const nextStatus = body.status !== undefined
+          ? cleanLower(body.status)
+          : nextActive ? 'active' : 'inactive';
+        if (!['active', 'inactive'].includes(nextStatus)) {
+          return sendError(res, 400, 'Estado de perfil inválido.');
+        }
+        if ((nextStatus === 'active') !== nextActive) {
+          return sendError(res, 400, 'El estado y la activación del perfil deben coincidir.');
+        }
+        const action = nextActive ? 'update' : 'disable';
 
         const statusAllowed = await ensureCanManageRole(req, role, action);
 
@@ -585,7 +655,10 @@ router.put(
           );
         }
 
-        if (body.active === false || cleanLower(body.status) !== 'active') {
+        if (!nextActive) {
+          if (!await requirePermission.hasEffectivePermission(req, 'roles:disable')) {
+            return sendError(res, 403, 'No tienes permiso para desactivar perfiles.');
+          }
           const usageAllowed = await ensureRoleCanBeDisabledOrDeleted(role);
 
           if (!usageAllowed.ok) {
@@ -595,32 +668,12 @@ router.put(
           }
         }
 
-        if (body.status !== undefined) {
-          role.status = cleanLower(body.status);
-        }
-
-        if (body.active !== undefined) {
-          role.active = body.active === true;
-        }
+        role.status = nextStatus;
+        role.active = nextActive;
       }
 
       if (body.isDefault !== undefined) {
         role.isDefault = body.isDefault === true;
-
-        if (role.isDefault) {
-          await AdminRole.updateMany(
-            {
-              _id: { $ne: role._id },
-              deletedAt: null,
-              isDefault: true,
-            },
-            {
-              $set: {
-                isDefault: false,
-              },
-            }
-          );
-        }
       }
 
       if (body.color !== undefined) {
@@ -635,9 +688,19 @@ router.put(
         role.notes = cleanText(body.notes);
       }
 
+      const grantAllowed = await ensureCanGrantRole(req, role);
+      if (!grantAllowed.ok) return sendError(res, grantAllowed.status, grantAllowed.message);
+
       role.updatedBy = getCurrentAdminId(req);
 
       await role.save();
+
+      if (body.isDefault === true) {
+        await AdminRole.updateMany(
+          { _id: { $ne: role._id }, deletedAt: null, isDefault: true },
+          { $set: { isDefault: false } }
+        );
+      }
 
       return res.json({
         ok: true,
@@ -678,27 +741,39 @@ router.patch(
         deletedAt: null,
       });
 
-      const allowed = await ensureCanManageRole(req, role, 'disable');
+      if (status === undefined && active === undefined) {
+        return sendError(res, 400, 'Debes indicar el nuevo estado del perfil.');
+      }
+      const nextActive = active !== undefined ? active === true : cleanLower(status) === 'active';
+      const nextStatus = status !== undefined ? cleanLower(status) : nextActive ? 'active' : 'inactive';
+      if (!['active', 'inactive'].includes(nextStatus)) {
+        return sendError(res, 400, 'Estado de perfil inválido.');
+      }
+      if ((nextStatus === 'active') !== nextActive) {
+        return sendError(res, 400, 'El estado y la activación del perfil deben coincidir.');
+      }
+
+      const allowed = await ensureCanManageRole(req, role, nextActive ? 'update' : 'disable');
 
       if (!allowed.ok) {
         return sendError(res, allowed.status, allowed.message);
       }
 
-      const usageAllowed = await ensureRoleCanBeDisabledOrDeleted(role);
+      const grantAllowed = await ensureCanGrantRole(req, role);
+      if (!grantAllowed.ok) return sendError(res, grantAllowed.status, grantAllowed.message);
 
-      if (!usageAllowed.ok) {
-        return sendError(res, usageAllowed.status, usageAllowed.message, {
-          usersCount: usageAllowed.usersCount,
-        });
+      if (!nextActive) {
+        const usageAllowed = await ensureRoleCanBeDisabledOrDeleted(role);
+
+        if (!usageAllowed.ok) {
+          return sendError(res, usageAllowed.status, usageAllowed.message, {
+            usersCount: usageAllowed.usersCount,
+          });
+        }
       }
 
-      if (status !== undefined) {
-        role.status = cleanLower(status);
-      }
-
-      if (active !== undefined) {
-        role.active = active === true;
-      }
+      role.status = nextStatus;
+      role.active = nextActive;
 
       role.updatedBy = getCurrentAdminId(req);
 
@@ -747,6 +822,9 @@ router.delete(
       if (!allowed.ok) {
         return sendError(res, allowed.status, allowed.message);
       }
+
+      const grantAllowed = await ensureCanGrantRole(req, role);
+      if (!grantAllowed.ok) return sendError(res, grantAllowed.status, grantAllowed.message);
 
       const usageAllowed = await ensureRoleCanBeDisabledOrDeleted(role);
 

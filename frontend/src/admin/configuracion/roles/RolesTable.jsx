@@ -280,6 +280,9 @@ function RoleCard({
   role,
   maxPermissions,
   currentAdminRole,
+  canEdit,
+  canDisable,
+  canManageTarget,
   onViewPermissions,
   onEdit,
   onToggleStatus,
@@ -288,9 +291,11 @@ function RoleCard({
   const permissionsCount = Array.isArray(role?.permissions) ? role.permissions.length : 0;
   const isActive = role?.active !== false && String(role?.status || '').toLowerCase() !== 'inactive';
 
-  const editable = canEditRole(role, currentAdminRole);
-  const disableable = canDisableRole(role, currentAdminRole);
-  const deletable = canDeleteRole(role, currentAdminRole);
+  const usersCount = Number(role?.usersCount || 0);
+  const manageable = canManageTarget?.(role) === true;
+  const editable = canEdit && manageable && canEditRole(role, currentAdminRole);
+  const disableable = canDisable && manageable && canDisableRole(role, currentAdminRole) && (!isActive || usersCount === 0);
+  const deletable = canDisable && manageable && canDeleteRole(role, currentAdminRole) && usersCount === 0;
 
   return (
     <article
@@ -373,10 +378,11 @@ function RoleCard({
           <div className="space-y-3">
             <PermissionMeter count={permissionsCount} max={maxPermissions} />
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <InfoChip label="Alcance" value={getRoleScopeLabel(role?.scope)} />
               <InfoChip label="Nivel" value={role?.level ?? 50} />
               <InfoChip label="Permisos" value={permissionsCount} />
+              <InfoChip label="Usuarios" value={usersCount} />
             </div>
           </div>
         </div>
@@ -404,7 +410,7 @@ function RoleCard({
           </ActionButton>
 
           <ActionButton
-            title={isActive ? 'Desactivar perfil' : 'Activar perfil'}
+            title={isActive && usersCount ? `Tiene ${usersCount} usuarios asignados` : isActive ? 'Desactivar perfil' : 'Activar perfil'}
             label={isActive ? 'Desactivar' : 'Activar'}
             disabled={!disableable}
             onClick={() => onToggleStatus?.(role)}
@@ -413,7 +419,7 @@ function RoleCard({
           </ActionButton>
 
           <ActionButton
-            title="Eliminar perfil"
+            title={usersCount ? `Tiene ${usersCount} usuarios asignados` : 'Eliminar perfil'}
             label="Eliminar"
             variant="danger"
             disabled={!deletable}
@@ -431,6 +437,9 @@ export default function RolesTable({
   roles = [],
   loading = false,
   currentAdminRole = '',
+  canEdit = false,
+  canDisable = false,
+  canManageTarget,
   onViewPermissions,
   onEdit,
   onToggleStatus,
@@ -459,6 +468,9 @@ export default function RolesTable({
           role={role}
           maxPermissions={maxPermissions}
           currentAdminRole={currentAdminRole}
+          canEdit={canEdit}
+          canDisable={canDisable}
+          canManageTarget={canManageTarget}
           onViewPermissions={onViewPermissions}
           onEdit={onEdit}
           onToggleStatus={onToggleStatus}
