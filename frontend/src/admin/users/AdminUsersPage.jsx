@@ -13,6 +13,8 @@ import {
 } from '../api/adminUsersApi';
 import { useAuth } from '../../context/AuthContext';
 import { hasAdminPermission } from '../security/adminPermissions';
+import { Activity, CheckCircle2, LockKeyhole, ShieldCheck, UsersRound } from 'lucide-react';
+import './adminUsersPage.css';
 
 import UserFormModal from './UserFormModal';
 import UserPasswordModal from './UserPasswordModal';
@@ -95,6 +97,9 @@ export default function AdminUsersPage() {
   const canAssign = hasAdminPermission(adminUser, 'admin-users:assign_role');
   const canChangePassword = hasAdminPermission(adminUser, 'admin-users:password');
   const canDisable = hasAdminPermission(adminUser, 'admin-users:disable');
+  const visibleActive = users.filter((user) => user.status === 'active').length;
+  const visibleAttention = users.filter((user) => ['blocked', 'pending'].includes(user.status)).length;
+  const visibleTwoFactor = users.filter((user) => user.twoFactorEnabled).length;
 
   const assignableRoles = roles.filter((role) => {
     if (isOwner) return true;
@@ -522,9 +527,9 @@ export default function AdminUsersPage() {
   }, [loadUsers]);
 
   return (
-    <div className="space-y-5">
+    <div className="admin-users-plus space-y-5">
       <section
-        className="rounded-[28px] border px-5 py-5 shadow-sm md:px-6"
+        className="admin-users-plus__hero rounded-[28px] border px-5 py-6 shadow-sm md:px-7 md:py-7"
         style={{
           background: 'var(--admin-glass-bg)',
           borderColor: 'var(--admin-glass-border)',
@@ -539,7 +544,7 @@ export default function AdminUsersPage() {
                 className="text-xs font-black uppercase tracking-[0.24em]"
                 style={{ color: 'var(--admin-card-muted-text)' }}
               >
-                Administración
+                CONFIGURACIÓN / ACCESOS
               </p>
 
               <span
@@ -550,7 +555,7 @@ export default function AdminUsersPage() {
                   color: 'var(--admin-primary-soft-text)',
                 }}
               >
-                {total} usuarios encontrados
+                Usuarios · Nivel Plus
               </span>
             </div>
 
@@ -558,15 +563,15 @@ export default function AdminUsersPage() {
               className="mt-3 text-2xl font-black leading-tight md:text-3xl"
               style={{ color: 'var(--admin-card-text)' }}
             >
-              Usuarios administrativos
+              Control de usuarios
             </h1>
 
             <p
               className="mt-2 max-w-2xl text-sm leading-6"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Gestiona accesos internos, roles, sedes, estados de usuario y
-              seguridad del panel administrativo.
+              Revisa quién puede entrar al panel, desde qué sedes y con qué protección.
+              Administra perfiles y accesos desde cada usuario.
             </p>
           </div>
 
@@ -592,7 +597,7 @@ export default function AdminUsersPage() {
                     : 1,
               }}
             >
-              Nuevo usuario
+              + Nuevo usuario
             </button>}
 
             <button
@@ -614,8 +619,44 @@ export default function AdminUsersPage() {
         </div>
       </section>
 
+      <section aria-label="Resumen de usuarios en esta página" className="admin-users-plus__overview">
+        <div className="admin-users-plus__overview-heading">
+          <div>
+            <p className="admin-users-plus__eyebrow">PANEL DE ACCESOS</p>
+            <h2>Estado de los usuarios</h2>
+          </div>
+          <span>En esta página · {loading ? 'Cargando' : `${users.length} visibles`}</span>
+        </div>
+        <div className="admin-users-plus__metrics">
+          <div className="admin-users-plus__metric">
+            <UsersRound aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : users.length}</strong>
+            <span>Usuarios visibles</span>
+          </div>
+          <div className="admin-users-plus__metric">
+            <CheckCircle2 aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : visibleActive}</strong>
+            <span>Con acceso activo</span>
+          </div>
+          <div className="admin-users-plus__metric">
+            <LockKeyhole aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : visibleTwoFactor}</strong>
+            <span>Con 2FA activo</span>
+          </div>
+          <div className="admin-users-plus__metric admin-users-plus__metric--attention">
+            <Activity aria-hidden="true" size={19} />
+            <strong>{loading ? '—' : visibleAttention}</strong>
+            <span>Pendientes o bloqueados</span>
+          </div>
+        </div>
+        <p className="admin-users-plus__overview-note">
+          <ShieldCheck aria-hidden="true" size={15} />
+          Cada ficha muestra el perfil, las sedes asignadas, el estado de acceso y la protección 2FA.
+        </p>
+      </section>
+
       <section
-        className="rounded-[28px] border p-5 shadow-sm"
+        className="admin-users-plus__list rounded-[28px] border p-5 shadow-sm"
         style={{
           background: 'var(--admin-card-bg)',
           borderColor: 'var(--admin-card-border)',
@@ -628,14 +669,14 @@ export default function AdminUsersPage() {
               className="text-lg font-black"
               style={{ color: 'var(--admin-card-text)' }}
             >
-              Listado de usuarios
+              Directorio de usuarios
             </h2>
 
             <p
               className="mt-1 text-sm"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Mostrando {users.length} de {total} usuarios. Página {page} de {totalPages}.
+              {total} resultados · Mostrando {users.length} · Página {page} de {totalPages}
             </p>
           </div>
 
