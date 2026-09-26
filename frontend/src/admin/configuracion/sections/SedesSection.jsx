@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2,
   Plus,
   RefreshCw,
   Save,
@@ -1357,34 +1356,25 @@ export default function SedesSection() {
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="space-y-3">
         <div
-          className="rounded-[28px] border p-5 backdrop-blur-xl"
+          className="rounded-2xl border p-4 backdrop-blur-xl"
           style={glassCardStyle}
         >
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div
-                className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-                style={primaryBadgeStyle}
-              >
-                <Building2 className="h-4 w-4" />
-                Módulo de sedes
-              </div>
-
               <h3
-                className="mt-3 text-xl font-bold"
+                className="text-xl font-bold"
                 style={{ color: 'var(--admin-card-text)' }}
               >
-                Administra las sedes de la tienda
+                Sedes
               </h3>
 
               <p
                 className="mt-1 max-w-3xl text-sm leading-6"
                 style={mutedTextStyle}
               >
-                Organiza tiendas, bodegas y puntos de recogida. Sus sedes ya se
-                utilizan en usuarios, inventario, ventas, caja y facturación.
+                Administra tiendas, bodegas y puntos de recogida.
               </p>
             </div>
 
@@ -1410,10 +1400,10 @@ export default function SedesSection() {
         )}
 
         <div
-          className="rounded-[28px] border p-4 backdrop-blur-xl"
+          className="rounded-2xl border p-3 backdrop-blur-xl"
           style={cardStyle}
         >
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px_auto]">
+          <div className="grid gap-2 lg:grid-cols-[1fr_180px_180px_auto]">
             <div
               className="flex items-center gap-2 rounded-2xl border px-3 py-2"
               style={inputStyle}
@@ -1483,15 +1473,11 @@ export default function SedesSection() {
             </button>
           </div>
 
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <span style={mutedTextStyle}>
-              Total de sedes: <strong>{total}</strong>
-            </span>
-          </div>
         </div>
 
         <SedesList
           branches={branches}
+          total={total}
           loading={loading}
           canEdit={canEdit}
           canDisable={canDisable}
