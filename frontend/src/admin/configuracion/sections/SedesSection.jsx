@@ -1440,15 +1440,6 @@ export default function SedesSection() {
           </div>
         </div>
 
-        {(message || error) && (
-          <div
-            className="rounded-2xl border px-4 py-3 text-sm font-semibold"
-            style={error ? dangerButtonStyle : primaryBadgeStyle}
-          >
-            {error || message}
-          </div>
-        )}
-
         <div
           className="rounded-2xl border p-3 backdrop-blur-xl"
           style={cardStyle}
@@ -1548,6 +1539,24 @@ export default function SedesSection() {
         )}
       </div>
 
+      {!showForm && (message || error) && typeof document !== 'undefined' && createPortal(
+        <div
+          role={error ? 'alert' : 'status'}
+          className="fixed left-1/2 top-5 z-[99998] flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl backdrop-blur-xl"
+          style={error ? dangerButtonStyle : primaryBadgeStyle}
+        >
+          <span>{error || message}</span>
+          <button
+            type="button"
+            onClick={() => { setMessage(''); setError(''); }}
+            aria-label="Cerrar aviso de sedes"
+            className="shrink-0 rounded-lg p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>,
+        document.body
+      )}
       {modalContent}
     </>
   );

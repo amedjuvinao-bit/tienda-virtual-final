@@ -114,4 +114,7 @@ it('guarda los datos de una sede inactiva sin volver a solicitar su desactivaci√
   expect(payload.name).toBe('Sede inactiva actualizada');
   expect(payload).not.toHaveProperty('status');
   expect(payload).not.toHaveProperty('active');
+  const confirmation = await screen.findByRole('status');
+  expect(confirmation).toHaveTextContent('Sede actualizada correctamente.');
+  expect(confirmation).toHaveClass('fixed');
 });
