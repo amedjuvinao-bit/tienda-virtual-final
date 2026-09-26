@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Eye, ShieldCheck, X } from 'lucide-react';
 
 import { getPermissionGroupsArray } from './rolesHelpers';
@@ -30,11 +31,11 @@ export default function RolePermissionsModal({ open = false, role = null, permis
 
   if (!open || !role) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-3 py-4 sm:px-5">
       <div
         className="absolute inset-0"
-        style={{ background: 'rgba(15, 23, 42, 0.52)', backdropFilter: 'blur(8px)' }}
+        style={{ background: 'transparent', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
         onClick={onClose}
       />
       <div
@@ -112,6 +113,7 @@ export default function RolePermissionsModal({ open = false, role = null, permis
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

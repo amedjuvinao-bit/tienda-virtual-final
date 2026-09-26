@@ -20,6 +20,9 @@ it('muestra primero los módulos asignados y permite agregar permisos con nombre
     <RoleFormModal open mode="edit" role={{ _id: 'aux', name: 'Auxiliar', code: 'auxiliar', scope: 'branch', level: 50, status: 'active', permissions: ['customers:view'] }} availablePermissions={catalog.flatMap((module) => module.permissions.map((item) => item.key))} permissionCatalog={catalog} onSubmit={onSubmit} />
   );
 
+  const dialog = screen.getByRole('dialog', { name: 'Editar perfil' });
+  expect(dialog.parentElement.parentElement).toBe(document.body);
+  expect(dialog.previousElementSibling).toHaveStyle({ background: 'transparent' });
   const modules = screen.getByRole('navigation', { name: 'Módulos para asignar permisos' });
   expect(within(modules).getByRole('button', { name: /Clientes/ })).toBeInTheDocument();
   expect(within(modules).queryByRole('button', { name: /Finanzas/ })).not.toBeInTheDocument();

@@ -1,6 +1,7 @@
 // frontend/src/admin/configuracion/roles/RoleConfirmModal.jsx
 
 import { AlertTriangle, Power, Trash2, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 /* ============================================================
  * MODAL DE CONFIRMACIÓN PARA PERFILES / ROLES
@@ -46,13 +47,14 @@ export default function RoleConfirmModal({
       ? 'Desactivar perfil'
       : 'Activar perfil';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-6">
       <div
         className="absolute inset-0"
         style={{
-          background: 'rgba(15, 23, 42, 0.52)',
+          background: 'transparent',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
         }}
         onClick={loading ? undefined : onClose}
       />
@@ -212,6 +214,7 @@ export default function RoleConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

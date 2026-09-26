@@ -1,6 +1,7 @@
 // frontend/src/admin/configuracion/roles/RoleFormModal.jsx
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Save, ShieldCheck, X } from 'lucide-react';
 
 import PermissionsSelector from './PermissionsSelector';
@@ -114,18 +115,22 @@ export default function RoleFormModal({
 
   const visibleError = localError || error;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-3 py-3 sm:px-4">
       <div
         className="fixed inset-0"
         style={{
-          background: 'rgba(15, 23, 42, 0.52)',
+          background: 'transparent',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
         }}
         onClick={loading ? undefined : onClose}
       />
 
       <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="role-form-title"
         onSubmit={handleSubmit}
         className="relative z-10 flex max-h-[94dvh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border shadow-2xl"
         style={{
@@ -152,7 +157,7 @@ export default function RoleFormModal({
             </div>
 
             <div>
-              <h2 className="text-lg font-black sm:text-xl">{title}</h2>
+              <h2 id="role-form-title" className="text-lg font-black sm:text-xl">{title}</h2>
 
               <p
                 className="mt-1 text-xs font-semibold sm:text-sm"
@@ -449,6 +454,7 @@ export default function RoleFormModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
