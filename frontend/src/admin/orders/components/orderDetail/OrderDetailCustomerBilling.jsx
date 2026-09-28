@@ -100,27 +100,34 @@ export default function OrderDetailCustomerBilling({
       />
 
       {editing ? (
-        <OrderCustomerBillingEditForm
-          form={form}
-          syncCustomer={syncCustomer}
-          onSyncCustomerChange={setSyncCustomer}
-          demoOrder={demoOrder}
-          onPartyFieldChange={setPartyField}
-          onBillingPersonTypeChange={setBillingPersonType}
-          regions={geography.regions}
-          regionsLoading={geography.regionsLoading}
-          onDepartmentChange={geography.setDepartment}
-          customerCities={geography.customerCities}
-          customerCitiesLoading={geography.customerCitiesLoading}
-          billingCities={geography.billingCities}
-          billingCitiesLoading={geography.billingCitiesLoading}
-          onMunicipalityChange={geography.setMunicipality}
-          formError={formError}
-          geoError={geography.geoError}
-          saving={saving}
-          onCancel={() => setEditing(false)}
-          onSubmit={submit}
-        />
+        <>
+          {['accepted', 'validated'].includes(String(order?.electronicInvoice?.status || '').toLowerCase()) ? (
+            <p style={{ gridColumn: '1 / -1', margin: 0, padding: 12, borderRadius: 12, background: 'var(--admin-warning-soft-bg)', color: 'var(--admin-warning-text)' }}>
+              La factura validada conserva los datos fiscales registrados al emitirse. Guardar aquí solo actualiza la orden.
+            </p>
+          ) : null}
+          <OrderCustomerBillingEditForm
+            form={form}
+            syncCustomer={syncCustomer}
+            onSyncCustomerChange={setSyncCustomer}
+            demoOrder={demoOrder}
+            onPartyFieldChange={setPartyField}
+            onBillingPersonTypeChange={setBillingPersonType}
+            regions={geography.regions}
+            regionsLoading={geography.regionsLoading}
+            onDepartmentChange={geography.setDepartment}
+            customerCities={geography.customerCities}
+            customerCitiesLoading={geography.customerCitiesLoading}
+            billingCities={geography.billingCities}
+            billingCitiesLoading={geography.billingCitiesLoading}
+            onMunicipalityChange={geography.setMunicipality}
+            formError={formError}
+            geoError={geography.geoError}
+            saving={saving}
+            onCancel={() => setEditing(false)}
+            onSubmit={submit}
+          />
+        </>
       ) : null}
 
       <BillingSummaryPanel billing={viewModel.billing} />

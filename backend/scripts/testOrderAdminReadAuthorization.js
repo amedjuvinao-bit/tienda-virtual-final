@@ -101,6 +101,7 @@ function unsafeInvoiceFixture() {
     orderNumber: '000240',
     required: true,
     status: 'accepted',
+    errorMessage: 'PROVIDER_ERROR_SECRET',
     invoiceNumber: 'SETP-240',
     cufe: 'CUFE-SEGURO-PARA-LA-VISTA',
     pdfUrl: 'https://private.example/invoice.pdf?token=PDF_SECRET',
@@ -292,6 +293,7 @@ async function validateMinimalFiscalDto() {
     'documents',
     'emission',
     'failedAt',
+    'failureReason',
     'generatedAt',
     'id',
     'invoiceNumber',
@@ -314,6 +316,19 @@ async function validateMinimalFiscalDto() {
     'validatedAt',
   ]);
   assert.strictEqual(summary.status, 'accepted');
+  assert.strictEqual(summary.failureReason, '');
+  assert.strictEqual(
+    serializeOrderAdminInvoiceSummary({
+      ...invoice,
+      status: 'failed',
+      errorMessage: 'Factus rechazó la factura: El campo apellido es obligatorio.',
+    }).failureReason,
+    'La factura no se pudo emitir porque falta el apellido fiscal del comprador.'
+  );
+  assert(!JSON.stringify(serializeOrderAdminInvoiceSummary({
+    ...invoice,
+    status: 'failed',
+  })).includes('PROVIDER_ERROR_SECRET'));
   assert.strictEqual(summary.invoiceNumber, 'SETP-240');
   assert.strictEqual(summary.cufe, 'CUFE-SEGURO-PARA-LA-VISTA');
   assert.strictEqual(summary.provider.name, 'factus');

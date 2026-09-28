@@ -9,6 +9,7 @@ const ADMIN_ORDER_INVOICE_SUMMARY_PROJECTION = Object.freeze({
   orderNumber: 1,
   required: 1,
   status: 1,
+  errorMessage: 1,
   invoiceNumber: 1,
   cufe: 1,
   'provider.name': 1,
@@ -126,12 +127,25 @@ function idText(value) {
 function serializeOrderAdminInvoiceSummary(invoice) {
   if (!invoice) return null;
 
+  const failed = ['failed', 'rejected', 'error'].includes(
+    String(invoice.status || '').toLowerCase()
+  );
+  const providerMessage = String(invoice.errorMessage || '').toLowerCase();
+  const failureReason = !failed
+    ? ''
+    : /apellido|surname|last.?name/.test(providerMessage)
+      ? 'La factura no se pudo emitir porque falta el apellido fiscal del comprador.'
+      : /municipio|municipality/.test(providerMessage)
+        ? 'La factura no se pudo emitir porque falta o es incorrecto el municipio fiscal.'
+        : 'No se pudo emitir la factura. Revisa el motivo en Facturación, Órdenes por facturar.';
+
   return {
     id: idText(invoice._id),
     orderId: idText(invoice.orderId),
     orderNumber: String(invoice.orderNumber || ''),
     required: invoice.required === true,
     status: String(invoice.status || 'pending'),
+    failureReason,
     invoiceNumber: String(
       invoice.invoiceNumber || invoice?.provider?.number || ''
     ),

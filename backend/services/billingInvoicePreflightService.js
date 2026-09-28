@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const { needsFactusLastName } = require('../lib/billing/factusCustomerValidation');
 const {
   buildRuntimeFactusConfig,
 } = require('../lib/billing/billingConfigurationSecurity');
@@ -70,7 +71,7 @@ function normalizeDocument(value) {
 function validateCustomerSnapshot(
   customer = {},
   payloadCustomer = {},
-  { requireMunicipality = true } = {}
+  { requireMunicipality = true, requireLastName = false } = {}
 ) {
   const blockers = [];
   const warnings = [];
@@ -164,6 +165,14 @@ function validateCustomerSnapshot(
       'BILLING_CUSTOMER_MUNICIPALITY_REQUIRED',
       'billing.municipalityCode',
       'Selecciona el municipio fiscal del comprador.'
+    ));
+  }
+
+  if (requireLastName && needsFactusLastName(customer)) {
+    blockers.push(issue(
+      'BILLING_CUSTOMER_LAST_NAME_REQUIRED',
+      'billing.lastName',
+      'Falta el apellido fiscal del comprador. Corrígelo en la orden antes de emitir la factura.'
     ));
   }
 
@@ -359,6 +368,7 @@ async function buildInvoicePreflight(
     }
     const validation = validateCustomerSnapshot(customer, factusPayload.customer, {
       requireMunicipality: mode.external && mode.provider === 'factus',
+      requireLastName: mode.external && mode.provider === 'factus',
     });
     blockers.push(...validation.blockers);
     warnings.push(...validation.warnings);

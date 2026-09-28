@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const { needsFactusLastName } = require('../lib/billing/factusCustomerValidation');
 const { generateCUFE } = require('../lib/dian/cufe');
 const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
 const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
@@ -685,6 +686,13 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     const customerSnapshot = buildCustomerSnapshot(order, {
       requireMunicipality: isExternalProvider && providerName === 'factus',
     });
+    if (isExternalProvider && providerName === 'factus' && needsFactusLastName(customerSnapshot)) {
+      throw createBillingError(
+        'Falta el apellido fiscal del comprador. Corrígelo en la orden antes de emitir la factura.',
+        422,
+        'BILLING_CUSTOMER_LAST_NAME_REQUIRED'
+      );
+    }
     const now = nowFactory();
     const issueDate = now.toISOString().slice(0, 10);
     const issueTime = now.toISOString().slice(11, 19);

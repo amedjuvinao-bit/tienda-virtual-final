@@ -117,7 +117,7 @@ export default function InvoiceCustomerBillingSection({ controller }) {
     <section className="rounded-3xl border p-5" style={PANEL_STYLE}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-bold" style={{ color: 'var(--admin-card-text)' }}>
-          Información del cliente / facturación
+          Datos actuales de la orden
         </h3>
         <div className="flex flex-wrap items-center gap-2">
           {editing && (
@@ -156,6 +156,9 @@ export default function InvoiceCustomerBillingSection({ controller }) {
           </button>
         </div>
       </div>
+      <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+        Editar estos datos no modifica una factura ya validada.
+      </p>
       {message && <Feedback tone="success">{message}</Feedback>}
       {error && <Feedback tone="error">{error}</Feedback>}
       {editing ? (

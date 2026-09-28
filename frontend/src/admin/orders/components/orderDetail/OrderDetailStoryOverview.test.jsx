@@ -125,6 +125,39 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.queryByText('Valor pagado')).not.toBeInTheDocument();
   });
 
+  it('explica la factura rechazada por apellido y conduce a corregir el comprador sin repetir el pago', () => {
+    const onEditBilling = vi.fn();
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      status: 'paid',
+      payment: { status: 'paid' },
+      customer: { name: 'Cliente', lastname: '' },
+      billing: { firstName: 'Cliente', lastName: '', personType: 'natural' },
+      electronicInvoice: { status: 'failed', failureReason: 'La factura no se pudo emitir porque falta el apellido fiscal del comprador.' },
+    }} onEditBilling={onEditBilling} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Falta el apellido fiscal');
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir datos fiscales' }));
+    expect(onEditBilling).toHaveBeenCalledOnce();
+  });
+
+  it('avisa de datos incompletos antes de emitir, pero no interrumpe la conciliación de una factura enviada', () => {
+    const paidOrder = {
+      ...BASE_ORDER,
+      payment: { status: 'paid' },
+      customer: { name: 'Cliente', lastname: '' },
+      billing: { firstName: 'Cliente', lastName: '', personType: 'natural' },
+    };
+    const { rerender } = render(<OrderDetailPaymentPanel order={paidOrder} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Falta el apellido fiscal');
+
+    rerender(<OrderDetailPaymentPanel order={{
+      ...paidOrder,
+      electronicInvoice: { status: 'reconciliation_pending' },
+    }} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('muestra valor y fecha pagados una vez confirmado el pago manual', () => {
     render(<OrderDetailPaymentPanel order={{
       ...BASE_ORDER,

@@ -33,6 +33,7 @@ export default async function buildInvoiceModalData(document = {}) {
   const fallbackOrder = buildFallbackOrderForInvoice(document);
   const resolvedOrder = order && (order._id || order.id) ? order : fallbackOrder;
   const resolvedInvoice =
+    (document?.id || document?._id ? document : null) ||
     resolvedOrder?.electronicInvoice ||
     resolvedOrder?.invoice ||
     resolvedOrder?.dian ||

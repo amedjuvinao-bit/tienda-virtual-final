@@ -22,11 +22,13 @@ import {
   getPaymentDetails,
 } from './orderPaymentPanelModel';
 import { getPaymentState } from './orderStoryStateModel';
+import { getOrderInvoiceIssue } from './orderInvoiceIssueModel';
 
 export default function OrderDetailPaymentPanel({
   order,
   canConfirmManualPayment = false,
   manualPaymentConfirmation,
+  onEditBilling,
 }) {
   const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentInfo(order);
@@ -48,6 +50,7 @@ export default function OrderDetailPaymentPanel({
     }[String(storeCredit.status || '').toLowerCase()] || 'Registrado';
   const badgeVariant = getPaymentBadgeVariant(payment.status);
   const paymentStatusLabel = exchange.noCharge ? 'Sin cobro' : payment.status;
+  const invoiceIssue = getOrderInvoiceIssue(order);
 
   return (
     <OrderDetailPanel
@@ -172,6 +175,17 @@ export default function OrderDetailPaymentPanel({
       </div>
 
       <OrderManualPaymentEvidence order={order} />
+      {invoiceIssue ? (
+        <div role="alert" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: '1px solid var(--admin-warning-border)', background: 'var(--admin-warning-soft-bg)', color: 'var(--admin-warning-text)' }}>
+          <strong style={{ display: 'block', fontSize: 14 }}>Factura pendiente de corrección</strong>
+          <p style={{ margin: '6px 0 0', fontSize: 13 }}>{invoiceIssue}</p>
+          {onEditBilling ? (
+            <button type="button" onClick={onEditBilling} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 10, border: '1px solid currentColor', fontWeight: 800 }}>
+              Corregir datos fiscales
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <OrderManualPaymentConfirmationCard
         canConfirmManualPayment={canConfirmManualPayment}
         controller={manualPaymentConfirmation}

@@ -136,6 +136,21 @@ async function main() {
   assert.ok(identified.blockers.some((item) => item.code === 'BILLING_FINAL_CONSUMER_MISMATCH'));
   ok('bloquea 222222222222 cuando el comprador no es consumidor final');
 
+  const missingLastName = validateCustomerSnapshot({
+    documentType: 'CC',
+    documentNumber: '0000000000',
+    personType: 'natural',
+    firstName: 'Fixture',
+    lastName: '',
+    address: 'DIRECCION FICTICIA SIN VALIDEZ',
+    email: 'fixture.fiscal@example.invalid',
+    municipalityCode: '11001',
+  }, {}, { requireLastName: true });
+  assert.ok(missingLastName.blockers.some(
+    (item) => item.code === 'BILLING_CUSTOMER_LAST_NAME_REQUIRED'
+  ));
+  ok('Factus exige apellido de la persona natural antes del envío');
+
   const finalCustomer = buildFactusCustomer({
     source: 'manual',
     customer: { name: 'Consumidor final', isFinalConsumer: true },

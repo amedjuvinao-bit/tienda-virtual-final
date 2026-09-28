@@ -159,6 +159,8 @@ async function validateControlledRetry() {
     subtotal: 50000,
     total: 50000,
     customer: {
+      name: 'Cliente',
+      lastname: 'Prueba',
       documentNumber: '987654321',
       email: 'retry@example.com',
       city: 'Zona Bananera',
@@ -240,6 +242,69 @@ async function validateControlledRetry() {
   assert(successfulRetry?.invoice?.status === 'accepted', 'El reintento exitoso debe finalizar en accepted.');
   assert(successfulRetry?.invoice?.emission?.attempts === 2, 'La auditoría debe registrar dos intentos.');
   ok('Los reintentos fallidos también quedan bloqueados contra concurrencia');
+}
+
+async function validateMissingLastNameBeforeProvider() {
+  const orderId = '64b000000000000000000003';
+  const order = {
+    _id: orderId,
+    orderNumber: '000302',
+    status: 'paid',
+    subtotal: 50000,
+    shipping: 0,
+    total: 50000,
+    customer: {
+      name: 'Cliente',
+      documentNumber: '0000000000',
+      municipalityCode: '11001',
+      countryCode: 'CO',
+    },
+    billing: {
+      firstName: 'Cliente',
+      lastName: '',
+      documentNumber: '0000000000',
+      municipalityCode: '11001',
+      countryCode: 'CO',
+    },
+    payment: {
+      status: 'paid',
+      provider: 'manual',
+      amount: 50000,
+      paidAt: new Date('2026-08-17T12:00:00.000Z'),
+    },
+    items: [{ title: 'Producto ficticio', quantity: 1, price: 50000 }],
+  };
+  const settings = {
+    billing: {
+      fiscalInfo: { nit: '900000000' },
+      dian: { enabled: true, mode: 'test', environment: '2' },
+      dianResolution: { prefix: 'SETP', currentNumber: 1, environment: '2' },
+      electronicProvider: { provider: 'factus' },
+    },
+  };
+  const models = createInMemoryModels({ order, settings });
+  let providerCalls = 0;
+  const service = createElectronicInvoiceIssuanceService({
+    ...models,
+    isValidObjectId: () => true,
+    sendElectronicInvoiceToProvider: async () => {
+      providerCalls += 1;
+      throw new Error('No debe contactar a Factus sin apellido.');
+    },
+  });
+
+  let rejection;
+  try {
+    await service.issueElectronicInvoiceForOrder({ orderId, source: 'manual' });
+  } catch (error) {
+    rejection = error;
+  }
+
+  assert(rejection?.code === 'BILLING_CUSTOMER_LAST_NAME_REQUIRED',
+    `Debe señalar la corrección del apellido antes de generar la factura: ${rejection?.code || rejection?.message || 'sin error'}.`);
+  assert(providerCalls === 0 && models.count() === 0,
+    'No debe reservar documento ni contactar a Factus con apellido faltante.');
+  ok('El pago manual sin apellido queda pendiente de corrección sin emitir duplicados');
 }
 
 async function validateConcurrentIssuance() {
@@ -412,6 +477,7 @@ async function main() {
 
   try {
     await validateConcurrentIssuance();
+    await validateMissingLastNameBeforeProvider();
     await validateControlledRetry();
     validateDatabaseConstraint();
     validateUnifiedEntryPoints();

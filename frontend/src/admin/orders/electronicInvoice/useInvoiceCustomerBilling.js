@@ -16,12 +16,26 @@ const EMPTY_CUSTOMER_BILLING = Object.freeze({
 
 export function buildInvoiceCustomerBillingForm(order) {
   const customer = order?.customer || {};
-  return Object.fromEntries(
+  const billing = order?.billing || {};
+  const form = Object.fromEntries(
     Object.keys(EMPTY_CUSTOMER_BILLING).map((field) => [
       field,
       customer[field] || '',
     ])
   );
+  return {
+    ...form,
+    name: billing.firstName || billing.name || form.name,
+    lastname: billing.lastName || billing.lastname || form.lastname,
+    id: billing.documentNumber || billing.id || form.id,
+    email: billing.email || form.email,
+    emailOrPhone: billing.email || form.emailOrPhone,
+    phone: billing.phone || form.phone,
+    address: billing.address || form.address,
+    city: billing.city || form.city,
+    department: billing.department || form.department,
+    country: billing.country || form.country,
+  };
 }
 
 export default function useInvoiceCustomerBilling(order) {
@@ -58,10 +72,31 @@ export default function useInvoiceCustomerBilling(order) {
       setMessage('');
       setError('');
       await api.patch(`/api/orders/${order._id}/customer-data`, {
-        customer: form,
-        billing: form,
+        customer: {
+          name: form.name,
+          lastname: form.lastname,
+          id: form.id,
+          email: form.email,
+          emailOrPhone: form.emailOrPhone,
+          phone: form.phone,
+          address: form.address,
+          city: form.city,
+          department: form.department,
+          country: form.country,
+        },
+        billing: {
+          firstName: form.name,
+          lastName: form.lastname,
+          documentNumber: form.id,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          city: form.city,
+          department: form.department,
+          country: form.country,
+        },
       });
-      setMessage('Datos de facturación actualizados correctamente.');
+      setMessage('Datos actuales de la orden guardados. La factura emitida conserva sus datos originales.');
       setEditing(false);
     } catch (saveError) {
       console.error('Error actualizando datos de facturación:', saveError);
