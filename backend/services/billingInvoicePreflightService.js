@@ -167,6 +167,19 @@ function validateCustomerSnapshot(
     ));
   }
 
+  if (
+    requireMunicipality &&
+    cleanText(customer.municipalityCode, 30) &&
+    cleanText(payloadCustomer?.municipality_code, 30) !==
+      cleanText(customer.municipalityCode, 30)
+  ) {
+    blockers.push(issue(
+      'BILLING_PROVIDER_MUNICIPALITY_MISMATCH',
+      'customer.municipality_code',
+      'El municipio fiscal no coincide con el que se enviará a Factus.'
+    ));
+  }
+
   if (!payloadCustomer || Array.isArray(payloadCustomer) || typeof payloadCustomer !== 'object') {
     blockers.push(issue(
       'BILLING_PROVIDER_CUSTOMER_INVALID',
@@ -337,7 +350,10 @@ async function buildInvoicePreflight(
 
   let factusPayload = null;
   if (customer && totals) {
-    factusPayload = buildFactusInvoicePayload({ order: normalizedOrder });
+    factusPayload = buildFactusInvoicePayload({
+      order: normalizedOrder,
+      customerSnapshot: customer,
+    });
     if (runtimeConfig?.numberingRangeId) {
       factusPayload.numbering_range_id = Number(runtimeConfig.numberingRangeId);
     }

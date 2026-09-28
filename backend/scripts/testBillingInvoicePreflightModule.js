@@ -173,6 +173,30 @@ async function main() {
   assert.match(preflight.fingerprint, /^[a-f0-9]{64}$/);
   ok('construye una fotografía fiscal completa y determinística sin llamar a Factus');
 
+  const legacyOrder = sampleOrder();
+  legacyOrder.customer.city = 'Zona Bananera';
+  legacyOrder.customer.department = 'Magdalena';
+  delete legacyOrder.customer.municipalityCode;
+  legacyOrder.billing.city = 'Zona Bananera';
+  legacyOrder.billing.department = 'Magdalena';
+  delete legacyOrder.billing.municipalityCode;
+  const legacyPreflight = await buildInvoicePreflight(
+    legacyOrder._id,
+    dependencies(legacyOrder)
+  );
+  assert.equal(legacyPreflight.customer.municipalityCode, '47980');
+  assert.equal(legacyPreflight.payload.customer.municipality_code, '47980');
+  ok('la vista previa envía a Factus el municipio recuperado de una orden anterior');
+
+  const municipalityMismatch = validateCustomerSnapshot(
+    legacyPreflight.customer,
+    { ...legacyPreflight.payload.customer, municipality_code: '' }
+  );
+  assert.ok(municipalityMismatch.blockers.some(
+    (item) => item.code === 'BILLING_PROVIDER_MUNICIPALITY_MISMATCH'
+  ));
+  ok('la vista previa bloquea un municipio ausente en la solicitud real a Factus');
+
   assert.equal(assertPreflightReady(preflight, preflight.fingerprint), true);
   assert.throws(
     () => assertPreflightReady(preflight, 'a'.repeat(64)),

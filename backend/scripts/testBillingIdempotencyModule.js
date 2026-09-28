@@ -13,6 +13,9 @@ const {
 const {
   createElectronicInvoiceIssuanceService,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  buildFactusInvoicePayload,
+} = require('../lib/dian/providers/factus/factusPayloads');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -159,7 +162,6 @@ async function validateControlledRetry() {
       documentNumber: '987654321',
       email: 'retry@example.com',
       city: 'Zona Bananera',
-      municipalityCode: '47980',
       department: 'Magdalena',
       departmentCode: '47',
       countryCode: 'CO',
@@ -190,8 +192,12 @@ async function validateControlledRetry() {
     randomUUID: () => `retry-lock-${providerCalls + 1}`,
     generateCUFE: () => ({ cufe: 'retry-local-cufe' }),
     generateInvoiceXML: () => '<Invoice />',
-    sendElectronicInvoiceToProvider: async () => {
+    sendElectronicInvoiceToProvider: async (invoiceData) => {
       providerCalls += 1;
+      assert(
+        buildFactusInvoicePayload(invoiceData.invoiceData).customer.municipality_code === '47980',
+        'La emisión y el reintento deben incluir el municipio recuperado en Factus.'
+      );
       await new Promise((resolve) => setTimeout(resolve, 15));
 
       if (shouldFail) {

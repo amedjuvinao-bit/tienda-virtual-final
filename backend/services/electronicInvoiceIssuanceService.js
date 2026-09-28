@@ -886,6 +886,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
           provider: providerName,
           invoiceData: {
             order: providerOrder,
+            customerSnapshot,
             settings: settingsForInvoice,
             cufeData,
             xmlContent,
