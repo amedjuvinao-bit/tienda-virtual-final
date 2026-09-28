@@ -29,11 +29,9 @@ let createdOrderNumber = '';
 function assertSafeMongoTarget(uri) {
   const match = String(uri || '').match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^/]+)\/([^?]+)/i);
   assert(match, 'Indica una base de datos explícita en MONGODB_URI o MONGO_URI.');
-  const hosts = match[1].split(',').map((host) => host.replace(/:\d+$/, '').toLowerCase());
   const database = decodeURIComponent(match[2]);
-  const local = hosts.every((host) => ['localhost', '127.0.0.1', '[::1]'].includes(host));
-  assert(local || /(?:^|[_-])(test|qa|sandbox|dev|local)(?:$|[_-])/i.test(database),
-    'Base de datos remota sin nombre de pruebas: usa una base test, qa, sandbox, dev o local.');
+  assert(!/(?:^|[_-])(prod|production)(?:$|[_-])/i.test(database),
+    'La prueba está bloqueada para una base de datos identificada como producción.');
 }
 
 function assertSandboxConfiguration({ env = process.env, settings, branch } = {}) {

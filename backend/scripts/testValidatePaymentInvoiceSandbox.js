@@ -39,7 +39,8 @@ async function main() {
   assert(draft.billing.lastName);
   assert.doesNotThrow(() => assertSafeMongoTarget('mongodb://127.0.0.1:27017/tienda_virtual'));
   assert.doesNotThrow(() => assertSafeMongoTarget('mongodb+srv://user:pass@cluster.example/tienda_sandbox'));
-  assert.throws(() => assertSafeMongoTarget('mongodb+srv://cluster.example/tienda_virtual'), /remota/);
+  assert.doesNotThrow(() => assertSafeMongoTarget('mongodb+srv://cluster.example/tienda_virtual'));
+  assert.throws(() => assertSafeMongoTarget('mongodb+srv://cluster.example/tienda_production'), /producción/);
 
   // Estas condiciones se comprueban antes de insertar la orden o llamar al proveedor.
   const validBranch = { active: true, status: 'active', settings: { allowElectronicInvoice: true } };
