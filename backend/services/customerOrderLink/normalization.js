@@ -163,12 +163,20 @@ function hasCustomerIdentity(payload = {}) {
 function applyCustomerResolutionToOrderData(orderData = {}, resolution = {}) {
   if (!resolution?.customer || !resolution?.snapshot) return orderData;
 
+  const submittedCustomer = orderData.customer || {};
+  const customer = { ...resolution.snapshot };
+  for (const [field, value] of Object.entries(submittedCustomer)) {
+    if (
+      field !== 'customerId' && field !== 'customerCode' &&
+      value != null && (typeof value !== 'string' || value.trim())
+    ) {
+      customer[field] = value;
+    }
+  }
+
   return {
     ...orderData,
-    customer: {
-      ...(orderData.customer || {}),
-      ...resolution.snapshot,
-    },
+    customer,
     customerRelationship: {
       ...(orderData.customerRelationship || {}),
       linkedAt: new Date(),

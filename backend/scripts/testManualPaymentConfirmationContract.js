@@ -318,6 +318,23 @@ async function main() {
   assert.strictEqual(blocked.state.inventoryCalls, 0);
   ok('Wompi y PayU quedan bloqueados antes de evidencia o inventario');
 
+  const crossedIdentity = makeOrder(IDS.manual);
+  crossedIdentity.source = 'manual';
+  crossedIdentity.customer = { name: 'Cliente anterior', id: '4234234234', documentType: 'CC' };
+  crossedIdentity.billing = { firstName: 'Nuevo', lastName: 'Comprador', documentNumber: '1234567890', documentType: 'CC' };
+  const crossed = createHarness([crossedIdentity]);
+  await rejectsCode(
+    crossed.service.confirmManualPayment({
+      orderId: IDS.manual,
+      payment: validPayment,
+      actor,
+    }),
+    'MANUAL_ORDER_CUSTOMER_BILLING_MISMATCH'
+  );
+  assert.strictEqual(crossed.state.evidence.length, 0);
+  assert.strictEqual(crossed.state.inventoryCalls, 0);
+  ok('una orden manual antigua con dos documentos no confirma el pago ni emite factura');
+
   const validation = createHarness([makeOrder(IDS.manual)]);
   await rejectsCode(
     validation.service.confirmManualPayment({

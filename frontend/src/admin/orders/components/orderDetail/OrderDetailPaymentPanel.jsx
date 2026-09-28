@@ -22,7 +22,7 @@ import {
   getPaymentDetails,
 } from './orderPaymentPanelModel';
 import { getPaymentState } from './orderStoryStateModel';
-import { getOrderInvoiceIssue } from './orderInvoiceIssueModel';
+import { getManualOrderIdentityIssue, getOrderInvoiceIssue } from './orderInvoiceIssueModel';
 
 export default function OrderDetailPaymentPanel({
   order,
@@ -51,6 +51,7 @@ export default function OrderDetailPaymentPanel({
   const badgeVariant = getPaymentBadgeVariant(payment.status);
   const paymentStatusLabel = exchange.noCharge ? 'Sin cobro' : payment.status;
   const invoiceIssue = getOrderInvoiceIssue(order);
+  const identityIssue = getManualOrderIdentityIssue(order);
 
   return (
     <OrderDetailPanel
@@ -175,10 +176,10 @@ export default function OrderDetailPaymentPanel({
       </div>
 
       <OrderManualPaymentEvidence order={order} />
-      {invoiceIssue ? (
+      {invoiceIssue || identityIssue ? (
         <div role="alert" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: '1px solid var(--admin-warning-border)', background: 'var(--admin-warning-soft-bg)', color: 'var(--admin-warning-text)' }}>
-          <strong style={{ display: 'block', fontSize: 14 }}>Factura pendiente de corrección</strong>
-          <p style={{ margin: '6px 0 0', fontSize: 13 }}>{invoiceIssue}</p>
+          <strong style={{ display: 'block', fontSize: 14 }}>{identityIssue ? 'Corrige la identidad del comprador' : 'Factura pendiente de corrección'}</strong>
+          <p style={{ margin: '6px 0 0', fontSize: 13 }}>{identityIssue || invoiceIssue}</p>
           {onEditBilling ? (
             <button type="button" onClick={onEditBilling} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 10, border: '1px solid currentColor', fontWeight: 800 }}>
               Corregir datos fiscales

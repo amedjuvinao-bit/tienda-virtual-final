@@ -6,7 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
+const { unlinkPendingManualCustomerAfterDocumentChange } = require('../controllers/orderCustomerDataController');
 const { hasExactIndex } = require('./lib/orderSchemaContract');
+const { prepareManualPayload } = require('../services/manualOrderCreationService');
 
 const customerOrderLinkModule = require('../services/customerOrderLinkService');
 const {
@@ -205,6 +207,44 @@ async function main() {
       sessionTrace.saves.every((value) => value === customerSession)
   );
 
+  const conflictingCustomer = {
+    _id: '64c000000000000000000010',
+    documentType: 'CC',
+    documentNumber: '4234234234',
+    email: payload.email,
+  };
+  const EmailCollisionModel = {
+    findOne(filter) {
+      return Promise.resolve(filter.normalizedEmail === payload.email
+        ? conflictingCustomer
+        : null);
+    },
+    async create() {
+      throw new Error('Un correo repetido no debe crear una orden con otro documento.');
+    },
+  };
+  const submittedManualOrder = prepareManualPayload({
+    customer: {
+      name: 'Amed', lastname: 'Barros', id: '1234567890',
+      emailOrPhone: payload.email, country: 'Colombia', deliveryType: 'retiro',
+    },
+    items: [{ productId: '64b000000000000000000001', quantity: 1 }],
+  });
+  ok('la orden manual prepara contacto y facturación con la misma identidad ingresada',
+    submittedManualOrder.customer.name === 'Amed' &&
+    submittedManualOrder.customer.id === submittedManualOrder.billing.documentNumber &&
+    submittedManualOrder.billing.firstName === 'Amed');
+  await assert.rejects(
+    () => resolveCustomerForOrder({
+      source: 'manual', customer: submittedManualOrder.customer,
+      billing: submittedManualOrder.billing,
+    }, { CustomerModel: EmailCollisionModel }),
+    (error) => error?.code === 'CUSTOMER_IDENTITY_CONFLICT' &&
+      error?.statusCode === 409 &&
+      error?.message.includes('otro documento')
+  );
+  ok('un correo compartido con otro documento no mezcla dos compradores en la orden');
+
   sessionTrace.querySessions.length = 0;
   sessionTrace.saves.length = 0;
   const masterSync = await syncCustomerMasterFromOrder(linkedOrder, {
@@ -246,6 +286,23 @@ async function main() {
     matchedBy: 'email',
   });
   ok('la orden conserva customerId y código del cliente', resolvedData.customer.customerId === matchedCustomer._id && resolvedData.customer.customerCode === 'CLI-WEB-001');
+  ok('el nombre y el documento escritos en la orden prevalecen sobre la ficha CRM vinculada',
+    resolvedData.customer.name === 'María' &&
+    resolvedData.customer.lastname === 'Pérez' &&
+    resolvedData.customer.id === '1.234.567.890');
+  const correctedManualOrder = {
+    source: 'manual', payment: { status: 'pending_manual' },
+    customer: { customerId: linkedCustomerId, customerCode: 'CLI-ANTERIOR', id: '1234567890' },
+    billing: { documentType: 'CC', documentNumber: '1234567890' },
+    customerRelationship: { matchedBy: 'email', linkedAt: new Date() },
+  };
+  assert.strictEqual(unlinkPendingManualCustomerAfterDocumentChange(correctedManualOrder, {
+    customerId: linkedCustomerId, id: '4234234234', documentType: 'CC',
+  }), true);
+  ok('al corregir el documento de una orden manual pendiente se desvincula la ficha equivocada',
+    correctedManualOrder.customer.customerId === null &&
+    correctedManualOrder.customer.customerCode === '' &&
+    correctedManualOrder.customerRelationship.matchedBy === '');
   ok('el vínculo registra cómo se resolvió sin marcar estadísticas anticipadamente', resolvedData.customerRelationship.matchedBy === 'email' && resolvedData.customerRelationship.statsAppliedAt === null);
 
   let statsUpdates = 0;

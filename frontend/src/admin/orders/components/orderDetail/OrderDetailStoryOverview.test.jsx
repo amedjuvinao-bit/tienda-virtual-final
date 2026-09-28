@@ -158,6 +158,20 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('advierte antes de confirmar el pago si la orden manual enlazó otro cliente', () => {
+    const onEditBilling = vi.fn();
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      payment: { status: 'pending_manual' },
+      customer: { name: 'Cliente', lastname: 'Anterior', id: '4234234234' },
+      billing: { firstName: 'Amed', lastName: 'Barros', documentNumber: '1234567890', personType: 'natural' },
+    }} onEditBilling={onEditBilling} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('El nombre o documento del cliente es diferente');
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir datos fiscales' }));
+    expect(onEditBilling).toHaveBeenCalledOnce();
+  });
+
   it('muestra valor y fecha pagados una vez confirmado el pago manual', () => {
     render(<OrderDetailPaymentPanel order={{
       ...BASE_ORDER,
