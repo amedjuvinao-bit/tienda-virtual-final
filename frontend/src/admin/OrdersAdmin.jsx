@@ -1,5 +1,5 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ import useOrdersAdminFilters from './orders/hooks/useOrdersAdminFilters';
 import useOrdersAdminQuery from './orders/hooks/useOrdersAdminQuery';
 import useOrdersAdminSelectionActions from './orders/hooks/useOrdersAdminSelectionActions';
 import useOrdersControlPanel from './orders/hooks/useOrdersControlPanel';
+import useManualOrderDialog from './orders/hooks/useManualOrderDialog';
 import {
   ADMIN_BORDER,
   STATUS_FILTERS,
@@ -40,7 +41,7 @@ export default function OrdersAdmin() {
     : '';
   const linkedOrderNumber = String(searchParams.get('q') || '').trim();
   const openedLinkedOrderRef = useRef('');
-  const [showManualOrder, setShowManualOrder] = useState(false);
+  const manualOrderDialog = useManualOrderDialog();
   const { isAuthenticated, adminToken, authLoading } = useAuth();
   const capabilities = useOrdersAdminCapabilities();
   const hasSession = !authLoading && isAuthenticated && Boolean(adminToken);
@@ -198,7 +199,7 @@ export default function OrdersAdmin() {
 
       <main className="orders-table-workspace">
         {capabilities.canCreate && <div className="flex justify-end pb-3">
-          <button type="button" onClick={() => setShowManualOrder(true)}
+          <button type="button" onClick={manualOrderDialog.show}
             className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
             + Nuevo pedido manual
           </button>
@@ -326,8 +327,8 @@ export default function OrdersAdmin() {
           />
         </Suspense>
       )}
-      {showManualOrder && <Suspense fallback={null}>
-        <ManualOrderModal open onClose={() => setShowManualOrder(false)}
+      {manualOrderDialog.open && <Suspense fallback={null}>
+        <ManualOrderModal open onClose={manualOrderDialog.close}
           onCreated={(order) => {
             filters.setTypingQuery(order.orderNumber);
             filters.setPage(1);
