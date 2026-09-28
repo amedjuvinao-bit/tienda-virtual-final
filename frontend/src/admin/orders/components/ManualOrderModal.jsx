@@ -161,7 +161,7 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
         ) : (
           <form onSubmit={handlePreview}>
             {error && <div className="manual-order-error" role="alert">{error}</div>}
-            <div className="manual-order-body">
+            <fieldset className="manual-order-body" disabled={loading}>
               <div className="manual-order-panel">
                 <label>Sede
                   <select required value={branchId} onChange={(event) => { setBranchId(event.target.value); invalidate(); }}>
@@ -212,7 +212,7 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
                 </div>
                 <p className="manual-order-hint">Para productos digitales o servicios, escribe un correo válido en “Correo o teléfono”.</p>
               </div>
-            </div>
+            </fieldset>
             <footer className="manual-order-footer">
               {preview && <div className="manual-order-pricing">
                 <span>Subtotal {money(preview.subtotal)} · IVA {money(preview.tax?.amount)} · Envío {money(preview.shipping)}</span>
