@@ -3,20 +3,22 @@
 const mongoose = require('mongoose');
 const { env } = require('../config/env');
 const Branch = require('../models/Branch');
+const branchSelectionIndexes = require('../models/branchSelectionIndexes');
 const { ensureBranchSelectionIndexes } = require('../services/branchSelectionService');
 
 function parseArguments(argv) {
-  const allowed = ['--apply', '--confirm-production', '--main=', '--online='];
+  const allowed = ['--apply', '--verify', '--confirm-production', '--main=', '--online='];
   if (argv.some((value) => !allowed.some((prefix) => value === prefix ||
     (prefix.endsWith('=') && value.startsWith(prefix))))) {
     throw new Error('Argumento desconocido. Usa --apply --main=ID --online=ID para corregir duplicados.');
   }
   const apply = argv.includes('--apply');
+  const verify = argv.includes('--verify');
   const main = argv.find((value) => value.startsWith('--main='))?.slice(7);
   const online = argv.find((value) => value.startsWith('--online='))?.slice(9);
   if (argv.filter((value) => value.startsWith('--main=')).length > 1 ||
       argv.filter((value) => value.startsWith('--online=')).length > 1 ||
-      (!apply && (main || online))) {
+      (!apply && (main || online)) || (verify && apply)) {
     throw new Error('Indica cada ID solo una vez y únicamente junto con --apply.');
   }
   if (apply && (Boolean(main) !== Boolean(online) ||
@@ -26,7 +28,18 @@ function parseArguments(argv) {
   if (apply && env.nodeEnv === 'production' && !argv.includes('--confirm-production')) {
     throw new Error('En producción agrega --confirm-production para aplicar cambios.');
   }
-  return { apply, main, online };
+  return { apply, verify, main, online };
+}
+
+async function inspectIndexes() {
+  const existing = await Branch.collection.listIndexes().toArray();
+  return branchSelectionIndexes.map(({ key, options }) => {
+    const index = existing.find((item) => item.name === options.name);
+    const ready = Boolean(index?.unique &&
+      JSON.stringify(index.key) === JSON.stringify(key) &&
+      JSON.stringify(index.partialFilterExpression) === JSON.stringify(options.partialFilterExpression));
+    return { name: options.name, ready };
+  });
 }
 
 async function inspect() {
@@ -39,11 +52,22 @@ async function inspect() {
 }
 
 async function run(argv = process.argv.slice(2)) {
-  const { apply, main, online } = parseArguments(argv);
+  const { apply, verify, main, online } = parseArguments(argv);
   await mongoose.connect(env.mongoUri, { autoIndex: false, serverSelectionTimeoutMS: 10000 });
   try {
     const before = await inspect();
-    if (!apply) return { mode: 'audit', selected: before, duplicates: Object.values(before).some((items) => items.length > 1) };
+    if (!apply) {
+      const indexes = await inspectIndexes();
+      const validSelection = Object.values(before).every((items) =>
+        items.length === 1 && items[0].active === true && items[0].status === 'active');
+      return {
+        mode: verify ? 'verify' : 'audit',
+        selected: before,
+        duplicates: Object.values(before).some((items) => items.length > 1),
+        indexes,
+        ready: validSelection && indexes.every((item) => item.ready),
+      };
+    }
 
     if (!main && Object.values(before).some((items) => items.length > 1)) {
       throw new Error('Hay selecciones duplicadas. Ejecuta de nuevo con --main=ID y --online=ID elegidos de las sedes activas.');
@@ -75,7 +99,10 @@ async function run(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) {
-  run().then((result) => process.stdout.write(`${JSON.stringify(result, null, 2)}\n`))
+  run().then((result) => {
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    if (result.mode === 'verify' && !result.ready) process.exitCode = 1;
+  })
     .catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
 

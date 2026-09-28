@@ -1,7 +1,8 @@
 {
   "scripts": {
     "validate:payment-invoice": "node scripts/validatePaymentInvoice.cjs",
-    "validate:branch-protection": "node backend/scripts/validateBranchProtectionLive.js"
+    "validate:branch-protection": "node backend/scripts/validateBranchProtectionLive.js",
+    "validate:branch-selection": "node backend/scripts/migrateBranchSelectionIndexes.js --verify"
   },
   "dependencies": {
     "@tailwindcss/aspect-ratio": "^0.4.2",
