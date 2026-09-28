@@ -64,4 +64,34 @@ describe('seguimiento de la factura posterior al pago', () => {
     await act(async () => vi.advanceTimersByTimeAsync(60000));
     expect(synchronizeAfterMutation).toHaveBeenCalledTimes(1);
   });
+
+  it('consulta los fallos transitorios con pausa y detiene las consultas al cerrar', async () => {
+    vi.useFakeTimers();
+    const retryingOrder = {
+      ...pendingOrder,
+      invoiceAutomation: { status: 'failed', failureReason: 'Se reintentará automáticamente.' },
+    };
+    const synchronizeAfterMutation = vi.fn().mockResolvedValue(retryingOrder);
+    const { rerender } = renderHook((props) => useOrderInvoiceStatusWatcher(props), {
+      initialProps: {
+        open: true,
+        order: retryingOrder,
+        synchronizeAfterMutation,
+        showToast: vi.fn(),
+      },
+    });
+
+    await act(async () => vi.advanceTimersByTimeAsync(29999));
+    expect(synchronizeAfterMutation).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(synchronizeAfterMutation).toHaveBeenCalledTimes(1);
+    rerender({
+      open: false,
+      order: retryingOrder,
+      synchronizeAfterMutation,
+      showToast: vi.fn(),
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(60000));
+    expect(synchronizeAfterMutation).toHaveBeenCalledTimes(1);
+  });
 });
