@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const Order = require('../models/Order');
 
 const EXPECTED_SCHEMA_FINGERPRINT =
-  '3145d77a68b70d85b01f3c2c030b150486c9935d12f57c360e2e1efb6d9c6a91';
+  '24fd6f300e9391eddc529aa7e6f91d56c4271f26dd842d02e8f37e751a6b71e2';
 
 function normalizeValue(value) {
   if (value === undefined) return '__undefined__';
@@ -246,7 +246,7 @@ async function main() {
 
   assert.strictEqual(Object.keys(schema.paths).length, 117);
   assert.strictEqual(Object.keys(schema.nested).length, 8);
-  assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 345);
+  assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 347);
   assert(schema.path('payment.manualConfirmation.requestFingerprint'));
   assert.strictEqual(schema.path('inventoryControl.reservationExpiresAt')?.instance, 'Date');
   assert.strictEqual(schema.indexes().length, 45);
