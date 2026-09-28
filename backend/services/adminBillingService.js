@@ -123,9 +123,9 @@ function serializePendingOrder(order = {}) {
     itemsCount: items.length,
     billingIssue: branchBillingDisabled
       ? {
-          status: 'blocked',
+          status: 'deferred',
           retryable: false,
-          errorMessage: 'La facturación electrónica está desactivada para esta sede. Actívala en Configuración → Sedes y después emite desde Facturación.',
+          errorMessage: 'La factura se omitió porque esta sede tenía desactivada la facturación al confirmar el pago. Si ya la activaste en Configuración → Sedes, revisa y emite desde Facturación.',
         }
       : automationFailed
       ? {

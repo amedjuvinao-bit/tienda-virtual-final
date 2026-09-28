@@ -127,6 +127,22 @@ describe('BillingPendingOrdersPanel', () => {
     expect(state.generate).not.toHaveBeenCalled();
   });
 
+  it('permite revisar una emisión omitida antes cuando la sede ya está activa', async () => {
+    state.getPending.mockResolvedValue({
+      rows: [{ ...ORDER, billingIssue: {
+        status: 'deferred', retryable: false,
+        errorMessage: 'La factura se omitió cuando la sede tenía desactivada la facturación. Si ya la activaste, revisa y emite.',
+      } }], total: 1, page: 1, pages: 1,
+    });
+    state.getPreflight.mockResolvedValue(PREFLIGHT);
+    renderPanel();
+    expect(await screen.findByText('Emisión omitida al confirmar el pago')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y emitir' }));
+    await waitFor(() => expect(state.getPreflight).toHaveBeenCalledWith(ORDER.id));
+    fireEvent.click(await screen.findByRole('checkbox'));
+    expect(await screen.findByRole('button', { name: 'Confirmar y emitir' })).toBeEnabled();
+  });
+
   it('abre Documentos filtrado por la factura después de una emisión exitosa', async () => {
     state.getPreflight.mockResolvedValue(PREFLIGHT);
     state.generate.mockResolvedValue({

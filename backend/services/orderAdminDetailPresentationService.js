@@ -228,7 +228,7 @@ function presentAdminOrderDetail(
         ? presentInvoiceFailureCode(automation.errorCode)
         : automationStatus === 'not_required'
           ? automation.outcomeCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED'
-            ? 'La facturación electrónica está desactivada para esta sede. Actívala en Configuración → Sedes y después emite desde Facturación.'
+            ? 'La factura se omitió porque esta sede tenía desactivada la facturación al confirmar el pago. Si ya la activaste en Configuración → Sedes, revisa y emite desde Facturación.'
             : 'La facturación electrónica está desactivada. Revisa su configuración antes de emitir.'
           : '',
     } : null,

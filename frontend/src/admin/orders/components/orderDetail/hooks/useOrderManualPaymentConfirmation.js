@@ -101,7 +101,7 @@ export default function useOrderManualPaymentConfirmation({
         title: data?.duplicate ? 'Pago ya confirmado' : 'Pago manual confirmado',
         message: postCommitWarning || (data?.duplicate
           ? 'La misma evidencia ya estaba registrada; no se duplicó ninguna operación.'
-          : 'La evidencia quedó registrada y la orden fue actualizada.'),
+          : 'El pago quedó registrado. La facturación se procesará en segundo plano según la configuración de la sede.'),
       });
       setForm((current) => ({ ...current, verified: false }));
       return data;

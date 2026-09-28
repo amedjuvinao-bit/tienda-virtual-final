@@ -152,7 +152,7 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Falta el municipio fiscal');
   });
 
-  it('dirige a Sedes cuando la facturación está desactivada, sin ofrecer corregir al cliente', () => {
+  it('explica la omisión histórica por sede sin ofrecer corregir al cliente', () => {
     render(<OrderDetailPaymentPanel order={{
       ...BASE_ORDER,
       status: 'paid', payment: { status: 'paid' },
@@ -160,10 +160,10 @@ describe('historia narrativa del detalle de la orden', () => {
       invoiceAutomation: {
         status: 'not_required',
         reasonCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
-        failureReason: 'Actívala en Configuración → Sedes y después emite desde Facturación.',
+        failureReason: 'La factura se omitió porque la sede tenía desactivada la facturación. Si ya la activaste en Configuración → Sedes, emite desde Facturación.',
       },
     }} onEditBilling={vi.fn()} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Facturación desactivada para esta sede');
+    expect(screen.getByRole('alert')).toHaveTextContent('Factura omitida al confirmar el pago');
     expect(screen.getByRole('alert')).toHaveTextContent('Configuración → Sedes');
     expect(screen.queryByRole('button', { name: 'Corregir datos fiscales' })).not.toBeInTheDocument();
   });
@@ -212,6 +212,19 @@ describe('historia narrativa del detalle de la orden', () => {
 
     expect(screen.getByText('Valor pagado')).toBeInTheDocument();
     expect(screen.getByText('Fecha de pago:').nextElementSibling).not.toHaveTextContent('—');
+  });
+
+  it('distingue pago confirmado de factura todavía en proceso', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'paid',
+      payment: { provider: 'manual', status: 'paid', amount: BASE_ORDER.total },
+      billing: { firstName: 'Ana', lastName: 'Prueba', personType: 'natural' },
+      invoiceAutomation: { status: 'pending' },
+    }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Facturación en proceso');
+    expect(screen.getByRole('status')).toHaveTextContent('El pago ya quedó confirmado');
   });
 
   it('cierra la historia del reembolso cuando todas las etapas están conciliadas', () => {
