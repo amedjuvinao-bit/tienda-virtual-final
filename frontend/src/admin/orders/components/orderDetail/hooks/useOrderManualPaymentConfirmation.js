@@ -4,10 +4,13 @@ import {
   canConfirmManualPaymentForOrder,
   createManualPaymentForm,
   getManualPaymentErrorMessage,
+  matchesManualPaymentConfirmation,
   validateManualPaymentForm,
 } from '../manualPaymentConfirmationModel';
 
 const EDITABLE_FIELDS = new Set(['method', 'reference', 'reason', 'verified']);
+// El servidor confirma el pago y después procesa la factura con Factus.
+const MANUAL_PAYMENT_CONFIRMATION_TIMEOUT_MS = 90000;
 
 export default function useOrderManualPaymentConfirmation({
   open,
@@ -77,14 +80,19 @@ export default function useOrderManualPaymentConfirmation({
     try {
       const { data } = await api.post(
         `/api/orders/${targetOrderId}/payments/manual-confirmation`,
-        currentValidation.request
+        currentValidation.request,
+        { timeout: MANUAL_PAYMENT_CONFIRMATION_TIMEOUT_MS }
       );
       if (!isCurrent(targetOrderId, requestId)) return { ignored: true };
 
-      await synchronizeAfterMutation?.(
-        data?.order || null,
-        typeof fetchTimeline === 'function' ? [fetchTimeline] : []
-      );
+      try {
+        await synchronizeAfterMutation?.(
+          data?.order || null,
+          typeof fetchTimeline === 'function' ? [fetchTimeline] : []
+        );
+      } catch {
+        // Un fallo al refrescar la pantalla no deshace un pago confirmado.
+      }
       if (!isCurrent(targetOrderId, requestId)) return { ignored: true };
 
       const postCommitWarning = data?.postCommitWarning?.message;
@@ -99,6 +107,48 @@ export default function useOrderManualPaymentConfirmation({
       return data;
     } catch (error) {
       if (!isCurrent(targetOrderId, requestId)) return { ignored: true };
+      // Un timeout/5xx puede ocurrir después de que la transacción se guardó.
+      // Solo se reconoce éxito cuando coincide exactamente la evidencia.
+      if (!error?.response || error.response.status >= 500) {
+        try {
+          const { data: freshOrder } = await api.get(`/api/orders/${targetOrderId}`);
+          if (!isCurrent(targetOrderId, requestId)) return { ignored: true };
+          try {
+            await synchronizeAfterMutation?.(
+              freshOrder,
+              typeof fetchTimeline === 'function' ? [fetchTimeline] : []
+            );
+          } catch {
+            // La lectura de la orden ya permitió verificar el resultado.
+          }
+          if (!isCurrent(targetOrderId, requestId)) return { ignored: true };
+          if (matchesManualPaymentConfirmation(freshOrder, currentValidation.request)) {
+            showToast?.({
+              type: 'success',
+              title: 'Pago manual confirmado',
+              message: 'El pago quedó registrado. Se verificó en la orden después de perder la respuesta inicial.',
+            });
+            setForm((current) => ({ ...current, verified: false }));
+            return { confirmed: true, reconciled: true, order: freshOrder };
+          }
+          if (String(freshOrder?.payment?.status || '').toLowerCase() === 'paid') {
+            showToast?.({
+              type: 'warning',
+              title: 'Revisa el pago de la orden',
+              message: 'La orden ya figura pagada, pero la evidencia es distinta. Revisa los datos antes de hacer otra operación.',
+            });
+            return { error, order: freshOrder };
+          }
+        } catch {
+          if (!isCurrent(targetOrderId, requestId)) return { ignored: true };
+        }
+        showToast?.({
+          type: 'warning',
+          title: 'Verifica el estado del pago',
+          message: 'No se pudo comprobar el resultado. Actualiza la orden y revisa la evidencia antes de volver a confirmar.',
+        });
+        return { error, unverified: true };
+      }
       showToast?.({
         type: 'error',
         title: 'No se confirmó el pago',

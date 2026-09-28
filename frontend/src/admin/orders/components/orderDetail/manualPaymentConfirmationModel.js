@@ -117,6 +117,19 @@ export function getManualPaymentEvidence(order) {
   };
 }
 
+export function matchesManualPaymentConfirmation(order, request) {
+  const evidence = order?.payment?.manualConfirmation;
+  return clean(order?.payment?.status).toLowerCase() === 'paid' &&
+    clean(order?.status).toLowerCase() === 'paid' &&
+    clean(order?.payment?.provider).toLowerCase() === 'manual' &&
+    evidence &&
+    clean(evidence.method).toLowerCase() === request.method &&
+    clean(evidence.reference) === request.reference &&
+    cents(evidence.amount) === cents(request.amount) &&
+    clean(evidence.currency).toUpperCase() === request.currency &&
+    clean(evidence.reason) === request.reason;
+}
+
 export function getManualPaymentErrorMessage(error) {
   return clean(error?.response?.data?.message) ||
     'No fue posible confirmar el pago manual. Intenta nuevamente.';
