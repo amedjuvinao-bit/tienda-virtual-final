@@ -94,6 +94,20 @@ describe('BillingPendingOrdersPanel', () => {
 
   afterEach(cleanup);
 
+  it('muestra el motivo fiscal sin exigir revisar la consola ni emitir otra factura', async () => {
+    state.getPending.mockResolvedValue({
+      rows: [{ ...ORDER, billingIssue: {
+        status: 'failed', retryable: true,
+        errorMessage: 'Falta el municipio fiscal. Selecciona departamento y municipio en Cliente e historial.',
+      } }], total: 1, page: 1, pages: 1,
+    });
+    renderPanel();
+    expect(await screen.findByText(/Falta el municipio fiscal/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y reintentar' }));
+    await waitFor(() => expect(state.getPreflight).toHaveBeenCalledWith(ORDER.id));
+    expect(state.generate).not.toHaveBeenCalled();
+  });
+
   it('abre Documentos filtrado por la factura después de una emisión exitosa', async () => {
     state.getPreflight.mockResolvedValue(PREFLIGHT);
     state.generate.mockResolvedValue({

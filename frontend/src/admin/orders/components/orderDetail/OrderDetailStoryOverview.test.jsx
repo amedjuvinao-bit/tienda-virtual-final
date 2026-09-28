@@ -141,6 +141,17 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(onEditBilling).toHaveBeenCalledOnce();
   });
 
+  it('presenta el fallo de municipio fiscal aunque no exista todavía una factura', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual', status: 'paid', payment: { status: 'paid' },
+      customer: { name: 'Ana', lastname: 'Prueba' },
+      billing: { firstName: 'Ana', lastName: 'Prueba' },
+      invoiceAutomation: { status: 'failed', failureReason: 'Falta el municipio fiscal. Selecciona departamento y municipio en Cliente e historial.' },
+    }} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Falta el municipio fiscal');
+  });
+
   it('avisa de datos incompletos antes de emitir, pero no interrumpe la conciliación de una factura enviada', () => {
     const paidOrder = {
       ...BASE_ORDER,

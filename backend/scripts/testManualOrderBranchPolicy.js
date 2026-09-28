@@ -25,6 +25,12 @@ const input = {
     name: 'Ana', lastname: 'Prueba', id: '1234567',
     emailOrPhone: 'ana@example.com', deliveryType: 'retiro',
   },
+  billing: {
+    personType: 'natural', documentType: 'CC', documentNumber: '1234567',
+    firstName: 'Ana', lastName: 'Prueba', email: 'ana@example.com',
+    useSameAddress: false, address: 'Calle 1', countryCode: 'CO',
+    department: 'Magdalena', departmentCode: '47', city: 'Santa Marta', municipalityCode: '47001',
+  },
 };
 
 async function main() {
@@ -56,6 +62,10 @@ async function main() {
     assert.equal(manualBranchFilter(owner)._id, undefined);
     assert.equal(manualBranchFilter(owner)['settings.allowManualOrders'], true);
     assert.equal(prepareManualPayload(input).cart[0].price, 1);
+    assert.equal(prepareManualPayload(input).billing.municipalityCode, '47001');
+    assert.throws(() => prepareManualPayload({ ...input, billing: undefined }), { code: 'MANUAL_ORDER_BILLING_REQUIRED' });
+    assert.throws(() => prepareManualPayload({ ...input, billing: { ...input.billing, municipalityCode: '' } }), { code: 'VALIDATION_ERROR' });
+    assert.throws(() => prepareManualPayload({ ...input, billing: { ...input.billing, municipalityCode: '99999' } }), { code: 'BILLING_MUNICIPALITY_CODE_INVALID' });
     assert.throws(() => prepareManualPayload({ ...input, items: [] }), { code: 'INVALID_ITEMS' });
     assert.throws(() => prepareManualPayload({ ...input, customer: { ...input.customer, deliveryType: 'x' } }), { code: 'INVALID_DELIVERY_TYPE' });
     await assert.rejects(findManualBranch(cashier, String(otherId)), { code: 'BRANCH_FORBIDDEN' });

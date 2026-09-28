@@ -30,3 +30,37 @@ it('explica el plazo antes de crear, conserva el foco y cierra con Escape', asyn
   expect(document.activeElement).toBe(opener);
   opener.remove();
 });
+
+it('pide municipio y datos fiscales al crear la orden manual', async () => {
+  api.get.mockImplementation((url) => {
+    if (url.includes('/branches')) return Promise.resolve({ data: { branches: [{ _id: '1', name: 'Principal', code: 'PR' }] } });
+    if (url.includes('/products')) return Promise.resolve({ data: { products: [{ _id: 'a', title: 'Producto', price: 10000, variants: [] }] } });
+    if (url.includes('/regions')) return Promise.resolve({ data: [{ code: '47', name: 'Magdalena' }] });
+    return Promise.resolve({ data: [{ code: '47001', name: 'Santa Marta' }] });
+  });
+  api.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/quote')
+    ? { pricing: { subtotal: 10000, total: 10000 } }
+    : { order: { _id: 'order-1', orderNumber: '000257', total: 10000 } } }));
+
+  render(<ManualOrderModal open onClose={vi.fn()} onCreated={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Ana' } });
+  fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'Prueba' } });
+  fireEvent.change(screen.getByLabelText('Documento'), { target: { value: '123456' } });
+  fireEvent.change(screen.getByLabelText('Correo o teléfono'), { target: { value: 'ana@example.com' } });
+  fireEvent.change(screen.getByLabelText('Correo fiscal'), { target: { value: 'ana@example.com' } });
+  fireEvent.change(screen.getByLabelText('Dirección fiscal'), { target: { value: 'Calle 1' } });
+  await waitFor(() => expect(screen.getByRole('option', { name: 'Magdalena' })).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Departamento fiscal'), { target: { value: '47' } });
+  await waitFor(() => expect(screen.getByRole('option', { name: 'Santa Marta' })).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Municipio fiscal'), { target: { value: '47001' } });
+  await waitFor(() => expect(screen.getByRole('button', { name: /Producto.*10.000/ })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /Producto.*10.000/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Revisar total' }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/orders/admin/manual/quote', expect.objectContaining({
+    billing: expect.objectContaining({ municipalityCode: '47001', departmentCode: '47', email: 'ana@example.com' }),
+  })));
+  fireEvent.click(screen.getByRole('button', { name: 'Crear pedido pendiente de pago' }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/orders/admin/manual', expect.objectContaining({
+    billing: expect.objectContaining({ municipalityCode: '47001', address: 'Calle 1', documentNumber: '123456' }),
+  })));
+});

@@ -91,6 +91,12 @@ async function main() {
     const body = {
       requestId: 'cbe109bb-830f-45d9-9106-a82dc23e2532', branchId: String(branchId),
       customer: { name: 'Ana', lastname: 'Prueba', id: '123456', emailOrPhone: 'ana@example.com', deliveryType: 'retiro' },
+      billing: {
+        personType: 'natural', documentType: 'CC', documentNumber: '123456',
+        firstName: 'Ana', lastName: 'Prueba', email: 'ana@example.com',
+        useSameAddress: false, address: 'Calle 1', countryCode: 'CO',
+        department: 'Magdalena', departmentCode: '47', city: 'Santa Marta', municipalityCode: '47001',
+      },
       items: [{ productId: String(productId), quantity: 2 }],
     };
     const result = await createManualOrder(req, body);
@@ -99,6 +105,7 @@ async function main() {
     assert.equal(persisted.channel, 'manual');
     assert.equal(persisted.saleType, 'manual_order');
     assert.equal(persisted.payment.status, 'pending_manual');
+    assert.equal(persisted.billing.municipalityCode, '47001');
     assert.equal(persisted.inventoryControl.discountedAtCheckout, false);
     assert.equal(persisted.inventoryControl.reservationExpiresAt?.getTime(), reservationExpiry.getTime());
     assert.equal(persisted.payment.amount, 24000);

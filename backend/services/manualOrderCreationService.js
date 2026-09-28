@@ -17,6 +17,7 @@ const {
 } = require('../lib/orders/orderCreationPayload');
 const { normalizeProductVariants } = require('../lib/products/productVariantConfig');
 const { buildOrderQuote } = require('./orderPricingService');
+const { resolveOrderBillingMunicipality } = require('./orderBillingMunicipalityService');
 const { buildBranchSnapshot } = require('./orderCreationBranchService');
 const { getNextOrderNumber } = require('./orderCreationTransactionService');
 const {
@@ -83,6 +84,9 @@ function prepareManualPayload(body = {}) {
   if (!['retiro', 'envio'].includes(body.customer?.deliveryType)) {
     throw fail('Selecciona entrega o retiro.', 'INVALID_DELIVERY_TYPE');
   }
+  if (!body.billing || typeof body.billing !== 'object' || Array.isArray(body.billing)) {
+    throw fail('Completa los datos fiscales del comprador antes de crear el pedido.', 'MANUAL_ORDER_BILLING_REQUIRED');
+  }
   const sanitizedItems = items.map((item) => ({
     productId: item?.productId,
     quantity: item?.quantity,
@@ -95,9 +99,11 @@ function prepareManualPayload(body = {}) {
   const { ok, errors, cleaned } = validateOrderPayload({
     cart: sanitizedItems,
     customer: body.customer,
+    billing: body.billing,
     payment: { provider: 'manual', status: 'pending_manual', currency: 'COP' },
   });
   if (!ok) throw fail(errors.join(' '), 'VALIDATION_ERROR');
+  resolveOrderBillingMunicipality(cleaned, { required: true });
   return cleaned;
 }
 
@@ -150,6 +156,7 @@ async function createManualOrder(req, body) {
   const requestHash = crypto.createHash('sha256').update(JSON.stringify({
     branchId: body.branchId,
     customer: body.customer,
+    billing: body.billing,
     items: body.items,
   })).digest('hex');
   const existing = await inspectExistingIdempotency(

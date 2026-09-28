@@ -32,6 +32,7 @@ const {
   serializeElectronicInvoice: serializeElectronicInvoiceRecord,
   serializeEmailDelivery: serializeEmailDeliveryRecord,
 } = require('./adminBillingSerializationService');
+const { presentInvoiceFailureCode } = require('./billingInvoiceFailurePresentationService');
 
 function cleanText(value, max = 180) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -98,6 +99,8 @@ function serializePendingOrder(order = {}) {
   const invoiceStatus = cleanText(invoice.status, 60).toLowerCase();
   const hasRetryableInvoice =
     Boolean(invoice._id) && ['failed', 'rejected', 'error'].includes(invoiceStatus);
+  const automation = order.paymentProcessing?.invoice || {};
+  const automationFailed = !invoice._id && automation.status === 'failed';
 
   return {
     id: String(order._id || ''),
@@ -116,7 +119,13 @@ function serializePendingOrder(order = {}) {
     shipping: money(order.shipping),
     total: money(order.total),
     itemsCount: items.length,
-    billingIssue: hasRetryableInvoice
+    billingIssue: automationFailed
+      ? {
+          status: 'failed',
+          retryable: true,
+          errorMessage: presentInvoiceFailureCode(automation.errorCode),
+        }
+      : hasRetryableInvoice
       ? {
           invoiceId: String(invoice._id),
           status: invoiceStatus,

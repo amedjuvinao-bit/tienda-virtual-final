@@ -1,4 +1,5 @@
 'use strict';
+const { presentInvoiceFailureCode } = require('./billingInvoiceFailurePresentationService');
 
 // El detalle de órdenes solo necesita un resumen fiscal para presentar el
 // estado. Los documentos y artefactos del proveedor se consultan en endpoints
@@ -209,10 +210,23 @@ function presentAdminOrderDetail(
   } = order || {};
 
   const presentedOrder = sanitizeAdminOrderDetail(safeOrder);
+  const automation = order?.paymentProcessing?.invoice || {};
+  const automationStatus = String(automation.status || '').toLowerCase();
+  const paid = String(order?.payment?.status || '').toLowerCase() === 'paid';
+  const validated = ['accepted', 'validated'].includes(String(invoice?.status || '').toLowerCase()) ||
+    invoice?.provider?.isValidated === true;
 
   const detail = {
     ...presentedOrder,
     electronicInvoice: serializeOrderAdminInvoiceSummary(invoice),
+    invoiceAutomation: paid && !validated && automationStatus ? {
+      status: automationStatus,
+      failureReason: automationStatus === 'failed'
+        ? presentInvoiceFailureCode(automation.errorCode)
+        : automationStatus === 'not_required'
+          ? 'La facturación electrónica está desactivada. Revisa su configuración antes de emitir.'
+          : '',
+    } : null,
   };
 
   if (includeDownloadLinks) {

@@ -8,6 +8,11 @@ const initialCustomer = {
   phone: '', email: '', deliveryType: 'retiro',
   address: '', city: '', country: 'Colombia',
 };
+const initialBilling = {
+  documentType: 'CC', email: '', address: '', department: '',
+  departmentCode: '', city: '', municipalityCode: '',
+  country: 'Colombia', countryCode: 'CO',
+};
 
 function errorMessage(error, fallback) {
   return error?.response?.data?.message || fallback;
@@ -26,6 +31,10 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
   const [search, setSearch] = useState('');
   const [items, setItems] = useState([]);
   const [customer, setCustomer] = useState(initialCustomer);
+  const [billing, setBilling] = useState(initialBilling);
+  const [regions, setRegions] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [geoLoading, setGeoLoading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [created, setCreated] = useState(null);
@@ -90,6 +99,29 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
     return () => { active = false; clearTimeout(timer); };
   }, [open, search, created]);
 
+  useEffect(() => {
+    if (!open || created) return undefined;
+    let active = true;
+    api.get('/api/geo/regions', { params: { country: 'CO' } })
+      .then(({ data }) => { if (active) setRegions(Array.isArray(data) ? data : []); })
+      .catch(() => { if (active) setError('No se pudieron cargar los departamentos fiscales. Intenta nuevamente.'); });
+    return () => { active = false; };
+  }, [open, created]);
+
+  useEffect(() => {
+    if (!open || !billing.departmentCode || created) {
+      setCities([]);
+      return undefined;
+    }
+    let active = true;
+    setGeoLoading(true);
+    api.get('/api/geo/cities', { params: { country: 'CO', region: billing.departmentCode, limit: 10000 } })
+      .then(({ data }) => { if (active) setCities(Array.isArray(data) ? data : []); })
+      .catch(() => { if (active) setError('No se pudieron cargar los municipios fiscales. Intenta nuevamente.'); })
+      .finally(() => { if (active) setGeoLoading(false); });
+    return () => { active = false; };
+  }, [open, billing.departmentCode, created]);
+
   if (!open) return null;
 
   function invalidate() {
@@ -129,7 +161,15 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
   function payload() {
     return {
       branchId,
-      customer,
+      customer: { ...customer, email: customer.email || billing.email },
+      billing: {
+        ...billing,
+        useSameAddress: false,
+        personType: 'natural',
+        firstName: customer.name,
+        lastName: customer.lastname,
+        documentNumber: customer.id,
+      },
       items: items.map(({ productId, variantKey, variantAttributes, size, color, quantity }) => ({
         productId, variantKey, variantAttributes, size, color, quantity,
       })),
@@ -242,7 +282,47 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
                     <label>País<input required value={customer.country} onChange={(event) => { setCustomer((current) => ({ ...current, country: event.target.value })); invalidate(); }} /></label>
                   </>}
                 </div>
-                <p className="manual-order-hint">Para productos digitales o servicios, escribe un correo válido en “Correo o teléfono”.</p>
+                <p className="manual-order-hint">El correo fiscal también servirá para la entrega electrónica de productos digitales o servicios.</p>
+                <h3>Datos para factura electrónica</h3>
+                <p className="manual-order-hint">Registra estos datos antes de crear el pedido para que la factura se emita al confirmar el pago.</p>
+                <div className="manual-order-fields">
+                  <label>Tipo de documento fiscal
+                    <select required value={billing.documentType} onChange={(event) => { setBilling((current) => ({ ...current, documentType: event.target.value })); invalidate(); }}>
+                      <option value="CC">Cédula de ciudadanía</option>
+                      <option value="CE">Cédula de extranjería</option>
+                      <option value="TI">Tarjeta de identidad</option>
+                      <option value="PP">Pasaporte</option>
+                      <option value="PPT">Permiso de protección temporal</option>
+                    </select>
+                  </label>
+                  <label>Correo fiscal
+                    <input type="email" required value={billing.email} onChange={(event) => { setBilling((current) => ({ ...current, email: event.target.value })); invalidate(); }} />
+                  </label>
+                  <label>Dirección fiscal
+                    <input required value={billing.address} onChange={(event) => { setBilling((current) => ({ ...current, address: event.target.value })); invalidate(); }} />
+                  </label>
+                  <label>Departamento fiscal
+                    <select required value={billing.departmentCode} onChange={(event) => {
+                      const region = regions.find((item) => String(item.code) === event.target.value);
+                      setBilling((current) => ({ ...current, departmentCode: event.target.value, department: region?.name || '', city: '', municipalityCode: '' }));
+                      setCities([]);
+                      invalidate();
+                    }}>
+                      <option value="">Selecciona departamento</option>
+                      {regions.map((region) => <option key={region.code} value={region.code}>{region.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Municipio fiscal
+                    <select required disabled={!billing.departmentCode || geoLoading} value={billing.municipalityCode} onChange={(event) => {
+                      const city = cities.find((item) => String(item.code) === event.target.value);
+                      setBilling((current) => ({ ...current, municipalityCode: event.target.value, city: city?.name || '' }));
+                      invalidate();
+                    }}>
+                      <option value="">{geoLoading ? 'Cargando municipios…' : 'Selecciona municipio'}</option>
+                      {cities.map((city) => <option key={city.code} value={city.code}>{city.name}</option>)}
+                    </select>
+                  </label>
+                </div>
               </div>
             </fieldset>
             <footer className="manual-order-footer">

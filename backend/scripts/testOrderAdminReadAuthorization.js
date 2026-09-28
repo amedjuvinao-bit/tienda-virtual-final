@@ -283,6 +283,17 @@ async function validateRbacMatrix() {
 }
 
 async function validateMinimalFiscalDto() {
+  const failedOrder = presentAdminOrderDetail({
+    status: 'paid', payment: { status: 'paid' },
+    paymentProcessing: { invoice: {
+      status: 'failed', errorCode: 'BILLING_MUNICIPALITY_REQUIRED',
+      claimId: 'CLAIM_SECRET',
+    } },
+  }, null);
+  assert.match(failedOrder.invoiceAutomation.failureReason, /municipio fiscal/);
+  assert(!JSON.stringify(failedOrder).includes('CLAIM_SECRET'));
+  assert(!Object.hasOwn(failedOrder, 'paymentProcessing'));
+
   const invoice = unsafeInvoiceFixture();
   const summary = serializeOrderAdminInvoiceSummary(invoice);
 

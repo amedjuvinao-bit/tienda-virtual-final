@@ -228,6 +228,12 @@ async function main() {
       name: 'Amed', lastname: 'Barros', id: '1234567890',
       emailOrPhone: payload.email, country: 'Colombia', deliveryType: 'retiro',
     },
+    billing: {
+      personType: 'natural', documentType: 'CC', documentNumber: '1234567890',
+      firstName: 'Amed', lastName: 'Barros', email: payload.email,
+      useSameAddress: false, address: 'Calle 1', countryCode: 'CO',
+      department: 'Magdalena', departmentCode: '47', city: 'Santa Marta', municipalityCode: '47001',
+    },
     items: [{ productId: '64b000000000000000000001', quantity: 1 }],
   });
   ok('la orden manual prepara contacto y facturación con la misma identidad ingresada',
