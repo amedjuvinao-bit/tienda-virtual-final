@@ -97,6 +97,18 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(story.next.title).toBe('Confirmar el pago');
   });
 
+  it('no presenta como pagado el total de un pedido manual pendiente', () => {
+    render(<OrderDetailSummaryRail order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'pending',
+      payment: { status: 'pending_manual' },
+    }} />);
+
+    expect(screen.getByText('Total del pedido')).toBeInTheDocument();
+    expect(screen.queryByText('Total pagado')).not.toBeInTheDocument();
+  });
+
   it('cierra la historia del reembolso cuando todas las etapas están conciliadas', () => {
     const order = {
       ...BASE_ORDER,

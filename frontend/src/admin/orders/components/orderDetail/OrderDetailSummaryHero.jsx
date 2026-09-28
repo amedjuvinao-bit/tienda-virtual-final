@@ -247,7 +247,7 @@ export default function OrderDetailSummaryHero({
         ) : null}
 
         <div style={{ height: 1, background: 'rgba(255,255,255,0.32)' }} />
-        <RailMoneyLine label="Total pagado" value={toCOP(breakdown.total)} strong />
+        <RailMoneyLine label="Total del pedido" value={toCOP(breakdown.total)} strong />
       </div>
 
       <div
