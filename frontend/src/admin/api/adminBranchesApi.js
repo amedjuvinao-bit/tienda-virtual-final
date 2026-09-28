@@ -19,12 +19,22 @@ const OPERATION_LABELS = {
   openCashSessionsCount: 'cajas abiertas',
   pendingOrdersCount: 'pedidos pendientes',
   heldSalesCount: 'ventas POS en espera',
+  pendingReturnsCount: 'devoluciones pendientes',
+  pendingRefundsCount: 'reembolsos por conciliar',
+  pendingExpensesCount: 'gastos o cuentas por pagar pendientes',
+  activeBudgetsCount: 'presupuestos activos',
+  provisionalPeriodClosesCount: 'cierres financieros provisionales',
   historicalStockRowsCount: 'registros de inventario en el historial',
   historicalReservationsCount: 'reservas en el historial',
   historicalMovementsCount: 'movimientos en el historial',
   historicalCashSessionsCount: 'sesiones de caja en el historial',
   historicalOrdersCount: 'pedidos en el historial',
   historicalHeldSalesCount: 'ventas POS en el historial',
+  historicalReturnsCount: 'devoluciones en el historial',
+  historicalRefundsCount: 'reembolsos en el historial',
+  historicalExpensesCount: 'gastos en el historial',
+  historicalBudgetsCount: 'presupuestos en el historial',
+  historicalPeriodClosesCount: 'cierres financieros en el historial',
 };
 
 function buildQueryParams(params = {}) {

@@ -198,6 +198,11 @@ jobs:
       - name: Habilitar transacciones MongoDB
         run: node backend/scripts/initMongoReplicaSet.js
 
+      - name: Validar protección de sedes con devoluciones, reembolsos y finanzas
+        env:
+          BRANCH_PROTECTION_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_branch_protection?replicaSet=rs0
+        run: npm --prefix backend run test:admin-branches-operation-protection-mongo
+
       - name: Validar reembolsos e inventario
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_refund_inventory?replicaSet=rs0

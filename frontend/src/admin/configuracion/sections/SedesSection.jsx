@@ -66,7 +66,6 @@ const EMPTY_FORM = {
     requireCashSessionForPos: true,
     allowNegativeStock: false,
     defaultPaymentMethod: 'cash',
-    defaultCustomerName: 'Consumidor final',
   },
   notes: '',
 };
@@ -168,8 +167,6 @@ function normalizeBranchToForm(branch) {
         branch?.settings?.requireCashSessionForPos !== false,
       allowNegativeStock: branch?.settings?.allowNegativeStock === true,
       defaultPaymentMethod: branch?.settings?.defaultPaymentMethod || 'cash',
-      defaultCustomerName:
-        branch?.settings?.defaultCustomerName || 'Consumidor final',
     },
     notes: branch?.notes || '',
   };
@@ -215,7 +212,6 @@ function buildBranchPayload(form) {
       requireCashSessionForPos: form.settings.requireCashSessionForPos,
       allowNegativeStock: form.settings.allowNegativeStock,
       defaultPaymentMethod: form.settings.defaultPaymentMethod,
-      defaultCustomerName: form.settings.defaultCustomerName,
     },
     notes: form.notes,
   };
@@ -1366,23 +1362,6 @@ export default function SedesSection() {
                         </select>
                       </label>
 
-                      <label className="space-y-1">
-                        <span className="text-sm font-semibold">
-                          Cliente por defecto
-                        </span>
-                        <input
-                          value={form.settings.defaultCustomerName}
-                          onChange={(event) =>
-                            updateNestedField(
-                              'settings',
-                              'defaultCustomerName',
-                              event.target.value
-                            )
-                          }
-                          className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                          style={inputStyle}
-                        />
-                      </label>
                     </div>
 
                     <label className="block space-y-1">

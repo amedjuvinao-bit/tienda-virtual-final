@@ -10,14 +10,22 @@ const InventoryReservation = require('../models/InventoryReservation');
 const InventoryMovement = require('../models/InventoryMovement');
 const CashSession = require('../models/CashSession');
 const Order = require('../models/Order');
+const OrderReturn = require('../models/OrderReturn');
+const OrderRefund = require('../models/OrderRefund');
 const PosHeldSale = require('../models/PosHeldSale');
+const FinanceExpense = require('../models/FinanceExpense');
+const FinanceBudget = require('../models/FinanceBudget');
+const FinancePeriodClose = require('../models/FinancePeriodClose');
 
 const { getBranchOperationSummary, hasBranchOperation } =
   require('../services/branchOperationProtectionService');
 
 const branchId = new mongoose.Types.ObjectId();
-const models = [InventoryStock, InventoryReservation, InventoryMovement, CashSession, Order, PosHeldSale];
+const models = [InventoryStock, InventoryReservation, InventoryMovement, CashSession, Order, PosHeldSale,
+  FinanceExpense, FinanceBudget, FinancePeriodClose];
 const originalCounters = models.map((model) => model.countDocuments);
+const relatedModels = [OrderReturn, OrderRefund];
+const originalAggregates = relatedModels.map((model) => model.aggregate);
 const originalFindOne = Branch.findOne;
 let scenario = {};
 
@@ -62,6 +70,24 @@ function fakeCount(model, filter) {
     assert(filter.fulfillmentStatus.$nin.includes('delivered'));
     return scenario.pendingOrdersCount || 0;
   }
+  if (model === FinanceExpense) {
+    assert.equal(String(filter.branch), String(branchId));
+    if (!filter.$or) return scenario.historicalExpensesCount || 0;
+    assert.equal(filter.deletedAt, null);
+    assert(filter.$or.some((entry) => entry.status === 'paid' &&
+      entry['settlement.status'].$in.includes('partial')));
+    return scenario.pendingExpensesCount || 0;
+  }
+  if (model === FinanceBudget) {
+    assert.equal(String(filter.branch), String(branchId));
+    return filter.status === 'active'
+      ? scenario.activeBudgetsCount || 0 : scenario.historicalBudgetsCount || 0;
+  }
+  if (model === FinancePeriodClose) {
+    assert.equal(String(filter.branch), String(branchId));
+    return filter.status === 'provisional'
+      ? scenario.provisionalPeriodClosesCount || 0 : scenario.historicalPeriodClosesCount || 0;
+  }
   assert.equal(String(filter.branch), String(branchId));
   return filter.status === 'active'
     ? scenario.heldSalesCount || 0
@@ -80,6 +106,17 @@ async function request(server, path, method, body) {
 async function main() {
   models.forEach((model) => {
     model.countDocuments = async (filter) => fakeCount(model, filter);
+  });
+  relatedModels.forEach((model, index) => {
+    model.aggregate = async (pipeline) => {
+      assert.equal(pipeline[1].$lookup.from, Order.collection.name);
+      assert.equal(pipeline[1].$lookup.localField, 'order');
+      assert.equal(String(pipeline[3].$match.$or[0]['linkedOrder.branch']), String(branchId));
+      assert.equal(String(pipeline[3].$match.$or[3]['inventoryRestorations.branch']), String(branchId));
+      const kind = index === 0 ? 'Returns' : 'Refunds';
+      const count = scenario[pipeline[0].$match.$or ? `pending${kind}Count` : `historical${kind}Count`] || 0;
+      return count ? [{ count }] : [];
+    };
   });
   Branch.findOne = () => ({
     select() { return this; },
@@ -116,6 +153,11 @@ async function main() {
       historicalCashSessionsCount: 1,
       historicalOrdersCount: 1,
       historicalHeldSalesCount: 1,
+      historicalReturnsCount: 1,
+      historicalRefundsCount: 1,
+      historicalExpensesCount: 1,
+      historicalBudgetsCount: 1,
+      historicalPeriodClosesCount: 1,
     });
     const summary = await getBranchOperationSummary(branchId);
     assert.equal(hasBranchOperation(summary), false);
@@ -125,12 +167,16 @@ async function main() {
     assert.equal(deletion.status, 409);
     assert.equal(deletion.body.operationSummary.historicalOrdersCount, 1);
     assert.equal(deletion.body.operationSummary.historicalReservationsCount, 1);
+    assert.equal(deletion.body.operationSummary.historicalExpensesCount, 1);
+    assert.equal(deletion.body.operationSummary.historicalReturnsCount, 1);
 
     // Una sola tarea pendiente de cualquiera de los procesos debe bloquear.
     for (const key of [
       'activeStockCount', 'reservedStockCount', 'pendingReservationsCount',
       'pendingMovementsCount', 'openCashSessionsCount', 'pendingOrdersCount',
       'heldSalesCount',
+      'pendingReturnsCount', 'pendingRefundsCount', 'pendingExpensesCount',
+      'activeBudgetsCount', 'provisionalPeriodClosesCount',
     ]) {
       setScenario({ [key]: 1 });
       const result = await request(server, `${path}/status`, 'PATCH', disable);
@@ -149,6 +195,7 @@ async function main() {
   } finally {
     if (server) await new Promise((resolve) => server.close(resolve));
     models.forEach((model, index) => { model.countDocuments = originalCounters[index]; });
+    relatedModels.forEach((model, index) => { model.aggregate = originalAggregates[index]; });
     Branch.findOne = originalFindOne;
     require.cache[adminPath].exports = originalAdmin;
     require.cache[permissionPath].exports = originalPermission;
