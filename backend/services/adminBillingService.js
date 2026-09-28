@@ -100,7 +100,7 @@ function serializePendingOrder(order = {}) {
   const hasRetryableInvoice =
     Boolean(invoice._id) && ['failed', 'rejected', 'error'].includes(invoiceStatus);
   const automation = order.paymentProcessing?.invoice || {};
-  const automationFailed = !invoice._id && automation.status === 'failed';
+  const automationFailed = !invoice._id && ['failed', 'needs_review'].includes(automation.status);
   const branchBillingDisabled = automation.status === 'not_required' &&
     automation.outcomeCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED';
 
@@ -131,7 +131,9 @@ function serializePendingOrder(order = {}) {
       ? {
           status: 'failed',
           retryable: true,
-          errorMessage: presentInvoiceFailureCode(automation.errorCode),
+          errorMessage: presentInvoiceFailureCode(automation.errorCode, {
+            needsReview: automation.status === 'needs_review',
+          }),
         }
       : hasRetryableInvoice
       ? {

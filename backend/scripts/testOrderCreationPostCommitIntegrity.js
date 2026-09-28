@@ -36,6 +36,9 @@ function applySet(target, update = {}) {
   for (const [key, value] of Object.entries(update.$set || {})) {
     setPath(target, key, value);
   }
+  for (const [key, value] of Object.entries(update.$inc || {})) {
+    setPath(target, key, Number(getPath(target, key) || 0) + value);
+  }
 }
 
 function getPath(target, dottedPath) {
@@ -51,6 +54,7 @@ function matchesCondition(value, condition) {
       return condition.$exists ? value !== undefined : value === undefined;
     }
     if ('$lt' in condition) return new Date(value) < new Date(condition.$lt);
+    if ('$lte' in condition) return value != null && new Date(value) <= new Date(condition.$lte);
   }
   return String(value) === String(condition);
 }
@@ -164,6 +168,7 @@ async function testDurablePostCommitRetry() {
   let invoiceCalls = 0;
   let shouldFail = true;
   let tick = 0;
+  let clockOffsetMs = 0;
   const service = createOrderCreationPostCommitService({
     OrderModel: createFakeOrderModel(state),
     fulfillmentProcessor: async () => {
@@ -189,7 +194,7 @@ async function testDurablePostCommitRetry() {
         reasonCode: 'INVOICE_PROCESSED',
       };
     },
-    now: () => new Date(Date.UTC(2026, 7, 27, 12, 0, tick++)),
+    now: () => new Date(Date.UTC(2026, 7, 27, 12, 0, tick++) + clockOffsetMs),
     randomUUID: () => `claim-${tick}`,
     logger: { error() {}, warn() {}, log() {} },
   });
@@ -209,6 +214,10 @@ async function testDurablePostCommitRetry() {
   ok('los fallos post-commit quedan persistidos como reintentables');
 
   shouldFail = false;
+  const premature = await service.processFullyPaidStoreCreditOrder({ order: state });
+  assert.strictEqual(premature.invoice.duplicate, true);
+  assert.strictEqual(invoiceCalls, 1);
+  clockOffsetMs = 61_000;
   const replay = await service.processFullyPaidStoreCreditOrder({ order: state });
   assert.strictEqual(replay.retryable, false);
   assert.strictEqual(state.paymentProcessing.fulfillment.status, 'completed');

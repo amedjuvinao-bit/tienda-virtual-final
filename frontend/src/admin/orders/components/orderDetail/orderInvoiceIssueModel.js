@@ -49,7 +49,7 @@ export function getOrderInvoiceIssue(order = {}) {
       'No se pudo emitir la factura. Revisa el motivo en Facturación, Órdenes por facturar.';
   }
 
-  if (order?.invoiceAutomation?.status === 'failed' || order?.invoiceAutomation?.status === 'not_required') {
+  if (['failed', 'needs_review', 'not_required'].includes(order?.invoiceAutomation?.status)) {
     return order.invoiceAutomation.failureReason ||
       'No se pudo emitir la factura. Revisa el motivo en Facturación, Órdenes por facturar.';
   }

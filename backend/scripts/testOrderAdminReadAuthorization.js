@@ -294,6 +294,16 @@ async function validateMinimalFiscalDto() {
   assert(!JSON.stringify(failedOrder).includes('CLAIM_SECRET'));
   assert(!Object.hasOwn(failedOrder, 'paymentProcessing'));
 
+  const reviewOrder = presentAdminOrderDetail({
+    status: 'paid', payment: { status: 'paid' },
+    paymentProcessing: { invoice: {
+      status: 'needs_review', errorCode: 'INVOICE_TEMPORARY_FAILURE',
+      attempts: 5, nextAttemptAt: null,
+    } },
+  }, null);
+  assert.match(reviewOrder.invoiceAutomation.failureReason, /después de varios intentos/);
+  assert(!Object.hasOwn(reviewOrder, 'paymentProcessing'));
+
   const branchDisabledOrder = presentAdminOrderDetail({
     status: 'paid', payment: { status: 'paid' },
     paymentProcessing: { invoice: {

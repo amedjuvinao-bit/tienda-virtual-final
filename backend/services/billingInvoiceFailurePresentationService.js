@@ -13,9 +13,11 @@ const FAILURE_MESSAGES = Object.freeze({
   FACTUS_CREDENTIALS_INCOMPLETE: 'Falta configurar el acceso a Factus. Revísalo en Configuración → Facturación.',
 });
 
-function presentInvoiceFailureCode(code) {
+function presentInvoiceFailureCode(code, { needsReview = false } = {}) {
   return FAILURE_MESSAGES[String(code || '').toUpperCase()] ||
-    'No se pudo emitir la factura. Revisa los datos y el motivo en Facturación → Órdenes por facturar.';
+    (needsReview
+      ? 'No se pudo emitir la factura después de varios intentos. Revísala en Facturación → Órdenes por facturar.'
+      : 'No se pudo emitir la factura. El sistema volverá a intentarlo; revisa el estado en Facturación → Órdenes por facturar.');
 }
 
 module.exports = { presentInvoiceFailureCode };

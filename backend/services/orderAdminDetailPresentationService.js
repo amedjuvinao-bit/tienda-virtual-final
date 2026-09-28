@@ -224,8 +224,10 @@ function presentAdminOrderDetail(
       reasonCode: automationStatus === 'not_required'
         ? String(automation.outcomeCode || '')
         : '',
-      failureReason: automationStatus === 'failed'
-        ? presentInvoiceFailureCode(automation.errorCode)
+      failureReason: ['failed', 'needs_review'].includes(automationStatus)
+        ? presentInvoiceFailureCode(automation.errorCode, {
+          needsReview: automationStatus === 'needs_review',
+        })
         : automationStatus === 'not_required'
           ? automation.outcomeCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED'
             ? 'La factura se omitió porque esta sede tenía desactivada la facturación al confirmar el pago. Si ya la activaste en Configuración → Sedes, revisa y emite desde Facturación.'

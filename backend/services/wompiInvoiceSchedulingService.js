@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { nextInvoiceAttempt } = require('./invoicePostPaymentRetryPolicy');
 
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -58,10 +59,13 @@ function createWompiInvoiceSchedulingService({
         },
         $or: [
           { 'paymentProcessing.invoice.status': { $exists: false } },
+          { 'paymentProcessing.invoice.status': 'pending' },
           {
-            'paymentProcessing.invoice.status': {
-              $in: ['pending', 'failed'],
-            },
+            'paymentProcessing.invoice.status': 'failed',
+            $or: [
+              { 'paymentProcessing.invoice.nextAttemptAt': { $exists: false } },
+              { 'paymentProcessing.invoice.nextAttemptAt': { $lte: claimedAt } },
+            ],
           },
           {
             'paymentProcessing.invoice.status': 'scheduling',
@@ -77,7 +81,9 @@ function createWompiInvoiceSchedulingService({
           'paymentProcessing.invoice.transactionId': transactionId,
           'paymentProcessing.invoice.outcomeCode': '',
           'paymentProcessing.invoice.errorCode': '',
+          'paymentProcessing.invoice.nextAttemptAt': null,
         },
+        $inc: { 'paymentProcessing.invoice.attempts': 1 },
       },
       { new: true }
     );
@@ -146,10 +152,16 @@ function createWompiInvoiceSchedulingService({
         outcome,
       };
     } catch (error) {
+      const retry = nextInvoiceAttempt({
+        error,
+        attempts: claimedOrder.paymentProcessing?.invoice?.attempts,
+        now: now(),
+      });
       try {
         await OrderModel.updateOne(fence, {
           $set: {
-            'paymentProcessing.invoice.status': 'failed',
+            'paymentProcessing.invoice.status': retry.status,
+            'paymentProcessing.invoice.nextAttemptAt': retry.nextAttemptAt,
             'paymentProcessing.invoice.scheduledAt': null,
             'paymentProcessing.invoice.outcomeCode': '',
             'paymentProcessing.invoice.errorCode': clean(
