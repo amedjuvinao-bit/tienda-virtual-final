@@ -227,6 +227,20 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.getByRole('status')).toHaveTextContent('El pago ya quedó confirmado');
   });
 
+  it('distingue el reintento automático de una corrección fiscal requerida', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      status: 'paid',
+      payment: { status: 'paid' },
+      invoiceAutomation: {
+        status: 'failed',
+        failureReason: 'No se pudo emitir la factura. El sistema volverá a intentarlo.',
+      },
+    }} onEditBilling={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Reintento automático de factura');
+    expect(screen.queryByRole('button', { name: 'Corregir datos fiscales' })).not.toBeInTheDocument();
+  });
+
   it('cierra la historia del reembolso cuando todas las etapas están conciliadas', () => {
     const order = {
       ...BASE_ORDER,

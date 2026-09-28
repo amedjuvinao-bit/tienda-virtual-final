@@ -53,6 +53,8 @@ export default function OrderDetailPaymentPanel({
   const invoiceIssue = getOrderInvoiceIssue(order);
   const identityIssue = getManualOrderIdentityIssue(order);
   const invoiceStatus = String(order?.invoiceAutomation?.status || '').toLowerCase();
+  const invoiceRetrying = invoiceStatus === 'failed' &&
+    !String(order?.electronicInvoice?.status || '').trim();
   const invoiceInProgress = paymentComplete && !invoiceIssue &&
     ['pending', 'scheduling'].includes(invoiceStatus) &&
     !['accepted', 'validated'].includes(String(order?.electronicInvoice?.status || '').toLowerCase());
@@ -183,14 +185,14 @@ export default function OrderDetailPaymentPanel({
       {invoiceInProgress ? (
         <div role="status" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg }}>
           <strong style={{ display: 'block', fontSize: 14 }}>Facturación en proceso</strong>
-          <p style={{ margin: '6px 0 0', fontSize: 13 }}>El pago ya quedó confirmado. Se está verificando si corresponde emitir la factura según la sede; consulta el resultado en Facturación.</p>
+          <p style={{ margin: '6px 0 0', fontSize: 13 }}>El pago ya quedó confirmado. El resultado de la factura se actualizará aquí mientras mantengas abierta la orden.</p>
         </div>
       ) : null}
       {invoiceIssue || identityIssue ? (
         <div role="alert" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: '1px solid var(--admin-warning-border)', background: 'var(--admin-warning-soft-bg)', color: 'var(--admin-warning-text)' }}>
-          <strong style={{ display: 'block', fontSize: 14 }}>{identityIssue ? 'Corrige la identidad del comprador' : order?.invoiceAutomation?.reasonCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? 'Factura omitida al confirmar el pago' : 'Factura pendiente de corrección'}</strong>
+          <strong style={{ display: 'block', fontSize: 14 }}>{identityIssue ? 'Corrige la identidad del comprador' : order?.invoiceAutomation?.reasonCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? 'Factura omitida al confirmar el pago' : invoiceRetrying ? 'Reintento automático de factura' : 'Factura pendiente de corrección'}</strong>
           <p style={{ margin: '6px 0 0', fontSize: 13 }}>{identityIssue || invoiceIssue}</p>
-          {onEditBilling && order?.invoiceAutomation?.reasonCode !== 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? (
+          {onEditBilling && !invoiceRetrying && order?.invoiceAutomation?.reasonCode !== 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? (
             <button type="button" onClick={onEditBilling} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 10, border: '1px solid currentColor', fontWeight: 800 }}>
               Corregir datos fiscales
             </button>
