@@ -8,6 +8,7 @@ import OrderDetailStoryOverview, {
   buildOrderStory,
 } from './OrderDetailStoryOverview';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
+import OrderDetailInventoryAllocations from './OrderDetailInventoryAllocations';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailHeader from './OrderDetailHeader';
 import OrderDetailTabs from './OrderDetailTabs';
@@ -198,6 +199,42 @@ describe('historia narrativa del detalle de la orden', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Revisar pago' }));
     expect(onNavigate).toHaveBeenCalledWith('payment');
+  });
+
+  it('muestra inventario liberado al vencer un pedido manual y cero unidades aún reservadas', () => {
+    const releasedAt = '2026-08-14T14:21:00.000Z';
+    const order = {
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'failed',
+      payment: { provider: 'manual', status: 'failed' },
+      inventoryControl: { restockedOnFailure: true, restockedAt: releasedAt },
+      inventoryAllocations: [{
+        quantity: 1,
+        reservedQuantity: 1,
+        releasedQuantity: 1,
+        status: 'released',
+        reservedAt: '2026-08-14T14:01:00.000Z',
+        releasedAt,
+        branchSnapshot: { name: 'Sede Principal', code: 'PRINCIPAL' },
+      }],
+    };
+    const overview = buildOrderOverview(order);
+
+    expect(overview.situation.find((item) => item.id === 'inventory')?.value)
+      .toBe('Liberado en Sede Principal');
+    expect(overview.situation.find((item) => item.id === 'preparation')?.value)
+      .toBe('Preparación detenida; orden cerrada');
+    expect(overview.movements.find((item) => item.id === 'inventory')).toMatchObject({
+      title: 'Inventario liberado',
+      date: new Date(releasedAt),
+    });
+
+    render(<><OrderDetailStoryOverview order={order} /><OrderDetailInventoryAllocations order={order} /></>);
+    expect(screen.getByText('Liberado en Sede Principal')).toBeInTheDocument();
+    expect(screen.getByText('Reservadas').nextElementSibling).toHaveTextContent('0');
+    expect(screen.getByText('Liberadas').nextElementSibling).toHaveTextContent('1');
+    expect(screen.queryByText('Bloqueada hasta confirmar el pago')).not.toBeInTheDocument();
   });
 
   it('indica preparar logística cuando hay pago e inventario vendido pero aún no existe envío', () => {
