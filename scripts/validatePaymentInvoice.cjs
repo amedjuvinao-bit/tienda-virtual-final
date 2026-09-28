@@ -1,6 +1,6 @@
 'use strict';
 
-// Pruebas locales reproducibles: nunca conecta con la tienda, MongoDB ni Factus.
+// Comprobaciones reproducibles seguidas de una venta real en Factus habilitación.
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,6 +12,11 @@ const vitest = path.join(frontend, 'node_modules', 'vitest', 'vitest.mjs');
 const vite = path.join(frontend, 'node_modules', 'vite', 'bin', 'vite.js');
 
 const checks = [
+  {
+    name: 'Sandbox: orden válida, bloqueo de producción y evidencia de aceptación',
+    cwd: backend,
+    script: 'scripts/testValidatePaymentInvoiceSandbox.js',
+  },
   {
     name: 'Pago manual rápido, evidencia exacta y confirmación sin duplicados',
     cwd: backend,
@@ -98,7 +103,7 @@ function run() {
 
   let passed = 0;
   const failed = [];
-  console.log('Validación local de pago y factura electrónica (casos simulados, sin emitir facturas)');
+  console.log('Validación de pago y factura electrónica: controles automáticos + Factus habilitación');
   for (const [index, check] of checks.entries()) {
     console.log(`\n[${index + 1}/${checks.length}] ${check.name}`);
     const file = path.isAbsolute(check.script)
@@ -125,16 +130,28 @@ function run() {
 
   console.log(`\nResultado: ${passed}/${checks.length} grupos aprobados.`);
   if (failed.length) {
-    console.error('Revisa estos casos antes de probar el pago en el navegador:');
+    console.error('Controles fallidos:');
     failed.forEach((name) => console.error(`- ${name}`));
     process.exitCode = 1;
     return;
   }
 
-  console.log('\nComprobación adicional en tu Factus sandbox (esta parte sí crea órdenes de prueba):');
-  console.log('1. Sede con factura activa: crea una orden manual con nombre, apellido y datos fiscales completos. Confirma el pago una sola vez. Debe quedar pagada enseguida; deja el detalle abierto hasta ver la factura aceptada sin actualizar la página.');
-  console.log('2. Sede con factura desactivada: crea otra orden y confirma el pago. Debe quedar pagada, sin factura automática, con el motivo visible. Reactiva la sede y emite desde Facturación si corresponde.');
-  console.log('Los errores de apellido y fallas temporales ya se comprobaron de forma simulada: no alteres clientes reales ni desconectes Factus para provocarlos.');
+  if (process.argv.includes('--simulated-only')) {
+    console.log('Solo se ejecutaron los controles simulados. Factus no fue consultado.');
+    return;
+  }
+
+  console.log('\nPrueba real: crear orden, confirmar pago simulado y esperar factura automática en Factus habilitación.');
+  const live = spawnSync(process.execPath, [path.join(backend, 'scripts/validatePaymentInvoiceSandbox.js')], {
+    cwd: backend,
+    stdio: 'inherit',
+    timeout: 4 * 60 * 1000,
+  });
+  if (live.status !== 0) {
+    console.error('FALLÓ la comprobación real de Factus. Los controles simulados no prueban la emisión externa.');
+    if (live.error) console.error(live.error.message);
+    process.exitCode = 1;
+  }
 }
 
 run();

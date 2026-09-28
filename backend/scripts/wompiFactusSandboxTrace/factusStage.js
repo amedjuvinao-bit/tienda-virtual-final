@@ -195,6 +195,7 @@ module.exports = {
   assertValidatedInvoice,
   assertIdentifiedFactusCustomer,
   ensureFactusInvoice,
+  verifyInvoiceDocuments,
   findValidatedCreditNote,
   retry,
   verifyCreditNoteDocuments,
