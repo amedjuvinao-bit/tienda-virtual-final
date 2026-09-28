@@ -6,6 +6,9 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const {
+  resolveBranchElectronicInvoicePolicy,
+} = require('./branchElectronicInvoicePolicyService');
 const { needsFactusLastName } = require('../lib/billing/factusCustomerValidation');
 const {
   buildRuntimeFactusConfig,
@@ -243,6 +246,7 @@ async function buildInvoicePreflight(
   orderId,
   {
     OrderModel = Order,
+    BranchModel,
     SettingsModel = SiteSettings,
     InvoiceModel = ElectronicInvoice,
   } = {}
@@ -267,6 +271,11 @@ async function buildInvoicePreflight(
   const warnings = [];
   const mode = providerMode(settings);
   const existingInvoice = safeInvoice(invoiceDocument);
+
+  const branchPolicy = await resolveBranchElectronicInvoicePolicy(order, { BranchModel });
+  if (!branchPolicy.allowed) {
+    blockers.push(issue(branchPolicy.code, 'branch', branchPolicy.message));
+  }
 
   if (!isBillableOrder(order)) {
     blockers.push(issue(
@@ -381,6 +390,7 @@ async function buildInvoicePreflight(
     provider: mode.provider,
     environment: runtimeConfig?.environment || mode.mode,
     existingInvoice,
+    branchPolicy,
     customer,
     totals,
     payload: factusPayload,

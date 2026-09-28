@@ -120,7 +120,9 @@ function createWompiInvoiceSchedulingService({
       const terminalBusinessSkip =
         outcome?.outcome === 'skipped' &&
         outcome?.terminal === true &&
-        outcome?.reasonCode === 'ELECTRONIC_BILLING_INACTIVE';
+        ['ELECTRONIC_BILLING_INACTIVE', 'BRANCH_ELECTRONIC_INVOICE_DISABLED'].includes(
+          outcome?.reasonCode
+        );
       const nextStatus = terminalBusinessSkip ? 'not_required' : 'pending';
       const persistence = await OrderModel.updateOne(fence, {
         $set: {

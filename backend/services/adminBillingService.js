@@ -101,6 +101,8 @@ function serializePendingOrder(order = {}) {
     Boolean(invoice._id) && ['failed', 'rejected', 'error'].includes(invoiceStatus);
   const automation = order.paymentProcessing?.invoice || {};
   const automationFailed = !invoice._id && automation.status === 'failed';
+  const branchBillingDisabled = automation.status === 'not_required' &&
+    automation.outcomeCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED';
 
   return {
     id: String(order._id || ''),
@@ -119,7 +121,13 @@ function serializePendingOrder(order = {}) {
     shipping: money(order.shipping),
     total: money(order.total),
     itemsCount: items.length,
-    billingIssue: automationFailed
+    billingIssue: branchBillingDisabled
+      ? {
+          status: 'blocked',
+          retryable: false,
+          errorMessage: 'La facturación electrónica está desactivada para esta sede. Actívala en Configuración → Sedes y después emite desde Facturación.',
+        }
+      : automationFailed
       ? {
           status: 'failed',
           retryable: true,

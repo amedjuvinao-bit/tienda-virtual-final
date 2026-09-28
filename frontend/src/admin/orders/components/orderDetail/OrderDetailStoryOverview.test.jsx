@@ -152,6 +152,22 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Falta el municipio fiscal');
   });
 
+  it('dirige a Sedes cuando la facturación está desactivada, sin ofrecer corregir al cliente', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      status: 'paid', payment: { status: 'paid' },
+      electronicInvoice: { status: 'failed', failureReason: 'Rechazo anterior de Factus.' },
+      invoiceAutomation: {
+        status: 'not_required',
+        reasonCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
+        failureReason: 'Actívala en Configuración → Sedes y después emite desde Facturación.',
+      },
+    }} onEditBilling={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Facturación desactivada para esta sede');
+    expect(screen.getByRole('alert')).toHaveTextContent('Configuración → Sedes');
+    expect(screen.queryByRole('button', { name: 'Corregir datos fiscales' })).not.toBeInTheDocument();
+  });
+
   it('avisa de datos incompletos antes de emitir, pero no interrumpe la conciliación de una factura enviada', () => {
     const paidOrder = {
       ...BASE_ORDER,

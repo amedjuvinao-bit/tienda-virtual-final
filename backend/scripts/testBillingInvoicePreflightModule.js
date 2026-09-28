@@ -188,6 +188,30 @@ async function main() {
   assert.match(preflight.fingerprint, /^[a-f0-9]{64}$/);
   ok('construye una fotografía fiscal completa y determinística sin llamar a Factus');
 
+  const branchOrder = sampleOrder({ branch: new mongoose.Types.ObjectId() });
+  const branch = { name: 'Sede de prueba', settings: { allowElectronicInvoice: false } };
+  const branchDependencies = {
+    ...dependencies(branchOrder),
+    BranchModel: { findById: () => query(branch) },
+  };
+  const disabledBranchPreflight = await buildInvoicePreflight(
+    branchOrder._id,
+    branchDependencies
+  );
+  assert.equal(disabledBranchPreflight.ready, false);
+  assert.ok(disabledBranchPreflight.blockers.some(
+    (item) => item.code === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' &&
+      item.message.includes('Sede de prueba')
+  ));
+  branch.settings.allowElectronicInvoice = true;
+  const enabledBranchPreflight = await buildInvoicePreflight(
+    branchOrder._id,
+    branchDependencies
+  );
+  assert.equal(enabledBranchPreflight.ready, true);
+  assert.notEqual(disabledBranchPreflight.fingerprint, enabledBranchPreflight.fingerprint);
+  ok('la vista previa impide emitir para una sede desactivada y se actualiza al habilitarla');
+
   const legacyOrder = sampleOrder();
   legacyOrder.customer.city = 'Zona Bananera';
   legacyOrder.customer.department = 'Magdalena';

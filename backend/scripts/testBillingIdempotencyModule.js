@@ -313,6 +313,7 @@ async function validateConcurrentIssuance() {
     _id: orderId,
     orderNumber: '000300',
     status: 'paid',
+    branch: '64b0000000000000000000b1',
     subtotal: 100000,
     shipping: 0,
     total: 119000,
@@ -358,6 +359,9 @@ async function validateConcurrentIssuance() {
 
   const service = createElectronicInvoiceIssuanceService({
     ...models,
+    Branch: {
+      findById: () => ({ settings: { allowElectronicInvoice: true } }),
+    },
     isValidObjectId: () => true,
     randomUUID: () => 'lock-token-test',
     now: () => new Date('2026-07-21T15:00:00.000Z'),
@@ -405,6 +409,60 @@ async function validateConcurrentIssuance() {
   assert(completed.emission.state === 'completed', 'La reserva debe finalizar en completed.');
   assert(completed.cufe === 'official-cufe', 'Debe conservarse el CUFE oficial del proveedor.');
   ok('El documento único conserva estado, número y CUFE oficiales');
+}
+
+async function validateDisabledBranchBeforeEmission() {
+  const orderId = '64b0000000000000000000b2';
+  const order = {
+    _id: orderId,
+    orderNumber: '000303',
+    branch: '64b0000000000000000000b3',
+    status: 'paid',
+    payment: {
+      status: 'paid',
+      provider: 'manual',
+      paidAt: new Date('2026-09-28T12:00:00.000Z'),
+    },
+    branchSnapshot: { name: 'Sede de prueba' },
+  };
+  const models = createInMemoryModels({ order, settings: {} });
+  let providerCalls = 0;
+  const service = createElectronicInvoiceIssuanceService({
+    ...models,
+    Branch: {
+      findById: () => ({
+        name: 'Sede de prueba',
+        settings: { allowElectronicInvoice: false },
+      }),
+    },
+    isValidObjectId: () => true,
+    sendElectronicInvoiceToProvider: async () => {
+      providerCalls += 1;
+      throw new Error('No debe contactar al proveedor');
+    },
+  });
+
+  const automatic = await service.issueElectronicInvoiceForOrder({
+    orderId,
+    source: 'wompi',
+    skipWhenElectronicBillingIsInactive: true,
+  });
+  assert(automatic.skipped === true, 'La emisión automática debe omitirse.');
+  assert(automatic.reasonCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED', 'Debe registrar el motivo por sede.');
+  let manualError = null;
+  try {
+    await service.issueElectronicInvoiceForOrder({ orderId, source: 'admin' });
+  } catch (error) {
+    manualError = error;
+  }
+  assert(
+    manualError?.code === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' &&
+      manualError.message.includes('Configuración → Sedes'),
+    'La emisión manual debe indicar cómo activar la sede.'
+  );
+  assert(providerCalls === 0, 'No debe contactar al proveedor.');
+  assert(models.count() === 0, 'No debe reservar un documento.');
+  ok('una sede con facturación desactivada omite la emisión automática y bloquea la manual antes de reservar factura');
 }
 
 function validateDatabaseConstraint() {
@@ -477,6 +535,7 @@ async function main() {
 
   try {
     await validateConcurrentIssuance();
+    await validateDisabledBranchBeforeEmission();
     await validateMissingLastNameBeforeProvider();
     await validateControlledRetry();
     validateDatabaseConstraint();

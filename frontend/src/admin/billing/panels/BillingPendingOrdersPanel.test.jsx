@@ -108,6 +108,25 @@ describe('BillingPendingOrdersPanel', () => {
     expect(state.generate).not.toHaveBeenCalled();
   });
 
+  it('explica la sede desactivada y no permite confirmar la factura desde el precontrol', async () => {
+    const message = 'La facturación electrónica está desactivada para esta sede. Actívala en Configuración → Sedes.';
+    state.getPending.mockResolvedValue({
+      rows: [{ ...ORDER, billingIssue: {
+        status: 'blocked', retryable: false, errorMessage: message,
+      } }], total: 1, page: 1, pages: 1,
+    });
+    state.getPreflight.mockResolvedValue({
+      ...PREFLIGHT,
+      ready: false,
+      blockers: [{ code: 'BRANCH_ELECTRONIC_INVOICE_DISABLED', field: 'branch', message }],
+    });
+    renderPanel();
+    expect(await screen.findByText('Facturación desactivada para esta sede')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y emitir' }));
+    expect(await screen.findByText(/La facturación electrónica está desactivada para esta sede/)).toBeInTheDocument();
+    expect(state.generate).not.toHaveBeenCalled();
+  });
+
   it('abre Documentos filtrado por la factura después de una emisión exitosa', async () => {
     state.getPreflight.mockResolvedValue(PREFLIGHT);
     state.generate.mockResolvedValue({

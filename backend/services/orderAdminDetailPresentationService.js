@@ -221,10 +221,15 @@ function presentAdminOrderDetail(
     electronicInvoice: serializeOrderAdminInvoiceSummary(invoice),
     invoiceAutomation: paid && !validated && automationStatus ? {
       status: automationStatus,
+      reasonCode: automationStatus === 'not_required'
+        ? String(automation.outcomeCode || '')
+        : '',
       failureReason: automationStatus === 'failed'
         ? presentInvoiceFailureCode(automation.errorCode)
         : automationStatus === 'not_required'
-          ? 'La facturación electrónica está desactivada. Revisa su configuración antes de emitir.'
+          ? automation.outcomeCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED'
+            ? 'La facturación electrónica está desactivada para esta sede. Actívala en Configuración → Sedes y después emite desde Facturación.'
+            : 'La facturación electrónica está desactivada. Revisa su configuración antes de emitir.'
           : '',
     } : null,
   };

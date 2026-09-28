@@ -294,6 +294,16 @@ async function validateMinimalFiscalDto() {
   assert(!JSON.stringify(failedOrder).includes('CLAIM_SECRET'));
   assert(!Object.hasOwn(failedOrder, 'paymentProcessing'));
 
+  const branchDisabledOrder = presentAdminOrderDetail({
+    status: 'paid', payment: { status: 'paid' },
+    paymentProcessing: { invoice: {
+      status: 'not_required', outcomeCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
+    } },
+  }, null);
+  assert.match(branchDisabledOrder.invoiceAutomation.failureReason, /Configuración → Sedes/);
+  assert.strictEqual(branchDisabledOrder.invoiceAutomation.reasonCode, 'BRANCH_ELECTRONIC_INVOICE_DISABLED');
+  assert(!Object.hasOwn(branchDisabledOrder, 'paymentProcessing'));
+
   const invoice = unsafeInvoiceFixture();
   const summary = serializeOrderAdminInvoiceSummary(invoice);
 

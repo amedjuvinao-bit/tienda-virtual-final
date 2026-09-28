@@ -428,6 +428,14 @@ const fakeElectronicInvoiceIssuanceService = {
         invoice: null,
       };
     }
+    if (state.invoiceMode === 'skip-branch-disabled') {
+      return {
+        skipped: true,
+        reasonCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
+        message: 'La sede no emite facturas electrónicas.',
+        invoice: null,
+      };
+    }
     if (state.invoiceMode === 'skip-retryable') {
       return {
         reused: true,
@@ -877,6 +885,24 @@ async function control(name, run) {
       'ELECTRONIC_BILLING_INACTIVE'
     );
     assert.equal(state.order.paymentProcessing.invoice.errorCode, '');
+
+    resetState(
+      { inventoryControl: { reservationRequired: false } },
+      'success',
+      'skip-branch-disabled'
+    );
+    const branchResponse = await invokeWebhook(
+      signedEvent('APPROVED', {
+        finalizedAt: FIRST_PAID_AT,
+        transactionId: 'tx-branch-billing-disabled',
+      })
+    );
+    assert.equal(branchResponse.statusCode, 200);
+    assert.equal(state.order.paymentProcessing.invoice.status, 'not_required');
+    assert.equal(
+      state.order.paymentProcessing.invoice.outcomeCode,
+      'BRANCH_ELECTRONIC_INVOICE_DISABLED'
+    );
 
     resetState(
       { inventoryControl: { reservationRequired: false } },

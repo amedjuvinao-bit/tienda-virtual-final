@@ -30,6 +30,10 @@ export function getOrderInvoiceIssue(order = {}) {
   if (FINAL_STATUSES.has(status) || invoice?.provider?.isValidated === true) return null;
   if (status && !FAILED_STATUSES.has(status) && status !== 'pending') return null;
 
+  if (order?.invoiceAutomation?.reasonCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED') {
+    return order.invoiceAutomation.failureReason;
+  }
+
   const billing = order?.billing || {};
   const customer = order?.customer || {};
   const identifiedNaturalPerson = billing.isFinalConsumer !== true &&

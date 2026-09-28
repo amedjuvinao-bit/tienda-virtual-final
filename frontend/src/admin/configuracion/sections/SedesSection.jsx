@@ -1318,7 +1318,7 @@ export default function SedesSection() {
                       </label>
 
                       <label
-                        className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm"
+                        className="flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm"
                         style={inputStyle}
                       >
                         <input
@@ -1332,7 +1332,12 @@ export default function SedesSection() {
                             )
                           }
                         />
-                        Facturación electrónica
+                        <span>
+                          <strong className="block">Facturación electrónica</strong>
+                          <span className="block text-xs opacity-75">
+                            Si la desactivas, la venta se registra sin factura. Al volver a activarla, emite las pendientes desde Facturación.
+                          </span>
+                        </span>
                       </label>
                     </div>
 

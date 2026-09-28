@@ -178,9 +178,9 @@ export default function OrderDetailPaymentPanel({
       <OrderManualPaymentEvidence order={order} />
       {invoiceIssue || identityIssue ? (
         <div role="alert" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: '1px solid var(--admin-warning-border)', background: 'var(--admin-warning-soft-bg)', color: 'var(--admin-warning-text)' }}>
-          <strong style={{ display: 'block', fontSize: 14 }}>{identityIssue ? 'Corrige la identidad del comprador' : 'Factura pendiente de corrección'}</strong>
+          <strong style={{ display: 'block', fontSize: 14 }}>{identityIssue ? 'Corrige la identidad del comprador' : order?.invoiceAutomation?.reasonCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? 'Facturación desactivada para esta sede' : 'Factura pendiente de corrección'}</strong>
           <p style={{ margin: '6px 0 0', fontSize: 13 }}>{identityIssue || invoiceIssue}</p>
-          {onEditBilling ? (
+          {onEditBilling && order?.invoiceAutomation?.reasonCode !== 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? (
             <button type="button" onClick={onEditBilling} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 10, border: '1px solid currentColor', fontWeight: 800 }}>
               Corregir datos fiscales
             </button>
