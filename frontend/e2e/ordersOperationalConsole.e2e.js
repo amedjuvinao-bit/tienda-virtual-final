@@ -331,9 +331,9 @@ async function readOnlyMobileScenario(browser) {
   await page.goto(`${BASE_URL}/admin/ordenes`, { waitUntil: 'networkidle' });
   await page.getByText(`#${ORDER.orderNumber}`, { exact: true }).waitFor();
   assert.equal(await page.getByRole('checkbox', { name: 'Seleccionar órdenes visibles' }).count(), 0);
-  await page.getByRole('button', { name: 'Mostrar panel de filtros' }).click();
+  await page.getByRole('button', { name: 'Abrir búsqueda y filtros' }).click();
   assert.equal(await page.getByRole('button', { name: 'Exportar CSV' }).count(), 0);
-  await page.getByRole('button', { name: 'Ocultar panel de filtros' }).click();
+  await page.getByRole('button', { name: 'Cerrar búsqueda y filtros' }).click();
 
   const dialog = await openOrder(page);
   await assertNoDocumentOverflow(page, 'La vista móvil de solo lectura');

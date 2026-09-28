@@ -11,14 +11,18 @@ process.env.CART_ACCESS_SECRET = 'cart-admin-access-test-secret'.padEnd(64, 'x')
 const Cart = require('../models/Cart');
 const AdminUser = require('../models/AdminUser');
 const AdminRole = require('../models/AdminRole');
+const AdminSession = require('../models/AdminSession');
 
 const ALLOWED_ADMIN_ID = '64b000000000000000000098';
 const LIMITED_ADMIN_ID = '64b000000000000000000099';
+const ALLOWED_SESSION_ID = 'cart-admin-allowed-session-id';
+const LIMITED_SESSION_ID = 'cart-admin-limited-session-id';
 
 const originals = {
   cartAggregate: Cart.aggregate,
   adminUserFindOne: AdminUser.findOne,
   adminRoleFindOne: AdminRole.findOne,
+  adminSessionFindOne: AdminSession.findOne,
 };
 
 let passed = 0;
@@ -79,6 +83,18 @@ async function run() {
     });
   };
   AdminRole.findOne = () => queryResult(null);
+  AdminSession.findOne = ({ sessionId } = {}) => {
+    const allowed = sessionId === ALLOWED_SESSION_ID;
+    const limited = sessionId === LIMITED_SESSION_ID;
+    return queryResult(allowed || limited ? {
+      sessionId,
+      adminUser: allowed ? ALLOWED_ADMIN_ID : LIMITED_ADMIN_ID,
+      authType: 'db',
+      username: allowed ? 'cart-admin' : 'limited-admin',
+      tokenVersion: 0,
+      lastSeenAt: new Date(),
+    } : null);
+  };
 
   const app = express();
   app.use(express.json());
@@ -94,6 +110,8 @@ async function run() {
       role: 'admin',
       authType: 'db',
       adminUserId: ALLOWED_ADMIN_ID,
+      username: 'cart-admin',
+      sessionId: ALLOWED_SESSION_ID,
       tokenVersion: 0,
     },
     process.env.JWT_SECRET,
@@ -109,6 +127,20 @@ async function run() {
       role: 'admin',
       authType: 'db',
       adminUserId: LIMITED_ADMIN_ID,
+      username: 'limited-admin',
+      sessionId: LIMITED_SESSION_ID,
+      tokenVersion: 0,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '2m' }
+  );
+  const revokedToken = jwt.sign(
+    {
+      role: 'admin',
+      authType: 'db',
+      adminUserId: ALLOWED_ADMIN_ID,
+      username: 'cart-admin',
+      sessionId: 'cart-admin-revoked-session-id',
       tokenVersion: 0,
     },
     process.env.JWT_SECRET,
@@ -121,6 +153,7 @@ async function run() {
     const summaryWithoutSession = await request(baseUrl, '/api/cart/admin/summary');
     const listWithoutSession = await request(baseUrl, '/api/cart/admin');
     const summaryWithoutPermission = await request(baseUrl, '/api/cart/admin/summary', limitedToken);
+    const summaryWithRevokedSession = await request(baseUrl, '/api/cart/admin/summary', revokedToken);
     const listWithoutPermission = await request(baseUrl, '/api/cart/admin', limitedToken);
     const summaryWithLegacyToken = await request(baseUrl, '/api/cart/admin/summary', legacyToken);
     const listWithLegacyToken = await request(baseUrl, '/api/cart/admin', legacyToken);
@@ -132,6 +165,10 @@ async function run() {
     check(summaryWithoutSession.status === 401, 'el resumen sin sesion responde 401 y nunca 404');
     check(listWithoutSession.status === 401, 'el listado sin sesion responde 401 y nunca 404');
     check(summaryWithoutPermission.status === 403, 'el resumen sin carts:view responde 403');
+    check(
+      summaryWithRevokedSession.status === 401 && summaryWithRevokedSession.body.error === 'SESSION_REVOKED',
+      'el resumen rechaza una sesión revocada'
+    );
     check(listWithoutPermission.status === 403, 'el listado sin carts:view responde 403');
     check(
       summaryWithLegacyToken.status === 403 && summaryWithLegacyToken.body.error === 'LEGACY_ADMIN_DISABLED',
@@ -146,6 +183,7 @@ async function run() {
     Cart.aggregate = originals.cartAggregate;
     AdminUser.findOne = originals.adminUserFindOne;
     AdminRole.findOne = originals.adminRoleFindOne;
+    AdminSession.findOne = originals.adminSessionFindOne;
   }
 
   check(require('mongoose').connection.readyState === 0, 'MongoDB permanecio desconectado');
@@ -156,6 +194,7 @@ run().catch((error) => {
   Cart.aggregate = originals.cartAggregate;
   AdminUser.findOne = originals.adminUserFindOne;
   AdminRole.findOne = originals.adminRoleFindOne;
+  AdminSession.findOne = originals.adminSessionFindOne;
   console.error(error.stack || error.message);
   process.exit(1);
 });

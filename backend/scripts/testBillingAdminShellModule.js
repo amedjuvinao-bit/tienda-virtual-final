@@ -75,12 +75,15 @@ function validateRoutes() {
 }
 
 function validateMenuAndPermissions() {
-  const layout = readProjectFile('frontend/src/admin/AdminLayout.js');
+  const layout = readProjectFile('frontend/src/admin/AdminLayout.jsx');
   const permissions = readProjectFile('frontend/src/admin/security/adminPermissions.js');
 
-  assertIncludes(layout, "path: '/admin/facturacion'", 'AdminLayout.js no agrega Facturación al menú');
-  assertIncludes(layout, "label: 'Facturación'", 'AdminLayout.js no muestra etiqueta Facturación');
-  assertIncludes(layout, "slotAfter: '/admin/ordenes'", 'Facturación no queda cerca de órdenes');
+  assertIncludes(layout, "{ to: '/admin/facturacion', label: 'Facturación'", 'AdminLayout.jsx no agrega Facturación al menú');
+  assert(
+    layout.indexOf("{ to: '/admin/ordenes'") < layout.indexOf("{ to: '/admin/facturacion'") &&
+      layout.indexOf("{ to: '/admin/facturacion'") < layout.indexOf("{ to: '/admin/clientes'"),
+    'Facturación no queda entre Órdenes y Clientes'
+  );
   assertIncludes(permissions, "facturacion: ['billing:view', 'billing:settings']", 'Permisos de /admin/facturacion no están definidos');
   assertIncludes(permissions, "path.startsWith('facturacion/')", 'Subrutas de facturación no heredan permisos');
 
