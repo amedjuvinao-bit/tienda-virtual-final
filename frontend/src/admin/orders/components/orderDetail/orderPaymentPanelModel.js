@@ -105,12 +105,8 @@ export function getPaymentDetails(order) {
       details.paidAt ||
       details.paymentDate ||
       transaction.finalized_at ||
-      transaction.created_at ||
-      dian.generatedAt ||
-      invoice?.generatedAt ||
-      invoice?.createdAt ||
+      order?.pos?.confirmedAt ||
       order?.paidAt ||
-      order?.updatedAt ||
       '',
     amount: firstValidValue(
       payment.amount,

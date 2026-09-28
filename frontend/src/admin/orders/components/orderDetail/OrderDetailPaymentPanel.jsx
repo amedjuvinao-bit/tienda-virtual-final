@@ -21,6 +21,7 @@ import {
   getPaymentBadgeVariant,
   getPaymentDetails,
 } from './orderPaymentPanelModel';
+import { getPaymentState } from './orderStoryStateModel';
 
 export default function OrderDetailPaymentPanel({
   order,
@@ -29,6 +30,7 @@ export default function OrderDetailPaymentPanel({
 }) {
   const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentInfo(order);
+  const paymentComplete = getPaymentState(order).complete;
   const details = getPaymentDetails(order);
   const storeCredit = order?.storeCredit || {};
   const hasStoreCredit = storeCredit.applied === true && Number(storeCredit.amount) > 0;
@@ -89,8 +91,8 @@ export default function OrderDetailPaymentPanel({
         />
 
         <MiniInfoCard
-          label={hasStoreCredit ? 'Total de la compra' : 'Valor pagado'}
-          value={toCOP(hasStoreCredit ? order?.total : details.amount)}
+          label={hasStoreCredit ? 'Total de la compra' : paymentComplete ? 'Valor pagado' : 'Total del pedido'}
+          value={toCOP(hasStoreCredit || !paymentComplete ? order?.total : details.amount)}
           icon={OrderDetailIcons.CheckCircle2}
           accent
         />
@@ -166,7 +168,7 @@ export default function OrderDetailPaymentPanel({
         <InfoLine label="Referencia:" value={details.reference} strong />
         <InfoLine label="Transacción:" value={details.transactionId} />
         <InfoLine label="Autorización:" value={details.authorization} />
-        <InfoLine label="Fecha de pago:" value={fmtDate(details.paidAt)} />
+        <InfoLine label="Fecha de pago:" value={paymentComplete ? fmtDate(details.paidAt) : '—'} />
       </div>
 
       <OrderManualPaymentEvidence order={order} />

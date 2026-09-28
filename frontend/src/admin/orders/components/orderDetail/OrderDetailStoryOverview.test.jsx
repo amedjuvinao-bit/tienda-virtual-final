@@ -110,6 +110,36 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.queryByText('Total pagado')).not.toBeInTheDocument();
   });
 
+  it('no presenta el importe ni la fecha de creación como pago recibido de un pedido manual pendiente', () => {
+    const order = {
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'pending',
+      updatedAt: BASE_ORDER.createdAt,
+      payment: { provider: 'manual', status: 'pending_manual', amount: BASE_ORDER.total },
+    };
+
+    render(<OrderDetailPaymentPanel order={order} />);
+    expect(screen.getByText('Total del pedido')).toBeInTheDocument();
+    expect(screen.getByText('Fecha de pago:').nextElementSibling).toHaveTextContent('—');
+    expect(screen.queryByText('Valor pagado')).not.toBeInTheDocument();
+  });
+
+  it('muestra valor y fecha pagados una vez confirmado el pago manual', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'paid',
+      payment: {
+        provider: 'manual', status: 'paid', amount: BASE_ORDER.total,
+        paidAt: '2026-08-14T15:00:00.000Z',
+      },
+    }} />);
+
+    expect(screen.getByText('Valor pagado')).toBeInTheDocument();
+    expect(screen.getByText('Fecha de pago:').nextElementSibling).not.toHaveTextContent('—');
+  });
+
   it('cierra la historia del reembolso cuando todas las etapas están conciliadas', () => {
     const order = {
       ...BASE_ORDER,
