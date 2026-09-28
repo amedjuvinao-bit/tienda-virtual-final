@@ -4,6 +4,7 @@ const {
   syncOrderInventoryAllocationsFromReservation,
 } = require('../orderInventoryAllocationService');
 const { releaseReservedItems } = require('./stockReservation');
+const { closeExpiredManualOrder } = require('./expireManualOrder');
 const { withTransaction } = require('./support');
 
 async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
@@ -39,13 +40,14 @@ async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
       await reservation.save({ session });
 
       if (options.syncOrderAllocations !== false) {
-        await syncOrderInventoryAllocationsFromReservation(
+        const order = await syncOrderInventoryAllocationsFromReservation(
           reservation,
           {
             session,
             orderId: reservation.order,
           }
         );
+        await closeExpiredManualOrder({ order, reservation, now, session });
       }
 
       await couponService.reconcileOrderCouponForStatus(

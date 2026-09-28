@@ -59,6 +59,7 @@ function createOrderSettlementFields() {
       ref: 'InventoryReservation',
       default: null,
     },
+    reservationExpiresAt: { type: Date, default: null },
     discountedAtCheckout: { type: Boolean, default: true },
     restockedOnFailure: { type: Boolean, default: false },
     restockedAt: { type: Date, default: null },

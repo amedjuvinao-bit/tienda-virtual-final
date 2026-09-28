@@ -1,5 +1,5 @@
-.manual-order-overlay { position: fixed; inset: 0; z-index: 130; background: rgba(10, 19, 36, .68); display: grid; place-items: center; padding: 16px; }
-.manual-order-dialog { width: min(960px, 100%); max-height: min(92vh, 940px); overflow: auto; background: var(--admin-card-bg, #fff); color: var(--admin-card-text, #142338); border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.28); }
+.manual-order-overlay { position: fixed; inset: 0; z-index: 130; background: color-mix(in srgb, var(--admin-page-bg, #f4f6fa) 36%, transparent); backdrop-filter: blur(10px); display: grid; place-items: center; padding: 16px; }
+.manual-order-dialog { width: min(960px, 100%); max-height: min(92vh, 940px); overflow: auto; background: var(--admin-modal-glass-bg, var(--admin-card-bg, #fff)); color: var(--admin-card-text, #142338); border: 1px solid var(--admin-card-border, #d1d9e5); border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.2); backdrop-filter: blur(24px); }
 .manual-order-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 24px 28px 18px; border-bottom: 1px solid rgba(120,140,160,.22); }
 .manual-order-header h2 { margin: 5px 0; font-size: 1.5rem; font-weight: 750; }
 .manual-order-header p, .manual-order-hint { color: var(--admin-muted-text, #64748b); font-size: .87rem; margin: 4px 0; }
@@ -9,7 +9,7 @@
 .manual-order-panel { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .manual-order-panel h3 { margin: 7px 0 0; font-size: 1rem; font-weight: 750; }
 .manual-order-panel label { display: flex; flex-direction: column; gap: 6px; font-size: .82rem; font-weight: 700; }
-.manual-order-panel input, .manual-order-panel select { width: 100%; min-height: 40px; border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px 10px; color: #17233a; background: white; }
+.manual-order-panel input, .manual-order-panel select { width: 100%; min-height: 40px; border: 1px solid var(--admin-card-border, #cbd5e1); border-radius: 9px; padding: 8px 10px; color: var(--admin-card-text, #17233a); background: var(--admin-card-bg, #fff); }
 .manual-order-products { display: flex; flex-direction: column; gap: 5px; overflow: auto; max-height: 260px; border: 1px solid rgba(120,140,160,.24); border-radius: 11px; padding: 6px; }
 .manual-order-products button { padding: 9px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; border-radius: 8px; }
 .manual-order-products button:hover { background: rgba(59,130,246,.1); }
@@ -22,6 +22,8 @@
 .manual-order-footer { display: flex; align-items: center; justify-content: end; gap: 10px; flex-wrap: wrap; padding: 18px 28px 24px; border-top: 1px solid rgba(120,140,160,.22); }
 .manual-order-pricing { margin-right: auto; display: flex; flex-direction: column; font-size: .82rem; }
 .manual-order-pricing strong { font-size: 1.1rem; }
+.manual-order-policy { flex-basis: 100%; margin: 0; color: var(--admin-card-text, #142338); font-size: .83rem; line-height: 1.4; }
+.manual-order-dialog :focus-visible { outline: 2px solid var(--admin-primary, #2563eb); outline-offset: 2px; }
 .manual-order-primary, .manual-order-secondary { padding: 10px 15px; border-radius: 10px; font-weight: 750; }
 .manual-order-primary { color: white; background: #2563eb; }
 .manual-order-primary:disabled { opacity: .55; cursor: wait; }

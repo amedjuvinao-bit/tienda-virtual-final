@@ -267,8 +267,8 @@ function startInventoryReservationExpirationJob() {
     inventoryReservationExpirationRunning = true;
     try {
       const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
-      if (result?.expired > 0) {
-        console.log(`Reservas expiradas automaticamente: ${result.expired}`);
+      if (result?.count > 0) {
+        console.log(`Reservas expiradas automaticamente: ${result.count}`);
       }
       if (typeof releaseExpiredStoreCreditReservations === 'function') {
         const storeCreditResult = await releaseExpiredStoreCreditReservations({

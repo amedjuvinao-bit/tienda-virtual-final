@@ -16,6 +16,7 @@ const allocation = require('../services/orderInventoryAllocationService');
 const branchId = new mongoose.Types.ObjectId();
 const productId = new mongoose.Types.ObjectId();
 const reservationId = new mongoose.Types.ObjectId();
+const reservationExpiry = new Date('2026-09-28T01:00:00.000Z');
 const transaction = { withTransaction: async (callback) => callback(), endSession: async () => {} };
 const original = [];
 function replace(target, key, value) {
@@ -50,7 +51,7 @@ async function main() {
       assert.deepEqual(options.branchPriorityIds.map(String), [String(branchId)]);
       assert.equal(options.expiresInMinutes, 20);
       operations.push('reserve');
-      return { _id: reservationId, items: [] };
+      return { _id: reservationId, expiresAt: reservationExpiry, items: [] };
     });
     replace(allocation, 'applyReservationToOrderDocument', () => {});
     replace(customerLink, 'resolveCustomerForOrder', async () => ({ skipped: true }));
@@ -98,6 +99,8 @@ async function main() {
     assert.equal(persisted.channel, 'manual');
     assert.equal(persisted.saleType, 'manual_order');
     assert.equal(persisted.payment.status, 'pending_manual');
+    assert.equal(persisted.inventoryControl.discountedAtCheckout, false);
+    assert.equal(persisted.inventoryControl.reservationExpiresAt?.getTime(), reservationExpiry.getTime());
     assert.equal(persisted.payment.amount, 24000);
     assert.equal(String(persisted.branch), String(branchId));
     assert.equal(String(persisted.inventoryControl.reservationId), String(reservationId));

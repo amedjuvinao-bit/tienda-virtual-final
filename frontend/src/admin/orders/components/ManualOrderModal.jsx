@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../../lib/api';
 import './manualOrderModal.css';
@@ -31,6 +31,38 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
   const [created, setCreated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const dialogRef = useRef(null);
+  const latestModalState = useRef({ loading, onClose });
+  latestModalState.current = { loading, onClose };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    dialog?.querySelector('[aria-label="Cerrar"]')?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !latestModalState.current.loading) {
+        event.preventDefault();
+        latestModalState.current.onClose();
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]')]
+        .filter((element) => element.getClientRects().length > 0);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -114,7 +146,7 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
     setLoading(true);
     try {
       const { data } = await api.post('/api/orders/admin/manual/quote', payload());
-      setPreview(data.pricing);
+      setPreview({ ...data.pricing, reservationRequired: data.reservationRequired === true });
     } catch (reason) {
       setError(errorMessage(reason, 'No se pudo calcular el pedido.'));
     } finally { setLoading(false); }
@@ -138,12 +170,12 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
     <div className="manual-order-overlay" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !loading) onClose();
     }}>
-      <section className="manual-order-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-order-title">
+      <section ref={dialogRef} className="manual-order-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-order-title">
         <header className="manual-order-header">
           <div>
-            <span className="manual-order-eyebrow">Órdenes · Gestión de sedes</span>
-            <h2 id="manual-order-title">{created ? 'Pedido creado' : 'Nuevo pedido manual'}</h2>
-            <p>{created ? 'Ya está guardado en el historial.' : 'Selecciona sede, productos y datos del cliente.'}</p>
+            <span className="manual-order-eyebrow">Órdenes · Encargos</span>
+            <h2 id="manual-order-title">{created ? 'Pedido creado' : 'Pedido pendiente de pago'}</h2>
+            <p>{created ? 'El pedido quedó guardado en Órdenes.' : 'Registra un encargo recibido por teléfono o mensaje. El cobro se confirma después en el detalle.'}</p>
           </div>
           <button type="button" className="manual-order-close" onClick={onClose} disabled={loading} aria-label="Cerrar">×</button>
         </header>
@@ -152,7 +184,7 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
           <div className="manual-order-success" role="status">
             <strong>Pedido #{created.orderNumber}</strong>
             <p>Total: {money(created.total)} · Pago pendiente de confirmación.</p>
-            {created.reservationExpiresAt && <p>El inventario se reserva durante 20 minutos. Confirma el pago desde el detalle antes de que venza.</p>}
+            {created.reservationExpiresAt && <p>Reserva de inventario hasta las {new Date(created.reservationExpiresAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}. Si no se confirma el pago antes, el pedido vence y el inventario se libera.</p>}
             <button type="button" className="manual-order-primary" onClick={() => {
               onClose();
               window.location.assign(`/admin/ordenes?openOrder=${created._id}`);
@@ -169,7 +201,7 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
                     {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name} · {branch.code}</option>)}
                   </select>
                 </label>
-                {!branches.length && <p className="manual-order-hint">No hay sedes activas que permitan pedidos manuales para tu usuario.</p>}
+                {!branches.length && <p className="manual-order-hint">No hay sedes activas habilitadas para pedidos pendientes de pago.</p>}
                 <label>Buscar producto
                   <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, SKU o código de barras" />
                 </label>
@@ -214,13 +246,16 @@ export default function ManualOrderModal({ open, onClose, onCreated }) {
               </div>
             </fieldset>
             <footer className="manual-order-footer">
+              <p className="manual-order-policy">{preview?.reservationRequired
+                ? 'Este pedido reservará inventario durante 20 minutos. Si no se confirma el pago, vencerá y liberará los productos.'
+                : 'Los productos que manejan inventario se reservan durante 20 minutos al crear el pedido.'} Confirma el pago solo cuando compruebes que lo recibiste.</p>
               {preview && <div className="manual-order-pricing">
                 <span>Subtotal {money(preview.subtotal)} · IVA {money(preview.tax?.amount)} · Envío {money(preview.shipping)}</span>
                 <strong>Total {money(preview.total)}</strong>
               </div>}
               <button type="button" className="manual-order-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
               {preview
-                ? <button type="button" className="manual-order-primary" onClick={handleCreate} disabled={loading}>{loading ? 'Guardando…' : 'Crear pedido con pago pendiente'}</button>
+                ? <button type="button" className="manual-order-primary" onClick={handleCreate} disabled={loading}>{loading ? 'Guardando…' : 'Crear pedido pendiente de pago'}</button>
                 : <button type="submit" className="manual-order-primary" disabled={loading || !branches.length}>{loading ? 'Calculando…' : 'Revisar total'}</button>}
             </footer>
           </form>

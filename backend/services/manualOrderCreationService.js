@@ -127,12 +127,16 @@ async function prepareQuote(req, body, session = null) {
     channel: 'manual',
   }, { session });
   await assertVariantSelection(quote.pricing.items, session);
+  const reservable = await expandReservableItems(quote.pricing.items, { session });
+  if (reservable.length && branch.settings?.allowInventoryMovements !== true) {
+    throw fail('Esta sede no permite reservar inventario para el pedido.', 'BRANCH_INVENTORY_DISABLED', 409);
+  }
   if (
     orderNeedsElectronicDelivery(quote.pricing.items) &&
     !isValidDeliveryEmail(getOrderCustomerEmail(cleaned))
   ) throw fail('Los productos digitales y servicios requieren un correo válido.', 'FULFILLMENT_EMAIL_REQUIRED');
   if (quote.pricing.total <= 0) throw fail('El total de la orden debe ser mayor a cero.', 'INVALID_TOTAL');
-  return { cleaned, branch, pricing: quote.pricing };
+  return { cleaned, branch, pricing: quote.pricing, reservationRequired: reservable.length > 0 };
 }
 
 async function createManualOrder(req, body) {
@@ -170,11 +174,7 @@ async function createManualOrder(req, body) {
   try {
     let created;
     await session.withTransaction(async () => {
-      const { cleaned, branch, pricing } = await prepareQuote(req, body, session);
-      const reservable = await expandReservableItems(pricing.items, { session });
-      if (reservable.length && branch.settings?.allowInventoryMovements !== true) {
-        throw fail('Esta sede no permite reservar inventario para la orden.', 'BRANCH_INVENTORY_DISABLED', 409);
-      }
+      const { cleaned, branch, pricing, reservationRequired } = await prepareQuote(req, body, session);
       const record = await beginIdempotencyRecord({
         key: idempotencyKey, requestHash, session, endpoint: MANUAL_ORDER_ENDPOINT,
       });
@@ -207,7 +207,11 @@ async function createManualOrder(req, body) {
         },
         createdByAdmin: req.adminUserId || null,
         createdByAdminSnapshot: buildAdminSnapshot(req),
-        inventoryControl: { reservationRequired: reservable.length > 0 },
+        inventoryControl: {
+          reservationRequired,
+          discountedAtCheckout: false,
+          restockedOnFailure: false,
+        },
       };
       const customerResolution = await resolveCustomerForOrder(base, { session, source: 'manual' });
       const [order] = await Order.create([
@@ -216,7 +220,7 @@ async function createManualOrder(req, body) {
       await applyCustomerStatsForOrder(order, { session });
 
       let reservation = null;
-      if (reservable.length) {
+      if (reservationRequired) {
         reservation = await createInventoryReservation({
           sessionId,
           order: order._id,
@@ -231,6 +235,7 @@ async function createManualOrder(req, body) {
         }, { session });
         if (!reservation) throw fail('No se pudo reservar el inventario.', 'RESERVATION_FAILED', 409);
         order.inventoryControl.reservationId = reservation._id;
+        order.inventoryControl.reservationExpiresAt = reservation.expiresAt;
         applyReservationToOrderDocument(order, reservation);
         await order.save({ session });
       }

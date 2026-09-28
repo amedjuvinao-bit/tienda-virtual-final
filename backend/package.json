@@ -77,6 +77,7 @@
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",
     "test:manual-order-branch-policy": "node scripts/testManualOrderBranchPolicy.js",
     "test:manual-order-transaction": "node scripts/testManualOrderCreationTransaction.js",
+    "test:manual-order-expiration": "node scripts/testManualOrderExpirationLifecycle.js",
     "test:order-cart-version": "node scripts/testOrderCartVersionContract.js",
     "test:order-cart-version-integration": "node scripts/testOrderCartVersionConcurrencyIntegration.js",
     "test:order-branch-authority": "node scripts/testOrderCreationBranchAuthority.js",

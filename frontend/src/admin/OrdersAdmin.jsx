@@ -201,7 +201,7 @@ export default function OrdersAdmin() {
         {capabilities.canCreate && <div className="flex justify-end pb-3">
           <button type="button" onClick={manualOrderDialog.show}
             className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
-            + Nuevo pedido manual
+            + Pedido pendiente de pago
           </button>
         </div>}
         <OrdersActiveFilters

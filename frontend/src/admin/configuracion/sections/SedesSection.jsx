@@ -1296,7 +1296,7 @@ export default function SedesSection() {
                             )
                           }
                         />
-                        Permite pedidos manuales
+                        Permite pedidos con pago pendiente
                       </label>
 
                       <label

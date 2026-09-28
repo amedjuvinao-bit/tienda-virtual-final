@@ -67,8 +67,8 @@ async function listManualOrderProducts(req, res) {
 
 async function previewManualOrder(req, res) {
   try {
-    const { pricing } = await prepareQuote(req, req.body || {});
-    return res.json({ ok: true, pricing });
+    const { pricing, reservationRequired } = await prepareQuote(req, req.body || {});
+    return res.json({ ok: true, pricing, reservationRequired });
   } catch (error) { return errorResponse(res, error); }
 }
 
@@ -83,9 +83,7 @@ async function postManualOrder(req, res) {
         total: order.total,
         branch: order.branch,
         paymentStatus: order.payment?.status,
-        reservationExpiresAt: order.inventoryControl?.reservationId
-          ? new Date(order.createdAt.getTime() + 20 * 60 * 1000)
-          : null,
+        reservationExpiresAt: order.inventoryControl?.reservationExpiresAt || null,
       },
     });
   } catch (error) { return errorResponse(res, error); }

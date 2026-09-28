@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
   canConfirmManualPaymentForOrder,
+  isManualOrderReservationExpired,
   MANUAL_PAYMENT_METHODS,
 } from './manualPaymentConfirmationModel';
 
@@ -34,6 +35,7 @@ export default function OrderManualPaymentConfirmationCard({
   const prefix = useId();
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState({});
+  const [now, setNow] = useState(Date.now);
   const { eligible, form, setField, submit, submitting, validation } = controller || {};
 
   useEffect(() => {
@@ -41,8 +43,19 @@ export default function OrderManualPaymentConfirmationCard({
     setTouched({});
   }, [order?._id]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 10000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (isManualOrderReservationExpired(order, now)) {
+    return <p role="status" style={{ marginTop: 16, color: ORDER_DETAIL_THEME.danger }}>
+      La reserva venció. Ya no se puede confirmar este pedido; revisa su estado actualizado antes de recibir un pago.
+    </p>;
+  }
+
   if (
-    !canConfirmManualPaymentForOrder(order, canConfirmManualPayment) ||
+    !canConfirmManualPaymentForOrder(order, canConfirmManualPayment, now) ||
     !eligible ||
     !form
   ) return null;
@@ -77,6 +90,9 @@ export default function OrderManualPaymentConfirmationCard({
       <p style={{ margin: '4px 0 14px', color: ORDER_DETAIL_THEME.mutedText, fontSize: 11 }}>
         Solo para pagos verificados fuera de una pasarela. La evidencia quedará auditada.
       </p>
+      {order?.source === 'manual' && order?.inventoryControl?.reservationExpiresAt && <p style={{ margin: '0 0 14px', color: ORDER_DETAIL_THEME.cardText, fontSize: 12 }}>
+        Reserva vigente hasta las {new Date(order.inventoryControl.reservationExpiresAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}.
+      </p>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
         <label htmlFor={`${prefix}-method`} style={{ fontSize: 11, fontWeight: 850 }}>

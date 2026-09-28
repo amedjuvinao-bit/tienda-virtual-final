@@ -403,6 +403,27 @@ async function main() {
   assert.strictEqual(inventoryFailure.state.postCommitCalls, 0);
   ok('un fallo de inventario revierte evidencia, pago y eventos');
 
+  const legacyOrder = makeOrder(IDS.other);
+  legacyOrder.source = 'manual';
+  legacyOrder.inventoryControl.discountedAtCheckout = true;
+  const legacyInventory = createHarness([legacyOrder], {
+    inventoryError: Object.assign(new Error('La reserva venció.'), {
+      code: 'RESERVATION_EXPIRED',
+    }),
+  });
+  await rejectsCode(
+    legacyInventory.service.confirmManualPayment({
+      orderId: IDS.other,
+      payment: { ...validPayment, reference: 'TRX-LEGACY-EXPIRED' },
+      actor,
+    }),
+    'RESERVATION_EXPIRED'
+  );
+  assert.strictEqual(legacyInventory.state.inventoryCalls, 1);
+  assert.strictEqual(legacyInventory.state.evidence.length, 0);
+  assert.strictEqual(legacyInventory.state.orders.get(IDS.other).payment.status, 'pending_manual');
+  ok('pedidos manuales antiguos no omiten la comprobación de reserva vencida');
+
   const postCommitFailure = createHarness(
     [makeOrder(IDS.other)],
     {

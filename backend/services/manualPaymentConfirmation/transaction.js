@@ -77,6 +77,7 @@ async function confirmOrderInventory(
   }
 
   if (
+    order.source !== 'manual' &&
     order.inventoryControl?.discountedAtCheckout === true &&
     order.inventoryControl?.restockedOnFailure !== true
   ) {

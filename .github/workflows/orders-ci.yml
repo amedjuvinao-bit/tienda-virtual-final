@@ -74,6 +74,7 @@ jobs:
           npm --prefix backend run test:order-creation-composition
           npm --prefix backend run test:manual-order-branch-policy
           npm --prefix backend run test:manual-order-transaction
+          npm --prefix backend run test:manual-order-expiration
           npm --prefix backend run test:order-cart-version
           npm --prefix backend run test:order-branch-authority
           npm --prefix backend run test:order-creation-postcommit
@@ -302,6 +303,7 @@ jobs:
           npm --prefix frontend run test:orders-detail-story
           npm --prefix frontend run test:orders-keyboard
           npm --prefix frontend run test:orders-manual-payment
+          npm --prefix frontend run test:orders-manual-order-form
 
       - name: Validar logística, envíos y posventa
         run: |
