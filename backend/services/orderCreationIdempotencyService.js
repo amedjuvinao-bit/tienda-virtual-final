@@ -61,11 +61,11 @@ async function syncExistingOrderForRetry(
 
 async function inspectExistingIdempotency(
   { key, requestHash },
-  { IdempotencyModel = IdempotencyKey } = {}
+  { IdempotencyModel = IdempotencyKey, endpoint = ORDER_CREATION_ENDPOINT } = {}
 ) {
   const record = await IdempotencyModel.findOne({
     key,
-    endpoint: ORDER_CREATION_ENDPOINT,
+    endpoint,
   });
   if (!record) return { action: 'continue' };
 
@@ -107,13 +107,13 @@ async function inspectExistingIdempotency(
           'La clave de idempotencia fallida pertenece a otro payload.',
       };
     }
-    await IdempotencyModel.deleteOne({ _id: record._id });
+    await IdempotencyModel.deleteOne({ _id: record._id, endpoint });
   }
 
   return { action: 'continue' };
 }
 
-async function beginIdempotencyRecord({ key, requestHash, session }) {
+async function beginIdempotencyRecord({ key, requestHash, session, endpoint = ORDER_CREATION_ENDPOINT }) {
   if (!key) return null;
 
   try {
@@ -121,7 +121,7 @@ async function beginIdempotencyRecord({ key, requestHash, session }) {
       [
         {
           key,
-          endpoint: ORDER_CREATION_ENDPOINT,
+          endpoint,
           requestHash,
           status: 'processing',
           createdAt: new Date(),

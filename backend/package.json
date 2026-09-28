@@ -75,6 +75,8 @@
     "test:inventory-final-closure": "node scripts/testInventoryFinalClosure.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",
+    "test:manual-order-branch-policy": "node scripts/testManualOrderBranchPolicy.js",
+    "test:manual-order-transaction": "node scripts/testManualOrderCreationTransaction.js",
     "test:order-cart-version": "node scripts/testOrderCartVersionContract.js",
     "test:order-cart-version-integration": "node scripts/testOrderCartVersionConcurrencyIntegration.js",
     "test:order-branch-authority": "node scripts/testOrderCreationBranchAuthority.js",

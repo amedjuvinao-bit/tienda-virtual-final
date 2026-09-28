@@ -1,5 +1,5 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React, { Suspense, lazy, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,7 @@ import {
 import './orders/ordersAdmin.css';
 
 const OrderDetailModal = lazy(() => import('./orders/components/OrderDetailModal'));
+const ManualOrderModal = lazy(() => import('./orders/components/ManualOrderModal'));
 
 export default function OrdersAdmin() {
   const [searchParams] = useSearchParams();
@@ -39,6 +40,7 @@ export default function OrdersAdmin() {
     : '';
   const linkedOrderNumber = String(searchParams.get('q') || '').trim();
   const openedLinkedOrderRef = useRef('');
+  const [showManualOrder, setShowManualOrder] = useState(false);
   const { isAuthenticated, adminToken, authLoading } = useAuth();
   const capabilities = useOrdersAdminCapabilities();
   const hasSession = !authLoading && isAuthenticated && Boolean(adminToken);
@@ -195,6 +197,12 @@ export default function OrdersAdmin() {
       </OrdersFilters>
 
       <main className="orders-table-workspace">
+        {capabilities.canCreate && <div className="flex justify-end pb-3">
+          <button type="button" onClick={() => setShowManualOrder(true)}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+            + Nuevo pedido manual
+          </button>
+        </div>}
         <OrdersActiveFilters
           quickView={filters.quickViews.quickView}
           onApplyQuickView={filters.quickViews.applyQuickView}
@@ -318,6 +326,13 @@ export default function OrdersAdmin() {
           />
         </Suspense>
       )}
+      {showManualOrder && <Suspense fallback={null}>
+        <ManualOrderModal open onClose={() => setShowManualOrder(false)}
+          onCreated={(order) => {
+            filters.setTypingQuery(order.orderNumber);
+            filters.setPage(1);
+          }} />
+      </Suspense>}
     </div>
   );
 }
