@@ -18,6 +18,7 @@
     "test:admin-role-permissions": "node scripts/testAdminRolePermissionPropagation.js",
     "test:admin-role-default-mongo": "node scripts/testAdminRoleDefaultSelectionMongo.js",
     "test:admin-role-assignment-mongo": "node scripts/testAdminRoleAssignmentMongo.js",
+    "test:admin-access-readiness": "node scripts/testAdminAccessReadiness.js",
     "migrate:admin-role-default-index": "node scripts/migrateAdminRoleDefaultIndex.js",
     "test:admin-branches-stage1": "node scripts/testAdminBranchesPermissionsStage1.js",
     "test:admin-branches-inventory-policy": "node scripts/testBranchInventoryOperationPolicy.js",
