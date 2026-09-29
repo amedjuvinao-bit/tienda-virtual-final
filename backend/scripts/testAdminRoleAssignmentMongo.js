@@ -7,6 +7,7 @@ const AdminUser = require('../models/AdminUser');
 const Branch = require('../models/Branch');
 const roleRouter = require('../routes/adminRoles');
 const userRouter = require('../routes/adminUsers');
+const branchRouter = require('../routes/adminBranches');
 const posRouter = require('../routes/adminPos');
 const requirePermission = require('../middleware/requirePermission');
 const { getAdminUserPermissionView } = require('../security/adminUserPermissionView');
@@ -59,6 +60,9 @@ async function main() {
     const branch = await Branch.create({
       name: 'Sede de prueba', code: 'ROLE-QA', status: 'active', active: true, isMain: true,
     });
+    const secondary = await Branch.create({
+      name: 'Sede secundaria', code: 'ROLE-QA-SECONDARY', status: 'active', active: true,
+    });
     const owner = { adminRole: 'owner', adminUserId: String(new mongoose.Types.ObjectId()) };
     const createdRole = await invoke(handler(roleRouter, 'post', '/'), {
       ...owner, body: { name: 'Operador de prueba', code: 'operator-qa',
@@ -70,7 +74,7 @@ async function main() {
     const createdUser = await invoke(handler(userRouter, 'post', '/'), {
       ...owner, body: { username: 'operatorqa', password: 'RoleQa!2026#Secret',
         firstName: 'Operador', lastName: 'Prueba', roleRef: roleId,
-        branches: [{ branch: String(branch._id), canSell: true }], mustChangePassword: false },
+        branches: [{ branch: String(secondary._id), canSell: true }], mustChangePassword: false },
     });
     assert.equal(createdUser.statusCode, 201, JSON.stringify(createdUser.body));
     const userId = createdUser.body.data._id;
@@ -104,7 +108,48 @@ async function main() {
     await checkAssignedUser(userId, {
       'orders:view': true, 'pos:view': false, 'pos:discount': false,
     });
-    console.log('MongoDB: asignación, cambios, revocación total y recuperación en Órdenes/POS verificados.');
+
+    const roleParams = { id: String(roleId) };
+    const branchParams = { id: String(secondary._id) };
+    const disableBranch = () => invoke(handler(branchRouter, 'patch', '/:id/status'), {
+      ...owner, params: branchParams, body: { status: 'inactive', active: false },
+    });
+    const listRoles = () => invoke(handler(roleRouter, 'get', '/'), { ...owner, query: {} });
+    const assignedRole = (response) => response.body.data.find((role) => String(role._id) === String(roleId));
+
+    assert.equal(assignedRole(await listRoles()).usersCount, 1);
+    let blocked = await disableBranch();
+    assert.equal(blocked.statusCode, 400, JSON.stringify(blocked.body));
+    assert.equal(blocked.body.usersCount, 1);
+    blocked = await invoke(handler(roleRouter, 'delete', '/:id'), { ...owner, params: roleParams });
+    assert.equal(blocked.statusCode, 400, JSON.stringify(blocked.body));
+    assert.equal(blocked.body.usersCount, 1);
+
+    const beforeDelete = await AdminUser.findById(userId).select('+tokenVersion');
+    const deleted = await invoke(handler(userRouter, 'delete', '/:id'), {
+      ...owner, params: { id: String(userId) },
+    });
+    assert.equal(deleted.statusCode, 200, JSON.stringify(deleted.body));
+    const afterDelete = await AdminUser.findById(userId).select('+tokenVersion');
+    assert(afterDelete.deletedAt instanceof Date);
+    assert.equal(afterDelete.active, false);
+    assert.equal(afterDelete.status, 'inactive');
+    assert.equal(afterDelete.tokenVersion, beforeDelete.tokenVersion + 1,
+      'La eliminación debe invalidar las sesiones activas.');
+
+    const users = await invoke(handler(userRouter, 'get', '/'), { ...owner, query: {} });
+    assert.equal(users.body.total, 0, 'El usuario eliminado no debe aparecer en Usuarios.');
+    assert.equal(assignedRole(await listRoles()).usersCount, 0,
+      'El usuario eliminado no debe contar como asignado al perfil.');
+    const disabled = await disableBranch();
+    assert.equal(disabled.statusCode, 200, JSON.stringify(disabled.body));
+    assert.equal((await Branch.findById(secondary._id)).active, false);
+    const deletedRole = await invoke(handler(roleRouter, 'delete', '/:id'), {
+      ...owner, params: roleParams,
+    });
+    assert.equal(deletedRole.statusCode, 200, JSON.stringify(deletedRole.body));
+    assert.equal((await AdminRole.findById(roleId)).active, false);
+    console.log('MongoDB: permisos, eliminación de usuario, sesiones, conteo de perfil y sede verificados.');
   } finally {
     await mongoose.connection.dropDatabase();
     await mongoose.disconnect();
