@@ -93,14 +93,14 @@ export function isPrivilegedAdmin(user) {
 export function getAdminUserPermissions(user) {
   const permissions = new Set();
 
+  // The verified session response is authoritative, including an empty list.
+  // Older snapshots stored on the user must not restore revoked role permissions.
   if (Array.isArray(user?.permissions)) {
     user.permissions.forEach((permission) => {
       const normalizedPermission = normalizePermission(permission);
-
-      if (normalizedPermission) {
-        permissions.add(normalizedPermission);
-      }
+      if (normalizedPermission) permissions.add(normalizedPermission);
     });
+    return permissions;
   }
 
   if (Array.isArray(user?.roleRef?.permissions)) {

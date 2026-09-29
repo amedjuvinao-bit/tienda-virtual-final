@@ -15,4 +15,16 @@ describe('acceso inicial de perfiles administrativos', () => {
     expect(getAdminLandingPath({ role: 'owner' })).toBe('/admin/dashboard');
     expect(getAdminLandingPath({ role: 'prueba', permissions: [] })).toBe('/admin/configuracion/seguridad');
   });
+
+  it('respeta permisos revocados aunque queden copias antiguas del perfil', () => {
+    const user = {
+      role: 'manager',
+      permissions: [],
+      roleRef: { permissions: ['orders:view'] },
+      profile: { permissions: ['orders:view'] },
+    };
+
+    expect(canAccessAdminPath(user, '/admin/ordenes')).toBe(false);
+    expect(getAdminLandingPath(user)).toBe('/admin/configuracion/seguridad');
+  });
 });

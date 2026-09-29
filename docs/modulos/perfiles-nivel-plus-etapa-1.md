@@ -32,3 +32,9 @@ La selección de otro perfil predeterminado retira la selección anterior y guar
 Antes de habilitar el índice en una base existente, ejecutar `npm run validate:role-default` desde la raíz. Si hay exactamente un perfil predeterminado activo y falta el índice, ejecutar `npm --prefix backend run migrate:admin-role-default-index -- --apply`. Si aparecen cero o varios, escoger el ID de un perfil activo y ejecutar `npm --prefix backend run migrate:admin-role-default-index -- --apply --default=ID`; la corrección de la selección y la creación del índice se hacen en ese orden. En producción el comando exige además `--confirm-production`. Repetir `npm run validate:role-default` hasta obtener `ready: true`. El comando `--verify` solo consulta, no cambia datos.
 
 La prueba de MongoDB transaccional `npm --prefix backend run test:admin-role-default-mongo` usa exclusivamente la base aislada `orders_ci_role_default` y se ejecuta en CI. La revisión funcional real de Perfiles y su cierre Nivel Plus continúan pendientes. El PR permanece en borrador y no se integra a `main` hasta cerrar Usuarios, Perfiles y Sedes.
+
+## Efecto de permisos en usuarios asignados
+
+Las respuestas de inicio y verificación de sesión toman los permisos del perfil activo asociado. Una lista vacía significa revocación total y no recupera copias antiguas guardadas en el usuario. La interfaz respeta esa lista, incluso si el perfil y el usuario conservan datos anteriores; al volver a la pestaña se actualiza la sesión. POS consulta la misma autorización vigente para mostrar capacidades y aprobar descuentos.
+
+`npm --prefix backend run test:admin-role-permissions` comprueba concesión, reducción, revocación total, perfil inactivo y la respuesta POS. `npm --prefix frontend run test:admin-roles-stage1` comprueba el acceso de la interfaz y su actualización al volver a la pestaña. La comprobación del recorrido en el panel con usuarios asignados sigue siendo parte del cierre integral.

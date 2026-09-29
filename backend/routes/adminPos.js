@@ -44,10 +44,6 @@ function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
-function normalizePermission(value) {
-  return cleanText(value).toLowerCase().replace(/\s+/g, ':');
-}
-
 function escapeRegex(value) {
   return cleanText(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -58,45 +54,11 @@ function toPositiveInt(value, fallback = 30, max = 60) {
   return Math.min(Math.floor(number), max);
 }
 
-function getEffectivePermissions(req) {
-  const permissions = new Set();
-  const sources = [
-    req.adminEffectivePermissions,
-    req.adminPermissions,
-    req.adminRolePermissions,
-    req.adminProfile?.permissions,
-  ];
-
-  sources.forEach((items) => {
-    if (!Array.isArray(items)) return;
-    items.forEach((item) => {
-      const permission = normalizePermission(item);
-      if (permission) permissions.add(permission);
-    });
-  });
-
-  return permissions;
+async function hasPermission(req, permission) {
+  return requirePermission.hasEffectivePermission(req, permission, { allowLegacyAdmin: true });
 }
 
-function hasPermission(req, permission) {
-  const role = cleanText(req.adminRole || req.adminProfile?.adminRole).toLowerCase();
-
-  if (req.adminAuthType === 'legacy') return true;
-  if (role === 'owner' || role === 'admin') return true;
-
-  const cleanPermission = normalizePermission(permission);
-  const [moduleName] = cleanPermission.split(':');
-  const permissions = getEffectivePermissions(req);
-
-  return (
-    permissions.has(cleanPermission) ||
-    permissions.has('*') ||
-    permissions.has('*:*') ||
-    Boolean(moduleName && permissions.has(`${moduleName}:*`))
-  );
-}
-
-function buildAdminContext(req) {
+async function buildAdminContext(req) {
   return {
     _id: req.adminUserId || req.adminProfile?.id || null,
     id: req.adminUserId || req.adminProfile?.id || null,
@@ -108,8 +70,8 @@ function buildAdminContext(req) {
       '',
     role: req.adminProfile?.role || 'admin',
     adminRole: req.adminRole || req.adminProfile?.adminRole || '',
-    canApplyPosDiscount: hasPermission(req, 'pos:discount'),
-    canApprovePosDiscount: hasPermission(req, 'pos:discount:approve'),
+    canApplyPosDiscount: await hasPermission(req, 'pos:discount'),
+    canApprovePosDiscount: await hasPermission(req, 'pos:discount:approve'),
   };
 }
 
@@ -405,14 +367,14 @@ router.get('/bootstrap', requirePermission('pos:view'), async (req, res) => {
                   : 'Otro',
       })),
       permissions: {
-        canView: hasPermission(req, 'pos:view'),
-        canSell: hasPermission(req, 'pos:sell'),
-        canDiscount: hasPermission(req, 'pos:discount'),
-        canApproveDiscount: hasPermission(req, 'pos:discount:approve'),
-        canReceipt: hasPermission(req, 'pos:receipt'),
-        canManageOrders: hasPermission(req, 'orders:view'),
-        canUpdateOrderStatus: hasPermission(req, 'orders:status'),
-        canRefundOrders: hasPermission(req, 'orders:refund'),
+        canView: await hasPermission(req, 'pos:view'),
+        canSell: await hasPermission(req, 'pos:sell'),
+        canDiscount: await hasPermission(req, 'pos:discount'),
+        canApproveDiscount: await hasPermission(req, 'pos:discount:approve'),
+        canReceipt: await hasPermission(req, 'pos:receipt'),
+        canManageOrders: await hasPermission(req, 'orders:view'),
+        canUpdateOrderStatus: await hasPermission(req, 'orders:status'),
+        canRefundOrders: await hasPermission(req, 'orders:refund'),
         canSuperviseCash: canSuperviseCashSession(req),
       },
       billing,
@@ -450,7 +412,7 @@ router.post('/held-sales', requirePermission('pos:sell'), async (req, res) => {
     const branchId = cleanText(req.body?.branchId || '');
     assertPosBranchAccess(req, branchId, { requireSell: true });
     const heldSale = await createHeldSale(req.body || {}, {
-      admin: buildAdminContext(req),
+      admin: await buildAdminContext(req),
     });
 
     return res.status(201).json({ ok: true, heldSale });
@@ -604,7 +566,7 @@ router.post('/sales/preview', requirePermission('pos:view'), async (req, res) =>
     assertPosBranchAccess(req, preview.branch?._id);
     validateDiscountAuthorization({
       normalizedPayload: preview,
-      admin: buildAdminContext(req),
+      admin: await buildAdminContext(req),
     });
 
     return res.json({
@@ -618,7 +580,7 @@ router.post('/sales/preview', requirePermission('pos:view'), async (req, res) =>
 
 router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
   try {
-    const admin = buildAdminContext(req);
+    const admin = await buildAdminContext(req);
     const idempotency = buildPosSaleIdempotency({
       key: req.headers['idempotency-key'],
       payload: req.body || {},

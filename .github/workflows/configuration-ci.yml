@@ -69,6 +69,7 @@ jobs:
           npm --prefix backend run test:admin-users-owner-guard
           npm --prefix backend run test:admin-users-activity
           npm --prefix backend run test:admin-roles-stage1
+          npm --prefix backend run test:admin-role-permissions
           npm --prefix backend run test:admin-branches-inventory-policy
           npm --prefix backend run test:admin-branches-operation-protection
           npm --prefix backend run test:admin-branches-selection
@@ -83,6 +84,7 @@ jobs:
           npm --prefix frontend run test:configuration-level-plus-stage5
           npm --prefix frontend run test:admin-users-stage1
           npm --prefix frontend run test:admin-users-stage2
+          npm --prefix frontend run test:admin-roles-stage1
           npm --prefix frontend run test:admin-branches-inventory-policy
 
       - name: Compilar frontend
