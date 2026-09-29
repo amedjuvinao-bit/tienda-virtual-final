@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AdminUsersPage from './AdminUsersPage';
-import { buildFormFromUser, buildUserEditPayload, getNewBranchAssignment } from './adminUsersHelpers';
+import { buildFormFromUser, buildUserEditPayload, getBranchName, getNewBranchAssignment } from './adminUsersHelpers';
 import { getAdminUserActivity, getAdminUsers, getAdminUsersMeta, updateAdminUser } from '../api/adminUsersApi';
 
 vi.mock('../../context/AuthContext', () => ({
@@ -101,6 +101,15 @@ it('al cambiar la sede principal conserva permisos individuales de ambas sedes',
         { branch: 'branch-b', isDefault: true, canSell: false, canInvoice: true },
       ],
     });
+});
+
+it('muestra el nombre vigente de una sede renombrada sin perder su asignación', () => {
+  const assigned = { branch: 'branch-b', branchName: 'Nombre anterior', branchCode: 'N-OLD' };
+  expect(getBranchName(assigned, [{ _id: 'branch-b', name: 'Sede Norte actualizada', code: 'N' }]))
+    .toBe('Sede Norte actualizada');
+  expect(getBranchName(assigned, [])).toBe('Nombre anterior');
+  expect(getBranchName({ ...assigned, branch: { _id: 'branch-b', name: 'Nombre desde servidor' } }, branches))
+    .toBe('Nombre desde servidor');
 });
 
 it('al asignar sede con alcance limitado no concede capacidades ajenas', () => {

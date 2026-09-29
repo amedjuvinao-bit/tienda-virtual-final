@@ -203,6 +203,11 @@ jobs:
           BRANCH_PROTECTION_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_branch_protection?replicaSet=rs0
         run: npm --prefix backend run test:admin-branches-operation-protection-mongo
 
+      - name: Validar sedes con usuarios, órdenes, inventario, caja y POS
+        env:
+          BRANCH_USERS_OPERATIONS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_branch_users_operations?replicaSet=rs0
+        run: npm --prefix backend run test:admin-branches-users-operations-mongo
+
       - name: Validar selección transaccional del perfil predeterminado
         env:
           ADMIN_ROLE_DEFAULT_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_role_default?replicaSet=rs0

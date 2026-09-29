@@ -65,13 +65,15 @@ export function getBranchName(item, branches = []) {
       ? branchValue._id
       : branchValue;
 
-  const found = branches.find((branch) => branch._id === branchId);
+  const found = branches.find((branch) => String(branch._id) === String(branchId));
 
   return (
+    branchValue?.name ||
+    found?.name ||
+    branchValue?.code ||
+    found?.code ||
     item?.branchName ||
     item?.branchCode ||
-    found?.name ||
-    found?.code ||
     'Sede'
   );
 }

@@ -23,6 +23,7 @@
     "test:admin-branches-inventory-policy": "node scripts/testBranchInventoryOperationPolicy.js",
     "test:admin-branches-operation-protection": "node scripts/testBranchOperationProtectionPolicy.js",
     "test:admin-branches-operation-protection-mongo": "node scripts/testBranchOperationProtectionMongo.js",
+    "test:admin-branches-users-operations-mongo": "node scripts/testBranchUsersOperationsMongo.js",
     "test:admin-branches-selection": "node scripts/testBranchSelectionConsistency.js",
     "migrate:branch-selection-indexes": "node scripts/migrateBranchSelectionIndexes.js",
     "test:admin-2fa-security": "node scripts/testAdminTwoFactorSecurity.js",
