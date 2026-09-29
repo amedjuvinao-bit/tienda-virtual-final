@@ -1836,6 +1836,7 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     method: 'GET',
     path: '/api/admin/audit-logs/export',
     permission: 'logs:export',
+    additionalPermissions: ['logs:view'],
     description: 'Exportar logs de auditoría.',
     audit: true,
   },

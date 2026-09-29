@@ -218,6 +218,11 @@ jobs:
           ADMIN_ROLE_ASSIGNMENT_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_role_assignment?replicaSet=rs0
         run: npm --prefix backend run test:admin-role-assignment-mongo
 
+      - name: Validar Logs con MongoDB, filtros y exportación
+        env:
+          ADMIN_AUDIT_LOGS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_admin_audit_logs?replicaSet=rs0
+        run: npm --prefix backend run test:admin-audit-logs-level-plus
+
       - name: Validar reembolsos e inventario
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_refund_inventory?replicaSet=rs0

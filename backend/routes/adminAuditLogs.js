@@ -9,9 +9,11 @@ const requirePermission = require('../middleware/requirePermission');
 
 const router = express.Router();
 
+class InvalidLogFilterError extends Error {}
+
 function parseBoundedInteger(value, fallback, minimum, maximum) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return fallback;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) return fallback;
   return Math.min(maximum, Math.max(minimum, parsed));
 }
 
@@ -22,8 +24,55 @@ function normalizeScope(value) {
 }
 
 function csvCell(value) {
-  const text = String(value ?? '').replace(/\r?\n/g, ' ');
+  let text = String(value ?? '').replace(/[\r\n\t]/g, ' ');
+  if (/^\s*[=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function buildLogFilter(scope, query = {}) {
+  const filter = {};
+  const username = String(query.username || '').trim();
+  if (username.length > 80) throw new InvalidLogFilterError('El usuario no puede superar 80 caracteres.');
+  if (username) {
+    filter[scope === 'operations' ? 'adminUsername' : 'username'] = {
+      $regex: username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i',
+    };
+  }
+
+  const status = String(query.status || '').trim().toLowerCase();
+  const allowedStatuses = scope === 'operations'
+    ? ['success', 'failed']
+    : ['success', 'pending', 'failed', 'blocked', 'error'];
+  if (status && !allowedStatuses.includes(status)) throw new InvalidLogFilterError('Estado de log inválido.');
+  if (status) {
+    if (scope === 'operations') filter.success = status === 'success';
+    else filter.status = status;
+  }
+
+  const moduleName = String(query.module || '').trim().toLowerCase();
+  if (moduleName && (scope !== 'operations' || !/^[a-z0-9:-]{1,50}$/.test(moduleName))) {
+    throw new InvalidLogFilterError('Módulo de log inválido.');
+  }
+  if (moduleName) filter.module = moduleName;
+
+  const from = String(query.from || '').trim();
+  const to = String(query.to || '').trim();
+  for (const date of [from, to]) {
+    if (date && (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(date) ||
+      !Number.isFinite(Date.parse(date)) ||
+      new Date(date).toISOString() !== (date.includes('.') ? date : date.replace(/Z$/, '.000Z')))) {
+      throw new InvalidLogFilterError('Rango de fechas inválido.');
+    }
+  }
+  if (from && to && Date.parse(from) >= Date.parse(to)) {
+    throw new InvalidLogFilterError('La fecha final debe ser posterior a la inicial.');
+  }
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from);
+    if (to) filter.createdAt.$lt = new Date(to);
+  }
+  return filter;
 }
 
 function serializeLoginLog(log) {
@@ -46,10 +95,13 @@ function serializeOperationLog(log) {
     createdAt: log?.createdAt || null,
     username: log?.adminUsername || '',
     ip: log?.ip || '',
-    status: log?.success === false ? 'failed' : 'success',
+    status: log?.success === true ? 'success' : log?.success === false ? 'failed' : 'unknown',
     reason: log?.description || log?.action || '',
     userAgent: log?.userAgent || '',
     permission: log?.permission || '',
+    module: log?.module || '',
+    resourceId: log?.resourceId || '',
+    statusCode: log?.statusCode ?? null,
     method: log?.method || '',
     path: log?.path || '',
   };
@@ -72,17 +124,18 @@ router.get(
   async (req, res, next) => {
     try {
       const scope = normalizeScope(req.query.scope);
-      const page = parseBoundedInteger(req.query.page, 1, 1, 100_000);
+      const page = parseBoundedInteger(req.query.page, 1, 1, 1000);
       const limit = parseBoundedInteger(req.query.limit, 50, 1, 100);
+      const filter = buildLogFilter(scope, req.query);
       const model = getLogModel(scope);
       const [rows, total] = await Promise.all([
         model
-          .find({})
-          .sort({ createdAt: -1 })
+          .find(filter)
+          .sort({ createdAt: -1, _id: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
           .lean(),
-        model.countDocuments({}),
+        model.countDocuments(filter),
       ]);
 
       return res.json({
@@ -92,11 +145,14 @@ router.get(
           page,
           limit,
           total,
-          pages: Math.max(1, Math.ceil(total / limit)),
+          pages: Math.max(1, Math.min(1000, Math.ceil(total / limit))),
         },
         scope,
       });
     } catch (error) {
+      if (error instanceof InvalidLogFilterError) {
+        return res.status(400).json({ ok: false, message: error.message });
+      }
       return next(error);
     }
   }
@@ -105,14 +161,15 @@ router.get(
 router.get(
   '/export',
   requireAdmin,
-  requirePermission('logs:export'),
+  requirePermission.all(['logs:view', 'logs:export']),
   async (req, res, next) => {
     try {
       const scope = normalizeScope(req.query.scope);
       const limit = parseBoundedInteger(req.query.limit, 1000, 1, 5000);
+      const filter = buildLogFilter(scope, req.query);
       const rows = await getLogModel(scope)
-        .find({})
-        .sort({ createdAt: -1 })
+        .find(filter)
+        .sort({ createdAt: -1, _id: -1 })
         .limit(limit)
         .lean();
       const normalized = rows.map((row) => serializeLog(scope, row));
@@ -126,6 +183,9 @@ router.get(
         'permiso',
         'metodo',
         'ruta',
+        'modulo',
+        'recurso',
+        'codigo_http',
       ];
       const lines = normalized.map((row) =>
         [
@@ -138,6 +198,9 @@ router.get(
           row.permission,
           row.method,
           row.path,
+          row.module,
+          row.resourceId,
+          row.statusCode,
         ]
           .map(csvCell)
           .join(',')
@@ -151,6 +214,9 @@ router.get(
       );
       return res.send(csv);
     } catch (error) {
+      if (error instanceof InvalidLogFilterError) {
+        return res.status(400).json({ ok: false, message: error.message });
+      }
       return next(error);
     }
   }
@@ -160,3 +226,5 @@ module.exports = router;
 module.exports.normalizeScope = normalizeScope;
 module.exports.serializeLoginLog = serializeLoginLog;
 module.exports.serializeOperationLog = serializeOperationLog;
+module.exports.buildLogFilter = buildLogFilter;
+module.exports.csvCell = csvCell;

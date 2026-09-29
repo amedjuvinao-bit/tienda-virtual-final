@@ -51,6 +51,7 @@
     "test:orders-manual-order-form": "vitest run src/admin/orders/components/ManualOrderModal.test.jsx",
     "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:configuration-level-plus-stage0": "vitest run src/admin/configuracion/ConfigurationStage0.test.js",
+    "test:admin-audit-logs-level-plus": "vitest run src/admin/configuracion/sections/LogsSection.test.jsx",
     "test:admin-users-stage1": "vitest run src/admin/users/AdminUsersStage1.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
     "test:admin-users-stage2": "vitest run src/admin/users/AdminUsersStage1.test.jsx src/admin/users/AdminUsersStage2.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
     "test:admin-roles-stage1": "vitest run src/admin/configuracion/sections/PerfilesSection.test.jsx src/admin/configuracion/roles/RolePermissionsModal.test.jsx src/admin/configuracion/roles/RoleFormModal.test.jsx src/admin/security/adminPermissions.test.js src/context/AuthContext.logout.test.jsx",

@@ -200,12 +200,7 @@ const OWNER_TWO_FACTOR_MAX_ATTEMPTS = 5;
 const OWNER_TWO_FACTOR_LOCK_MS = 10 * 60 * 1000;
 
 function getClientIp(req) {
-  return String(
-    req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || ''
-  )
-    .split(',')[0]
-    .trim()
-    .slice(0, 80);
+  return String(req.ip || req.socket?.remoteAddress || '').trim().slice(0, 80);
 }
 
 function getUserAgent(req) {

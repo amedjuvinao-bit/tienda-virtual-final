@@ -119,12 +119,7 @@ function sanitizeValue(value, depth = 0) {
 }
 
 function getClientIp(req) {
-  const forwardedFor = String(req.headers['x-forwarded-for'] || '')
-    .split(',')[0]
-    .trim();
-
   return (
-    forwardedFor ||
     req.ip ||
     req.connection?.remoteAddress ||
     req.socket?.remoteAddress ||
