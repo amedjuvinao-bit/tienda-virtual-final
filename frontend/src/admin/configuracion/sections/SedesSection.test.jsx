@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import SedesSection from './SedesSection';
-import { createAdminBranch, getAdminBranches, getAdminBranchesMeta, updateAdminBranch } from '../../api/adminBranchesApi';
+import { createAdminBranch, getAdminBranches, getAdminBranchesMeta, updateAdminBranch, updateAdminBranchStatus, deleteAdminBranch } from '../../api/adminBranchesApi';
 
 const auth = vi.hoisted(() => ({ user: { role: 'viewer', permissions: ['branches:view'] } }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ adminUser: auth.user }) }));
@@ -63,6 +63,90 @@ it('muestra las acciones poco frecuentes solo cuando se abren las opciones', asy
   expect(screen.getByRole('button', { name: 'Desactivar Sede 1' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Eliminar Sede 1' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Hacer sede principal' })).toBeVisible();
+});
+
+it('explica qué operaciones y usuarios impiden desactivar una sede y abre el módulo correspondiente', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  updateAdminBranchStatus.mockRejectedValueOnce({ response: { data: {
+    message: 'No puedes desactivar esta sede porque tiene operaciones pendientes.',
+    operationSummary: { pendingOrdersCount: 2, openCashSessionsCount: 1 },
+  } } });
+  updateAdminBranchStatus.mockRejectedValueOnce({ response: { data: {
+    message: 'No puedes desactivar esta sede porque tiene usuarios asignados.', usersCount: 3,
+  } } });
+
+  render(<SedesSection />);
+  await user.click(await screen.findByRole('button', { name: 'Opciones de Sede 1' }));
+  await user.click(screen.getByRole('button', { name: 'Desactivar Sede 1' }));
+  let detail = await screen.findByRole('alert', { name: 'Sede con pendientes' });
+  expect(detail).toHaveTextContent('pedidos pendientes: 2');
+  expect(detail).toHaveTextContent('cajas abiertas: 1');
+  expect(within(detail).getByRole('link', { name: 'Abrir Órdenes' })).toHaveAttribute('href', '/admin/ordenes');
+  expect(within(detail).getByRole('link', { name: 'Abrir Caja' })).toHaveAttribute('href', '/admin/caja');
+
+  await user.click(screen.getByRole('button', { name: 'Desactivar Sede 1' }));
+  detail = await screen.findByRole('alert', { name: 'Sede con pendientes' });
+  expect(detail).toHaveTextContent('usuarios asignados: 3');
+  expect(detail).not.toHaveTextContent('pedidos pendientes');
+  expect(within(detail).getByRole('link', { name: 'Abrir Usuarios' }))
+    .toHaveAttribute('href', '/admin/configuracion/usuarios');
+  expect(getAdminBranches).toHaveBeenCalledTimes(1);
+});
+
+it('muestra que el historial impide eliminar la sede sin ocultar la opción de desactivarla', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  deleteAdminBranch.mockRejectedValueOnce({ response: { data: {
+    message: 'La sede tiene historial asociado.',
+    operationSummary: { historicalOrdersCount: 1 },
+  } } });
+  try {
+    render(<SedesSection />);
+    await user.click(await screen.findByRole('button', { name: 'Opciones de Sede 1' }));
+    await user.click(screen.getByRole('button', { name: 'Eliminar Sede 1' }));
+    const detail = await screen.findByRole('alert', { name: 'Sede con pendientes' });
+    expect(detail).toHaveTextContent('pedidos en el historial: 1');
+    expect(detail).toHaveTextContent('puedes desactivar la sede');
+    expect(within(detail).getByRole('link', { name: 'Abrir Órdenes' })).toHaveAttribute('href', '/admin/ordenes');
+  } finally {
+    confirm.mockRestore();
+  }
+});
+
+it('muestra la causa del bloqueo sin enviar a módulos sin permiso', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'manager', permissions: ['branches:view', 'branches:disable'] };
+  updateAdminBranchStatus.mockRejectedValueOnce({ response: { data: {
+    message: 'Hay pedidos pendientes.',
+    operationSummary: { pendingOrdersCount: 1 },
+  } } });
+  render(<SedesSection />);
+  await user.click(await screen.findByRole('button', { name: 'Opciones de Sede 1' }));
+  await user.click(screen.getByRole('button', { name: 'Desactivar Sede 1' }));
+  const detail = await screen.findByRole('alert', { name: 'Sede con pendientes' });
+  expect(detail).toHaveTextContent('pedidos pendientes: 1');
+  expect(within(detail).queryByRole('link', { name: 'Abrir Órdenes' })).not.toBeInTheDocument();
+});
+
+it('explica el bloqueo dentro del editor cuando allí se cambia el estado', async () => {
+  const user = userEvent.setup();
+  auth.user = { role: 'owner' };
+  updateAdminBranch.mockRejectedValueOnce({ response: { data: {
+    message: 'Cierra la caja antes de desactivar la sede.',
+    operationSummary: { openCashSessionsCount: 1 },
+  } } });
+  render(<SedesSection />);
+  await user.click(await screen.findByRole('button', { name: 'Editar Sede 1' }));
+  const modal = within(screen.getByRole('dialog', { name: 'Editar sede' }));
+  await user.selectOptions(modal.getByRole('combobox', { name: 'Estado' }), 'inactive');
+  await user.click(modal.getByRole('button', { name: '3. Operación' }));
+  await user.click(modal.getByRole('button', { name: 'Guardar sede' }));
+  const detail = await modal.findByRole('alert', { name: 'Sede con pendientes' });
+  expect(detail).toHaveTextContent('cajas abiertas: 1');
+  expect(within(detail).getByRole('link', { name: 'Abrir Caja' })).toHaveAttribute('href', '/admin/caja');
+  expect(updateAdminBranch).toHaveBeenCalledWith('1', expect.objectContaining({ status: 'inactive', active: false }));
 });
 
 it('guía la creación por secciones, conserva los datos y muestra los errores dentro del modal', async () => {

@@ -85,6 +85,7 @@ jobs:
           npm --prefix frontend run test:admin-users-stage1
           npm --prefix frontend run test:admin-users-stage2
           npm --prefix frontend run test:admin-roles-stage1
+          npm --prefix frontend run test:admin-branches-ui
           npm --prefix frontend run test:admin-branches-inventory-policy
 
       - name: Compilar frontend

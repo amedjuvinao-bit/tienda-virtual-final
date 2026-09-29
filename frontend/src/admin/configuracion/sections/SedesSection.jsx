@@ -24,8 +24,9 @@ import {
 } from '../../api/adminBranchesApi';
 import api from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
-import { hasAdminPermission } from '../../security/adminPermissions';
+import { canAccessAdminPath, hasAdminPermission } from '../../security/adminPermissions';
 import SedesList from './SedesList';
+import { getBranchBlockerDetails } from '../../api/branchBlockerDetails';
 
 const EMPTY_FORM = {
   name: '',
@@ -248,6 +249,7 @@ export default function SedesSection() {
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [branchBlockers, setBranchBlockers] = useState(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 20;
@@ -577,11 +579,13 @@ export default function SedesSection() {
     setFormStep('general');
     setSaving(false);
     setError('');
+    setBranchBlockers(null);
   };
 
   const openCreateForm = () => {
     setMessage('');
     setError('');
+    setBranchBlockers(null);
     setEditingBranch(null);
     setForm(EMPTY_FORM);
     setFormStep('general');
@@ -591,6 +595,7 @@ export default function SedesSection() {
   const openEditForm = (branch) => {
     setMessage('');
     setError('');
+    setBranchBlockers(null);
     setEditingBranch(branch);
     setForm(normalizeBranchToForm(branch));
     setFormStep('general');
@@ -622,6 +627,7 @@ export default function SedesSection() {
       setSaving(true);
       setError('');
       setMessage('');
+      setBranchBlockers(null);
 
       const payload = buildBranchPayload(form);
 
@@ -667,12 +673,15 @@ export default function SedesSection() {
         else await loadBranches();
       }
     } catch (saveError) {
-      setError(
-        saveError?.response?.data?.message ||
-          saveError?.response?.data?.errors?.join(' ') ||
-          saveError?.message ||
-          'No fue posible guardar la sede.'
-      );
+      const data = saveError?.response?.data || {};
+      const details = getBranchBlockerDetails(data);
+      if (editingBranchId && details.length) {
+        setBranchBlockers({ branchName: editingBranch.name, action: 'disable',
+          message: saveError?.originalError?.response?.data?.message || data.message,
+          details });
+      } else {
+        setError(data.message || data.errors?.join(' ') || saveError?.message || 'No fue posible guardar la sede.');
+      }
     } finally {
       setSaving(false);
     }
@@ -692,17 +701,22 @@ export default function SedesSection() {
     try {
       setError('');
       setMessage('');
+      setBranchBlockers(null);
 
       await deleteAdminBranch(branchId);
       setMessage('Sede eliminada correctamente.');
       if (branches.length === 1 && page > 1) setPage(page - 1);
       else await loadBranches();
     } catch (deleteError) {
-      setError(
-        deleteError?.response?.data?.message ||
-          deleteError?.message ||
-          'No fue posible eliminar la sede.'
-      );
+      const data = deleteError?.response?.data || {};
+      const details = getBranchBlockerDetails(data);
+      if (details.length) {
+        setBranchBlockers({ branchName: branch.name, action: 'delete',
+          message: deleteError?.originalError?.response?.data?.message || data.message,
+          details });
+      } else {
+        setError(data.message || deleteError?.message || 'No fue posible eliminar la sede.');
+      }
     }
   };
 
@@ -717,6 +731,7 @@ export default function SedesSection() {
     try {
       setError('');
       setMessage('');
+      setBranchBlockers(null);
 
       await updateAdminBranchStatus(branchId, {
         active: nextActive,
@@ -731,11 +746,15 @@ export default function SedesSection() {
 
       await loadBranches();
     } catch (statusError) {
-      setError(
-        statusError?.response?.data?.message ||
-          statusError?.message ||
-          'No fue posible cambiar el estado de la sede.'
-      );
+      const data = statusError?.response?.data || {};
+      const details = getBranchBlockerDetails(data);
+      if (details.length) {
+        setBranchBlockers({ branchName: branch.name, action: 'disable',
+          message: statusError?.originalError?.response?.data?.message || data.message,
+          details });
+      } else {
+        setError(data.message || statusError?.message || 'No fue posible cambiar el estado de la sede.');
+      }
     }
   };
 
@@ -747,6 +766,7 @@ export default function SedesSection() {
     try {
       setError('');
       setMessage('');
+      setBranchBlockers(null);
 
       await markAdminBranchAsMain(branchId);
       setMessage('Sede principal actualizada correctamente.');
@@ -768,6 +788,7 @@ export default function SedesSection() {
     try {
       setError('');
       setMessage('');
+      setBranchBlockers(null);
 
       await markAdminBranchAsOnlineDefault(branchId);
       setMessage('Sede online predeterminada actualizada correctamente.');
@@ -780,6 +801,34 @@ export default function SedesSection() {
       );
     }
   };
+
+  const blockerNotice = branchBlockers && (
+    <section role="alert" aria-label="Sede con pendientes" className="rounded-2xl border p-4 sm:p-5"
+      style={{ ...glassCardStyle, borderColor: 'var(--admin-danger-border)' }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-bold">{branchBlockers.branchName}: acción pendiente</h4>
+          <p className="mt-1 text-sm" style={mutedTextStyle}>{branchBlockers.message}</p>
+          {branchBlockers.action === 'delete' && branchBlockers.details.some(({ key }) => key.startsWith('historical')) && (
+            <p className="mt-2 text-sm">El historial se conserva. Cuando cierres las operaciones pendientes, puedes desactivar la sede y mantener ese historial.</p>
+          )}
+        </div>
+        <button type="button" aria-label="Cerrar detalle de sede" onClick={() => setBranchBlockers(null)}
+          className="rounded-lg p-1" style={{ color: 'var(--admin-card-text)' }}><X className="h-4 w-4" /></button>
+      </div>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {branchBlockers.details.map(({ key, count, label, href, destination }) => (
+          <li key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm"
+            style={cardStyle}>
+            <span>{label}: <strong>{count}</strong></span>
+            {canAccessAdminPath(adminUser, href) && (
+              <a href={href} className="font-semibold underline underline-offset-2">Abrir {destination}</a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 
   const modalContent =
     showForm && typeof document !== 'undefined'
@@ -859,6 +908,7 @@ export default function SedesSection() {
               </nav>
 
               {error && <div role="alert" className="mx-5 mt-3 rounded-xl border px-3 py-2 text-sm font-semibold md:mx-6" style={dangerButtonStyle}>{error}</div>}
+              {blockerNotice && <div className="mx-5 mt-3 md:mx-6">{blockerNotice}</div>}
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 md:px-6">
                 <div>
@@ -1455,6 +1505,8 @@ export default function SedesSection() {
             </button>}
           </div>
         </div>
+
+        {!showForm && blockerNotice}
 
         <div
           className="rounded-2xl border p-3 backdrop-blur-xl"

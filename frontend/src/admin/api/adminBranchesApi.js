@@ -1,6 +1,7 @@
 // frontend/src/admin/api/adminBranchesApi.js
 
 import api from '../../lib/api';
+import { formatBranchOperationMessage } from './branchBlockerDetails';
 
 /* ============================================================
  * ADMIN BRANCHES API
@@ -10,32 +11,6 @@ import api from '../../lib/api';
  * ============================================================ */
 
 const BASE_URL = '/api/admin/branches';
-
-const OPERATION_LABELS = {
-  activeStockCount: 'productos con stock',
-  reservedStockCount: 'stock reservado',
-  pendingReservationsCount: 'reservas pendientes',
-  pendingMovementsCount: 'movimientos de inventario pendientes',
-  openCashSessionsCount: 'cajas abiertas',
-  pendingOrdersCount: 'pedidos pendientes',
-  heldSalesCount: 'ventas POS en espera',
-  pendingReturnsCount: 'devoluciones pendientes',
-  pendingRefundsCount: 'reembolsos por conciliar',
-  pendingExpensesCount: 'gastos o cuentas por pagar pendientes',
-  activeBudgetsCount: 'presupuestos activos',
-  provisionalPeriodClosesCount: 'cierres financieros provisionales',
-  historicalStockRowsCount: 'registros de inventario en el historial',
-  historicalReservationsCount: 'reservas en el historial',
-  historicalMovementsCount: 'movimientos en el historial',
-  historicalCashSessionsCount: 'sesiones de caja en el historial',
-  historicalOrdersCount: 'pedidos en el historial',
-  historicalHeldSalesCount: 'ventas POS en el historial',
-  historicalReturnsCount: 'devoluciones en el historial',
-  historicalRefundsCount: 'reembolsos en el historial',
-  historicalExpensesCount: 'gastos en el historial',
-  historicalBudgetsCount: 'presupuestos en el historial',
-  historicalPeriodClosesCount: 'cierres financieros en el historial',
-};
 
 function buildQueryParams(params = {}) {
   const query = new URLSearchParams();
@@ -50,35 +25,11 @@ function buildQueryParams(params = {}) {
   return queryString ? `?${queryString}` : '';
 }
 
-function getOperationSummaryItems(summary = {}) {
-  return Object.entries(OPERATION_LABELS)
-    .map(([key, label]) => {
-      const value = Number(summary?.[key] || 0);
-
-      if (!value) return '';
-
-      return `${value} ${label}`;
-    })
-    .filter(Boolean);
-}
-
-function buildOperationBlockedMessage(data = {}) {
-  const baseMessage =
-    data?.message ||
-    'No puedes desactivar o eliminar esta sede porque tiene operación asociada.';
-
-  const items = getOperationSummaryItems(data?.operationSummary);
-
-  if (!items.length) return baseMessage;
-
-  return `${baseMessage} Operación detectada: ${items.join(', ')}.`;
-}
-
 function getApiErrorMessage(error, fallbackMessage) {
   const data = error?.response?.data || {};
 
   if (data?.code === 'BRANCH_HAS_OPERATION') {
-    return buildOperationBlockedMessage(data);
+    return formatBranchOperationMessage(data);
   }
 
   if (Array.isArray(data?.errors) && data.errors.length) {
