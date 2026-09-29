@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import api from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { hasAdminPermission } from '../../security/adminPermissions';
+import { describeLog } from './logPresentation';
 
 const EMPTY_FILTERS = { username: '', status: '', module: '', fromDate: '', toDate: '' };
 const STATUS_LABELS = {
@@ -16,7 +17,13 @@ function statusStyle(status) {
 }
 const MODULE_LABELS = {
   'admin-users': 'Usuarios', roles: 'Perfiles', branches: 'Sedes',
-  logs: 'Logs',
+  seguridad: 'Seguridad', logs: 'Logs', settings: 'Configuración',
+  orders: 'Órdenes', pos: 'POS', inventory: 'Inventario',
+  billing: 'Facturación', customers: 'Clientes', products: 'Productos',
+  finance: 'Finanzas', payments: 'Pagos', reports: 'Reportes',
+  coupons: 'Cupones', carts: 'Carritos', favorites: 'Favoritos',
+  pages: 'Páginas', appearance: 'Apariencia', dashboard: 'Panel',
+  media: 'Archivos', geo: 'Ubicaciones',
 };
 
 function formatDate(value) {
@@ -40,6 +47,9 @@ function toQuery(scope, filters) {
 }
 
 export default function LogsSection() {
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const { adminUser } = useAuth();
   const canExport = hasAdminPermission(adminUser, 'logs:export');
   const [scope, setScope] = useState('login');
@@ -196,7 +206,7 @@ export default function LogsSection() {
             <span className={`rounded-lg px-2 py-1 ${statusStyle(log.status)}`}>{STATUS_LABELS[log.status] || log.status}</span>
           </div>
           <p className="mt-1 opacity-70">{formatDate(log.createdAt)} · IP: {log.ip || '—'}</p>
-          <p className="mt-3">{log.reason || 'Sin detalle'}</p>
+          <p className="mt-3">{describeLog(log)}</p>
           {scope === 'operations' && <p className="mt-2 break-all opacity-70">
             {MODULE_LABELS[log.module] || log.module || 'Operación'} · Recurso: {log.resourceId || '—'}
           </p>}
@@ -217,7 +227,7 @@ export default function LogsSection() {
               <td className="p-3">{log.ip || '—'}</td>
               <td className="p-3"><span className={`rounded-lg px-2 py-1 font-medium ${statusStyle(log.status)}`}>
                 {STATUS_LABELS[log.status] || log.status}</span></td>
-              <td className="min-w-48 p-3">{log.reason || '—'}</td>
+              <td className="min-w-48 p-3">{describeLog(log)}</td>
               {scope === 'operations' && <><td className="p-3">{MODULE_LABELS[log.module] || log.module || '—'}</td>
                 <td className="max-w-48 break-all p-3" title={log.resourceId}>{log.resourceId || '—'}</td></>}
             </tr>)}
