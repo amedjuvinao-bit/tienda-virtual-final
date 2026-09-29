@@ -7,6 +7,8 @@
     "backup:free": "node scripts/backupAtlasFree.js",
     "backup:decrypt": "node scripts/decryptFreeBackup.js",
     "test:backup-archive": "node scripts/testFreeBackupArchive.js",
+    "test:backup-maintenance": "node scripts/testBackupMaintenanceGate.js",
+    "test:backup-panel-flow": "node scripts/testBackupPanelStart.js",
     "seed:geo:all": "node scripts/seedGeoAll.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:env": "node scripts/testEnvConfig.js",

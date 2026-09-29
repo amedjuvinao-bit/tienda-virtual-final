@@ -1,7 +1,7 @@
 'use strict';
 
-// Run after stopping every backend/worker that writes to the source database.
-// The temporary 503 server reserves the API port throughout the dump.
+// Offline mode reserves the API port. Managed mode is run only by the backend
+// after its maintenance gate has drained requests and workers.
 require('../config/env');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -13,7 +13,9 @@ const {
   backupDirectory, encryptionKey, sha256, encryptArchive, verifiedPlaintextDigest,
 } = require('../services/freeBackupArchive');
 
-const id = crypto.randomBytes(12).toString('hex');
+const managed = process.argv.includes('--managed-maintenance');
+const id = managed && /^[a-f\d]{24}$/.test(process.env.BACKUP_RUN_ID || '')
+  ? process.env.BACKUP_RUN_ID : crypto.randomBytes(12).toString('hex');
 let interrupted = false;
 let activeChild = null;
 function interrupt() {
@@ -130,14 +132,32 @@ async function writeRecord(file, record) {
   await fs.promises.rename(temp, file);
 }
 
+async function confirmManagedLock() {
+  if (!managed) return;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      const lock = JSON.parse(await fs.promises.readFile(path.join(backupDirectory(), '.backup-maintenance.json'), 'utf8'));
+      if (lock.id === id && lock.childPid === process.pid) return;
+    } catch { /* El padre todavía prepara el bloqueo. */ }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error('No existe un bloqueo de mantenimiento válido para este proceso.');
+}
+
 async function main() {
   const options = configuration();
+  await confirmManagedLock();
   await fs.promises.mkdir(options.dir, { recursive: true, mode: 0o700 });
   backupDirectory(); // Recheck after mkdir: an existing symlink must not resolve inside the project.
   await fs.promises.chmod(options.dir, 0o700);
   const recordPath = path.join(options.dir, `backup-${id}.json`);
   const encryptedPath = path.join(options.dir, `backup-${id}.archive.gz.enc`);
-  const record = { id, database: options.database, startedAt: new Date().toISOString(), status: 'en_proceso', steps: [] };
+  const record = managed
+    ? JSON.parse(await fs.promises.readFile(recordPath, 'utf8'))
+    : { id, database: options.database, startedAt: new Date().toISOString(), status: 'en_proceso', steps: [] };
+  if (record.id !== id || record.status !== 'en_proceso' || !Array.isArray(record.steps)) {
+    throw new Error('El registro inicial del respaldo no coincide con el bloqueo de mantenimiento.');
+  }
   let server;
   let tempDir;
   let success = false;
@@ -149,10 +169,14 @@ async function main() {
     process.stdout.write(`${name}\n`);
   };
   try {
-    server = await reservePort(options.port);
-    await step('Puerto de API reservado; tienda en mantenimiento (HTTP 503)');
-    // Allows in-flight responses from the old process to finish after its listener closes.
-    await new Promise((resolve) => setTimeout(resolve, 15000));
+    if (!managed) {
+      server = await reservePort(options.port);
+      await step('Puerto de API reservado; tienda en mantenimiento (HTTP 503)');
+      // Allows in-flight responses from the old process to finish after its listener closes.
+      await new Promise((resolve) => setTimeout(resolve, 15000));
+    } else {
+      await step('Tienda en mantenimiento desde el panel; solicitudes y trabajadores drenados');
+    }
     checkInterrupted();
     tempDir = await fs.promises.mkdtemp(path.join(options.dir, `.working-${id}-`));
     await fs.promises.chmod(tempDir, 0o700);
@@ -162,6 +186,7 @@ async function main() {
     await fs.promises.writeFile(restoreConfig, `uri: ${JSON.stringify(options.staging)}\n`, { mode: 0o600 });
     const archive = path.join(tempDir, 'dump.archive.gz');
     const before = await counts(options.source, options.database);
+    if (!before.adminusers?.documents) throw new Error('La base seleccionada no contiene propietarios administrativos. Revisa BACKUP_DB_NAME.');
     checkInterrupted();
     await step('Inventario y huellas de documentos e índices del origen registrados');
     await runTool('mongodump', [`--config=${dumpConfig}`, `--db=${options.database}`, `--archive=${archive}`, '--gzip']);
@@ -227,7 +252,8 @@ async function main() {
     }
     if (!success) await fs.promises.rm(encryptedPath, { force: true }).catch(() => {});
     if (server) await new Promise((resolve) => server.close(resolve));
-    process.stdout.write('Mantenimiento terminado. Vuelve a iniciar el backend y confirma el estado en el panel.\n');
+    process.stdout.write(managed ? 'Copia terminada; el panel reanudará la tienda.\n' :
+      'Mantenimiento terminado. Vuelve a iniciar el backend y confirma el estado en el panel.\n');
   }
 }
 

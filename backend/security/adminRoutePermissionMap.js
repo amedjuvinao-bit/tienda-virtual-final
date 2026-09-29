@@ -1310,6 +1310,28 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Consultar la trazabilidad de los respaldos del propietario.',
   },
   {
+    method: 'GET',
+    path: '/api/admin/backup-preferences/readiness',
+    permission: 'settings:store',
+    description: 'Comprobar si el servidor puede iniciar un respaldo desde el panel.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/backup-preferences/start',
+    permission: 'settings:store',
+    description: 'Pausar la tienda e iniciar una copia verificada con credenciales del propietario.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/backup-preferences/recover',
+    permission: 'settings:store',
+    description: 'Reabrir tras revisar una copia interrumpida.',
+    audit: true,
+    danger: true,
+  },
+  {
     method: 'POST',
     path: '/api/admin/backup-preferences/runs/:id/download',
     permission: 'settings:store',

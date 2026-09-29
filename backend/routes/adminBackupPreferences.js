@@ -10,6 +10,7 @@ const BackupPreference = require('../models/BackupPreference');
 const AdminUser = require('../models/AdminUser');
 const { decryptTwoFactorSecret, verifyTotp } = require('../security/adminTwoFactorCrypto');
 const { backupDirectory, listBackups, safeBackupId, sha256 } = require('../services/freeBackupArchive');
+const backupMaintenance = require('../services/backupMaintenanceService');
 
 const router = express.Router();
 const STRATEGIES = new Set(['free_manual', 'atlas_managed']);
@@ -78,16 +79,61 @@ router.get('/runs', async (_req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+router.get('/readiness', async (_req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store, private');
+    return res.json(await backupMaintenance.readiness());
+  } catch (error) { return next(error); }
+});
+
+async function verifyOwnerCredentials(req) {
+  const owner = await AdminUser.findById(req.adminUserId).select('+passwordHash +twoFactorSecret');
+  return Boolean(owner && owner.twoFactorEnabled && owner.twoFactorSecret &&
+    await owner.comparePassword(String(req.body?.currentPassword || '')) &&
+    verifyTotp(decryptTwoFactorSecret(owner.twoFactorSecret), String(req.body?.twoFactorCode || '')));
+}
+
+const startLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true,
+  legacyHeaders: false, message: { message: 'Demasiados intentos. Espera 15 minutos.' } });
+router.post('/start', startLimiter, async (req, res, next) => {
+  try {
+    if (!(await verifyOwnerCredentials(req))) {
+      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
+    }
+    const preference = await BackupPreference.findById('primary').lean();
+    if (preference?.strategy !== 'free_manual') {
+      return res.status(409).json({ message: 'Primero selecciona y guarda Atlas Free como método de respaldo.' });
+    }
+    const id = await backupMaintenance.begin({ owner: req.adminUsername || req.adminUserId });
+    res.once('finish', () => { setImmediate(() => backupMaintenance.launch(id).catch((error) =>
+      console.error('[backup-maintenance] Inicio fallido:', error.message))); });
+    res.set('Cache-Control', 'no-store, private');
+    return res.status(202).json({ id, message: 'La tienda está en mantenimiento y la copia ha comenzado.' });
+  } catch (error) {
+    if (/Ya hay una copia|BACKUP_PANEL_SINGLE_INSTANCE|Configura|Instala MongoDB/.test(error.message)) {
+      return res.status(409).json({ message: error.message });
+    }
+    return next(error);
+  }
+});
+
+router.post('/recover', startLimiter, async (req, res, next) => {
+  try {
+    if (!(await verifyOwnerCredentials(req))) {
+      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
+    }
+    res.set('Cache-Control', 'no-store, private');
+    return res.json(await backupMaintenance.recover());
+  } catch (error) { return next(error); }
+});
+
 const downloadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true,
   legacyHeaders: false, message: { message: 'Demasiados intentos. Espera 15 minutos.' } });
 router.post('/runs/:id/download', downloadLimiter, async (req, res, next) => {
   const { id } = req.params;
   if (!safeBackupId(id)) return res.status(400).json({ message: 'Identificador inválido.' });
   try {
-    const owner = await AdminUser.findById(req.adminUserId).select('+passwordHash +twoFactorSecret');
-    if (!owner || !owner.twoFactorEnabled || !owner.twoFactorSecret ||
-        !(await owner.comparePassword(String(req.body?.currentPassword || ''))) ||
-        !verifyTotp(decryptTwoFactorSecret(owner.twoFactorSecret), String(req.body?.twoFactorCode || ''))) {
+    if (!(await verifyOwnerCredentials(req))) {
       return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
     }
     const directory = backupDirectory();

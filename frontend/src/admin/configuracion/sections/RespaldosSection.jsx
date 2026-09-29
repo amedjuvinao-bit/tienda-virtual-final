@@ -38,6 +38,13 @@ export default function RespaldosSection() {
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [readiness, setReadiness] = useState(null);
+  const [maintenance, setMaintenance] = useState(null);
+  const [starting, setStarting] = useState(false);
+  const [showStart, setShowStart] = useState(false);
+  const [startPassword, setStartPassword] = useState('');
+  const [startCode, setStartCode] = useState('');
+  const [previousPhase, setPreviousPhase] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -46,6 +53,10 @@ export default function RespaldosSection() {
       const { data } = await api.get('/api/admin/backup-preferences');
       setSaved(data);
       setStrategy(data.strategy);
+      try {
+        const ready = await api.get('/api/admin/backup-preferences/readiness');
+        setReadiness(ready.data);
+      } catch { setReadiness({ ready: false, checks: ['No se pudo comprobar la preparación del servidor.'] }); }
       try {
         const history = await api.get('/api/admin/backup-preferences/runs');
         setRuns(history.data.runs || []);
@@ -60,7 +71,66 @@ export default function RespaldosSection() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    let mounted = true;
+    const poll = async () => {
+      try {
+        const { data } = await api.get('/api/backup-maintenance/status', { skipAdminRouteLoader: true });
+        if (mounted) setMaintenance(data);
+      } catch { /* Una interrupción de red no cambia el resultado del servidor. */ }
+    };
+    poll();
+    const timer = setInterval(poll, 3000);
+    return () => { mounted = false; clearInterval(timer); };
+  }, []);
+
+  useEffect(() => {
+    if (maintenance && previousPhase && maintenance.phase !== previousPhase &&
+        ['completado', 'fallido'].includes(maintenance.phase)) load();
+    if (maintenance) setPreviousPhase(maintenance.phase);
+  }, [maintenance?.phase]);
+
+  async function startBackup(event) {
+    event.preventDefault();
+    if (starting || maintenance?.maintenance) return;
+    setStarting(true);
+    setError('');
+    setNotice('');
+    try {
+      await api.post('/api/admin/backup-preferences/start', {
+        currentPassword: startPassword, twoFactorCode: startCode,
+      });
+      setShowStart(false);
+      setMaintenance({ phase: 'pausando', maintenance: true, progress: 'Pausando la tienda.' });
+      setNotice('Copia iniciada. Mantén esta página abierta para ver el resultado.');
+    } catch (failure) {
+      setError(failure?.response?.data?.message || failure?.userMessage || 'No se pudo iniciar la copia.');
+    } finally {
+      setStartPassword('');
+      setStartCode('');
+      setStarting(false);
+    }
+  }
+
+  async function recoverBackup(event) {
+    event.preventDefault();
+    setStarting(true);
+    setError('');
+    try {
+      const { data } = await api.post('/api/admin/backup-preferences/recover', {
+        currentPassword: startPassword, twoFactorCode: startCode,
+      });
+      setMaintenance(data);
+      setShowStart(false);
+      setNotice('La tienda volvió a estar disponible. Revisa el resultado en el historial.');
+      load();
+    } catch (failure) {
+      setError(failure?.response?.data?.message || failure?.userMessage || 'No se pudo reabrir. Revisa el servidor.');
+    } finally {
+      setStartPassword(''); setStartCode(''); setStarting(false);
+    }
+  }
 
   async function download(event) {
     event.preventDefault();
@@ -182,10 +252,28 @@ export default function RespaldosSection() {
       </div>}
 
       <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
-        <h2 className="font-semibold">Hacer una copia en Atlas Free</h2>
-        <p className="mt-2">Programa una pausa, detén el backend y cualquier otro proceso que escriba en esta base. Desde la carpeta <code>backend</code> ejecuta:</p>
-        <code className="mt-2 block overflow-x-auto rounded-lg bg-slate-900 p-3 text-white">npm run backup:free</code>
-        <p className="mt-2">La API mostrará mantenimiento durante la copia. El programa compara huellas de los documentos e índices, ensaya la restauración en otro servidor, cifra el archivo y registra cada paso. Al terminar, inicia el backend y descarga la copia aquí. Se requieren MongoDB Database Tools y las variables del instructivo de respaldo.</p>
+        <h2 className="font-semibold">Crear copia de seguridad</h2>
+        <p className="mt-2">Al iniciarla, la tienda hará una pausa. El sistema copiará los datos, comprobará que se pueden restaurar y reabrirá la tienda al terminar.</p>
+        {maintenance?.maintenance ? (
+          <div role="status" className="mt-3 rounded-xl border border-amber-500/60 bg-amber-500/10 p-3">
+            <strong>Tienda en mantenimiento</strong>
+            <p>{maintenance.progress || 'Copia en curso…'}</p>
+            {maintenance.phase === 'requiere_revision' && <p className="mt-2">El servidor se interrumpió. La tienda sigue pausada para proteger los datos. {maintenance.recoverable ? 'La copia tiene resultado final y puede reabrirse con tu confirmación.' : 'Un operador debe revisar si el proceso o un archivo temporal siguen activos.'}</p>}
+          </div>
+        ) : maintenance?.phase === 'completado' ? <p role="status" className="mt-3 text-emerald-700">Copia verificada. Descárgala desde el historial.</p>
+          : maintenance?.phase === 'fallido' ? <p role="alert" className="mt-3 text-red-700">La copia falló. Revisa el historial; la tienda ya está abierta.</p> : null}
+        {readiness && !readiness.ready && !maintenance?.maintenance && <div className="mt-3 rounded-xl border border-amber-500/60 p-3">El servidor aún necesita preparación para iniciar copias desde aquí. <details className="mt-1"><summary className="cursor-pointer underline">Ver qué falta</summary><ul className="mt-2 list-inside list-disc">{(readiness.checks || []).map((check) => <li key={check}>{check}</li>)}</ul></details></div>}
+        {!maintenance?.maintenance && <button type="button" disabled={!readiness?.ready || saved?.strategy !== 'free_manual'}
+          onClick={() => setShowStart(true)} className="mt-3 rounded-xl bg-slate-950 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Crear copia ahora</button>}
+        {saved?.strategy !== 'free_manual' && <p className="mt-2 opacity-75">Selecciona y guarda “Atlas Free · copia externa” para crearla aquí.</p>}
+        {maintenance?.phase === 'requiere_revision' && maintenance.recoverable && <button type="button" className="mt-3 underline" onClick={() => setShowStart(true)}>Reabrir después de revisar</button>}
+        {showStart && <form onSubmit={maintenance?.phase === 'requiere_revision' ? recoverBackup : startBackup} className="mt-4 space-y-3 rounded-xl border p-3">
+          <strong>{maintenance?.phase === 'requiere_revision' ? 'Confirmar reapertura' : 'Confirmar pausa y copia'}</strong>
+          <label className="block">Contraseña del propietario<input type="password" autoComplete="current-password" required value={startPassword} onChange={(event) => setStartPassword(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
+          <label className="block">Código de 6 dígitos<input inputMode="numeric" pattern="[0-9]{6}" required value={startCode} onChange={(event) => setStartCode(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
+          <button type="submit" disabled={starting} className="rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-50">{starting ? 'Procesando…' : maintenance?.phase === 'requiere_revision' ? 'Reabrir tienda' : 'Pausar tienda y crear copia'}</button>
+          <button type="button" onClick={() => { setShowStart(false); setStartPassword(''); setStartCode(''); }} className="ml-3 underline">Cancelar</button>
+        </form>}
       </div>
 
       <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>

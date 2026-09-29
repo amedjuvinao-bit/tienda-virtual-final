@@ -9,7 +9,12 @@ describe('preferencia de respaldos', () => {
   afterEach(cleanup);
   beforeEach(() => {
     vi.clearAllMocks();
-    api.get.mockResolvedValue({ data: { strategy: null, revision: 0, backupVerified: false } });
+    api.get.mockImplementation(async (path) => {
+      if (path.endsWith('/runs')) return { data: { runs: [] } };
+      if (path.endsWith('/readiness')) return { data: { ready: true, checks: [] } };
+      if (path.endsWith('/status')) return { data: { phase: 'inactivo', maintenance: false } };
+      return { data: { strategy: null, revision: 0, backupVerified: false } };
+    });
   });
 
   it('advierte que la elección no crea una copia y guarda la preferencia con su revisión', async () => {
@@ -57,5 +62,24 @@ describe('preferencia de respaldos', () => {
     expect(screen.getByLabelText('Contraseña actual')).toBeRequired();
     expect(screen.getByLabelText('Código de 6 dígitos')).toBeRequired();
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('inicia la pausa desde el panel con contraseña y TOTP del propietario', async () => {
+    api.get.mockImplementation(async (path) => {
+      if (path.endsWith('/runs')) return { data: { runs: [] } };
+      if (path.endsWith('/readiness')) return { data: { ready: true, checks: [] } };
+      if (path.endsWith('/status')) return { data: { phase: 'inactivo', maintenance: false } };
+      return { data: { strategy: 'free_manual', revision: 1 } };
+    });
+    api.post.mockResolvedValue({ data: { id: 'a'.repeat(24) } });
+    render(<RespaldosSection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Crear copia ahora' }));
+    fireEvent.change(screen.getByLabelText('Contraseña del propietario'), { target: { value: 'contraseña-segura' } });
+    fireEvent.change(screen.getByLabelText('Código de 6 dígitos'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar tienda y crear copia' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/admin/backup-preferences/start', {
+      currentPassword: 'contraseña-segura', twoFactorCode: '123456',
+    }));
+    expect(await screen.findByText('Tienda en mantenimiento')).toBeInTheDocument();
   });
 });
