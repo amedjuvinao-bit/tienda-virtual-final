@@ -46,6 +46,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'configuracion/usuarios': ['admin-users:view'],
   'configuracion/perfiles': ['roles:view'],
   'configuracion/seguridad': [],
+  'configuracion/respaldos': [],
   'configuracion/logs': ['logs:view'],
 };
 
@@ -228,6 +229,9 @@ export function getRequiredPermissionsForAdminPath(pathname) {
 }
 
 export function canAccessAdminPath(user, pathname) {
+  if (normalizePath(pathname) === 'configuracion/respaldos') {
+    return getAdminUserRole(user) === 'owner';
+  }
   return hasAnyAdminPermission(user, getRequiredPermissionsForAdminPath(pathname));
 }
 

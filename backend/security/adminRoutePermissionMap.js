@@ -1292,6 +1292,33 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/admin/backup-preferences',
+    permission: 'settings:store',
+    description: 'Consultar método de respaldo elegido por el propietario.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/backup-preferences',
+    permission: 'settings:store',
+    description: 'Elegir método de respaldo sin ejecutar copias ni cambiar el plan de Atlas.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/backup-preferences/runs',
+    permission: 'settings:store',
+    description: 'Consultar la trazabilidad de los respaldos del propietario.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/backup-preferences/runs/:id/download',
+    permission: 'settings:store',
+    description: 'Descargar un respaldo cifrado verificado con reautenticación.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
     path: '/api/admin/payment-settings',
     permission: 'settings:payments',
     description: 'Consultar la configuración protegida de proveedores de pago.',

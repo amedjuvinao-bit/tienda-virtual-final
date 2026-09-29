@@ -40,6 +40,7 @@ import {
   WalletCards,
   CircleDollarSign,
   Fingerprint,
+  DatabaseBackup,
   Command,
   ArrowRight,
   Clock3,
@@ -77,6 +78,7 @@ const CONFIG_SUBLINKS = [
   { to: '/admin/configuracion/usuarios', label: 'Usuarios', icon: Users },
   { to: '/admin/configuracion/perfiles', label: 'Perfiles', icon: UserCog },
   { to: '/admin/configuracion/seguridad', label: 'Seguridad', icon: Fingerprint },
+  { to: '/admin/configuracion/respaldos', label: 'Respaldos', icon: DatabaseBackup },
   { to: '/admin/configuracion/sedes', label: 'Sedes', icon: Building2 },
   { to: '/admin/configuracion/logs', label: 'Logs', icon: ScrollText },
 ];

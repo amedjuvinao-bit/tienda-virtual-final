@@ -1,7 +1,7 @@
 // src/admin/ConfiguracionPage.jsx
 import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Store, CreditCard, Truck, Mail, ShieldCheck, LayoutPanelTop, Users, IdCard, FileSearch, Building2, Fingerprint } from 'lucide-react';
+import { Store, CreditCard, Truck, Mail, ShieldCheck, LayoutPanelTop, Users, IdCard, FileSearch, Building2, Fingerprint, DatabaseBackup } from 'lucide-react';
 
 // 🔹 IMPORTS MODULARES
 import EmpresaSection from './configuracion/sections/EmpresaSection';
@@ -15,6 +15,7 @@ import PerfilesSection from './configuracion/sections/PerfilesSection';
 import LogsSection from './configuracion/sections/LogsSection';
 import SedesSection from './configuracion/sections/SedesSection';
 import SeguridadSection from './configuracion/sections/SeguridadSection';
+import RespaldosSection from './configuracion/sections/RespaldosSection';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
@@ -79,6 +80,12 @@ const TABS = [
     description: '2FA, sesiones, dispositivos, alertas e historial de acceso.',
   },
   {
+    id: 'respaldos',
+    label: 'Respaldos',
+    icon: DatabaseBackup,
+    description: 'Método de respaldo y estado de verificación de la base de datos.',
+  },
+  {
     id: 'logs',
     label: 'Logs',
     icon: FileSearch,
@@ -117,6 +124,8 @@ export default function ConfiguracionPage() {
         return <PerfilesSection />;
       case 'seguridad':
         return <SeguridadSection />;
+      case 'respaldos':
+        return <RespaldosSection />;
       case 'logs':
         return <LogsSection />;
       default:

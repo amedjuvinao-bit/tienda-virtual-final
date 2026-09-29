@@ -27,4 +27,10 @@ describe('acceso inicial de perfiles administrativos', () => {
     expect(canAccessAdminPath(user, '/admin/ordenes')).toBe(false);
     expect(getAdminLandingPath(user)).toBe('/admin/configuracion/seguridad');
   });
+
+  it('reserva la configuración de respaldos al propietario incluso ante comodines de permisos', () => {
+    expect(canAccessAdminPath({ adminRole: 'owner' }, '/admin/configuracion/respaldos')).toBe(true);
+    expect(canAccessAdminPath({ adminRole: 'admin', permissions: ['*'] }, '/admin/configuracion/respaldos')).toBe(false);
+    expect(canAccessAdminPath({ adminRole: 'manager', permissions: ['settings:store'] }, '/admin/configuracion/respaldos')).toBe(false);
+  });
 });
