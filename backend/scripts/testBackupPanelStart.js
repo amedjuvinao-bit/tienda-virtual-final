@@ -5,8 +5,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { resolveMongoTool } = require('../services/backupMongoTools');
 
 async function main() {
+  const installedTool = 'C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe';
+  assert.equal(resolveMongoTool('mongodump', {
+    platform: 'win32', environment: { ProgramFiles: 'C:\\Program Files' },
+    exists: (file) => file === installedTool,
+  }), installedTool);
+  assert.equal(resolveMongoTool('mongorestore', {
+    platform: 'win32', environment: {}, exists: () => false,
+  }), 'mongorestore');
   if (process.platform === 'win32') {
     console.log('Ensayo del coordinador omitido en Windows (usa ejecutables simulados Unix).');
     return;

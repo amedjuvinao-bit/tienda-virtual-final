@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { backupDirectory } = require('./freeBackupArchive');
+const { resolveMongoTool } = require('./backupMongoTools');
 const { configuration } = require('../scripts/backupAtlasFree');
 const adminAccessGate = require('../middleware/adminAccessGate');
 
@@ -78,7 +79,7 @@ function middleware(req, res, next) {
 
 function toolAvailable(binary) {
   return new Promise((resolve) => {
-    const child = spawn(binary, ['--version'], { shell: false, stdio: 'ignore', windowsHide: true });
+    const child = spawn(resolveMongoTool(binary), ['--version'], { shell: false, stdio: 'ignore', windowsHide: true });
     let settled = false;
     const done = (available) => {
       if (settled) return;

@@ -9,6 +9,7 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const mongoose = require('mongoose');
+const { resolveMongoTool } = require('../services/backupMongoTools');
 const {
   backupDirectory, encryptionKey, sha256, encryptArchive, verifiedPlaintextDigest,
 } = require('../services/freeBackupArchive');
@@ -52,7 +53,7 @@ function configuration() {
 function runTool(binary, args) {
   return new Promise((resolve, reject) => {
     if (interrupted) return reject(new Error('Operación interrumpida.'));
-    const child = spawn(binary, args, { shell: false, stdio: 'ignore', windowsHide: true });
+    const child = spawn(resolveMongoTool(binary), args, { shell: false, stdio: 'ignore', windowsHide: true });
     activeChild = child;
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; child.kill(); }, 2 * 60 * 60 * 1000);
