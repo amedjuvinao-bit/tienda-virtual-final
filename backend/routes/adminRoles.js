@@ -10,6 +10,7 @@ const AdminRole = require('../models/AdminRole');
 const AdminUser = require('../models/AdminUser');
 const { canGrantRole } = require('../security/adminUserWritePolicy');
 const { getPublicPermissionCatalog } = require('../security/adminPermissionCatalog');
+const { saveRoleWithDefaultSelection, selectionError } = require('../services/adminRoleDefaultSelectionService');
 
 const router = express.Router();
 
@@ -105,6 +106,21 @@ function sendError(res, status, message, extra = {}) {
     message,
     ...extra,
   });
+}
+
+function sendRoleWriteError(res, error, fallbackMessage) {
+  const resolved = selectionError(error);
+  if (['ROLE_DEFAULT_CONFLICT', 'ROLE_DEFAULT_INDEX_CONFLICT'].includes(resolved.code)) {
+    return sendError(res, 409, resolved.message);
+  }
+  if (resolved.code === 'ROLE_DEFAULT_INDEX_UNAVAILABLE') {
+    return sendError(res, 503, resolved.message);
+  }
+  if (resolved.code === 'ROLE_DEFAULT_INACTIVE') {
+    return sendError(res, 400, resolved.message);
+  }
+  if (resolved.code === 11000) return sendError(res, 409, 'Ya existe un rol con ese código.');
+  return sendError(res, 500, resolved.message || fallbackMessage);
 }
 
 function normalizePermissions(input) {
@@ -516,16 +532,9 @@ router.post(
         updatedBy: getCurrentAdminId(req),
       });
 
-      await role.save();
+      await saveRoleWithDefaultSelection(role);
       res.locals = res.locals || {};
       res.locals.adminAuditResourceId = String(role._id);
-
-      if (role.isDefault) {
-        await AdminRole.updateMany(
-          { _id: { $ne: role._id }, deletedAt: null, isDefault: true },
-          { $set: { isDefault: false } }
-        );
-      }
 
       return res.status(201).json({
         ok: true,
@@ -535,11 +544,7 @@ router.post(
     } catch (error) {
       console.error('❌ Error creando rol admin:', error.message);
 
-      if (error?.code === 11000) {
-        return sendError(res, 409, 'Ya existe un rol con ese código.');
-      }
-
-      return sendError(res, 500, error.message || 'Error creando rol.');
+      return sendRoleWriteError(res, error, 'Error creando rol.');
     }
   }
 );
@@ -677,6 +682,9 @@ router.put(
       }
 
       if (body.isDefault !== undefined) {
+        if (role.isDefault === true && body.isDefault === false) {
+          return sendError(res, 400, 'Primero selecciona otro perfil como predeterminado.');
+        }
         role.isDefault = body.isDefault === true;
       }
 
@@ -697,14 +705,7 @@ router.put(
 
       role.updatedBy = getCurrentAdminId(req);
 
-      await role.save();
-
-      if (body.isDefault === true) {
-        await AdminRole.updateMany(
-          { _id: { $ne: role._id }, deletedAt: null, isDefault: true },
-          { $set: { isDefault: false } }
-        );
-      }
+      await saveRoleWithDefaultSelection(role);
 
       return res.json({
         ok: true,
@@ -714,11 +715,7 @@ router.put(
     } catch (error) {
       console.error('❌ Error actualizando rol admin:', error.message);
 
-      if (error?.code === 11000) {
-        return sendError(res, 409, 'Ya existe otro rol con ese código.');
-      }
-
-      return sendError(res, 500, error.message || 'Error actualizando rol.');
+      return sendRoleWriteError(res, error, 'Error actualizando rol.');
     }
   }
 );

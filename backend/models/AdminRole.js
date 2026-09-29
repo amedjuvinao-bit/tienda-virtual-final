@@ -6,6 +6,7 @@ const {
   ADMIN_PERMISSION_KEYS,
   canonicalPermission,
 } = require('../security/adminPermissionCatalog');
+const defaultRoleIndex = require('./adminRoleDefaultIndex');
 
 const ROLE_STATUS = ['active', 'inactive'];
 
@@ -180,6 +181,7 @@ AdminRoleSchema.index({ active: 1, status: 1, level: 1 });
 AdminRoleSchema.index({ scope: 1 });
 AdminRoleSchema.index({ isSystem: 1 });
 AdminRoleSchema.index({ isDefault: 1 });
+AdminRoleSchema.index(defaultRoleIndex.key, defaultRoleIndex.options);
 AdminRoleSchema.index({ deletedAt: 1 });
 
 /* ============================
