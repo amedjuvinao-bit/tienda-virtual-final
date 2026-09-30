@@ -332,7 +332,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.24.2",
     "multer": "^2.2.0",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^10.0.13",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "xmlbuilder2": "^4.0.3"
