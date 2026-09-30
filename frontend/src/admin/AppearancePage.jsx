@@ -1,8 +1,8 @@
 import { adminFetch } from '../lib/api';
 // src/admin/AppearancePage.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
-import { fetchSiteSettings, saveSiteSettings } from "../lib/siteSettingsApi";
+import { fetchAppearanceSettings, saveSiteSettings } from "../lib/siteSettingsApi";
 import { applyTheme } from "../theme/applyTheme";
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
@@ -14,6 +14,7 @@ import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
 import AdminModuleHero from "./components/AdminModuleHero";
+import useAdminPermissions from './security/useAdminPermissions';
 import {
   LOOK_SECTION_DEFAULTS,
   normalizeLookSection,
@@ -460,10 +461,19 @@ function deepEqual(a, b) {
 }
 
 export default function AppearancePage() {
+  const { can } = useAdminPermissions();
+  const canEditAppearance = can('appearance:update');
+  const canEditSections = can('appearance:sections');
+  const canEditMenus = can('appearance:menus');
+  const canEditAny = canEditAppearance || canEditSections || canEditMenus;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [serverSnapshot, setServerSnapshot] = useState(null);
+  const [appearanceRevision, setAppearanceRevision] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveConflict, setSaveConflict] = useState(false);
+  const savingRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState("general");
   const [theme, setTheme] = useState(buildThemeFromServer(null));
@@ -520,14 +530,17 @@ export default function AppearancePage() {
       setLoading(true);
       setLoadError(false);
       try {
-        const settings = await fetchSiteSettings();
-        if (!settings?.theme || !settings?.menus) {
+        const settings = await fetchAppearanceSettings();
+        if (!settings?.theme || !settings?.menus ||
+          !Number.isSafeInteger(settings.appearanceRevision) || settings.appearanceRevision < 0) {
           throw new Error("La configuración de apariencia llegó incompleta.");
         }
         if (cancelled) return;
         const merged = buildThemeFromServer(settings?.theme);
         setTheme(merged);
         setServerSnapshot(merged);
+        setAppearanceRevision(settings.appearanceRevision);
+        setSaveConflict(false);
         applyTheme(merged);
 
         const mergedMenus = buildMenusFromServer(settings?.menus);
@@ -600,6 +613,7 @@ export default function AppearancePage() {
   const onPreview = () => applyTheme(theme);
 
   const onReset = () => {
+    if (savingRef.current || saveConflict) return;
     if (serverSnapshot) {
       const merged = buildThemeFromServer(serverSnapshot);
       setTheme(merged);
@@ -716,11 +730,44 @@ export default function AppearancePage() {
   };
 
   const onSave = async () => {
+    if (savingRef.current || saveConflict || serverSnapshot === null || appearanceRevision === null || uploading) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveConflict(false);
     try {
+      const normalizedTheme = normalizeThemeForSave(theme);
+      const originalTheme = normalizeThemeForSave(serverSnapshot);
+      const changedTheme = {};
+      for (const key of Object.keys(normalizedTheme)) {
+        if (!deepEqual(normalizedTheme[key], originalTheme[key])) {
+          changedTheme[key] = normalizedTheme[key];
+        }
+      }
+
+      const changedMenus = {};
+      if (!deepEqual(menus.header, menusSnapshot.header)) {
+        changedMenus.header = (menus.header || []).map((it) => ({
+          ...it,
+          title: String(it?.title || '').trim(),
+          type: String(it?.type || 'url').trim(),
+          ref: String(it?.ref || '').trim(),
+          children: Array.isArray(it?.children) ? it.children : [],
+        }));
+      }
+      if (!deepEqual(menus.footer, menusSnapshot.footer)) changedMenus.footer = menus.footer;
+
+      const payload = { appearanceRevision };
+      if (Object.keys(changedTheme).length) payload.theme = changedTheme;
+      if (Object.keys(changedMenus).length) payload.menus = changedMenus;
+      if (!payload.theme && !payload.menus) {
+        alert('No hay cambios por guardar.');
+        return;
+      }
+
       const hexOk = (v) => !v || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
 
       const c = theme.colors || {};
-      if (![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
+      if (changedTheme.colors && ![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
         alert("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
         return;
       }
@@ -747,45 +794,45 @@ export default function AppearancePage() {
         h.mobileMenuOverlayColor,
       ];
 
-      if (!headerColorList.every(hexOk)) {
+      if (changedTheme.header && !headerColorList.every(hexOk)) {
         alert("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
         return;
       }
 
       const op = Number(h.bgOpacity);
-      if (Number.isNaN(op) || op < 0 || op > 1) {
+      if (changedTheme.header && (Number.isNaN(op) || op < 0 || op > 1)) {
         alert("La transparencia del header debe estar entre 0 y 1.");
         return;
       }
 
       const mobileOverlayOpacity = Number(h.mobileMenuOverlayOpacity);
-      if (
+      if (changedTheme.header && (
         Number.isNaN(mobileOverlayOpacity) ||
         mobileOverlayOpacity < 0 ||
         mobileOverlayOpacity > 1
-      ) {
+      )) {
         alert("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
         return;
       }
 
       const lh = Number(h.logoHeightPx);
-      if (Number.isNaN(lh) || lh < 30 || lh > 160) {
+      if (changedTheme.header && (Number.isNaN(lh) || lh < 30 || lh > 160)) {
         alert("El tamaño del logo debe estar entre 30 y 160 px.");
         return;
       }
 
       const mobileAnimDuration = Number(h.mobileMenuAnimationDurationMs);
-      if (
+      if (changedTheme.header && (
         Number.isNaN(mobileAnimDuration) ||
         mobileAnimDuration < 120 ||
         mobileAnimDuration > 1200
-      ) {
+      )) {
         alert("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
         return;
       }
 
       const mobileWidth = Number(h.mobileMenuWidthPercent);
-      if (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100) {
+      if (changedTheme.header && (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100)) {
         alert("El ancho del menú móvil debe estar entre 60% y 100%.");
         return;
       }
@@ -793,23 +840,23 @@ export default function AppearancePage() {
       // ✅ Validación básica banner (tipo + altura + sliderInterval)
       const b = theme.banner || {};
       const bannerType = String(b.type || "slider");
-      if (!["slider", "image", "video"].includes(bannerType)) {
+      if (changedTheme.banner && !["slider", "image", "video"].includes(bannerType)) {
         alert("El tipo de banner debe ser: slider, image o video.");
         return;
       }
       const hm = String(b.heightMode || "auto");
-      if (!["auto", "fullscreen"].includes(hm)) {
+      if (changedTheme.banner && !["auto", "fullscreen"].includes(hm)) {
         alert("heightMode debe ser: auto o fullscreen.");
         return;
       }
-      if (hm === "auto") {
+      if (changedTheme.banner && hm === "auto") {
         const hp = Number(b.heightPx);
         if (Number.isNaN(hp) || hp < 240 || hp > 1200) {
           alert("La altura del banner (px) debe estar entre 240 y 1200.");
           return;
         }
       }
-      if (bannerType === "slider") {
+      if (changedTheme.banner && bannerType === "slider") {
         const iv = Number(b.sliderIntervalMs);
         if (Number.isFinite(iv) && (iv < 1000 || iv > 15000)) {
           alert("En slider: el intervalo (ms) debe estar entre 1000 y 15000.");
@@ -823,30 +870,18 @@ export default function AppearancePage() {
         }
       }
 
-      const cleanedHeaderMenu = (menus?.header || []).map((it) => ({
-        ...it,
-        title: String(it?.title || "").trim(),
-        type: String(it?.type || "url").trim(),
-        ref: String(it?.ref || "").trim(),
-        children: Array.isArray(it?.children) ? it.children : [],
-      }));
-
-      const payload = {
-        theme: normalizeThemeForSave(theme), // ✅ FIX CLAVE
-        menus: {
-          ...(menus || {}),
-          header: cleanedHeaderMenu,
-        },
-      };
-
       const saved = await saveSiteSettings(payload);
+      if (!Number.isSafeInteger(saved?.appearanceRevision)) {
+        throw new Error('La respuesta de guardado no incluyó la revisión de Apariencia. Recarga antes de guardar de nuevo.');
+      }
 
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
+      setAppearanceRevision(saved.appearanceRevision);
       setTheme(merged);
       applyTheme(merged);
 
-      const mergedMenus = buildMenusFromServer(saved?.menus || payload.menus);
+      const mergedMenus = buildMenusFromServer(saved?.menus || menus);
       setMenus(mergedMenus);
       setMenusSnapshot(mergedMenus);
 
@@ -859,7 +894,14 @@ export default function AppearancePage() {
       alert("Apariencia guardada ✅");
     } catch (err) {
       console.error("❌ Error guardando apariencia:", err);
-      alert(err.userMessage || "Error al guardar apariencia.");
+      if (['APPEARANCE_REVISION_CONFLICT', 'APPEARANCE_REVISION_REQUIRED'].includes(err?.response?.data?.error)) {
+        setSaveConflict(true);
+      } else {
+        alert(err.userMessage || err.message || "Error al guardar apariencia.");
+      }
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -887,6 +929,14 @@ export default function AppearancePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+      {saveConflict && (
+        <div className="admin-widget-surface rounded-2xl p-4" role="alert">
+          <p>La Apariencia guardada cambió mientras editabas. Tus cambios siguen en este panel; no se sobrescribió la versión guardada.</p>
+          <button type="button" className="mt-3 rounded-xl border px-4 py-2" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+            Cargar versión actual y descartar mis cambios
+          </button>
+        </div>
+      )}
       <AdminModuleHero
         icon={Palette}
         eyebrow="Identidad visual de la tienda"
@@ -904,6 +954,7 @@ export default function AppearancePage() {
           </button>
           <button
             onClick={onSave}
+            disabled={saving || uploading || saveConflict || !canEditAny}
             className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white"
             style={{ background: 'var(--admin-primary)' }}
             type="button"
@@ -912,6 +963,7 @@ export default function AppearancePage() {
           </button>
           <button
             onClick={onReset}
+            disabled={saving || saveConflict}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
             style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
             type="button"
@@ -946,9 +998,10 @@ export default function AppearancePage() {
 
       {/* Contenido */}
       <main className="admin-widget-surface min-w-0 overflow-hidden rounded-[28px] border">
+        <fieldset disabled={saving} className="min-w-0">
         <div className="p-4 md:p-5 min-w-0">
           {/* GENERAL */}
-          {activeTab === "general" && <GeneralPanel theme={theme} setPath={setPath} />}
+          {activeTab === "general" && <fieldset disabled={!canEditAppearance}><GeneralPanel theme={theme} setPath={setPath} /></fieldset>}
 
           {/* HEADER */}
           {activeTab === "header" && (
@@ -966,11 +1019,14 @@ export default function AppearancePage() {
               removeHeaderMenuItem={removeHeaderMenuItem}
               moveHeaderMenuItem={moveHeaderMenuItem}
               setHeaderMenuItem={setHeaderMenuItem}
+              canEditTheme={canEditAppearance}
+              canEditMenus={canEditMenus}
             />
           )}
 
           {/* ✅ BANNER */}
           {activeTab === "banner" && (
+            <fieldset disabled={!canEditAppearance}>
             <BannerPanel
               theme={theme}
               setPath={setPath}
@@ -979,10 +1035,12 @@ export default function AppearancePage() {
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
               onPreview={onPreview}
             />
+            </fieldset>
           )}
 
           {/* ✅ SECCIONES (reemplaza Home/Body) */}
           {activeTab === "sections" && (
+            <fieldset disabled={!canEditSections}>
             <SectionsPanel
               theme={theme}
               setPath={setPath}
@@ -990,10 +1048,12 @@ export default function AppearancePage() {
               setUploading={setUploading}
               uploadToCloudinary={uploadToCloudinaryViaBackend}
             />
+            </fieldset>
           )}
 
           {/* ✅ FOOTER separado */}
           {activeTab === "footer" && (
+            <fieldset disabled={!canEditAppearance}>
             <FooterPanel
               theme={theme}
               setPath={setPath}
@@ -1001,6 +1061,7 @@ export default function AppearancePage() {
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
             />
+            </fieldset>
           )}
         </div>
 
@@ -1022,6 +1083,7 @@ export default function AppearancePage() {
               </button>
               <button
                 onClick={onSave}
+                disabled={saving || uploading || saveConflict || !canEditAny}
                 className="px-4 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700"
                 type="button"
               >
@@ -1029,6 +1091,7 @@ export default function AppearancePage() {
               </button>
               <button
                 onClick={onReset}
+                disabled={saving || saveConflict}
                 className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50"
                 type="button"
               >
@@ -1037,6 +1100,7 @@ export default function AppearancePage() {
             </div>
           </div>
         </div>
+        </fieldset>
       </main>
     </div>
   );

@@ -131,6 +131,8 @@ export default function HeaderPanel({
   removeHeaderMenuItem,
   moveHeaderMenuItem,
   setHeaderMenuItem,
+  canEditTheme = true,
+  canEditMenus = true,
 }) {
   const mainTabs = useMemo(
     () => [
@@ -185,6 +187,7 @@ export default function HeaderPanel({
           ))}
         </div>
 
+        <fieldset disabled={!canEditTheme}>
         {activeMainTab === "branding" && (
           <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
             <div className="mb-4">
@@ -1207,6 +1210,9 @@ export default function HeaderPanel({
           </section>
         )}
 
+        </fieldset>
+
+        <fieldset disabled={!canEditMenus}>
         {activeMainTab === "menu" && (
           <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
             <div className="mb-4">
@@ -1336,6 +1342,7 @@ export default function HeaderPanel({
             </div>
           </section>
         )}
+        </fieldset>
       </div>
     </div>
   );

@@ -4,14 +4,15 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AppearancePage from './AppearancePage';
-import { fetchSiteSettings, saveSiteSettings } from '../lib/siteSettingsApi';
+import { fetchAppearanceSettings, saveSiteSettings } from '../lib/siteSettingsApi';
 
 vi.mock('../lib/siteSettingsApi', () => ({
-  fetchSiteSettings: vi.fn(),
+  fetchAppearanceSettings: vi.fn(),
   saveSiteSettings: vi.fn(),
 }));
 vi.mock('../lib/api', () => ({ adminFetch: vi.fn().mockResolvedValue({ ok: true, json: async () => [] }) }));
 vi.mock('../theme/applyTheme', () => ({ applyTheme: vi.fn() }));
+vi.mock('./security/useAdminPermissions', () => ({ default: () => ({ can: () => true }) }));
 vi.mock('./appearance/general/GeneralPanel', () => ({ default: () => <div>Editor general</div> }));
 vi.mock('./appearance/header/HeaderPanel', () => ({ default: () => null }));
 vi.mock('./appearance/banner/BannerPanel', () => ({ default: () => null }));
@@ -24,9 +25,9 @@ describe('carga inicial de Apariencia', () => {
 
   it('impide guardar valores iniciales si la carga falla y permite reintentar', async () => {
     const user = userEvent.setup();
-    fetchSiteSettings
+    fetchAppearanceSettings
       .mockRejectedValueOnce(new Error('Red no disponible'))
-      .mockResolvedValueOnce({ theme: {}, menus: { header: [], footer: [], social: [] } });
+      .mockResolvedValueOnce({ theme: {}, menus: { header: [], footer: [], social: [] }, appearanceRevision: 0 });
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       render(<AppearancePage />);
@@ -37,7 +38,7 @@ describe('carga inicial de Apariencia', () => {
 
       await user.click(screen.getByRole('button', { name: 'Reintentar carga' }));
       expect(await screen.findByText('Editor general')).toBeInTheDocument();
-      expect(fetchSiteSettings).toHaveBeenCalledTimes(2);
+      expect(fetchAppearanceSettings).toHaveBeenCalledTimes(2);
       expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
     } finally {
       consoleError.mockRestore();
@@ -47,7 +48,7 @@ describe('carga inicial de Apariencia', () => {
   it('rechaza una respuesta incompleta en lugar de presentar el diseño predeterminado', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      fetchSiteSettings.mockResolvedValue({ theme: {} });
+      fetchAppearanceSettings.mockResolvedValue({ theme: {} });
       render(<AppearancePage />);
       expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar Apariencia');
       expect(saveSiteSettings).not.toHaveBeenCalled();

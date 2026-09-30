@@ -566,6 +566,7 @@ const SiteSettingsSchema = new Schema(
     shippingRatesRevision: { type: Number, min: 0, default: 0 },
 
     theme: ThemeSchema,
+    appearanceRevision: { type: Number, min: 0, default: 0 },
 
     admin: {
       type: AdminAppearanceSchema,
