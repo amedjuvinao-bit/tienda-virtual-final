@@ -1,10 +1,10 @@
 # Preparación de respaldo y reversión — Configuración Nivel Plus
 
-**Alcance:** PR #16, rama `feature/configuracion-sedes-nivel-plus`: Usuarios, Perfiles, Sedes y Logs. Esta guía prepara una futura integración y puesta en servicio. No ejecuta un respaldo, una restauración, un despliegue ni una integración en `main`.
+**Alcance:** PR #16, integrado a `main` en `f928c2e`: Usuarios, Perfiles, Sedes y Logs. Esta guía prepara una futura puesta en servicio. No ejecuta un respaldo, una restauración ni un despliegue.
 
 ## Dos momentos distintos
 
-1. **Antes de integrar el código:** revisar el PR completo, las pruebas, las capturas del panel y la compatibilidad con la versión actual de `main`. Integrar código no cambia por sí solo la base de datos en producción.
+1. **Integración de código completada:** el PR #16 se revisó y sus nueve flujos de CI aprobaron antes de fusionarse a `main`. Integrar código no cambia por sí solo la base de datos en producción.
 2. **Inmediatamente antes de activar la nueva versión en producción:** registrar la versión anterior y la nueva, hacer y verificar el respaldo, confirmar cómo se detienen las escrituras y preparar la reversión. Un respaldo antiguo no reemplaza uno tomado en esta ventana.
 
 La preparación productiva también incluye HTTPS, secretos, configuración de Factus, rangos oficiales y pasarela de pago; esos puntos tienen su propio control y no quedan aprobados por este documento.
@@ -55,7 +55,7 @@ cd backend
 npm run backup:media:extract -- "C:\ruta\media-ID.bundle.enc" "C:\ruta\media-ID.json" "C:\destino\ensayo-vacio"
 ```
 
-El directorio de salida **no debe existir**: el comando lo crea, comprueba el SHA-256 del archivo cifrado y extrae los originales verificando cada huella. Deja archivos sin cifrar en ese directorio; protegerlo y eliminarlo tras la prueba. `uploads/` contiene los archivos servidos por el backend, `backend-uploads/` los de esa carpeta cuando era distinta, y `cloudinary/` contiene originales con sus identificadores. El JSON conserva `publicId`, tipo y versión para reconstrucción supervisada. Esta prueba **no** los publica de nuevo en Cloudinary ni modifica MongoDB. En una recuperación real hay que preparar una cuenta Cloudinary, reponer activos y validar las URL/versiones almacenadas en MongoDB antes de reabrir la tienda. No asumir que volver a subir un archivo restaura automáticamente las antiguas URL versionadas.
+El directorio de salida **no debe existir**: el comando lo crea, comprueba el SHA-256 del archivo cifrado y extrae los originales verificando cada huella. Deja archivos sin cifrar en ese directorio; protegerlo y eliminarlo tras la prueba. `uploads/` contiene los archivos servidos por el backend, `backend-uploads/` los de esa carpeta cuando era distinta, y `cloudinary/` contiene originales con su identificador y extensión (`.png`, `.jpg`, etc.), de modo que Windows pueda abrirlos. El JSON conserva `publicId`, tipo y versión para reconstrucción supervisada. Las copias cifradas creadas antes de esta mejora también se extraen con extensiones cuando su registro conserva el formato. Esta prueba **no** los publica de nuevo en Cloudinary ni modifica MongoDB. En una recuperación real hay que preparar una cuenta Cloudinary, reponer activos y validar las URL/versiones almacenadas en MongoDB antes de reabrir la tienda. No asumir que volver a subir un archivo restaura automáticamente las antiguas URL versionadas.
 
 **Alternativa sin botón:** detener todos los backend/workers y ejecutar `npm run backup:free` desde `backend/`. El comando reserva el puerto configurado y responde HTTP 503; si el backend sigue escuchando, falla sin hacer la copia. Al terminar, iniciar de nuevo el backend. Esta alternativa sirve cuando no se puede confirmar una sola instancia para el botón del panel.
 
@@ -112,6 +112,6 @@ Tras cualquiera de las rutas: comprobar los validadores de solo lectura, inicio 
 
 ## Estado de esta guía
 
-El ensayo de MongoDB en Atlas Free se realizó el 30/09/2026 con un conjunto de datos de prueba: la copia cifrada y el registro se descargaron y sus huellas coincidieron; el proceso ensayó la restauración en otro clúster. La copia de archivos externos se implementó después y requiere una prueba con la cuenta Cloudinary y los archivos reales del entorno antes de considerarla verificada. **Para el día de activación** aún se necesita una copia reciente de ambas partes, almacenamiento externo, custodia de la clave, detener todas las escrituras externas y comprobar la recuperación a partir de los archivos descargados. Esta guía no autoriza integrar la rama a `main` ni iniciar producción.
+El ensayo de MongoDB en Atlas Free se realizó el 30/09/2026 con un conjunto de datos de prueba: la copia cifrada y el registro se descargaron y sus huellas coincidieron; el proceso ensayó la restauración en otro clúster. La copia de archivos externos con la cuenta Cloudinary del entorno se descargó y recuperó el 30/09/2026: 506 originales de Cloudinary y 5 archivos locales, todos verificados por la extracción. **Para el día de activación** aún se necesita una copia reciente de ambas partes, almacenamiento externo, custodia de la clave, detener todas las escrituras externas y comprobar la recuperación a partir de los archivos descargados. Esta guía no inicia producción.
 
 Referencias de MongoDB Database Tools: [mongodump](https://www.mongodb.com/docs/database-tools/mongodump/) y [mongorestore](https://www.mongodb.com/docs/database-tools/mongorestore/).

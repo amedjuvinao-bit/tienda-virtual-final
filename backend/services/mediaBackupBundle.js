@@ -7,6 +7,14 @@ const { Readable } = require('node:stream');
 
 const MAGIC = Buffer.from('TVMEDIA1');
 
+function extractedName(meta) {
+  if (!meta.name.startsWith('cloudinary/')) return meta.name;
+  // Cloudinary's asset ID is stable, while format makes recovered originals
+  // directly usable by the operating system. Keep the archive name unchanged.
+  const format = typeof meta.format === 'string' ? meta.format.toLowerCase() : '';
+  return /^[a-z0-9]{1,12}$/.test(format) ? `${meta.name}.${format}` : meta.name;
+}
+
 function safeName(name) {
   return typeof name === 'string' && name.length > 0 && name.length < 1024 &&
     !name.includes('\\') && !name.includes('\0') && !name.split('/').some((part) => !part || part === '.' || part === '..') &&
@@ -162,7 +170,7 @@ async function extractBundle(bundle, destination, expected) {
           JSON.stringify(meta) !== JSON.stringify((({ sha256, ...rest }) => rest)(expected[index]))) {
         throw new Error('Una entrada no coincide con el registro.');
       }
-      const output = path.join(destination, ...meta.name.split('/'));
+      const output = path.join(destination, ...extractedName(meta).split('/'));
       await fs.promises.mkdir(path.dirname(output), { recursive: true });
       const handle = await fs.promises.open(output, 'wx', 0o600);
       const hash = crypto.createHash('sha256');
