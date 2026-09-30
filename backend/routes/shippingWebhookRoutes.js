@@ -15,6 +15,7 @@ const {
 const {
   processShippingWebhookEvent,
 } = require('../services/shippingWebhookProcessingService');
+const { scheduleTrackedBackground } = require('../services/backupActivityTracker');
 
 const router = express.Router();
 
@@ -44,11 +45,9 @@ async function persistVerifiedEvent(verified, payload) {
       sandboxTest: verified.sandboxTest === true,
     });
     await markShippingWebhookVerified(verified);
-    setImmediate(() => {
-      processShippingWebhookEvent(event._id).catch((error) => {
-        console.error('[shipping-webhook] No fue posible procesar el evento:', error?.message || error);
-      });
-    });
+    scheduleTrackedBackground(setImmediate,
+      () => processShippingWebhookEvent(event._id),
+      (error) => console.error('[shipping-webhook] No fue posible procesar el evento:', error?.message || error));
     return { duplicate: false };
   } catch (error) {
     if (error?.code === 11000) {
@@ -80,8 +79,8 @@ router.post('/', async (req, res) => {
 
   if (!hasSignedHeaders && temporarySandboxTunnel) {
     const response = res.status(200).json({ received: true });
-    setImmediate(async () => {
-      try {
+    scheduleTrackedBackground(setImmediate,
+      async () => {
         const runtime = await getRuntimeShippingConfiguration();
         const verified = verifyEnviaSandboxTestWebhook({
           rawBody: req.body,
@@ -92,13 +91,13 @@ router.post('/', async (req, res) => {
         });
         const payload = JSON.parse(verified.body || '{}');
         await persistVerifiedEvent(verified, payload);
-      } catch (error) {
+      },
+      (error) => {
         console.warn('[shipping-webhook] Prueba Sandbox confirmada pero descartada:', {
           code: error?.code || 'SHIPPING_WEBHOOK_FAILED',
           status: error?.statusCode || 500,
         });
-      }
-    });
+      });
     return response;
   }
 
@@ -133,11 +132,9 @@ router.post('/', async (req, res) => {
 
     if (verified.sandboxTest === true) {
       const response = res.status(200).json({ received: true });
-      setImmediate(() => {
-        persistVerifiedEvent(verified, payload).catch((error) => {
-          console.error('[shipping-webhook] No fue posible guardar la prueba aceptada:', error?.message || error);
-        });
-      });
+      scheduleTrackedBackground(setImmediate,
+        () => persistVerifiedEvent(verified, payload),
+        (error) => console.error('[shipping-webhook] No fue posible guardar la prueba aceptada:', error?.message || error));
       return response;
     }
 

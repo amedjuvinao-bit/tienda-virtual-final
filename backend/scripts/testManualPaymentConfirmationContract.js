@@ -20,6 +20,7 @@ const {
 const {
   createManualPaymentConfirmationService,
 } = require('../services/manualPaymentConfirmationService');
+const { pendingBackgroundOperations } = require('../services/backupActivityTracker');
 const {
   manualPaymentErrorResponse,
   presentManualPaymentOrder,
@@ -491,6 +492,7 @@ async function main() {
   const slowPostCommit = createHarness([makeOrder(IDS.other)], {
     postCommitGate: new Promise((resolve) => { finishPostCommit = resolve; }),
   });
+  const pendingBeforePayment = pendingBackgroundOperations();
   const fastResponse = await slowPostCommit.service.confirmManualPayment({
     orderId: IDS.other,
     payment: { ...validPayment, reference: 'TRX-SLOW-FACTUS' },
@@ -498,12 +500,15 @@ async function main() {
   });
   assert.strictEqual(fastResponse.order.payment.status, 'paid');
   assert.strictEqual(slowPostCommit.state.postCommitCalls, 0);
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment + 1);
   const backgroundWork = slowPostCommit.state.runPostCommitJobs();
   await Promise.resolve();
   assert.strictEqual(slowPostCommit.state.postCommitCalls, 1);
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment + 1);
   finishPostCommit();
   await backgroundWork;
-  ok('la respuesta del pago no espera a Factus ni a la entrega');
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment);
+  ok('la respuesta del pago no espera a Factus y el respaldo aguarda el trabajo pendiente');
 
   const schedulingFailure = createHarness([makeOrder(IDS.other)], {
     scheduleError: Object.assign(new Error('Worker no disponible.'), {
@@ -519,6 +524,7 @@ async function main() {
   assert.strictEqual(recoveredByWorker.postCommit.scheduled, false);
   assert.strictEqual(recoveredByWorker.postCommitWarning.code, 'MANUAL_PAYMENT_POST_COMMIT_SCHEDULE_FAILED');
   assert.strictEqual(recoveredByWorker.order.paymentProcessing.invoice.status, 'pending');
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment);
   ok('un fallo al iniciar la factura conserva el pago y deja el outbox pendiente');
 
   const replay = await validation.service.confirmManualPayment({

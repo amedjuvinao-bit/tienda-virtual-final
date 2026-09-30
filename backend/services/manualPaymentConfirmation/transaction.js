@@ -32,6 +32,7 @@ const {
 const {
   createManualPaymentPostCommitProcessor,
 } = require('./postCommit');
+const { scheduleTrackedBackground } = require('../backupActivityTracker');
 
 async function executeQuery(query, { session = null, lean = false } = {}) {
   let current = query;
@@ -413,21 +414,20 @@ function createManualPaymentConfirmationService({
     };
     let scheduled = false;
     try {
-      postCommitScheduler(() => Promise.resolve()
-        .then(() => postCommitProcessor(postCommitPayload))
-        .then((outcome) => {
+      scheduleTrackedBackground(postCommitScheduler,
+        () => Promise.resolve(postCommitProcessor(postCommitPayload)).then((outcome) => {
           if (outcome?.retryable === true) {
             logger.warn?.('manual_payment_post_commit_retry_required', {
               orderId: String(transactionResult.orderId),
             });
           }
-        })
-        .catch((error) => {
+        }),
+        (error) => {
           logger.error?.('manual_payment_post_commit_failed', {
             orderId: String(transactionResult.orderId),
             code: error?.code || 'MANUAL_PAYMENT_POST_COMMIT_FAILED',
           });
-        }));
+        });
       scheduled = true;
     } catch (error) {
       logger.error?.('manual_payment_post_commit_schedule_failed', {

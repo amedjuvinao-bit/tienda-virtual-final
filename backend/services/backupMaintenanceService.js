@@ -10,6 +10,7 @@ const { configuration } = require('../scripts/backupAtlasFree');
 const { env } = require('../config/env');
 const { encryptionKey } = require('./freeBackupArchive');
 const adminAccessGate = require('../middleware/adminAccessGate');
+const { pendingBackgroundOperations } = require('./backupActivityTracker');
 
 const STATUS_PATH = '/api/backup-maintenance/status';
 let state = { phase: 'inactivo', id: null, progress: '' };
@@ -163,7 +164,8 @@ async function begin({ owner, kind = 'database' }) {
 async function waitForDrain(timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (activeRequests === 0 && adminAccessGate.pendingAuditCount() === 0 && workersIdle()) return;
+    if (activeRequests === 0 && adminAccessGate.pendingAuditCount() === 0 &&
+        pendingBackgroundOperations() === 0 && workersIdle()) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error('No terminaron las operaciones anteriores en dos minutos. La copia no se inició.');
