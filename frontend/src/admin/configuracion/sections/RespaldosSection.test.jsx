@@ -58,10 +58,45 @@ describe('preferencia de respaldos', () => {
     render(<RespaldosSection />);
     expect(await screen.findByText('Última copia verificada')).toBeInTheDocument();
     expect(screen.getByText(/2 colecciones, 10 documentos y 3 índices/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Descargar copia cifrada' }));
+    const downloadButton = screen.getByRole('button', { name: 'Descargar copia cifrada' });
+    fireEvent.click(downloadButton);
+    expect(downloadButton.closest('li')).toContainElement(screen.getByRole('heading', { name: 'Confirmar descarga' }));
     expect(screen.getByLabelText('Contraseña actual')).toBeRequired();
     expect(screen.getByLabelText('Código de 6 dígitos')).toBeRequired();
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('descarga el archivo tras confirmar y deja el registro para una segunda acción explícita', async () => {
+    const id = 'a'.repeat(24);
+    const run = { id, status: 'verificado', available: true, size: 3, database: 'tienda_virtual',
+      startedAt: '2026-09-29T00:00:00.000Z', completedAt: '2026-09-29T00:01:00.000Z',
+      sha256: 'b'.repeat(64), restoreTest: { collections: 2, documents: 10, indexes: 3 }, steps: [] };
+    api.get.mockImplementation(async (path) => path.endsWith('/runs') ? { data: { runs: [run] } }
+      : { data: { strategy: 'free_manual', revision: 1 } });
+    api.post.mockResolvedValue({ data: new Blob(['abc']) });
+    const createObjectURL = vi.fn(() => 'blob:backup-test');
+    const revokeObjectURL = vi.fn();
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      render(<RespaldosSection />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Descargar copia cifrada' }));
+      fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'correcta' } });
+      fireEvent.change(screen.getByLabelText('Código de 6 dígitos'), { target: { value: '123456' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y descargar' }));
+      await waitFor(() => expect(api.post).toHaveBeenCalledWith(`/api/admin/backup-preferences/runs/${id}/download`,
+        { currentPassword: 'correcta', twoFactorCode: '123456' }, { responseType: 'blob', timeout: 0 }));
+      expect(await screen.findByRole('button', { name: 'Descargar registro de la copia' })).toBeInTheDocument();
+      expect(click).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Descargar registro de la copia' }));
+      expect(click).toHaveBeenCalledTimes(2);
+      expect(createObjectURL).toHaveBeenCalledTimes(2);
+    } finally {
+      click.mockRestore();
+      delete URL.createObjectURL;
+      delete URL.revokeObjectURL;
+    }
   });
 
   it('inicia la pausa desde el panel con contraseña y TOTP del propietario', async () => {

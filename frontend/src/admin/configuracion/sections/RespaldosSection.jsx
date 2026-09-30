@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DatabaseBackup, Download, ExternalLink, ShieldAlert } from 'lucide-react';
 import api from '../../../lib/api';
 
@@ -35,6 +35,9 @@ export default function RespaldosSection() {
   const [runs, setRuns] = useState([]);
   const [runsError, setRunsError] = useState('');
   const [selectedRun, setSelectedRun] = useState(null);
+  const [downloadedRunId, setDownloadedRunId] = useState(null);
+  const [downloadError, setDownloadError] = useState('');
+  const downloadFormRef = useRef(null);
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -91,6 +94,12 @@ export default function RespaldosSection() {
     if (maintenance) setPreviousPhase(maintenance.phase);
   }, [maintenance?.phase]);
 
+  useEffect(() => {
+    if (!selectedRun) return;
+    downloadFormRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    downloadFormRef.current?.querySelector('input[type="password"]')?.focus({ preventScroll: true });
+  }, [selectedRun]);
+
   async function startBackup(event) {
     event.preventDefault();
     if (starting || maintenance?.maintenance) return;
@@ -136,10 +145,14 @@ export default function RespaldosSection() {
     event.preventDefault();
     if (!selectedRun || downloading) return;
     setDownloading(true);
-    setError('');
+    setDownloadError('');
     try {
+      const record = runs.find((run) => run.id === selectedRun);
       const response = await api.post(`/api/admin/backup-preferences/runs/${selectedRun}/download`,
         { currentPassword: password, twoFactorCode }, { responseType: 'blob', timeout: 0 });
+      if (!(response.data instanceof Blob) || (record?.size && response.data.size !== record.size)) {
+        throw new Error('El archivo recibido está incompleto. No se inició la descarga.');
+      }
       const url = URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
@@ -148,28 +161,31 @@ export default function RespaldosSection() {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      const record = runs.find((run) => run.id === selectedRun);
-      const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' }));
-      const manifestLink = document.createElement('a');
-      manifestLink.href = manifestUrl;
-      manifestLink.download = `backup-${selectedRun}.json`;
-      document.body.appendChild(manifestLink);
-      manifestLink.click();
-      manifestLink.remove();
-      setTimeout(() => URL.revokeObjectURL(manifestUrl), 60000);
+      setDownloadedRunId(selectedRun);
       setSelectedRun(null);
-      setNotice('Descarga de la copia y su registro iniciada. Guarda ambos archivos y la clave de cifrado en lugares seguros y separados.');
+      setNotice('Comprueba que el archivo cifrado llegó a tu carpeta Descargas. Descarga también su registro desde el historial.');
     } catch (failure) {
       let message = 'No se pudo descargar el respaldo. Comprueba tus credenciales y vuelve a intentar.';
       if (failure?.response?.data instanceof Blob) {
         try { message = JSON.parse(await failure.response.data.text()).message || message; } catch { /* respuesta no JSON */ }
       }
-      setError(message);
+      setDownloadError(failure?.message?.startsWith('El archivo recibido') ? failure.message : message);
     } finally {
       setPassword('');
       setTwoFactorCode('');
       setDownloading(false);
     }
+  }
+
+  function downloadManifest(run) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(run, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `backup-${run.id}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
   const latestVerified = runs.find((run) => run.status === 'verificado' && run.available);
@@ -289,20 +305,28 @@ export default function RespaldosSection() {
               {run.restoreTest && <p>Restauración: {run.restoreTest.collections} colecciones, {run.restoreTest.documents} documentos y {run.restoreTest.indexes} índices en servidor separado.</p>}
               {run.restoreTest?.contentSha256 && <p className="break-all">Huella del contenido restaurado: <code>{run.restoreTest.contentSha256}</code></p>}
               <ol className="mt-2 list-inside list-decimal text-xs opacity-75">{run.steps.map((step, index) => <li key={index}>{step.name} · {new Date(step.at).toLocaleString('es-CO')}</li>)}</ol>
-              {run.status === 'verificado' && run.available && <button type="button" className="mt-2 inline-flex items-center gap-1 underline" onClick={() => setSelectedRun(run.id)}><Download size={14} /> Descargar copia cifrada</button>}
+              {run.status === 'verificado' && run.available && <button type="button" className="mt-2 inline-flex items-center gap-1 underline" onClick={() => {
+                setSelectedRun(run.id);
+                setDownloadError('');
+                if (selectedRun === run.id) downloadFormRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+              }}><Download size={14} /> Descargar copia cifrada</button>}
+              {selectedRun === run.id && <form ref={downloadFormRef} onSubmit={download} className="mt-3 space-y-3 rounded-xl border p-4" style={cardStyle}>
+                <h3 className="font-semibold">Confirmar descarga</h3>
+                <p>Por seguridad, introduce tu contraseña y el código actual de la aplicación. Después comenzará la descarga.</p>
+                <label className="block">Contraseña actual<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
+                <label className="block">Código de 6 dígitos<input inputMode="numeric" pattern="[0-9]{6}" required value={twoFactorCode} onChange={(event) => setTwoFactorCode(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
+                {downloadError && <p role="alert" className="text-red-700">{downloadError}</p>}
+                <button type="submit" disabled={downloading} className="rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-50">{downloading ? 'Descargando…' : 'Confirmar y descargar'}</button>
+                <button type="button" onClick={() => { setSelectedRun(null); setPassword(''); setTwoFactorCode(''); setDownloadError(''); }} className="ml-3 underline">Cancelar</button>
+              </form>}
+              {downloadedRunId === run.id && <div role="status" className="mt-3 rounded-xl border border-emerald-500/50 p-3">
+                <p>Comprueba que el archivo cifrado esté en Descargas. Guarda también el registro para comprobarlo después.</p>
+                <button type="button" className="mt-2 inline-flex items-center gap-1 underline" onClick={() => downloadManifest(run)}><Download size={14} /> Descargar registro de la copia</button>
+              </div>}
             </li>)}
           </ul>
         )}
       </div>
-
-      {selectedRun && <form onSubmit={download} className="rounded-2xl border p-4 text-sm" style={cardStyle}>
-        <h2 className="font-semibold">Confirmar descarga de {selectedRun}</h2>
-        <p className="mt-1">Solo el propietario puede descargar. Confirma tu contraseña y el código actual de la aplicación de seguridad.</p>
-        <label className="mt-3 block">Contraseña actual<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
-        <label className="mt-3 block">Código de 6 dígitos<input inputMode="numeric" pattern="[0-9]{6}" required value={twoFactorCode} onChange={(event) => setTwoFactorCode(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
-        <button type="submit" disabled={downloading} className="mt-3 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-50">{downloading ? 'Descargando…' : 'Confirmar y descargar'}</button>
-        <button type="button" onClick={() => { setSelectedRun(null); setPassword(''); setTwoFactorCode(''); }} className="ml-3 underline">Cancelar</button>
-      </form>}
 
       <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
         <h2 className="font-semibold">Cambio de plan en Atlas</h2>
