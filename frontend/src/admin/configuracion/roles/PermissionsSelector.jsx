@@ -1,433 +1,124 @@
-// frontend/src/admin/configuracion/roles/PermissionsSelector.jsx
+import { useMemo, useState } from 'react';
+import { Check, Search } from 'lucide-react';
+import { getPermissionGroupsArray, normalizePermissions, togglePermission, togglePermissionGroup } from './rolesHelpers';
 
-import { useEffect, useMemo, useState } from 'react';
-
-import {
-  getPermissionGroupsArray,
-  isPermissionGroupSelected,
-  isPermissionSelected,
-  normalizePermissions,
-  togglePermission,
-  togglePermissionGroup,
-} from './rolesHelpers';
-
-/* ============================================================
- * SELECTOR VISUAL DE PERMISOS
- * ------------------------------------------------------------
- * Versión compacta:
- * - No muestra todos los permisos hacia abajo.
- * - Muestra módulos como pestañas.
- * - Solo muestra permisos del módulo activo.
- * - Botones y contadores con contraste corregido.
- * ============================================================ */
-
-const THEME = {
-  cardBg: 'var(--admin-card-bg, #ffffff)',
-  cardText: 'var(--admin-card-text, #111827)',
-  mutedText: 'var(--admin-card-muted-text, var(--admin-card-muted, #6b7280))',
-  border:
-    'var(--admin-card-border, var(--admin-border, rgba(148, 163, 184, 0.22)))',
-  softBg: 'var(--admin-soft-bg, rgba(255,255,255,0.55))',
-  primaryBg: 'var(--admin-button-bg, var(--admin-primary, #be185d))',
-  primaryText: 'var(--admin-button-text, #ffffff)',
-  inputBg: 'var(--admin-input-bg, #ffffff)',
-  inputText: 'var(--admin-input-text, var(--admin-card-text, #111827))',
-  inputBorder:
-    'var(--admin-input-border, var(--admin-card-border, rgba(148, 163, 184, 0.22)))',
-};
-
-const LIGHT_BUTTON = {
-  background: 'rgba(255, 255, 255, 0.96)',
-  color: '#0f172a',
-  border: '1px solid rgba(244, 114, 182, 0.35)',
-};
-
-const DISABLED_BUTTON = {
-  background: 'rgba(241, 245, 249, 0.95)',
-  color: '#64748b',
-  border: '1px solid rgba(203, 213, 225, 0.85)',
-};
-
-const PRIMARY_BUTTON = {
-  background: THEME.primaryBg,
-  color: '#ffffff',
-  border: `1px solid ${THEME.primaryBg}`,
-};
-
-const GOLD_BUTTON = {
-  background: 'rgba(212, 175, 55, 0.18)',
-  color: '#0f172a',
-  border: '1px solid rgba(212, 175, 55, 0.45)',
-};
-
-const TOP_COUNTER = {
-  background: 'rgba(255, 255, 255, 0.12)',
-  color: '#ffffff',
-  border: '1px solid rgba(255, 255, 255, 0.24)',
-};
-
-function getGroupSelectedCount(selectedPermissions = [], groupPermissions = []) {
-  const selected = normalizePermissions(selectedPermissions);
-  const group = normalizePermissions(groupPermissions);
-
-  return group.filter((permission) => selected.includes(permission)).length;
-}
+const muted = 'var(--admin-card-muted, #6b7280)';
+const border = 'var(--admin-border, rgba(0,0,0,0.10))';
+const primary = 'var(--admin-button-bg, var(--admin-primary, #be185d))';
 
 export default function PermissionsSelector({
   availablePermissions = [],
+  permissionCatalog = [],
   selectedPermissions = [],
   onChange,
   disabled = false,
 }) {
+  const [showAll, setShowAll] = useState(false);
   const [activeModule, setActiveModule] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const normalizedAvailablePermissions = useMemo(
-    () => normalizePermissions(availablePermissions),
-    [availablePermissions]
+  const [search, setSearch] = useState('');
+  const available = useMemo(() => normalizePermissions(availablePermissions), [availablePermissions]);
+  const selected = useMemo(() => normalizePermissions(selectedPermissions), [selectedPermissions]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const groups = useMemo(
+    () => getPermissionGroupsArray(available, permissionCatalog),
+    [available, permissionCatalog]
   );
+  const allModules = showAll || selected.length === 0;
+  const visibleGroups = groups.filter((group) => {
+    const hasPermission = allModules || group.permissions.some((item) => selectedSet.has(item.value));
+    const matches = !search.trim() || group.label.toLocaleLowerCase('es').includes(search.trim().toLocaleLowerCase('es'));
+    return hasPermission && matches;
+  });
+  const active = visibleGroups.find((group) => group.module === activeModule) || visibleGroups[0];
+  const activeValues = active?.permissions.map((permission) => permission.value) || [];
+  const activeCount = activeValues.filter((value) => selectedSet.has(value)).length;
 
-  const normalizedSelectedPermissions = useMemo(
-    () => normalizePermissions(selectedPermissions),
-    [selectedPermissions]
-  );
-
-  const permissionGroups = useMemo(() => {
-    return getPermissionGroupsArray(normalizedAvailablePermissions);
-  }, [normalizedAvailablePermissions]);
-
-  const selectedCount = normalizedSelectedPermissions.length;
-  const totalCount = normalizedAvailablePermissions.length;
-
-  const activeGroup = useMemo(() => {
-    if (!permissionGroups.length) return null;
-
-    return (
-      permissionGroups.find((group) => group.module === activeModule) ||
-      permissionGroups[0]
-    );
-  }, [permissionGroups, activeModule]);
-
-  const activeGroupPermissions = useMemo(() => {
-    if (!activeGroup?.permissions) return [];
-
-    return activeGroup.permissions.map((permission) => permission.value);
-  }, [activeGroup]);
-
-  const filteredActivePermissions = useMemo(() => {
-    const cleanSearch = searchTerm.trim().toLowerCase();
-
-    if (!activeGroup?.permissions) return [];
-
-    if (!cleanSearch) return activeGroup.permissions;
-
-    return activeGroup.permissions.filter((permission) => {
-      const label = String(permission.label || '').toLowerCase();
-      const value = String(permission.value || '').toLowerCase();
-      const actionLabel = String(permission.actionLabel || '').toLowerCase();
-
-      return (
-        label.includes(cleanSearch) ||
-        value.includes(cleanSearch) ||
-        actionLabel.includes(cleanSearch)
-      );
-    });
-  }, [activeGroup, searchTerm]);
-
-  const activeGroupSelected = isPermissionGroupSelected(
-    normalizedSelectedPermissions,
-    activeGroupPermissions
-  );
-
-  const selectedInActiveGroup = getGroupSelectedCount(
-    normalizedSelectedPermissions,
-    activeGroupPermissions
-  );
-
-  useEffect(() => {
-    if (!permissionGroups.length) {
-      setActiveModule('');
-      return;
-    }
-
-    const activeExists = permissionGroups.some(
-      (group) => group.module === activeModule
-    );
-
-    if (!activeExists) {
-      setActiveModule(permissionGroups[0].module);
-    }
-  }, [permissionGroups, activeModule]);
-
-  function emitChange(nextPermissions) {
-    if (disabled) return;
-
-    if (typeof onChange === 'function') {
-      onChange(normalizePermissions(nextPermissions));
-    }
-  }
-
-  function handleTogglePermission(permission) {
-    const nextPermissions = togglePermission(
-      normalizedSelectedPermissions,
-      permission
-    );
-
-    emitChange(nextPermissions);
-  }
-
-  function handleToggleActiveGroup() {
-    const nextPermissions = togglePermissionGroup(
-      normalizedSelectedPermissions,
-      activeGroupPermissions
-    );
-
-    emitChange(nextPermissions);
-  }
-
-  function handleSelectAll() {
-    emitChange(normalizedAvailablePermissions);
-  }
-
-  function handleClearAll() {
-    emitChange([]);
+  function emit(next) {
+    if (!disabled) onChange?.(normalizePermissions(next));
   }
 
   return (
-    <div
-      className="rounded-3xl border p-4"
-      style={{
-        background: THEME.cardBg,
-        borderColor: THEME.border,
-        color: THEME.cardText,
-      }}
-    >
-      <div
-        className="flex items-start justify-between gap-4 border-b pb-3"
-        style={{
-          borderColor: THEME.border,
-        }}
-      >
+    <section className="min-w-0 rounded-3xl border p-4 sm:p-5" style={{ background: 'var(--admin-card-bg, #fff)', borderColor: border, color: 'var(--admin-card-text, #111827)' }}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-black uppercase tracking-[0.16em]">
-            Permisos
-          </h3>
-
-          <p
-            className="mt-1 text-xs font-semibold"
-            style={{
-              color: THEME.mutedText,
-            }}
-          >
-            Selecciona un módulo y activa sus acciones.
+          <h3 className="text-base font-black">¿Qué puede hacer este perfil?</h3>
+          <p className="mt-1 text-sm font-medium" style={{ color: muted }}>
+            Activa solo las acciones necesarias para su trabajo.
           </p>
         </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <span
-            className="rounded-full px-3 py-1 text-xs font-black"
-            style={TOP_COUNTER}
-          >
-            {selectedCount}/{totalCount}
-          </span>
-
-          <button
-            type="button"
-            disabled={disabled || totalCount === 0}
-            onClick={handleSelectAll}
-            className="rounded-full px-3 py-1 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed"
-            style={disabled || totalCount === 0 ? DISABLED_BUTTON : PRIMARY_BUTTON}
-          >
-            Todo
-          </button>
-
-          <button
-            type="button"
-            disabled={disabled || selectedCount === 0}
-            onClick={handleClearAll}
-            className="rounded-full px-3 py-1 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed"
-            style={disabled || selectedCount === 0 ? DISABLED_BUTTON : LIGHT_BUTTON}
-          >
-            Limpiar
-          </button>
-        </div>
+        <span className="rounded-full px-3 py-1 text-xs font-black" style={{ background: 'rgba(190,24,93,.1)', color: 'var(--admin-primary, #be185d)' }}>
+          {selected.length} accesos asignados
+        </span>
       </div>
 
-      {permissionGroups.length === 0 ? (
-        <div
-          className="mt-4 rounded-2xl border border-dashed p-5 text-center text-sm font-semibold"
-          style={{
-            borderColor: THEME.border,
-            color: THEME.mutedText,
-          }}
-        >
-          No hay permisos disponibles para mostrar.
-        </div>
+      {groups.length === 0 ? (
+        <p className="mt-5 text-sm" style={{ color: muted }}>No hay permisos disponibles para mostrar.</p>
       ) : (
         <>
-          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
-            {permissionGroups.map((group) => {
-              const groupPermissionValues = group.permissions.map(
-                (permission) => permission.value
-              );
-
-              const selectedInGroup = getGroupSelectedCount(
-                normalizedSelectedPermissions,
-                groupPermissionValues
-              );
-
-              const isActive = group.module === activeGroup?.module;
-
-              return (
-                <button
-                  key={group.module}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => {
-                    setActiveModule(group.module);
-                    setSearchTerm('');
-                  }}
-                  className="min-h-[42px] rounded-2xl border px-3 py-2 text-left transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
-                  style={{
-                    background: isActive
-                      ? THEME.primaryBg
-                      : 'rgba(255, 255, 255, 0.92)',
-                    color: isActive ? '#ffffff' : '#0f172a',
-                    borderColor: isActive
-                      ? THEME.primaryBg
-                      : 'rgba(244, 114, 182, 0.28)',
-                  }}
-                >
-                  <span className="block truncate text-[11px] font-black">
-                    {group.label}
-                  </span>
-
-                  <span
-                    className="mt-0.5 block text-[10px] font-bold"
-                    style={{
-                      color: isActive ? 'rgba(255,255,255,0.92)' : '#334155',
-                    }}
-                  >
-                    {selectedInGroup} de {group.permissions.length}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="mt-4 flex flex-wrap gap-2" aria-label="Filtrar módulos">
+            <button type="button" disabled={disabled || selected.length === 0} onClick={() => { setShowAll(false); setSearch(''); }} aria-pressed={!allModules} className="rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ borderColor: border, background: !allModules ? primary : 'transparent', color: !allModules ? '#fff' : 'inherit' }}>
+              Asignados ({groups.filter((group) => group.permissions.some((permission) => selectedSet.has(permission.value))).length})
+            </button>
+            <button type="button" disabled={disabled} onClick={() => { setShowAll(true); setSearch(''); }} aria-pressed={allModules} className="rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ borderColor: border, background: allModules ? primary : 'transparent', color: allModules ? '#fff' : 'inherit' }}>
+              Explorar todos ({groups.length})
+            </button>
           </div>
 
-          <section
-            className="mt-3 rounded-3xl border p-3"
-            style={{
-              background: 'rgba(255, 255, 255, 0.88)',
-              borderColor: 'rgba(244, 114, 182, 0.28)',
-              color: '#0f172a',
-            }}
-          >
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-center">
-              <div>
-                <h4 className="text-sm font-black">
-                  {activeGroup?.label || 'Permisos'}
-                </h4>
+          {allModules && (
+            <label className="mt-3 flex items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: border }}>
+              <Search size={16} aria-hidden="true" style={{ color: muted }} />
+              <span className="sr-only">Buscar módulos</span>
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} disabled={disabled} placeholder="Buscar módulo, por ejemplo: ventas" className="w-full bg-transparent text-sm outline-none" />
+            </label>
+          )}
 
-                <p
-                  className="mt-1 text-xs font-semibold"
-                  style={{
-                    color: '#334155',
-                  }}
-                >
-                  {selectedInActiveGroup} de {activeGroup?.permissions?.length || 0}{' '}
-                  permisos activos
-                </p>
-              </div>
+          {visibleGroups.length === 0 ? (
+            <p className="mt-5 text-sm font-semibold" style={{ color: muted }}>No hay módulos con ese nombre.</p>
+          ) : (
+            <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
+              <nav aria-label="Módulos para asignar permisos" className="flex max-h-[330px] gap-2 overflow-auto pb-1 lg:flex-col lg:pr-1">
+                {visibleGroups.map((group) => {
+                  const count = group.permissions.filter((permission) => selectedSet.has(permission.value)).length;
+                  const current = group.module === active?.module;
+                  return (
+                    <button key={group.module} type="button" disabled={disabled} onClick={() => setActiveModule(group.module)} aria-current={current ? 'true' : undefined} className="flex min-w-[155px] items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold transition disabled:opacity-50 lg:min-w-0" style={{ background: current ? primary : 'var(--admin-soft-bg, rgba(248,250,252,.75))', color: current ? '#fff' : 'inherit' }}>
+                      <span className="line-clamp-2">{group.label}</span>
+                      <span className="shrink-0">{count}/{group.permissions.length}</span>
+                    </button>
+                  );
+                })}
+              </nav>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  disabled={disabled}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Buscar aquí..."
-                  className="min-w-0 flex-1 rounded-2xl border px-3 py-2 text-xs font-semibold outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    background: THEME.inputBg,
-                    color: THEME.inputText,
-                    borderColor: THEME.inputBorder,
-                    '--tw-ring-color': 'rgba(190, 24, 93, 0.22)',
-                  }}
-                />
-
-                <button
-                  type="button"
-                  disabled={disabled || !activeGroup}
-                  onClick={handleToggleActiveGroup}
-                  className="shrink-0 rounded-2xl px-3 py-2 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed"
-                  style={
-                    disabled || !activeGroup
-                      ? DISABLED_BUTTON
-                      : activeGroupSelected
-                      ? GOLD_BUTTON
-                      : PRIMARY_BUTTON
-                  }
-                >
-                  {activeGroupSelected ? 'Quitar módulo' : 'Seleccionar'}
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredActivePermissions.map((permission) => {
-                const checked = isPermissionSelected(
-                  normalizedSelectedPermissions,
-                  permission.value
-                );
-
-                return (
-                  <button
-                    key={permission.value}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => handleTogglePermission(permission.value)}
-                    className="flex min-h-[42px] items-center gap-3 rounded-2xl border px-3 py-2 text-left transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
-                    style={{
-                      background: checked
-                        ? 'rgba(6, 182, 212, 0.14)'
-                        : 'rgba(255, 255, 255, 0.96)',
-                      borderColor: checked
-                        ? 'rgba(6, 182, 212, 0.65)'
-                        : 'rgba(244, 114, 182, 0.26)',
-                      color: '#0f172a',
-                    }}
-                  >
-                    <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-black"
-                      style={{
-                        background: checked
-                          ? 'var(--admin-primary, #06b6d4)'
-                          : 'transparent',
-                        borderColor: checked
-                          ? 'var(--admin-primary, #06b6d4)'
-                          : 'rgba(15, 23, 42, 0.28)',
-                        color: checked ? '#ffffff' : 'transparent',
-                      }}
-                    >
-                      ✓
-                    </span>
-
-                    <span
-                      className="block min-w-0 truncate text-xs font-black"
-                      style={{
-                        color: '#0f172a',
-                      }}
-                    >
-                      {permission.actionLabel}
-                    </span>
+              <div className="min-w-0 rounded-2xl border p-4" style={{ borderColor: border, background: 'var(--admin-soft-bg, rgba(248,250,252,.75))' }}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-black">{active.label}</h4>
+                    {active.description && <p className="mt-1 text-xs leading-snug" style={{ color: muted }}>{active.description}</p>}
+                    <p className="mt-1 text-xs font-semibold" style={{ color: muted }}>{activeCount} de {active.permissions.length} acciones activas</p>
+                  </div>
+                  <button type="button" disabled={disabled} onClick={() => emit(togglePermissionGroup(selected, activeValues))} className="rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ borderColor: border, background: 'var(--admin-card-bg, #fff)' }}>
+                    {activeCount === activeValues.length ? 'Quitar módulo' : 'Activar módulo'}
                   </button>
-                );
-              })}
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {active.permissions.map((permission) => {
+                    const checked = selectedSet.has(permission.value);
+                    return (
+                      <button key={permission.value} type="button" disabled={disabled} aria-pressed={checked} onClick={() => emit(togglePermission(selected, permission.value))} className="flex min-w-0 items-start gap-2 rounded-xl border px-3 py-2 text-left transition disabled:opacity-50" style={{ borderColor: checked ? 'var(--admin-primary, #be185d)' : border, background: checked ? 'rgba(190,24,93,.07)' : 'var(--admin-card-bg, #fff)' }}>
+                        <span aria-hidden="true" className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border" style={{ borderColor: checked ? 'var(--admin-primary, #be185d)' : border, background: checked ? primary : 'transparent', color: '#fff' }}>{checked && <Check size={12} />}</span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-bold leading-snug">{permission.label}</span>
+                          {permission.description && <span className="mt-0.5 block text-[11px] leading-snug" style={{ color: muted }}>{permission.description}</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </section>
+          )}
         </>
       )}
-    </div>
+    </section>
   );
 }

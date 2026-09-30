@@ -101,6 +101,7 @@ function unsafeInvoiceFixture() {
     orderNumber: '000240',
     required: true,
     status: 'accepted',
+    errorMessage: 'PROVIDER_ERROR_SECRET',
     invoiceNumber: 'SETP-240',
     cufe: 'CUFE-SEGURO-PARA-LA-VISTA',
     pdfUrl: 'https://private.example/invoice.pdf?token=PDF_SECRET',
@@ -282,6 +283,37 @@ async function validateRbacMatrix() {
 }
 
 async function validateMinimalFiscalDto() {
+  const failedOrder = presentAdminOrderDetail({
+    status: 'paid', payment: { status: 'paid' },
+    paymentProcessing: { invoice: {
+      status: 'failed', errorCode: 'BILLING_MUNICIPALITY_REQUIRED',
+      claimId: 'CLAIM_SECRET',
+    } },
+  }, null);
+  assert.match(failedOrder.invoiceAutomation.failureReason, /municipio fiscal/);
+  assert(!JSON.stringify(failedOrder).includes('CLAIM_SECRET'));
+  assert(!Object.hasOwn(failedOrder, 'paymentProcessing'));
+
+  const reviewOrder = presentAdminOrderDetail({
+    status: 'paid', payment: { status: 'paid' },
+    paymentProcessing: { invoice: {
+      status: 'needs_review', errorCode: 'INVOICE_TEMPORARY_FAILURE',
+      attempts: 5, nextAttemptAt: null,
+    } },
+  }, null);
+  assert.match(reviewOrder.invoiceAutomation.failureReason, /después de varios intentos/);
+  assert(!Object.hasOwn(reviewOrder, 'paymentProcessing'));
+
+  const branchDisabledOrder = presentAdminOrderDetail({
+    status: 'paid', payment: { status: 'paid' },
+    paymentProcessing: { invoice: {
+      status: 'not_required', outcomeCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
+    } },
+  }, null);
+  assert.match(branchDisabledOrder.invoiceAutomation.failureReason, /Configuración → Sedes/);
+  assert.strictEqual(branchDisabledOrder.invoiceAutomation.reasonCode, 'BRANCH_ELECTRONIC_INVOICE_DISABLED');
+  assert(!Object.hasOwn(branchDisabledOrder, 'paymentProcessing'));
+
   const invoice = unsafeInvoiceFixture();
   const summary = serializeOrderAdminInvoiceSummary(invoice);
 
@@ -292,6 +324,7 @@ async function validateMinimalFiscalDto() {
     'documents',
     'emission',
     'failedAt',
+    'failureReason',
     'generatedAt',
     'id',
     'invoiceNumber',
@@ -314,6 +347,19 @@ async function validateMinimalFiscalDto() {
     'validatedAt',
   ]);
   assert.strictEqual(summary.status, 'accepted');
+  assert.strictEqual(summary.failureReason, '');
+  assert.strictEqual(
+    serializeOrderAdminInvoiceSummary({
+      ...invoice,
+      status: 'failed',
+      errorMessage: 'Factus rechazó la factura: El campo apellido es obligatorio.',
+    }).failureReason,
+    'La factura no se pudo emitir porque falta el apellido fiscal del comprador.'
+  );
+  assert(!JSON.stringify(serializeOrderAdminInvoiceSummary({
+    ...invoice,
+    status: 'failed',
+  })).includes('PROVIDER_ERROR_SECRET'));
   assert.strictEqual(summary.invoiceNumber, 'SETP-240');
   assert.strictEqual(summary.cufe, 'CUFE-SEGURO-PARA-LA-VISTA');
   assert.strictEqual(summary.provider.name, 'factus');

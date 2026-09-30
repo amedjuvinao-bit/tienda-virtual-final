@@ -1,6 +1,7 @@
 // backend/models/Branch.js
 
 const mongoose = require('mongoose');
+const branchSelectionIndexes = require('./branchSelectionIndexes');
 
 const BRANCH_STATUS = ['active', 'inactive', 'closed', 'maintenance'];
 
@@ -441,6 +442,9 @@ BranchSchema.index({ code: 1 }, { unique: true });
 BranchSchema.index({ active: 1, status: 1, type: 1 });
 BranchSchema.index({ isMain: 1 });
 BranchSchema.index({ isDefaultForOnlineOrders: 1 });
+for (const { key, options } of branchSelectionIndexes) {
+  BranchSchema.index(key, options);
+}
 BranchSchema.index({ manager: 1 });
 BranchSchema.index({ 'address.city': 1 });
 BranchSchema.index({ 'address.department': 1 });

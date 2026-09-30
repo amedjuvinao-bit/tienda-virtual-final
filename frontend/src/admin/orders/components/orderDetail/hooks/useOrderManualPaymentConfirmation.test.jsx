@@ -4,7 +4,7 @@ import api from '../../../../../lib/api';
 import useOrderManualPaymentConfirmation from './useOrderManualPaymentConfirmation';
 
 vi.mock('../../../../../lib/api', () => ({
-  default: { post: vi.fn() },
+  default: { post: vi.fn(), get: vi.fn() },
 }));
 
 const ORDER = {
@@ -65,7 +65,8 @@ describe('confirmación manual de pago', () => {
         amount: 250000,
         currency: 'COP',
         reason: 'Transferencia verificada en el banco',
-      }
+      },
+      { timeout: 90000 }
     );
     expect(callbacks.synchronizeAfterMutation).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'paid' }),
@@ -102,9 +103,95 @@ describe('confirmación manual de pago', () => {
     await act(async () => result.current.submit());
 
     expect(callbacks.synchronizeAfterMutation).not.toHaveBeenCalled();
+    expect(api.get).not.toHaveBeenCalled();
     expect(callbacks.showToast).toHaveBeenCalledWith(expect.objectContaining({
       type: 'error',
       message: 'La referencia ya fue utilizada.',
+    }));
+  });
+
+  it('reconcilia un timeout con la evidencia guardada sin requerir un segundo clic', async () => {
+    api.post.mockRejectedValue({ code: 'ECONNABORTED' });
+    const paidOrder = {
+      ...ORDER,
+      status: 'paid',
+      payment: {
+        ...ORDER.payment,
+        status: 'paid',
+        manualConfirmation: {
+          method: 'transfer',
+          reference: 'TRX-2026-001',
+          amount: 250000,
+          currency: 'COP',
+          reason: 'Transferencia verificada en el banco',
+        },
+      },
+    };
+    api.get.mockResolvedValue({ data: paidOrder });
+    const { result, callbacks } = renderManualHook();
+    completeForm(result);
+
+    const outcome = await act(async () => result.current.submit());
+
+    expect(outcome).toMatchObject({ confirmed: true, reconciled: true });
+    expect(api.get).toHaveBeenCalledWith('/api/orders/order-manual-1');
+    expect(callbacks.synchronizeAfterMutation).toHaveBeenCalledWith(
+      paidOrder,
+      [callbacks.fetchTimeline]
+    );
+    expect(callbacks.showToast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'success',
+      title: 'Pago manual confirmado',
+    }));
+  });
+
+  it('no reporta éxito si otra evidencia pagó la orden', async () => {
+    api.post.mockRejectedValue({ response: { status: 500 } });
+    api.get.mockResolvedValue({ data: {
+      ...ORDER,
+      status: 'paid',
+      payment: { ...ORDER.payment, status: 'paid', manualConfirmation: {
+        method: 'transfer', reference: 'OTRA-REFERENCIA', amount: 250000,
+        currency: 'COP', reason: 'Transferencia verificada en el banco',
+      } },
+    } });
+    const { result, callbacks } = renderManualHook();
+    completeForm(result);
+
+    const outcome = await act(async () => result.current.submit());
+
+    expect(outcome.confirmed).toBeUndefined();
+    expect(callbacks.showToast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'warning', title: 'Revisa el pago de la orden',
+    }));
+  });
+
+  it('mantiene el resultado incierto si no puede consultar la orden', async () => {
+    api.post.mockRejectedValue({ code: 'ECONNABORTED' });
+    api.get.mockRejectedValue(new Error('network down'));
+    const { result, callbacks } = renderManualHook();
+    completeForm(result);
+
+    const outcome = await act(async () => result.current.submit());
+
+    expect(outcome.unverified).toBe(true);
+    expect(callbacks.showToast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'warning', title: 'Verifica el estado del pago',
+    }));
+  });
+
+  it('un fallo al refrescar no cambia el éxito ya confirmado por el servidor', async () => {
+    api.post.mockResolvedValue({ data: { confirmed: true, order: { ...ORDER, status: 'paid' } } });
+    const { result, callbacks } = renderManualHook({
+      synchronizeAfterMutation: vi.fn().mockRejectedValue(new Error('refresh failed')),
+    });
+    completeForm(result);
+
+    const outcome = await act(async () => result.current.submit());
+
+    expect(outcome.confirmed).toBe(true);
+    expect(callbacks.showToast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'success', title: 'Pago manual confirmado',
     }));
   });
 

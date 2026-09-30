@@ -11,6 +11,7 @@ import useOrderDetailManagement from './orderDetail/hooks/useOrderDetailManageme
 import useOrderDetailResources from './orderDetail/hooks/useOrderDetailResources';
 import useOrderDocuments from './orderDetail/hooks/useOrderDocuments';
 import useOrderManualPaymentConfirmation from './orderDetail/hooks/useOrderManualPaymentConfirmation';
+import useOrderInvoiceStatusWatcher from './orderDetail/hooks/useOrderInvoiceStatusWatcher';
 import useOrderRefundActions from './orderDetail/hooks/useOrderRefundActions';
 import useOrderReturnActions from './orderDetail/hooks/useOrderReturnActions';
 
@@ -72,6 +73,13 @@ export default function OrderDetailModal({
     orderId: order?._id,
     canAddNotes,
     onOrderUpdated,
+    showToast,
+  });
+
+  useOrderInvoiceStatusWatcher({
+    open,
+    order,
+    synchronizeAfterMutation: resources.synchronizeAfterMutation,
     showToast,
   });
 

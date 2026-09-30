@@ -32,6 +32,7 @@ const {
   serializeElectronicInvoice: serializeElectronicInvoiceRecord,
   serializeEmailDelivery: serializeEmailDeliveryRecord,
 } = require('./adminBillingSerializationService');
+const { presentInvoiceFailureCode } = require('./billingInvoiceFailurePresentationService');
 
 function cleanText(value, max = 180) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -98,6 +99,10 @@ function serializePendingOrder(order = {}) {
   const invoiceStatus = cleanText(invoice.status, 60).toLowerCase();
   const hasRetryableInvoice =
     Boolean(invoice._id) && ['failed', 'rejected', 'error'].includes(invoiceStatus);
+  const automation = order.paymentProcessing?.invoice || {};
+  const automationFailed = !invoice._id && ['failed', 'needs_review'].includes(automation.status);
+  const branchBillingDisabled = automation.status === 'not_required' &&
+    automation.outcomeCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED';
 
   return {
     id: String(order._id || ''),
@@ -116,7 +121,21 @@ function serializePendingOrder(order = {}) {
     shipping: money(order.shipping),
     total: money(order.total),
     itemsCount: items.length,
-    billingIssue: hasRetryableInvoice
+    billingIssue: branchBillingDisabled
+      ? {
+          status: 'deferred',
+          retryable: false,
+          errorMessage: 'La factura se omitió porque esta sede tenía desactivada la facturación al confirmar el pago. Si ya la activaste en Configuración → Sedes, revisa y emite desde Facturación.',
+        }
+      : automationFailed
+      ? {
+          status: 'failed',
+          retryable: true,
+          errorMessage: presentInvoiceFailureCode(automation.errorCode, {
+            needsReview: automation.status === 'needs_review',
+          }),
+        }
+      : hasRetryableInvoice
       ? {
           invoiceId: String(invoice._id),
           status: invoiceStatus,

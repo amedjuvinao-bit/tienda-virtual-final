@@ -12,6 +12,13 @@ const Branch = require('../models/Branch');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryReservation = require('../models/InventoryReservation');
 const InventoryMovement = require('../models/InventoryMovement');
+const CashSession = require('../models/CashSession');
+const Order = require('../models/Order');
+const PosHeldSale = require('../models/PosHeldSale');
+const {
+  getBranchOperationSummary,
+  hasBranchOperation,
+} = require('../services/branchOperationProtectionService');
 
 const BASE_URL = String(
   process.env.BRANCH_PROTECTION_BASE_URL ||
@@ -77,54 +84,9 @@ async function requestJson(url, { method = 'GET', token = '', body = null } = {}
   };
 }
 
-async function getBranchOperationSummary(branchId) {
-  const objectId = new mongoose.Types.ObjectId(String(branchId));
-
-  const [activeStockCount, reservedStockCount, pendingReservationsCount, movementsCount] =
-    await Promise.all([
-      InventoryStock.countDocuments({
-        branch: objectId,
-        deletedAt: null,
-        active: true,
-        stock: { $gt: 0 },
-      }),
-      InventoryStock.countDocuments({
-        branch: objectId,
-        deletedAt: null,
-        active: true,
-        reservedStock: { $gt: 0 },
-      }),
-      InventoryReservation.countDocuments({
-        status: 'pending',
-        'items.branch': objectId,
-      }),
-      InventoryMovement.countDocuments({
-        deletedAt: null,
-        $or: [{ branchFrom: objectId }, { branchTo: objectId }],
-      }),
-    ]);
-
-  return {
-    activeStockCount,
-    reservedStockCount,
-    pendingReservationsCount,
-    movementsCount,
-  };
-}
-
-function hasOperation(summary = {}) {
-  return (
-    Number(summary.activeStockCount || 0) > 0 ||
-    Number(summary.reservedStockCount || 0) > 0 ||
-    Number(summary.pendingReservationsCount || 0) > 0 ||
-    Number(summary.movementsCount || 0) > 0
-  );
-}
-
 async function findBranchWithOperation() {
   const stock = await InventoryStock.findOne({
     deletedAt: null,
-    active: true,
     $or: [{ stock: { $gt: 0 } }, { reservedStock: { $gt: 0 } }],
   })
     .sort({ stock: -1, reservedStock: -1, updatedAt: -1 })
@@ -163,6 +125,7 @@ async function findBranchWithOperation() {
 
   const movement = await InventoryMovement.findOne({
     deletedAt: null,
+    status: 'draft',
     $or: [{ branchFrom: { $ne: null } }, { branchTo: { $ne: null } }],
   })
     .sort({ createdAt: -1 })
@@ -179,6 +142,25 @@ async function findBranchWithOperation() {
     if (branch) {
       return branch;
     }
+  }
+
+  const openCash = await CashSession.findOne({ status: 'open' }).lean();
+  const pendingOrder = await Order.findOne({
+    status: { $in: ['pending', 'processing', 'paid', 'shipped'] },
+    fulfillmentStatus: { $nin: ['delivered', 'returned', 'cancelled'] },
+  }).lean();
+  const heldSale = await PosHeldSale.findOne({ status: 'active' }).lean();
+
+  for (const branchId of [
+    openCash?.branch,
+    pendingOrder?.branch,
+    pendingOrder?.inventoryAllocations?.find((item) => item?.branch)?.branch,
+    pendingOrder?.fulfillment?.shipments?.find((item) => item?.branch)?.branch,
+    heldSale?.branch,
+  ]) {
+    if (!branchId) continue;
+    const branch = await Branch.findOne({ _id: branchId, deletedAt: null }).lean();
+    if (branch) return branch;
   }
 
   return null;
@@ -248,7 +230,7 @@ async function testProtectedBranch(token, branch) {
   console.log('Sede usada:', branch.name, branch.code, String(branch._id));
   console.log('Resumen operación:', summary);
 
-  if (!hasOperation(summary)) {
+  if (!hasBranchOperation(summary)) {
     console.log('⏭️  Omitida: la sede encontrada no tiene operación contable/inventario detectable.');
     return { passed: 0, failed: 0, skipped: 2 };
   }
@@ -401,7 +383,7 @@ async function main() {
   const operationBranch = await findBranchWithOperation();
 
   if (!operationBranch) {
-    console.log('⚠️ No se encontró una sede con stock/reserva/movimiento para probar bloqueo.');
+    console.log('⚠️ No se encontró una sede con operaciones pendientes para probar bloqueo.');
   }
 
   const protectedResult = operationBranch

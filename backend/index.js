@@ -29,6 +29,7 @@ const {
 } = require('./config/mongooseIndexPolicy');
 
 const adminAccessGate = require('./middleware/adminAccessGate');
+const backupMaintenance = require('./services/backupMaintenanceService');
 
 const app = express();
 app.disable('x-powered-by');
@@ -68,6 +69,8 @@ function requireCritical(relPath) {
 
 app.use(securityHeaders);
 app.use(cors(buildCorsOptions(env)));
+// Must precede raw shipping/payment webhooks and every writer route.
+app.use(backupMaintenance.middleware);
 const shippingWebhookRoutes = tryRequire('./routes/shippingWebhookRoutes');
 if (shippingWebhookRoutes) {
   app.use(
@@ -154,6 +157,7 @@ const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 const adminLoginSettingsRoutes = tryRequire('./routes/adminLoginSettings');
 const adminAuditLogsRoutes = tryRequire('./routes/adminAuditLogs');
 const adminStoreSettingsRoutes = tryRequire('./routes/adminStoreSettings');
+const adminBackupPreferencesRoutes = requireCritical('./routes/adminBackupPreferences');
 const adminPaymentSettingsRoutes = tryRequire('./routes/adminPaymentSettings');
 const adminShippingSettingsRoutes = tryRequire('./routes/adminShippingSettings');
 const adminShippingRatesRoutes = tryRequire('./routes/adminShippingRates');
@@ -209,6 +213,7 @@ if (adminLoginSettingsRoutes) {
 }
 if (adminAuditLogsRoutes) app.use('/api/admin/audit-logs', adminAuditLogsRoutes);
 if (adminStoreSettingsRoutes) app.use('/api/admin/store-settings', adminStoreSettingsRoutes);
+app.use('/api/admin/backup-preferences', adminBackupPreferencesRoutes);
 if (adminPaymentSettingsRoutes) {
   app.use('/api/admin/payment-settings', adminPaymentSettingsRoutes);
 }
@@ -257,7 +262,7 @@ function startInventoryReservationExpirationJob() {
   }
 
   const runExpiration = async () => {
-    if (inventoryReservationExpirationRunning) return;
+    if (inventoryReservationExpirationRunning || backupMaintenance.isActive()) return;
 
     if (mongoose.connection.readyState !== 1) {
       console.warn('Job de reservas omitido: MongoDB no esta conectado.');
@@ -267,8 +272,8 @@ function startInventoryReservationExpirationJob() {
     inventoryReservationExpirationRunning = true;
     try {
       const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
-      if (result?.expired > 0) {
-        console.log(`Reservas expiradas automaticamente: ${result.expired}`);
+      if (result?.count > 0) {
+        console.log(`Reservas expiradas automaticamente: ${result.count}`);
       }
       if (typeof releaseExpiredStoreCreditReservations === 'function') {
         const storeCreditResult = await releaseExpiredStoreCreditReservations({
@@ -308,7 +313,7 @@ function startBillingInvoiceRecoveryJob() {
   if (billingRecoveryTimer) return;
 
   const runRecovery = async () => {
-    if (billingRecoveryRunning) return;
+    if (billingRecoveryRunning || backupMaintenance.isActive()) return;
     if (mongoose.connection.readyState !== 1) {
       billingOperationalRuntime?.markWorkerCycleSkipped?.(
         'mongodb_disconnected'
@@ -364,7 +369,7 @@ function startShippingWebhookRecoveryJob() {
   if (typeof recover !== 'function' || shippingWebhookRecoveryTimer) return;
 
   const runRecovery = async () => {
-    if (shippingWebhookRecoveryRunning || mongoose.connection.readyState !== 1) return;
+    if (shippingWebhookRecoveryRunning || backupMaintenance.isActive() || mongoose.connection.readyState !== 1) return;
     shippingWebhookRecoveryRunning = true;
     try {
       const result = await recover({ limit: 25, maxAttempts: 5 });
@@ -397,7 +402,7 @@ function startOrderPostCommitOutboxWorker() {
     orderPostCommitOutboxWorkerService.createOrderPostCommitOutboxWorker({
       intervalMs: env.orderPostCommitOutbox.intervalMs,
       batchSize: env.orderPostCommitOutbox.batchSize,
-      isReady: () => mongoose.connection.readyState === 1,
+      isReady: () => mongoose.connection.readyState === 1 && !backupMaintenance.isActive(),
       logger: console,
     });
   orderPostCommitOutboxWorker.start({ runImmediately: true });
@@ -409,10 +414,14 @@ function startOrderPostCommitOutboxWorker() {
 
 mongoose
   .connect(env.mongoUri, {
-    autoIndex: mongooseIndexPolicy.autoIndex,
+    autoIndex: mongooseIndexPolicy.autoIndex && !backupMaintenance.isActive(),
   })
   .then(() => {
     console.log('MongoDB conectado');
+    backupMaintenance.setWorkersIdle(() =>
+      !inventoryReservationExpirationRunning && !billingRecoveryRunning &&
+      !shippingWebhookRecoveryRunning && !orderPostCommitOutboxWorker?.metrics().running
+    );
     startInventoryReservationExpirationJob();
     startBillingInvoiceRecoveryJob();
     startShippingWebhookRecoveryJob();

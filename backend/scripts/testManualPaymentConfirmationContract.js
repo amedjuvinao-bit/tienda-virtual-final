@@ -20,6 +20,7 @@ const {
 const {
   createManualPaymentConfirmationService,
 } = require('../services/manualPaymentConfirmationService');
+const { pendingBackgroundOperations } = require('../services/backupActivityTracker');
 const {
   manualPaymentErrorResponse,
   presentManualPaymentOrder,
@@ -97,7 +98,12 @@ function query(getter) {
 
 function createHarness(
   initialOrders,
-  { inventoryError = null, postCommitError = null } = {}
+  {
+    inventoryError = null,
+    postCommitError = null,
+    postCommitGate = null,
+    scheduleError = null,
+  } = {}
 ) {
   const state = {
     orders: new Map(initialOrders.map((order) => [String(order._id), clone(order)])),
@@ -106,6 +112,12 @@ function createHarness(
     inventoryCalls: 0,
     statsCalls: 0,
     postCommitCalls: 0,
+    postCommitJobs: [],
+    postCommitErrors: [],
+  };
+  state.runPostCommitJobs = async () => {
+    const jobs = state.postCommitJobs.splice(0);
+    await Promise.all(jobs.map((job) => job()));
   };
   let sequence = 0;
   let lock = Promise.resolve();
@@ -231,8 +243,18 @@ function createHarness(
     },
     async postCommitProcessor() {
       state.postCommitCalls += 1;
+      if (postCommitGate) await postCommitGate;
       if (postCommitError) throw postCommitError;
       return { processed: true };
+    },
+    postCommitScheduler(callback) {
+      if (scheduleError) throw scheduleError;
+      state.postCommitJobs.push(callback);
+    },
+    logger: {
+      error(message, details) {
+        state.postCommitErrors.push({ message, details });
+      },
     },
     now: () => new Date('2026-08-27T12:00:00.000Z'),
   });
@@ -318,6 +340,23 @@ async function main() {
   assert.strictEqual(blocked.state.inventoryCalls, 0);
   ok('Wompi y PayU quedan bloqueados antes de evidencia o inventario');
 
+  const crossedIdentity = makeOrder(IDS.manual);
+  crossedIdentity.source = 'manual';
+  crossedIdentity.customer = { name: 'Cliente anterior', id: '4234234234', documentType: 'CC' };
+  crossedIdentity.billing = { firstName: 'Nuevo', lastName: 'Comprador', documentNumber: '1234567890', documentType: 'CC' };
+  const crossed = createHarness([crossedIdentity]);
+  await rejectsCode(
+    crossed.service.confirmManualPayment({
+      orderId: IDS.manual,
+      payment: validPayment,
+      actor,
+    }),
+    'MANUAL_ORDER_CUSTOMER_BILLING_MISMATCH'
+  );
+  assert.strictEqual(crossed.state.evidence.length, 0);
+  assert.strictEqual(crossed.state.inventoryCalls, 0);
+  ok('una orden manual antigua con dos documentos no confirma el pago ni emite factura');
+
   const validation = createHarness([makeOrder(IDS.manual)]);
   await rejectsCode(
     validation.service.confirmManualPayment({
@@ -356,6 +395,9 @@ async function main() {
   assert.strictEqual(validation.state.evidence.length, 1);
   assert.strictEqual(validation.state.inventoryCalls, 1);
   assert.strictEqual(validation.state.statsCalls, 1);
+  assert.strictEqual(validation.state.postCommitCalls, 0);
+  assert.deepStrictEqual(successful.postCommit, { status: 'pending', scheduled: true });
+  await validation.state.runPostCommitJobs();
   assert.strictEqual(validation.state.postCommitCalls, 1);
   assert.strictEqual(successful.order.status, 'paid');
   assert.strictEqual(successful.order.payment.status, 'paid');
@@ -403,6 +445,27 @@ async function main() {
   assert.strictEqual(inventoryFailure.state.postCommitCalls, 0);
   ok('un fallo de inventario revierte evidencia, pago y eventos');
 
+  const legacyOrder = makeOrder(IDS.other);
+  legacyOrder.source = 'manual';
+  legacyOrder.inventoryControl.discountedAtCheckout = true;
+  const legacyInventory = createHarness([legacyOrder], {
+    inventoryError: Object.assign(new Error('La reserva venció.'), {
+      code: 'RESERVATION_EXPIRED',
+    }),
+  });
+  await rejectsCode(
+    legacyInventory.service.confirmManualPayment({
+      orderId: IDS.other,
+      payment: { ...validPayment, reference: 'TRX-LEGACY-EXPIRED' },
+      actor,
+    }),
+    'RESERVATION_EXPIRED'
+  );
+  assert.strictEqual(legacyInventory.state.inventoryCalls, 1);
+  assert.strictEqual(legacyInventory.state.evidence.length, 0);
+  assert.strictEqual(legacyInventory.state.orders.get(IDS.other).payment.status, 'pending_manual');
+  ok('pedidos manuales antiguos no omiten la comprobación de reserva vencida');
+
   const postCommitFailure = createHarness(
     [makeOrder(IDS.other)],
     {
@@ -418,9 +481,51 @@ async function main() {
   });
   assert.strictEqual(committed.confirmed, true);
   assert.strictEqual(committed.order.payment.status, 'paid');
-  assert.strictEqual(committed.postCommitWarning.code, 'POST_COMMIT_RETRY_REQUIRED');
+  assert.strictEqual(committed.postCommitWarning, null);
+  assert.deepStrictEqual(committed.postCommit, { status: 'pending', scheduled: true });
   assert.strictEqual(postCommitFailure.state.evidence.length, 1);
+  await postCommitFailure.state.runPostCommitJobs();
+  assert.strictEqual(postCommitFailure.state.postCommitErrors[0].details.code, 'POST_COMMIT_RETRY_REQUIRED');
   ok('un fallo post-commit no deshace el hecho financiero ya confirmado');
+
+  let finishPostCommit;
+  const slowPostCommit = createHarness([makeOrder(IDS.other)], {
+    postCommitGate: new Promise((resolve) => { finishPostCommit = resolve; }),
+  });
+  const pendingBeforePayment = pendingBackgroundOperations();
+  const fastResponse = await slowPostCommit.service.confirmManualPayment({
+    orderId: IDS.other,
+    payment: { ...validPayment, reference: 'TRX-SLOW-FACTUS' },
+    actor,
+  });
+  assert.strictEqual(fastResponse.order.payment.status, 'paid');
+  assert.strictEqual(slowPostCommit.state.postCommitCalls, 0);
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment + 1);
+  const backgroundWork = slowPostCommit.state.runPostCommitJobs();
+  await Promise.resolve();
+  assert.strictEqual(slowPostCommit.state.postCommitCalls, 1);
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment + 1);
+  finishPostCommit();
+  await backgroundWork;
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment);
+  ok('la respuesta del pago no espera a Factus y el respaldo aguarda el trabajo pendiente');
+
+  const schedulingFailure = createHarness([makeOrder(IDS.other)], {
+    scheduleError: Object.assign(new Error('Worker no disponible.'), {
+      code: 'WORKER_NOT_AVAILABLE',
+    }),
+  });
+  const recoveredByWorker = await schedulingFailure.service.confirmManualPayment({
+    orderId: IDS.other,
+    payment: { ...validPayment, reference: 'TRX-SCHEDULING-FAIL' },
+    actor,
+  });
+  assert.strictEqual(recoveredByWorker.order.payment.status, 'paid');
+  assert.strictEqual(recoveredByWorker.postCommit.scheduled, false);
+  assert.strictEqual(recoveredByWorker.postCommitWarning.code, 'MANUAL_PAYMENT_POST_COMMIT_SCHEDULE_FAILED');
+  assert.strictEqual(recoveredByWorker.order.paymentProcessing.invoice.status, 'pending');
+  assert.strictEqual(pendingBackgroundOperations(), pendingBeforePayment);
+  ok('un fallo al iniciar la factura conserva el pago y deja el outbox pendiente');
 
   const replay = await validation.service.confirmManualPayment({
     orderId: IDS.manual,
@@ -432,6 +537,8 @@ async function main() {
   assert.strictEqual(validation.state.evidence.length, 1);
   assert.strictEqual(validation.state.inventoryCalls, 1);
   assert.strictEqual(validation.state.statsCalls, 1);
+  assert.strictEqual(validation.state.postCommitCalls, 1);
+  await validation.state.runPostCommitJobs();
   assert.strictEqual(validation.state.postCommitCalls, 2);
   ok('replay idéntico es idempotente y solo reintenta post-commit seguro');
 

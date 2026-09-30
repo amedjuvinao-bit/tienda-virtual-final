@@ -20,15 +20,21 @@ function clean(value, maximum = 120) {
   return String(value || '').trim().slice(0, maximum);
 }
 
-function recoverableLaneFilter(lane, staleBefore) {
+function recoverableLaneFilter(lane, staleBefore, cycleNow) {
+  const failedFilter = lane === 'invoice'
+    ? {
+        [`paymentProcessing.${lane}.status`]: 'failed',
+        $or: [
+          { 'paymentProcessing.invoice.nextAttemptAt': { $exists: false } },
+          { 'paymentProcessing.invoice.nextAttemptAt': { $lte: cycleNow } },
+        ],
+      }
+    : { [`paymentProcessing.${lane}.status`]: 'failed' };
   return {
     $or: [
       { [`paymentProcessing.${lane}.status`]: { $exists: false } },
-      {
-        [`paymentProcessing.${lane}.status`]: {
-          $in: ['pending', 'failed'],
-        },
-      },
+      { [`paymentProcessing.${lane}.status`]: 'pending' },
+      failedFilter,
       {
         [`paymentProcessing.${lane}.status`]:
           lane === 'invoice' ? 'scheduling' : 'processing',
@@ -38,7 +44,7 @@ function recoverableLaneFilter(lane, staleBefore) {
   };
 }
 
-function buildOutboxCandidateFilter({ staleBefore } = {}) {
+function buildOutboxCandidateFilter({ staleBefore, cycleNow = new Date() } = {}) {
   const threshold = staleBefore instanceof Date ? staleBefore : new Date(0);
   return {
     'payment.status': 'paid',
@@ -61,8 +67,8 @@ function buildOutboxCandidateFilter({ staleBefore } = {}) {
       $in: ['confirmed', 'not_required'],
     },
     $or: [
-      recoverableLaneFilter('fulfillment', threshold),
-      recoverableLaneFilter('invoice', threshold),
+      recoverableLaneFilter('fulfillment', threshold, cycleNow),
+      recoverableLaneFilter('invoice', threshold, cycleNow),
     ],
   };
 }
@@ -118,7 +124,7 @@ function createOrderPostCommitOutboxWorker({
 
   async function loadCandidates(cycleNow) {
     const staleBefore = new Date(cycleNow.getTime() - safeClaimTimeoutMs);
-    let query = OrderModel.find(buildOutboxCandidateFilter({ staleBefore }));
+    let query = OrderModel.find(buildOutboxCandidateFilter({ staleBefore, cycleNow }));
     if (typeof query?.sort === 'function') {
       query = query.sort({ updatedAt: 1, _id: 1 });
     }

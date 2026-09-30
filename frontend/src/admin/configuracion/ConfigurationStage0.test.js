@@ -24,8 +24,8 @@ describe('Configuración Nivel Plus Etapa 0', () => {
     const logsSection = source('./sections/LogsSection.jsx');
 
     expect(logsSection).toContain("api.get('/api/admin/audit-logs'");
-    expect(logsSection).toContain('params: { scope, page: 1, limit: 100 }');
-    expect(logsSection).toContain("setScope('operations')");
+    expect(logsSection).toContain('page, limit: 25');
+    expect(logsSection).toContain("['operations', 'Operaciones']");
     expect(logsSection).not.toContain('/api/admin/auth/logs');
   });
 

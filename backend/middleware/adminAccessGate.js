@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const requireAdmin = require('./requireAdmin');
 const requirePermission = require('./requirePermission');
 const AdminAuditLog = require('../models/AdminAuditLog');
+let pendingAudits = 0;
 
 const {
   findAdminRoutePermission,
@@ -119,12 +120,7 @@ function sanitizeValue(value, depth = 0) {
 }
 
 function getClientIp(req) {
-  const forwardedFor = String(req.headers['x-forwarded-for'] || '')
-    .split(',')[0]
-    .trim();
-
   return (
-    forwardedFor ||
     req.ip ||
     req.connection?.remoteAddress ||
     req.socket?.remoteAddress ||
@@ -253,12 +249,15 @@ function attachAuditLogger(req, res, rule) {
   req.adminRequestId = getRequestId(req);
 
   res.once('finish', async () => {
+    pendingAudits += 1;
     try {
       const payload = buildAuditPayload(req, res, rule, startedAt);
 
       await AdminAuditLog.create(payload);
     } catch (error) {
       console.error('[adminAccessGate] Error guardando auditoría:', error.message);
+    } finally {
+      pendingAudits -= 1;
     }
   });
 }
@@ -329,3 +328,4 @@ function adminAccessGate(req, res, next) {
 module.exports = adminAccessGate;
 module.exports.sanitizeValue = sanitizeValue;
 module.exports.resolveRulePermissions = resolveRulePermissions;
+module.exports.pendingAuditCount = () => pendingAudits;

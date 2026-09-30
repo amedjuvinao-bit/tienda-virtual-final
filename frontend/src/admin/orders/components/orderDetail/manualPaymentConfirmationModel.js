@@ -19,13 +19,23 @@ function cents(value) {
   return Number.isFinite(number) ? Math.round(number * 100) : NaN;
 }
 
-export function canConfirmManualPaymentForOrder(order, hasPermission) {
+export function isManualOrderReservationExpired(order, now = Date.now()) {
+  const expiresAt = order?.inventoryControl?.reservationExpiresAt;
+  const deadline = expiresAt ? new Date(expiresAt).getTime() : NaN;
+  return order?.source === 'manual' &&
+    order?.inventoryControl?.reservationRequired === true &&
+    Number.isFinite(deadline) && deadline <= now &&
+    clean(order?.payment?.status).toLowerCase() === 'pending_manual';
+}
+
+export function canConfirmManualPaymentForOrder(order, hasPermission, now = Date.now()) {
   const provider = clean(order?.payment?.provider).toLowerCase();
   const paymentStatus = clean(order?.payment?.status).toLowerCase();
   const orderStatus = clean(order?.status).toLowerCase();
 
   return Boolean(
     hasPermission &&
+    !isManualOrderReservationExpired(order, now) &&
     provider === 'manual' &&
     paymentStatus === 'pending_manual' &&
     ['pending', 'processing'].includes(orderStatus)
@@ -105,6 +115,19 @@ export function getManualPaymentEvidence(order) {
     actorRole: clean(evidence.actorRole),
     confirmedAt: evidence.confirmedAt || null,
   };
+}
+
+export function matchesManualPaymentConfirmation(order, request) {
+  const evidence = order?.payment?.manualConfirmation;
+  return clean(order?.payment?.status).toLowerCase() === 'paid' &&
+    clean(order?.status).toLowerCase() === 'paid' &&
+    clean(order?.payment?.provider).toLowerCase() === 'manual' &&
+    evidence &&
+    clean(evidence.method).toLowerCase() === request.method &&
+    clean(evidence.reference) === request.reference &&
+    cents(evidence.amount) === cents(request.amount) &&
+    clean(evidence.currency).toUpperCase() === request.currency &&
+    clean(evidence.reason) === request.reason;
 }
 
 export function getManualPaymentErrorMessage(error) {

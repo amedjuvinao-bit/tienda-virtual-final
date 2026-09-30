@@ -72,8 +72,10 @@ function groupAllocations(allocations = []) {
     };
 
     group.allocations.push(allocation);
-    group.reserved += toQuantity(
-      allocation?.reservedQuantity || allocation?.quantity
+    group.reserved += Math.max(0,
+      toQuantity(allocation?.reservedQuantity ?? allocation?.quantity) -
+      toQuantity(allocation?.releasedQuantity) -
+      toQuantity(allocation?.soldQuantity)
     );
     group.sold += toQuantity(allocation?.soldQuantity);
     group.shipped += toQuantity(allocation?.shippedQuantity);
@@ -177,7 +179,7 @@ export default function OrderDetailInventoryAllocations({
       <SectionTitle
         icon={OrderDetailIcons.Building2}
         title="Preparación por sedes"
-        subtitle="Unidades reservadas, vendidas y despachadas desde cada ubicación"
+        subtitle="Estado actual y movimientos de inventario por ubicación"
         action={
           <SoftBadge
             variant={groups.length > 1 ? 'warning' : 'primary'}

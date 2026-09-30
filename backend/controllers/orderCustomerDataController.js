@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const OrderEvent = require('../models/OrderEvent');
+const { normalizeDocumentNumber } = require('../lib/customers/customerIdentity');
 const {
   applyCustomerStatsForOrder,
   syncCustomerMasterFromOrder,
@@ -110,6 +111,32 @@ function sanitizeOrderPartyPatch(value, allowedFields) {
   return Object.keys(result).length ? result : null;
 }
 
+function unlinkPendingManualCustomerAfterDocumentChange(order, previousCustomer) {
+  if (
+    order?.source !== 'manual' ||
+    order?.payment?.status !== 'pending_manual' ||
+    !previousCustomer?.customerId
+  ) return false;
+
+  const previous = normalizeDocumentNumber(
+    previousCustomer.id, previousCustomer.documentType || order.billing?.documentType
+  );
+  const current = normalizeDocumentNumber(
+    order.customer?.id, order.customer?.documentType || order.billing?.documentType
+  );
+  if (!previous || !current || previous === current) return false;
+
+  order.customer.customerId = null;
+  order.customer.customerCode = '';
+  order.customerRelationship = {
+    ...(order.customerRelationship?.toObject?.() || order.customerRelationship || {}),
+    linkedAt: null,
+    statsAppliedAt: null,
+    matchedBy: '',
+  };
+  return true;
+}
+
 async function updateOrderCustomerData(req, res) {
   const session = await mongoose.startSession();
 
@@ -215,6 +242,10 @@ async function updateOrderCustomerData(req, res) {
         };
       }
 
+      const customerLinkRemoved = customer
+        ? unlinkPendingManualCustomerAfterDocumentChange(order, beforeCustomer)
+        : false;
+
       if (syncCustomer) {
         const result = await syncCustomerMasterFromOrder(order, {
           session,
@@ -239,6 +270,7 @@ async function updateOrderCustomerData(req, res) {
               customerFields: customer ? Object.keys(customer) : [],
               billingFields: billing ? Object.keys(billing) : [],
               syncCustomer,
+              customerLinkRemoved,
               customerId: linkedCustomer?._id || order.customer?.customerId || null,
               by: req.adminUsername || req.adminUserId || 'admin',
             },
@@ -281,5 +313,6 @@ module.exports = {
   ORDER_DOCUMENT_TYPES,
   ORDER_PERSON_TYPES,
   sanitizeOrderPartyPatch,
+  unlinkPendingManualCustomerAfterDocumentChange,
   updateOrderCustomerData,
 };

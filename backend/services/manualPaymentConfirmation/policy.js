@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { normalizeDocumentNumber } = require('../../lib/customers/customerIdentity');
 
 const MANUAL_PAYMENT_METHODS = Object.freeze([
   'cash',
@@ -21,6 +22,11 @@ function cleanText(value, maximum = 300) {
     .trim()
     .replace(/\s+/g, ' ')
     .slice(0, maximum);
+}
+
+function normalizedBuyerName(first, last) {
+  return cleanText([first, last].filter(Boolean).join(' '), 250)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 function createManualPaymentError(
@@ -198,6 +204,31 @@ function assertOrderAwaitsManualPayment(order) {
       409,
       { orderStatus, paymentStatus }
     );
+  }
+
+  if (cleanText(order?.source, 40).toLowerCase() === 'manual') {
+    const contact = order.customer || {};
+    const billing = order.billing || {};
+    const contactDocument = normalizeDocumentNumber(
+      contact.documentNumber || contact.id, contact.documentType || billing.documentType
+    );
+    const billingDocument = normalizeDocumentNumber(
+      billing.documentNumber || billing.id, billing.documentType || contact.documentType
+    );
+    const contactName = normalizedBuyerName(contact.name, contact.lastname);
+    const billingName = normalizedBuyerName(
+      billing.firstName || billing.name, billing.lastName || billing.lastname
+    );
+    const documentsDiffer = contactDocument && billingDocument && contactDocument !== billingDocument;
+    const namesDiffer = billing.personType !== 'juridica' &&
+      contactName && billingName && contactName !== billingName;
+    if (documentsDiffer || namesDiffer) {
+      throw createManualPaymentError(
+        'MANUAL_ORDER_CUSTOMER_BILLING_MISMATCH',
+        'El nombre o documento del cliente es diferente de facturación. Corrige los datos de la orden antes de confirmar el pago.',
+        409
+      );
+    }
   }
 }
 

@@ -32,6 +32,7 @@ const {
 const {
   createManualPaymentPostCommitProcessor,
 } = require('./postCommit');
+const { scheduleTrackedBackground } = require('../backupActivityTracker');
 
 async function executeQuery(query, { session = null, lean = false } = {}) {
   let current = query;
@@ -77,6 +78,7 @@ async function confirmOrderInventory(
   }
 
   if (
+    order.source !== 'manual' &&
     order.inventoryControl?.discountedAtCheckout === true &&
     order.inventoryControl?.restockedOnFailure !== true
   ) {
@@ -277,7 +279,9 @@ function createManualPaymentConfirmationService({
   customerStatsApplier = applyCustomerStatsForOrder,
   consumeStoreCredit = consumeReservedStoreCreditForOrder,
   postCommitProcessor = createManualPaymentPostCommitProcessor(),
+  postCommitScheduler = setImmediate,
   now = () => new Date(),
+  logger = console,
 } = {}) {
   if (typeof mongooseAdapter?.startSession !== 'function') {
     throw new TypeError('MANUAL_PAYMENT_TRANSACTION_ADAPTER_REQUIRED');
@@ -397,40 +401,50 @@ function createManualPaymentConfirmationService({
       await session.endSession();
     }
 
-    let postCommit = null;
-    let postCommitWarning = null;
-    try {
-      postCommit = await postCommitProcessor({
-        orderId: transactionResult.orderId,
-        evidence: transactionResult.evidence,
-      });
-      if (postCommit?.retryable === true) {
-        postCommitWarning = {
-          code: 'MANUAL_PAYMENT_POST_COMMIT_RETRY_REQUIRED',
-          message:
-            'El pago quedó confirmado, pero sus efectos posteriores requieren reintento.',
-        };
-      }
-    } catch (error) {
-      postCommitWarning = {
-        code: error?.code || 'MANUAL_PAYMENT_POST_COMMIT_FAILED',
-        message:
-          error?.message ||
-          'El pago quedó confirmado, pero sus efectos posteriores requieren reintento.',
-      };
-    }
-
     const order = await executeQuery(
       OrderModel.findById(transactionResult.orderId),
       { lean: true }
     );
+    // El pago y la evidencia ya son durables. Factus y la entrega se ejecutan
+    // fuera de la respuesta HTTP; el worker post-pago reintenta estados pendientes
+    // si este proceso termina o algún proveedor falla.
+    const postCommitPayload = {
+      orderId: transactionResult.orderId,
+      evidence: transactionResult.evidence,
+    };
+    let scheduled = false;
+    try {
+      scheduleTrackedBackground(postCommitScheduler,
+        () => Promise.resolve(postCommitProcessor(postCommitPayload)).then((outcome) => {
+          if (outcome?.retryable === true) {
+            logger.warn?.('manual_payment_post_commit_retry_required', {
+              orderId: String(transactionResult.orderId),
+            });
+          }
+        }),
+        (error) => {
+          logger.error?.('manual_payment_post_commit_failed', {
+            orderId: String(transactionResult.orderId),
+            code: error?.code || 'MANUAL_PAYMENT_POST_COMMIT_FAILED',
+          });
+        });
+      scheduled = true;
+    } catch (error) {
+      logger.error?.('manual_payment_post_commit_schedule_failed', {
+        orderId: String(transactionResult.orderId),
+        code: error?.code || 'MANUAL_PAYMENT_POST_COMMIT_SCHEDULE_FAILED',
+      });
+    }
     return {
       confirmed: transactionResult.duplicate !== true,
       duplicate: transactionResult.duplicate === true,
       order,
       evidence: serializeEvidence(transactionResult.evidence),
-      postCommit,
-      postCommitWarning,
+      postCommit: { status: 'pending', scheduled },
+      postCommitWarning: scheduled ? null : {
+        code: 'MANUAL_PAYMENT_POST_COMMIT_SCHEDULE_FAILED',
+        message: 'El pago quedó confirmado. La entrega y la factura siguen pendientes de recuperación automática.',
+      },
     };
   }
 

@@ -126,11 +126,11 @@ async function main() {
   assert.match(webhookRouteSource, /router\.get\('\/'[\s\S]*?ready: true/);
   assert.match(
     webhookRouteSource,
-    /if \(!hasSignedHeaders && temporarySandboxTunnel\) \{[\s\S]*?res\.status\(200\)\.json\(\{ received: true \}\)[\s\S]*?setImmediate/
+    /if \(!hasSignedHeaders && temporarySandboxTunnel\) \{[\s\S]*?res\.status\(200\)\.json\(\{ received: true \}\)[\s\S]*?scheduleTrackedBackground\(setImmediate,/
   );
   assert.match(webhookRouteSource, /verified\.sandboxTest === true/);
   assert.match(webhookRouteSource, /res\.status\(200\)\.json\(\{ received: true \}\)/);
-  assert.match(webhookRouteSource, /setImmediate\(\(\) => \{[\s\S]*?persistVerifiedEvent/);
+  assert.match(webhookRouteSource, /scheduleTrackedBackground\(setImmediate,\s*\(\) => persistVerifiedEvent\(verified, payload\)/);
   assert.match(webhookRouteSource, /Solicitud aceptada/);
   assert.match(webhookRouteSource, /Solicitud rechazada/);
   assert.match(webhookRouteSource, /markShippingWebhookVerified\(verified\)/);

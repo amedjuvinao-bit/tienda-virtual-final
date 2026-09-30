@@ -62,7 +62,7 @@ async function executeElectronicInvoiceAfterPayment({
         outcome: 'skipped',
         performed: false,
         terminal: true,
-        reasonCode: 'ELECTRONIC_BILLING_INACTIVE',
+        reasonCode: result.reasonCode || 'ELECTRONIC_BILLING_INACTIVE',
         message: trimSafe(result.message, 300),
         invoice: result.invoice || null,
         reused: result.reused === true,

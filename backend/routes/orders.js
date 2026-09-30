@@ -76,12 +76,23 @@ const {
 const {
   confirmOrderManualPayment,
 } = require('../controllers/orderManualPaymentController');
+const {
+  listManualOrderBranches,
+  listManualOrderProducts,
+  previewManualOrder,
+  postManualOrder,
+} = require('../controllers/orderManualCreationController');
 
 
 router.use('/admin', requireAdmin);
 
 /* GET /api/orders/admin: consulta paginada y métricas en un servicio aislado. */
 router.get('/admin', listAdminOrders);
+
+router.get('/admin/manual/branches', requirePermission('orders:create'), listManualOrderBranches);
+router.get('/admin/manual/products', requirePermission('orders:create'), listManualOrderProducts);
+router.post('/admin/manual/quote', requirePermission('orders:create'), previewManualOrder);
+router.post('/admin/manual', requirePermission('orders:create'), postManualOrder);
 
 router.get('/admin/operations/health', getOrderOperationalHealth);
 

@@ -201,6 +201,7 @@ export default function OrderDetailProfessionalView({
       <>
         <OrderDetailPaymentPanel
           order={order}
+          onEditBilling={onSaveCustomerData ? () => setActiveTab('customer') : undefined}
           canConfirmManualPayment={canConfirmManualPayment}
           manualPaymentConfirmation={manualPaymentConfirmation}
         />

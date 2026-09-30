@@ -27,9 +27,10 @@ vi.mock('../admin/api/adminAuthApi', () => {
 });
 
 function SessionStatus({ onLogout }) {
-  const { isAuthenticated, authLoading, logout, logoutPending, logoutError, retryPendingLogout } = useAuth();
+  const { isAuthenticated, authLoading, logout, logoutPending, logoutError, retryPendingLogout, adminUser } = useAuth();
   return <>
     <span>{authLoading ? 'verificando' : isAuthenticated ? 'autenticado' : 'sin sesión'}</span>
+    <span>{adminUser?.permissions?.join(',') || 'sin permisos'}</span>
     <span>{logoutPending ? 'cierre pendiente' : 'cierre confirmado'}</span>
     {logoutError && <span>{logoutError}</span>}
     <button type="button" onClick={() => onLogout(logout())}>Cerrar sesión</button>
@@ -102,5 +103,17 @@ describe('confirmación del cierre de sesión admin', () => {
     });
     expect(screen.getByText('sin sesión')).toBeInTheDocument();
     expect(setAdminSessionActive).not.toHaveBeenCalledWith(true);
+  });
+
+  it('actualiza permisos al volver a la pestaña tras editar el perfil', async () => {
+    api.get.mockResolvedValueOnce({ data: { authenticated: true,
+      user: { username: 'operador', permissions: ['orders:view'] } } })
+      .mockResolvedValue({ data: { authenticated: true,
+        user: { username: 'operador', permissions: [] } } });
+    render(<AuthProvider><SessionStatus onLogout={() => {}} /></AuthProvider>);
+    await screen.findByText('orders:view');
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    await screen.findByText('sin permisos');
+    expect(api.get).toHaveBeenCalledTimes(2);
   });
 });

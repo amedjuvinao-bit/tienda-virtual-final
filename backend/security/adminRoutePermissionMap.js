@@ -13,6 +13,7 @@ const {
 const {
   resolveSiteSettingsWritePermissions,
 } = require('./siteSettingsWritePermissions');
+const { requiredUserWritePermissions } = require('./adminUserWritePolicy');
 
 const ADMIN_ROUTE_PERMISSION_RULES = [
   /* =========================================================
@@ -1291,6 +1292,87 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/admin/backup-preferences',
+    permission: 'settings:store',
+    description: 'Consultar método de respaldo elegido por el propietario.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/backup-preferences',
+    permission: 'settings:store',
+    description: 'Elegir método de respaldo sin ejecutar copias ni cambiar el plan de Atlas.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/backup-preferences/runs',
+    permission: 'settings:store',
+    description: 'Consultar la trazabilidad de los respaldos del propietario.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/backup-preferences/readiness',
+    permission: 'settings:store',
+    description: 'Comprobar si el servidor puede iniciar un respaldo desde el panel.',
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-readiness',
+    permission: 'settings:store', description: 'Comprobar la preparación de la copia de archivos.',
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-runs',
+    permission: 'settings:store', description: 'Consultar el historial de copias de archivos.',
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-runs/:id/record',
+    permission: 'settings:store', description: 'Consultar el inventario verificado de una copia de archivos.',
+  },
+  {
+    method: 'POST', path: '/api/admin/backup-preferences/media-start',
+    permission: 'settings:store', description: 'Pausar la tienda y crear una copia cifrada de archivos.',
+    audit: true, danger: true,
+  },
+  {
+    method: 'POST', path: '/api/admin/backup-preferences/media-runs/:id/download',
+    permission: 'settings:store', description: 'Descargar una copia cifrada de archivos con reautenticación.',
+    audit: true, danger: true,
+  },
+  {
+    method: 'POST', path: '/api/admin/backup-preferences/media-runs/:id/native-download',
+    permission: 'settings:store', description: 'Autorizar una descarga de archivos del navegador con contraseña y 2FA.',
+    audit: true, danger: true,
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-runs/:id/file',
+    permission: 'settings:store', description: 'Transmitir un archivo cifrado con autorización de un solo uso.',
+    audit: true, danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/backup-preferences/start',
+    permission: 'settings:store',
+    description: 'Pausar la tienda e iniciar una copia verificada con credenciales del propietario.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/backup-preferences/recover',
+    permission: 'settings:store',
+    description: 'Reabrir tras revisar una copia interrumpida.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/backup-preferences/runs/:id/download',
+    permission: 'settings:store',
+    description: 'Descargar un respaldo cifrado verificado con reautenticación.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
     path: '/api/admin/payment-settings',
     permission: 'settings:payments',
     description: 'Consultar la configuración protegida de proveedores de pago.',
@@ -1442,9 +1524,17 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Ver usuario administrativo.',
   },
   {
+    method: 'GET',
+    path: '/api/admin/users/:id/activity',
+    permission: 'admin-users:view',
+    additionalPermissions: ['logs:view'],
+    description: 'Ver actividad administrativa de un usuario.',
+  },
+  {
     method: 'POST',
     path: '/api/admin/users',
     permission: 'admin-users:create',
+    additionalPermissions: ['admin-users:assign_role'],
     description: 'Crear usuario administrativo.',
     audit: true,
   },
@@ -1452,6 +1542,8 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     method: 'PUT',
     path: '/api/admin/users/:id',
     permission: 'admin-users:update',
+    dynamic: true,
+    resolvePermissions: (req) => requiredUserWritePermissions('PUT', req.body),
     description: 'Editar usuario administrativo.',
     audit: true,
   },
@@ -1461,6 +1553,14 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     permission: 'admin-users:update',
     description: 'Editar parcialmente usuario administrativo.',
     audit: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/admin/users/:id/status',
+    permission: 'admin-users:disable',
+    description: 'Cambiar el estado de acceso de un usuario administrativo.',
+    audit: true,
+    danger: true,
   },
   {
     method: 'PATCH',
@@ -1519,9 +1619,9 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'PATCH',
-    path: '/api/admin/roles/:id',
-    permission: 'roles:update',
-    description: 'Editar parcialmente perfil administrativo.',
+    path: '/api/admin/roles/:id/status',
+    permission: 'roles:disable',
+    description: 'Cambiar estado de perfil administrativo.',
     audit: true,
     danger: true,
   },
@@ -1817,6 +1917,7 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     method: 'GET',
     path: '/api/admin/audit-logs/export',
     permission: 'logs:export',
+    additionalPermissions: ['logs:view'],
     description: 'Exportar logs de auditoría.',
     audit: true,
   },

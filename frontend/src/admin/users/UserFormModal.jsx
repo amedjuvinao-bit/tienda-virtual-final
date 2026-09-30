@@ -2,12 +2,19 @@
 
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { getNewBranchAssignment } from './adminUsersHelpers';
 
 export default function UserFormModal({
   open,
   mode,
   roles,
   branches,
+  canAssign,
+  canDisable,
+  canChangePassword,
+  actorBranches,
+  globalBranchAccess,
+  hasUnavailableBranches,
   form,
   setForm,
   saving,
@@ -360,8 +367,10 @@ export default function UserFormModal({
                   </span>
 
                   <select
+                    aria-label="Perfil administrativo"
                     value={form.role}
                     onChange={(event) => updateField('role', event.target.value)}
+                    disabled={isEditMode && !canAssign}
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     required
                     style={inputStyle}
@@ -438,33 +447,49 @@ export default function UserFormModal({
                   </div>
                 </div>
 
-                <label className="grid gap-2">
-                  <span className="text-sm font-bold" style={labelStyle}>
-                    Sede *
-                  </span>
-                  <select
-                    value={form.branchId}
-                    onChange={(event) =>
-                      updateField('branchId', event.target.value)
-                    }
-                    className="rounded-2xl border px-4 py-3 text-sm outline-none"
-                    required
-                    style={inputStyle}
-                  >
-                    <option value="" style={optionStyle}>
-                      Seleccionar sede
-                    </option>
-                    {branches.map((branch) => (
-                      <option
-                        key={branch._id}
-                        value={branch._id}
-                        style={optionStyle}
-                      >
-                        {branch.name} ({branch.code})
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <fieldset className="grid gap-2" disabled={isEditMode && (!canAssign || hasUnavailableBranches)}>
+                  <legend className="text-sm font-bold" style={labelStyle}>Sedes autorizadas *</legend>
+                  <p className="text-xs" style={mutedTextStyle}>
+                    Elige las sedes a las que tendrá acceso y marca una como principal.
+                  </p>
+                  {hasUnavailableBranches && <p className="text-xs font-bold" style={mutedTextStyle}>
+                    Este usuario tiene una sede no disponible. Sus asignaciones se conservan;
+                    revisa la sede antes de cambiarlas.
+                  </p>}
+                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-2xl border p-3" style={{ borderColor: 'var(--admin-input-border)' }}>
+                    {branches.map((branch) => {
+                      const selected = (form.assignedBranches || []).some((item) => item.branch === branch._id);
+                      return (
+                        <div key={branch._id} className="flex flex-wrap items-center gap-3 text-sm" style={labelStyle}>
+                          <label className="flex min-w-0 flex-1 items-center gap-2">
+                            <input type="checkbox" checked={selected}
+                              onChange={(event) => setForm((current) => {
+                                const assigned = current.assignedBranches || [];
+                                if (event.target.checked) {
+                                  return {
+                                    ...current,
+                                    assignedBranches: [...assigned, getNewBranchAssignment(
+                                      branch._id, current.role, actorBranches, globalBranchAccess)],
+                                    branchId: current.branchId || branch._id,
+                                  };
+                                }
+                                const remaining = assigned.filter((item) => item.branch !== branch._id);
+                                return { ...current, assignedBranches: remaining,
+                                  branchId: current.branchId === branch._id ? remaining[0]?.branch || '' : current.branchId };
+                              })} />
+                            <span className="truncate">{branch.name} ({branch.code})</span>
+                          </label>
+                          {selected && (
+                            <label className="flex items-center gap-1 whitespace-nowrap text-xs">
+                              <input type="radio" name="user-default-branch" checked={form.branchId === branch._id}
+                                onChange={() => updateField('branchId', branch._id)} /> Principal
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </fieldset>
 
                 <label className="grid gap-2">
                   <span className="text-sm font-bold" style={labelStyle}>
@@ -473,6 +498,7 @@ export default function UserFormModal({
                   <select
                     value={form.status}
                     onChange={(event) => updateField('status', event.target.value)}
+                    disabled={isEditMode && !canDisable}
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={inputStyle}
                   >
@@ -505,6 +531,7 @@ export default function UserFormModal({
                     onChange={(event) =>
                       updateField('mustChangePassword', event.target.checked)
                     }
+                    disabled={isEditMode && !canChangePassword}
                     className="h-4 w-4"
                     style={{
                       accentColor: 'var(--admin-primary)',

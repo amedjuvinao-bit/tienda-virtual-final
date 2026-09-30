@@ -94,6 +94,55 @@ describe('BillingPendingOrdersPanel', () => {
 
   afterEach(cleanup);
 
+  it('muestra el motivo fiscal sin exigir revisar la consola ni emitir otra factura', async () => {
+    state.getPending.mockResolvedValue({
+      rows: [{ ...ORDER, billingIssue: {
+        status: 'failed', retryable: true,
+        errorMessage: 'Falta el municipio fiscal. Selecciona departamento y municipio en Cliente e historial.',
+      } }], total: 1, page: 1, pages: 1,
+    });
+    renderPanel();
+    expect(await screen.findByText(/Falta el municipio fiscal/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y reintentar' }));
+    await waitFor(() => expect(state.getPreflight).toHaveBeenCalledWith(ORDER.id));
+    expect(state.generate).not.toHaveBeenCalled();
+  });
+
+  it('explica la sede desactivada y no permite confirmar la factura desde el precontrol', async () => {
+    const message = 'La facturación electrónica está desactivada para esta sede. Actívala en Configuración → Sedes.';
+    state.getPending.mockResolvedValue({
+      rows: [{ ...ORDER, billingIssue: {
+        status: 'blocked', retryable: false, errorMessage: message,
+      } }], total: 1, page: 1, pages: 1,
+    });
+    state.getPreflight.mockResolvedValue({
+      ...PREFLIGHT,
+      ready: false,
+      blockers: [{ code: 'BRANCH_ELECTRONIC_INVOICE_DISABLED', field: 'branch', message }],
+    });
+    renderPanel();
+    expect(await screen.findByText('Facturación desactivada para esta sede')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y emitir' }));
+    expect(await screen.findByText(/La facturación electrónica está desactivada para esta sede/)).toBeInTheDocument();
+    expect(state.generate).not.toHaveBeenCalled();
+  });
+
+  it('permite revisar una emisión omitida antes cuando la sede ya está activa', async () => {
+    state.getPending.mockResolvedValue({
+      rows: [{ ...ORDER, billingIssue: {
+        status: 'deferred', retryable: false,
+        errorMessage: 'La factura se omitió cuando la sede tenía desactivada la facturación. Si ya la activaste, revisa y emite.',
+      } }], total: 1, page: 1, pages: 1,
+    });
+    state.getPreflight.mockResolvedValue(PREFLIGHT);
+    renderPanel();
+    expect(await screen.findByText('Emisión omitida al confirmar el pago')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y emitir' }));
+    await waitFor(() => expect(state.getPreflight).toHaveBeenCalledWith(ORDER.id));
+    fireEvent.click(await screen.findByRole('checkbox'));
+    expect(await screen.findByRole('button', { name: 'Confirmar y emitir' })).toBeEnabled();
+  });
+
   it('abre Documentos filtrado por la factura después de una emisión exitosa', async () => {
     state.getPreflight.mockResolvedValue(PREFLIGHT);
     state.generate.mockResolvedValue({

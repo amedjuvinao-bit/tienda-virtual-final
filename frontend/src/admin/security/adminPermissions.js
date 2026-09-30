@@ -3,7 +3,7 @@
 const PRIVILEGED_ROLES = new Set(['owner', 'admin']);
 
 export const ADMIN_ROUTE_PERMISSIONS = {
-  dashboard: [],
+  dashboard: ['dashboard:view'],
 
   productos: ['products:view'],
   'productos/nuevo': ['products:create'],
@@ -46,6 +46,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'configuracion/usuarios': ['admin-users:view'],
   'configuracion/perfiles': ['roles:view'],
   'configuracion/seguridad': [],
+  'configuracion/respaldos': [],
   'configuracion/logs': ['logs:view'],
 };
 
@@ -93,14 +94,14 @@ export function isPrivilegedAdmin(user) {
 export function getAdminUserPermissions(user) {
   const permissions = new Set();
 
+  // The verified session response is authoritative, including an empty list.
+  // Older snapshots stored on the user must not restore revoked role permissions.
   if (Array.isArray(user?.permissions)) {
     user.permissions.forEach((permission) => {
       const normalizedPermission = normalizePermission(permission);
-
-      if (normalizedPermission) {
-        permissions.add(normalizedPermission);
-      }
+      if (normalizedPermission) permissions.add(normalizedPermission);
     });
+    return permissions;
   }
 
   if (Array.isArray(user?.roleRef?.permissions)) {
@@ -228,5 +229,19 @@ export function getRequiredPermissionsForAdminPath(pathname) {
 }
 
 export function canAccessAdminPath(user, pathname) {
+  if (normalizePath(pathname) === 'configuracion/respaldos') {
+    return getAdminUserRole(user) === 'owner';
+  }
   return hasAnyAdminPermission(user, getRequiredPermissionsForAdminPath(pathname));
+}
+
+export function getAdminLandingPath(user) {
+  const firstAllowed = Object.keys(ADMIN_ROUTE_PERMISSIONS)
+    .filter((path) => !path.includes('/') || (
+      path.startsWith('configuracion/') && path !== 'configuracion/seguridad'
+    ))
+    .find((path) => path !== 'configuracion' && canAccessAdminPath(user, `/admin/${path}`));
+
+  // Every administrator can manage the security of their own account.
+  return firstAllowed ? `/admin/${firstAllowed}` : '/admin/configuracion/seguridad';
 }

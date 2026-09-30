@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const Order = require('../models/Order');
 
 const EXPECTED_SCHEMA_FINGERPRINT =
-  '1349f946dfd5d95c32932ed04b7ba5da8c190159a9ff381be7c3555bc1b94b08';
+  '24fd6f300e9391eddc529aa7e6f91d56c4271f26dd842d02e8f37e751a6b71e2';
 
 function normalizeValue(value) {
   if (value === undefined) return '__undefined__';
@@ -244,10 +244,11 @@ async function validateBehaviorParity() {
 async function main() {
   const schema = Order.schema;
 
-  assert.strictEqual(Object.keys(schema.paths).length, 116);
+  assert.strictEqual(Object.keys(schema.paths).length, 117);
   assert.strictEqual(Object.keys(schema.nested).length, 8);
-  assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 345);
+  assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 347);
   assert(schema.path('payment.manualConfirmation.requestFingerprint'));
+  assert.strictEqual(schema.path('inventoryControl.reservationExpiresAt')?.instance, 'Date');
   assert.strictEqual(schema.indexes().length, 45);
   assert.strictEqual(schema.s.hooks._pres.get('validate')?.length, 1);
   assert.strictEqual(schema.s.hooks._pres.get('save')?.length, 6);

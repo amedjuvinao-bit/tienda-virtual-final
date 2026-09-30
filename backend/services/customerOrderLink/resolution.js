@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 
 const Customer = require('../../models/Customer');
 const {
+  buildCustomerIdentity,
   isActiveMongoTransaction,
   isMongoDuplicateKeyError,
 } = require('../../lib/customers/customerIdentity');
@@ -25,6 +26,25 @@ function createCustomerLinkError(message, code, statusCode = 409, details = {}) 
   error.statusCode = statusCode;
   error.details = details;
   return error;
+}
+
+function assertMatchingDocument(payload, customer) {
+  const incoming = buildCustomerIdentity(payload);
+  const existing = buildCustomerIdentity(customer);
+  if (
+    incoming.normalizedDocument &&
+    existing.normalizedDocument &&
+    (incoming.normalizedDocument !== existing.normalizedDocument ||
+      (incoming.documentType && existing.documentType &&
+        incoming.documentType !== existing.documentType))
+  ) {
+    throw createCustomerLinkError(
+      'El correo o teléfono pertenece a una ficha con otro documento. Revisa la identidad del comprador antes de crear la orden.',
+      'CUSTOMER_IDENTITY_CONFLICT',
+      409,
+      { matchedCustomerId: String(customer._id) }
+    );
+  }
 }
 
 async function resolveCustomerForOrder(
@@ -68,6 +88,7 @@ async function resolveCustomerForOrder(
   }
 
   if (match?.customer) {
+    assertMatchingDocument(payload, match.customer);
     const conflictingMatch = await findCustomerMatch(payload, {
       session,
       excludeId: match.customer._id,
@@ -137,6 +158,7 @@ async function resolveCustomerForOrder(
     }
 
     customer = concurrentMatch.customer;
+    assertMatchingDocument(payload, customer);
     if (fillMissingCustomerFields(customer, payload)) {
       await customer.save({ session });
     }

@@ -136,6 +136,21 @@ async function main() {
   assert.ok(identified.blockers.some((item) => item.code === 'BILLING_FINAL_CONSUMER_MISMATCH'));
   ok('bloquea 222222222222 cuando el comprador no es consumidor final');
 
+  const missingLastName = validateCustomerSnapshot({
+    documentType: 'CC',
+    documentNumber: '0000000000',
+    personType: 'natural',
+    firstName: 'Fixture',
+    lastName: '',
+    address: 'DIRECCION FICTICIA SIN VALIDEZ',
+    email: 'fixture.fiscal@example.invalid',
+    municipalityCode: '11001',
+  }, {}, { requireLastName: true });
+  assert.ok(missingLastName.blockers.some(
+    (item) => item.code === 'BILLING_CUSTOMER_LAST_NAME_REQUIRED'
+  ));
+  ok('Factus exige apellido de la persona natural antes del envío');
+
   const finalCustomer = buildFactusCustomer({
     source: 'manual',
     customer: { name: 'Consumidor final', isFinalConsumer: true },
@@ -172,6 +187,54 @@ async function main() {
   assert.equal(preflight.totals.total, 100000);
   assert.match(preflight.fingerprint, /^[a-f0-9]{64}$/);
   ok('construye una fotografía fiscal completa y determinística sin llamar a Factus');
+
+  const branchOrder = sampleOrder({ branch: new mongoose.Types.ObjectId() });
+  const branch = { name: 'Sede de prueba', settings: { allowElectronicInvoice: false } };
+  const branchDependencies = {
+    ...dependencies(branchOrder),
+    BranchModel: { findById: () => query(branch) },
+  };
+  const disabledBranchPreflight = await buildInvoicePreflight(
+    branchOrder._id,
+    branchDependencies
+  );
+  assert.equal(disabledBranchPreflight.ready, false);
+  assert.ok(disabledBranchPreflight.blockers.some(
+    (item) => item.code === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' &&
+      item.message.includes('Sede de prueba')
+  ));
+  branch.settings.allowElectronicInvoice = true;
+  const enabledBranchPreflight = await buildInvoicePreflight(
+    branchOrder._id,
+    branchDependencies
+  );
+  assert.equal(enabledBranchPreflight.ready, true);
+  assert.notEqual(disabledBranchPreflight.fingerprint, enabledBranchPreflight.fingerprint);
+  ok('la vista previa impide emitir para una sede desactivada y se actualiza al habilitarla');
+
+  const legacyOrder = sampleOrder();
+  legacyOrder.customer.city = 'Zona Bananera';
+  legacyOrder.customer.department = 'Magdalena';
+  delete legacyOrder.customer.municipalityCode;
+  legacyOrder.billing.city = 'Zona Bananera';
+  legacyOrder.billing.department = 'Magdalena';
+  delete legacyOrder.billing.municipalityCode;
+  const legacyPreflight = await buildInvoicePreflight(
+    legacyOrder._id,
+    dependencies(legacyOrder)
+  );
+  assert.equal(legacyPreflight.customer.municipalityCode, '47980');
+  assert.equal(legacyPreflight.payload.customer.municipality_code, '47980');
+  ok('la vista previa envía a Factus el municipio recuperado de una orden anterior');
+
+  const municipalityMismatch = validateCustomerSnapshot(
+    legacyPreflight.customer,
+    { ...legacyPreflight.payload.customer, municipality_code: '' }
+  );
+  assert.ok(municipalityMismatch.blockers.some(
+    (item) => item.code === 'BILLING_PROVIDER_MUNICIPALITY_MISMATCH'
+  ));
+  ok('la vista previa bloquea un municipio ausente en la solicitud real a Factus');
 
   assert.equal(assertPreflightReady(preflight, preflight.fingerprint), true);
   assert.throws(

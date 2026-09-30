@@ -21,14 +21,18 @@ import {
   getPaymentBadgeVariant,
   getPaymentDetails,
 } from './orderPaymentPanelModel';
+import { getPaymentState } from './orderStoryStateModel';
+import { getManualOrderIdentityIssue, getOrderInvoiceIssue } from './orderInvoiceIssueModel';
 
 export default function OrderDetailPaymentPanel({
   order,
   canConfirmManualPayment = false,
   manualPaymentConfirmation,
+  onEditBilling,
 }) {
   const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentInfo(order);
+  const paymentComplete = getPaymentState(order).complete;
   const details = getPaymentDetails(order);
   const storeCredit = order?.storeCredit || {};
   const hasStoreCredit = storeCredit.applied === true && Number(storeCredit.amount) > 0;
@@ -46,6 +50,14 @@ export default function OrderDetailPaymentPanel({
     }[String(storeCredit.status || '').toLowerCase()] || 'Registrado';
   const badgeVariant = getPaymentBadgeVariant(payment.status);
   const paymentStatusLabel = exchange.noCharge ? 'Sin cobro' : payment.status;
+  const invoiceIssue = getOrderInvoiceIssue(order);
+  const identityIssue = getManualOrderIdentityIssue(order);
+  const invoiceStatus = String(order?.invoiceAutomation?.status || '').toLowerCase();
+  const invoiceRetrying = invoiceStatus === 'failed' &&
+    !String(order?.electronicInvoice?.status || '').trim();
+  const invoiceInProgress = paymentComplete && !invoiceIssue &&
+    ['pending', 'scheduling'].includes(invoiceStatus) &&
+    !['accepted', 'validated'].includes(String(order?.electronicInvoice?.status || '').toLowerCase());
 
   return (
     <OrderDetailPanel
@@ -89,8 +101,8 @@ export default function OrderDetailPaymentPanel({
         />
 
         <MiniInfoCard
-          label={hasStoreCredit ? 'Total de la compra' : 'Valor pagado'}
-          value={toCOP(hasStoreCredit ? order?.total : details.amount)}
+          label={hasStoreCredit ? 'Total de la compra' : paymentComplete ? 'Valor pagado' : 'Total del pedido'}
+          value={toCOP(hasStoreCredit || !paymentComplete ? order?.total : details.amount)}
           icon={OrderDetailIcons.CheckCircle2}
           accent
         />
@@ -166,10 +178,27 @@ export default function OrderDetailPaymentPanel({
         <InfoLine label="Referencia:" value={details.reference} strong />
         <InfoLine label="Transacción:" value={details.transactionId} />
         <InfoLine label="Autorización:" value={details.authorization} />
-        <InfoLine label="Fecha de pago:" value={fmtDate(details.paidAt)} />
+        <InfoLine label="Fecha de pago:" value={paymentComplete ? fmtDate(details.paidAt) : '—'} />
       </div>
 
       <OrderManualPaymentEvidence order={order} />
+      {invoiceInProgress ? (
+        <div role="status" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg }}>
+          <strong style={{ display: 'block', fontSize: 14 }}>Facturación en proceso</strong>
+          <p style={{ margin: '6px 0 0', fontSize: 13 }}>El pago ya quedó confirmado. El resultado de la factura se actualizará aquí mientras mantengas abierta la orden.</p>
+        </div>
+      ) : null}
+      {invoiceIssue || identityIssue ? (
+        <div role="alert" style={{ marginTop: 16, padding: 16, borderRadius: 16, border: '1px solid var(--admin-warning-border)', background: 'var(--admin-warning-soft-bg)', color: 'var(--admin-warning-text)' }}>
+          <strong style={{ display: 'block', fontSize: 14 }}>{identityIssue ? 'Corrige la identidad del comprador' : order?.invoiceAutomation?.reasonCode === 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? 'Factura omitida al confirmar el pago' : invoiceRetrying ? 'Reintento automático de factura' : 'Factura pendiente de corrección'}</strong>
+          <p style={{ margin: '6px 0 0', fontSize: 13 }}>{identityIssue || invoiceIssue}</p>
+          {onEditBilling && !invoiceRetrying && order?.invoiceAutomation?.reasonCode !== 'BRANCH_ELECTRONIC_INVOICE_DISABLED' ? (
+            <button type="button" onClick={onEditBilling} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 10, border: '1px solid currentColor', fontWeight: 800 }}>
+              Corregir datos fiscales
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <OrderManualPaymentConfirmationCard
         canConfirmManualPayment={canConfirmManualPayment}
         controller={manualPaymentConfirmation}

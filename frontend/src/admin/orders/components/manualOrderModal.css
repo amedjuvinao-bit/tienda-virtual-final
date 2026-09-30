@@ -1,0 +1,35 @@
+.manual-order-overlay { position: fixed; inset: 0; z-index: 130; background: color-mix(in srgb, var(--admin-page-bg, #f4f6fa) 36%, transparent); backdrop-filter: blur(10px); display: grid; place-items: center; padding: 16px; }
+.manual-order-dialog { width: min(960px, 100%); max-height: min(92vh, 940px); overflow: auto; background: var(--admin-modal-glass-bg, var(--admin-card-bg, #fff)); color: var(--admin-card-text, #142338); border: 1px solid var(--admin-card-border, #d1d9e5); border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.2); backdrop-filter: blur(24px); }
+.manual-order-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 24px 28px 18px; border-bottom: 1px solid rgba(120,140,160,.22); }
+.manual-order-header h2 { margin: 5px 0; font-size: 1.5rem; font-weight: 750; }
+.manual-order-header p, .manual-order-hint { color: var(--admin-muted-text, #64748b); font-size: .87rem; margin: 4px 0; }
+.manual-order-eyebrow { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #2563eb; }
+.manual-order-close { font-size: 1.7rem; line-height: 1; padding: 2px 10px; border-radius: 10px; }
+.manual-order-body { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 22px 28px; border: 0; margin: 0; min-width: 0; }
+.manual-order-panel { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.manual-order-panel h3 { margin: 7px 0 0; font-size: 1rem; font-weight: 750; }
+.manual-order-panel label { display: flex; flex-direction: column; gap: 6px; font-size: .82rem; font-weight: 700; }
+.manual-order-panel input, .manual-order-panel select { width: 100%; min-height: 40px; border: 1px solid var(--admin-card-border, #cbd5e1); border-radius: 9px; padding: 8px 10px; color: var(--admin-card-text, #17233a); background: var(--admin-card-bg, #fff); }
+.manual-order-products { display: flex; flex-direction: column; gap: 5px; overflow: auto; max-height: 260px; border: 1px solid rgba(120,140,160,.24); border-radius: 11px; padding: 6px; }
+.manual-order-products button { padding: 9px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; border-radius: 8px; }
+.manual-order-products button:hover { background: rgba(59,130,246,.1); }
+.manual-order-products small, .manual-order-line small { display: block; color: var(--admin-muted-text, #64748b); font-weight: 400; }
+.manual-order-products b { color: #2563eb; font-size: 1.2rem; }
+.manual-order-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.manual-order-line { display: grid; grid-template-columns: 1fr 68px 28px; align-items: center; gap: 8px; font-size: .86rem; }
+.manual-order-line input { min-height: 34px; }
+.manual-order-line button { font-size: 1.3rem; }
+.manual-order-footer { display: flex; align-items: center; justify-content: end; gap: 10px; flex-wrap: wrap; padding: 18px 28px 24px; border-top: 1px solid rgba(120,140,160,.22); }
+.manual-order-pricing { margin-right: auto; display: flex; flex-direction: column; font-size: .82rem; }
+.manual-order-pricing strong { font-size: 1.1rem; }
+.manual-order-policy { flex-basis: 100%; margin: 0; color: var(--admin-card-text, #142338); font-size: .83rem; line-height: 1.4; }
+.manual-order-dialog :focus-visible { outline: 2px solid var(--admin-primary, #2563eb); outline-offset: 2px; }
+.manual-order-primary, .manual-order-secondary { padding: 10px 15px; border-radius: 10px; font-weight: 750; }
+.manual-order-primary { color: white; background: #2563eb; }
+.manual-order-primary:disabled { opacity: .55; cursor: wait; }
+.manual-order-secondary { border: 1px solid #cbd5e1; }
+.manual-order-error { margin: 16px 28px 0; padding: 11px 13px; background: #fff1f2; color: #991b1b; border-radius: 9px; font-size: .87rem; }
+.manual-order-success { padding: 32px 28px; }
+.manual-order-success strong { font-size: 1.3rem; }
+.manual-order-success p { margin: 10px 0; }
+@media (max-width: 740px) { .manual-order-body { grid-template-columns: 1fr; } .manual-order-header, .manual-order-body, .manual-order-footer { padding-left: 16px; padding-right: 16px; } .manual-order-fields { grid-template-columns: 1fr; } }

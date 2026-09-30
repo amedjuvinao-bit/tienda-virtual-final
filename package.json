@@ -1,4 +1,11 @@
 {
+  "scripts": {
+    "validate:payment-invoice": "node scripts/validatePaymentInvoice.cjs",
+    "validate:branch-protection": "node backend/scripts/validateBranchProtectionLive.js",
+    "validate:branch-selection": "node backend/scripts/migrateBranchSelectionIndexes.js --verify",
+    "validate:role-default": "node backend/scripts/migrateAdminRoleDefaultIndex.js --verify",
+    "validate:admin-access": "node backend/scripts/validateAdminAccessReadOnly.js"
+  },
   "dependencies": {
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.10",

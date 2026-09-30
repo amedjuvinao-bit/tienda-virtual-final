@@ -72,6 +72,9 @@ jobs:
           npm --prefix backend run test:orders-cursor
           npm --prefix backend run test:order-admin-cursor-index-migration
           npm --prefix backend run test:order-creation-composition
+          npm --prefix backend run test:manual-order-branch-policy
+          npm --prefix backend run test:manual-order-transaction
+          npm --prefix backend run test:manual-order-expiration
           npm --prefix backend run test:order-cart-version
           npm --prefix backend run test:order-branch-authority
           npm --prefix backend run test:order-creation-postcommit
@@ -195,6 +198,31 @@ jobs:
       - name: Habilitar transacciones MongoDB
         run: node backend/scripts/initMongoReplicaSet.js
 
+      - name: Validar protección de sedes con devoluciones, reembolsos y finanzas
+        env:
+          BRANCH_PROTECTION_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_branch_protection?replicaSet=rs0
+        run: npm --prefix backend run test:admin-branches-operation-protection-mongo
+
+      - name: Validar sedes con usuarios, órdenes, inventario, caja y POS
+        env:
+          BRANCH_USERS_OPERATIONS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_branch_users_operations?replicaSet=rs0
+        run: npm --prefix backend run test:admin-branches-users-operations-mongo
+
+      - name: Validar selección transaccional del perfil predeterminado
+        env:
+          ADMIN_ROLE_DEFAULT_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_role_default?replicaSet=rs0
+        run: npm --prefix backend run test:admin-role-default-mongo
+
+      - name: Validar perfiles asignados con Órdenes y POS
+        env:
+          ADMIN_ROLE_ASSIGNMENT_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_role_assignment?replicaSet=rs0
+        run: npm --prefix backend run test:admin-role-assignment-mongo
+
+      - name: Validar Logs con MongoDB, filtros y exportación
+        env:
+          ADMIN_AUDIT_LOGS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_admin_audit_logs?replicaSet=rs0
+        run: npm --prefix backend run test:admin-audit-logs-level-plus
+
       - name: Validar reembolsos e inventario
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_refund_inventory?replicaSet=rs0
@@ -300,6 +328,7 @@ jobs:
           npm --prefix frontend run test:orders-detail-story
           npm --prefix frontend run test:orders-keyboard
           npm --prefix frontend run test:orders-manual-payment
+          npm --prefix frontend run test:orders-manual-order-form
 
       - name: Validar logística, envíos y posventa
         run: |

@@ -9,6 +9,7 @@ const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminSecurityAlert = require('../models/AdminSecurityAlert');
 const AdminUser = require('../models/AdminUser');
+const { getAdminUserPermissionView } = require('../security/adminUserPermissionView');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const { sendMail } = require('../lib/mail/mailer');
@@ -111,10 +112,6 @@ function isLegacyAdminConfigured() {
 }
 
 function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-
-  if (forwarded) return String(forwarded).split(',')[0].trim();
-
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
@@ -148,9 +145,10 @@ function buildAdminResetPasswordUrl(rawToken) {
   return `${baseUrl}/admin/reset-password?token=${cleanToken}`;
 }
 
-async function saveLoginAudit(req, { username = '', status, reason = '' }) {
+async function saveLoginAudit(req, { username = '', adminUserId = null, status, reason = '' }) {
   try {
     const audit = await AdminLoginAudit.create({
+      adminUserId,
       username,
       ip: getClientIp(req),
       status,
@@ -413,50 +411,17 @@ function buildLegacyTokenPayload(username) {
   };
 }
 
-function normalizePermissionList(input) {
-  if (!Array.isArray(input)) return [];
-
-  const seen = new Set();
-  const permissions = [];
-
-  input.forEach((item) => {
-    const permission = String(item || '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ':');
-
-    if (!permission) return;
-    if (seen.has(permission)) return;
-
-    seen.add(permission);
-    permissions.push(permission);
-  });
-
-  return permissions;
-}
-
-function getMergedAdminPermissions(adminUser) {
-  const rolePermissions = normalizePermissionList(
-    adminUser?.roleRef?.permissions
-  );
-
-  if (rolePermissions.length > 0) {
-    return rolePermissions;
-  }
-
-  return normalizePermissionList(adminUser?.permissions);
-}
-
 function buildUserResponseFromDb(adminUser) {
   const safeUser =
     typeof adminUser.toSafeObject === 'function'
       ? adminUser.toSafeObject()
       : adminUser.toObject();
 
-  const effectivePermissions = getMergedAdminPermissions(adminUser);
+  const { permissions: effectivePermissions, roleRef } = getAdminUserPermissionView(adminUser);
   const twoFactorPolicy = buildTwoFactorPolicy(adminUser);
 
   safeUser.permissions = effectivePermissions;
+  safeUser.roleRef = roleRef;
 
   return {
     id: String(adminUser._id),
@@ -469,7 +434,7 @@ function buildUserResponseFromDb(adminUser) {
     adminRole: adminUser.role,
     actualRole: adminUser.role,
 
-    roleRef: adminUser.roleRef || null,
+    roleRef,
     permissions: effectivePermissions,
     branches: Array.isArray(adminUser.branches) ? adminUser.branches : [],
     defaultBranch: adminUser.defaultBranch || null,
@@ -579,7 +544,7 @@ async function findAdminUserForToken(decoded) {
   deletedAt: null,
   })
     .select('+tokenVersion +failedLoginAttempts +lockedUntil')
-    .populate('roleRef', 'name code level scope permissions');
+    .populate('roleRef', 'name code level scope permissions active status deletedAt');
 }
 
 async function findAdminUserForPasswordChange(decoded) {
@@ -860,7 +825,7 @@ async function verifyAdminToken(req) {
 async function loginWithDatabaseUser(req, { cleanUsername, cleanPassword }) {
   const adminUser = await AdminUser.findByLogin(cleanUsername);
   if (adminUser) {
-    await adminUser.populate('roleRef', 'name code level scope permissions');
+    await adminUser.populate('roleRef', 'name code level scope permissions active status deletedAt');
   }
 
   if (!adminUser) {
@@ -1030,6 +995,7 @@ router.post('/login', async (req, res) => {
         );
 
         await saveLoginAudit(req, {
+          adminUserId: dbLoginResult.adminUser._id,
           username: dbLoginResult.user.username,
           status: 'pending',
           reason: 'password_verified_2fa_required',
@@ -1067,6 +1033,7 @@ router.post('/login', async (req, res) => {
       });
 
       await saveLoginAudit(req, {
+        adminUserId: dbLoginResult.adminUser._id,
         username: dbLoginResult.user.username,
         status: 'success',
         reason: 'db_login_success',
@@ -1242,6 +1209,7 @@ router.post('/2fa/verify', async (req, res) => {
     });
 
     await saveLoginAudit(req, {
+      adminUserId: adminUser._id,
       username: adminUser.username,
       status: 'success',
       reason: verification.recoveryCodeUsed
@@ -2105,7 +2073,7 @@ router.post('/reset-password', async (req, res) => {
     adminUser.clearPasswordResetToken({ markAsUsed: true });
 
     await adminUser.save();
-    await adminUser.populate('roleRef', 'name code level scope permissions');
+    await adminUser.populate('roleRef', 'name code level scope permissions active status deletedAt');
     await revokeAllUserSessions(adminUser._id, 'password_reset');
 
     if (adminUser.twoFactorEnabled === true) {
@@ -2113,6 +2081,7 @@ router.post('/reset-password', async (req, res) => {
       clearTwoFactorChallengeCookie(res);
 
       await saveLoginAudit(req, {
+        adminUserId: adminUser._id,
         username: adminUser.username,
         status: 'success',
         reason: 'reset_password_success_2fa_login_required',
@@ -2138,6 +2107,7 @@ router.post('/reset-password', async (req, res) => {
     });
 
     await saveLoginAudit(req, {
+      adminUserId: adminUser._id,
       username: adminUser.username,
       status: 'success',
       reason: 'reset_password_success',
@@ -2250,7 +2220,7 @@ router.post('/change-password-required', async (req, res) => {
     adminUser.updatedBy = adminUser._id;
 
     await adminUser.save();
-    await adminUser.populate('roleRef', 'name code level scope permissions');
+    await adminUser.populate('roleRef', 'name code level scope permissions active status deletedAt');
     await revokeAllUserSessions(adminUser._id, 'required_password_changed');
     const sessionResult = await startAdminSession({
       req,
@@ -2263,6 +2233,7 @@ router.post('/change-password-required', async (req, res) => {
     });
 
     await saveLoginAudit(req, {
+      adminUserId: adminUser._id,
       username: adminUser.username,
       status: 'success',
       reason: 'required_password_change_success',

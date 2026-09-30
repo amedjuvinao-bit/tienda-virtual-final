@@ -19,6 +19,7 @@ import useOrdersAdminFilters from './orders/hooks/useOrdersAdminFilters';
 import useOrdersAdminQuery from './orders/hooks/useOrdersAdminQuery';
 import useOrdersAdminSelectionActions from './orders/hooks/useOrdersAdminSelectionActions';
 import useOrdersControlPanel from './orders/hooks/useOrdersControlPanel';
+import useManualOrderDialog from './orders/hooks/useManualOrderDialog';
 import {
   ADMIN_BORDER,
   STATUS_FILTERS,
@@ -30,6 +31,7 @@ import {
 import './orders/ordersAdmin.css';
 
 const OrderDetailModal = lazy(() => import('./orders/components/OrderDetailModal'));
+const ManualOrderModal = lazy(() => import('./orders/components/ManualOrderModal'));
 
 export default function OrdersAdmin() {
   const [searchParams] = useSearchParams();
@@ -39,6 +41,7 @@ export default function OrdersAdmin() {
     : '';
   const linkedOrderNumber = String(searchParams.get('q') || '').trim();
   const openedLinkedOrderRef = useRef('');
+  const manualOrderDialog = useManualOrderDialog();
   const { isAuthenticated, adminToken, authLoading } = useAuth();
   const capabilities = useOrdersAdminCapabilities();
   const hasSession = !authLoading && isAuthenticated && Boolean(adminToken);
@@ -195,6 +198,12 @@ export default function OrdersAdmin() {
       </OrdersFilters>
 
       <main className="orders-table-workspace">
+        {capabilities.canCreate && <div className="flex justify-end pb-3">
+          <button type="button" onClick={manualOrderDialog.show}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+            + Pedido pendiente de pago
+          </button>
+        </div>}
         <OrdersActiveFilters
           quickView={filters.quickViews.quickView}
           onApplyQuickView={filters.quickViews.applyQuickView}
@@ -318,6 +327,13 @@ export default function OrdersAdmin() {
           />
         </Suspense>
       )}
+      {manualOrderDialog.open && <Suspense fallback={null}>
+        <ManualOrderModal open onClose={manualOrderDialog.close}
+          onCreated={(order) => {
+            filters.setTypingQuery(order.orderNumber);
+            filters.setPage(1);
+          }} />
+      </Suspense>}
     </div>
   );
 }

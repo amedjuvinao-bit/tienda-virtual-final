@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
+  History,
   Building2,
   KeyRound,
   Mail,
@@ -184,12 +185,20 @@ export default function UsersTable({
   branches,
   statusSavingId,
   deleteSavingId,
+  canEdit,
+  canChangePassword,
+  canDisable,
+  canViewActivity,
+  currentUserId,
+  currentRole,
+  currentBranches,
   canManageTwoFactor,
   onEditUser,
   onChangePassword,
   onManageTwoFactor,
   onToggleStatus,
   onDeleteUser,
+  onViewActivity,
 }) {
   const [openActionsId, setOpenActionsId] = useState('');
   const actionsRef = useRef(null);
@@ -227,7 +236,7 @@ export default function UsersTable({
   };
 
   return (
-    <div className="relative z-0 mt-6 grid gap-3">
+    <div className="admin-users-plus__directory relative z-0 mt-6 grid gap-3">
       {users.map((user) => {
         const displayName = getUserDisplayName(user);
         const initials = getUserInitials(user);
@@ -235,6 +244,19 @@ export default function UsersTable({
         const isSavingStatus = statusSavingId === user._id;
         const isDeleting = deleteSavingId === user._id;
         const isOwnerUser = user.username === 'owner' || user.role === 'owner';
+        const privileged = currentRole === 'owner' || currentRole === 'admin';
+        const ownBranchIds = new Set((currentBranches || []).map((item) => String(item.branch || '')));
+        const targetBranches = Array.isArray(user.branches) ? user.branches : [];
+        const withinScope = privileged || (targetBranches.length > 0 &&
+          targetBranches.every((item) => ownBranchIds.has(String(item.branch))));
+        const canManageTarget = withinScope && (!isOwnerUser || canManageTwoFactor);
+        const canEditTarget = canEdit && canManageTarget;
+        const canResetPassword = canChangePassword && canManageTarget;
+        const canToggleStatus = canDisable && canManageTarget &&
+          String(currentUserId) !== String(user._id);
+        const canDeleteTarget = canToggleStatus && !isOwnerUser;
+        const hasMoreActions = canViewActivity || canResetPassword || canManageTwoFactor ||
+          canToggleStatus || canDeleteTarget;
         const isActionsOpen = openActionsId === user._id;
         const primaryBranch = getPrimaryBranchLabel(user, branches);
         const roleDetails = getUserRoleDetails(user, roles);
@@ -246,7 +268,7 @@ export default function UsersTable({
         return (
           <article
             key={user._id}
-            className={`relative overflow-visible rounded-[26px] border px-4 py-4 transition hover:-translate-y-0.5 md:px-5 ${
+            className={`admin-users-plus__person relative overflow-visible rounded-[26px] border px-4 py-4 transition hover:-translate-y-0.5 md:px-5 ${
               isActionsOpen ? 'z-[90]' : 'z-0'
             }`}
             style={{
@@ -262,10 +284,10 @@ export default function UsersTable({
               color: 'var(--admin-card-text)',
             }}
           >
-            <div className="grid gap-4 xl:grid-cols-[minmax(230px,1fr)_minmax(430px,1.45fr)_96px] xl:items-center">
+            <div className="grid gap-4 xl:grid-cols-[minmax(230px,1fr)_minmax(430px,1.45fr)_118px] xl:items-center">
               <div className="flex min-w-0 items-center gap-4">
                 <div
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-black"
+                  className="admin-users-plus__avatar flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-black"
                   style={{
                     borderColor: 'var(--admin-primary-soft-border)',
                     background: 'var(--admin-primary-soft-bg)',
@@ -306,7 +328,7 @@ export default function UsersTable({
 
               <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,0.75fr)]">
                 <div
-                  className="flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5"
+                  className="admin-users-plus__detail flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5"
                   style={getInfoBoxStyle()}
                 >
                   <ShieldCheck
@@ -350,7 +372,7 @@ export default function UsersTable({
                 </div>
 
                 <div
-                  className="flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2.5"
+                  className="admin-users-plus__detail flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2.5"
                   style={getInfoBoxStyle()}
                 >
                   <Building2
@@ -363,14 +385,14 @@ export default function UsersTable({
                       className="text-[10px] font-black uppercase tracking-[0.16em]"
                       style={{ color: 'var(--admin-card-muted-text)' }}
                     >
-                      Sede
+                      {targetBranches.length > 1 ? 'Sedes · principal' : 'Sede'}
                     </p>
 
                     <p
                       className="break-words text-xs font-black leading-4"
                       style={{ color: 'var(--admin-card-text)' }}
                     >
-                      {primaryBranch}
+                      {primaryBranch}{targetBranches.length > 1 ? ` +${targetBranches.length - 1}` : ''}
                     </p>
                   </div>
                 </div>
@@ -385,7 +407,7 @@ export default function UsersTable({
                 </span>
 
                 <span
-                  className={`inline-flex w-full justify-center rounded-full border px-3 py-1 text-[10px] font-black ${
+                  className={`admin-users-plus__two-factor inline-flex w-full justify-center rounded-full border px-3 py-1 text-[10px] font-black ${
                     user.twoFactorEnabled
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
                       : user.twoFactorRequired
@@ -400,7 +422,7 @@ export default function UsersTable({
                       : '2FA OPCIONAL'}
                 </span>
 
-                <button
+                {canEditTarget && <button
                   type="button"
                   onClick={() => {
                     closeActions();
@@ -411,9 +433,9 @@ export default function UsersTable({
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   Editar
-                </button>
+                </button>}
 
-                <div
+                {hasMoreActions && <div
                   ref={isActionsOpen ? actionsRef : null}
                   className="relative z-[100] w-full"
                 >
@@ -442,7 +464,14 @@ export default function UsersTable({
                         backdropFilter: 'blur(var(--admin-glass-blur))',
                       }}
                     >
-                      <button
+                      {canViewActivity && <button type="button" onClick={() => {
+                        closeActions(); onViewActivity(user);
+                      }} className="mb-1 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-xs font-black transition hover:opacity-90"
+                        style={{ borderColor: 'var(--admin-light-panel-border)', background: 'var(--admin-light-panel-soft-bg)', color: 'var(--admin-light-panel-text)' }}>
+                        <History className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} />
+                        Ver actividad
+                      </button>}
+                      {canResetPassword && <button
                         type="button"
                         onClick={() => {
                           closeActions();
@@ -460,7 +489,7 @@ export default function UsersTable({
                           style={{ color: 'var(--admin-primary)' }}
                         />
                         Cambiar contraseña
-                      </button>
+                      </button>}
 
                       {canManageTwoFactor ? (
                         <button
@@ -481,7 +510,7 @@ export default function UsersTable({
                         </button>
                       ) : null}
 
-                      <button
+                      {canToggleStatus && <button
                         type="button"
                         onClick={() => {
                           closeActions();
@@ -496,10 +525,12 @@ export default function UsersTable({
                           ? 'Guardando...'
                           : isActive
                             ? 'Desactivar usuario'
-                            : 'Activar usuario'}
-                      </button>
+                            : user.status === 'blocked'
+                              ? 'Desbloquear y activar'
+                              : 'Activar usuario'}
+                      </button>}
 
-                      <button
+                      {canDeleteTarget && <button
                         type="button"
                         onClick={() => {
                           closeActions();
@@ -516,10 +547,10 @@ export default function UsersTable({
                       >
                         <Trash2 className="h-4 w-4" />
                         {isDeleting ? 'Eliminando...' : 'Eliminar usuario'}
-                      </button>
+                      </button>}
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
           </article>

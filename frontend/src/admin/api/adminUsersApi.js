@@ -118,6 +118,16 @@ export async function getAdminUserById(userId) {
   }
 }
 
+export async function getAdminUserActivity(userId, scope = 'actions', page = 1) {
+  if (!userId) throw new Error('El ID del usuario administrativo es obligatorio.');
+  try {
+    const response = await api.get(`${BASE_URL}/${userId}/activity${buildQueryParams({ scope, page })}`);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo consultar la actividad del usuario.');
+  }
+}
+
 export async function createAdminUser(payload) {
   if (!payload) {
     throw new Error('Los datos del usuario administrativo son obligatorios.');

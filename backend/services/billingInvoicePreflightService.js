@@ -7,6 +7,10 @@ const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const {
+  resolveBranchElectronicInvoicePolicy,
+} = require('./branchElectronicInvoicePolicyService');
+const { needsFactusLastName } = require('../lib/billing/factusCustomerValidation');
+const {
   buildRuntimeFactusConfig,
 } = require('../lib/billing/billingConfigurationSecurity');
 const {
@@ -70,7 +74,7 @@ function normalizeDocument(value) {
 function validateCustomerSnapshot(
   customer = {},
   payloadCustomer = {},
-  { requireMunicipality = true } = {}
+  { requireMunicipality = true, requireLastName = false } = {}
 ) {
   const blockers = [];
   const warnings = [];
@@ -167,6 +171,27 @@ function validateCustomerSnapshot(
     ));
   }
 
+  if (requireLastName && needsFactusLastName(customer)) {
+    blockers.push(issue(
+      'BILLING_CUSTOMER_LAST_NAME_REQUIRED',
+      'billing.lastName',
+      'Falta el apellido fiscal del comprador. Corrígelo en la orden antes de emitir la factura.'
+    ));
+  }
+
+  if (
+    requireMunicipality &&
+    cleanText(customer.municipalityCode, 30) &&
+    cleanText(payloadCustomer?.municipality_code, 30) !==
+      cleanText(customer.municipalityCode, 30)
+  ) {
+    blockers.push(issue(
+      'BILLING_PROVIDER_MUNICIPALITY_MISMATCH',
+      'customer.municipality_code',
+      'El municipio fiscal no coincide con el que se enviará a Factus.'
+    ));
+  }
+
   if (!payloadCustomer || Array.isArray(payloadCustomer) || typeof payloadCustomer !== 'object') {
     blockers.push(issue(
       'BILLING_PROVIDER_CUSTOMER_INVALID',
@@ -221,6 +246,7 @@ async function buildInvoicePreflight(
   orderId,
   {
     OrderModel = Order,
+    BranchModel,
     SettingsModel = SiteSettings,
     InvoiceModel = ElectronicInvoice,
   } = {}
@@ -245,6 +271,11 @@ async function buildInvoicePreflight(
   const warnings = [];
   const mode = providerMode(settings);
   const existingInvoice = safeInvoice(invoiceDocument);
+
+  const branchPolicy = await resolveBranchElectronicInvoicePolicy(order, { BranchModel });
+  if (!branchPolicy.allowed) {
+    blockers.push(issue(branchPolicy.code, 'branch', branchPolicy.message));
+  }
 
   if (!isBillableOrder(order)) {
     blockers.push(issue(
@@ -337,12 +368,16 @@ async function buildInvoicePreflight(
 
   let factusPayload = null;
   if (customer && totals) {
-    factusPayload = buildFactusInvoicePayload({ order: normalizedOrder });
+    factusPayload = buildFactusInvoicePayload({
+      order: normalizedOrder,
+      customerSnapshot: customer,
+    });
     if (runtimeConfig?.numberingRangeId) {
       factusPayload.numbering_range_id = Number(runtimeConfig.numberingRangeId);
     }
     const validation = validateCustomerSnapshot(customer, factusPayload.customer, {
       requireMunicipality: mode.external && mode.provider === 'factus',
+      requireLastName: mode.external && mode.provider === 'factus',
     });
     blockers.push(...validation.blockers);
     warnings.push(...validation.warnings);
@@ -355,6 +390,7 @@ async function buildInvoicePreflight(
     provider: mode.provider,
     environment: runtimeConfig?.environment || mode.mode,
     existingInvoice,
+    branchPolicy,
     customer,
     totals,
     payload: factusPayload,

@@ -5,6 +5,7 @@ import {
   canConfirmManualPaymentForOrder,
   createManualPaymentForm,
   getManualPaymentEvidence,
+  isManualOrderReservationExpired,
   validateManualPaymentForm,
 } from './manualPaymentConfirmationModel';
 import {
@@ -75,6 +76,23 @@ describe('política frontend de confirmación manual', () => {
       reason: 'Motivo suficiente',
       verified: true,
     }, MANUAL_ORDER).errors.method).toMatch(/permitido/i);
+  });
+
+  it('oculta la confirmación cuando vence la reserva física del pedido', () => {
+    const order = {
+      ...MANUAL_ORDER,
+      source: 'manual',
+      inventoryControl: {
+        reservationRequired: true,
+        reservationExpiresAt: '2026-09-28T01:00:00.000Z',
+      },
+    };
+    const before = new Date('2026-09-28T00:59:59.000Z').getTime();
+    const after = new Date('2026-09-28T01:00:00.000Z').getTime();
+    expect(canConfirmManualPaymentForOrder(order, true, before)).toBe(true);
+    expect(isManualOrderReservationExpired(order, after)).toBe(true);
+    expect(canConfirmManualPaymentForOrder(order, true, after)).toBe(false);
+    expect(isManualOrderReservationExpired({ ...order, payment: { status: 'paid' } }, after)).toBe(false);
   });
 
   it('normaliza evidencia persistida para una vista de solo lectura', () => {

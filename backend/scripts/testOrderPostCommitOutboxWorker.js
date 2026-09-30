@@ -44,6 +44,7 @@ function matchesValue(value, condition) {
       return condition.$exists ? value !== undefined : value === undefined;
     }
     if ('$lt' in condition) return new Date(value) < new Date(condition.$lt);
+    if ('$lte' in condition) return value != null && new Date(value) <= new Date(condition.$lte);
   }
   return String(value) === String(condition);
 }
@@ -70,6 +71,9 @@ function matchesFilter(target, filter = {}) {
 function applySet(target, update = {}) {
   for (const [path, value] of Object.entries(update.$set || {})) {
     setPath(target, path, value);
+  }
+  for (const [path, value] of Object.entries(update.$inc || {})) {
+    setPath(target, path, Number(getPath(target, path) || 0) + value);
   }
 }
 
@@ -153,11 +157,11 @@ async function testCandidateFilter() {
   });
   assert.equal(filter.$or.length, 2);
   assert.equal(
-    filter.$or[0].$or[2]['paymentProcessing.fulfillment.status'],
+    filter.$or[0].$or[3]['paymentProcessing.fulfillment.status'],
     'processing'
   );
   assert.equal(
-    filter.$or[1].$or[2]['paymentProcessing.invoice.status'],
+    filter.$or[1].$or[3]['paymentProcessing.invoice.status'],
     'scheduling'
   );
   ok('el escáner incluye pendientes, fallidos y leases vencidos tras la barrera de inventario');
@@ -331,6 +335,54 @@ async function testCrashLeaseRecovery() {
   ok('el worker recupera ambos leases después del crash sin cambiar la identidad financiera');
 }
 
+async function testInvoiceReviewAndBoundedRetry() {
+  let clock = new Date('2026-08-27T12:00:00.000Z');
+  const state = paidState();
+  const OrderModel = createSharedOrderModel(state);
+  let invoiceCalls = 0;
+  let errorCode = 'BILLING_CUSTOMER_LAST_NAME_REQUIRED';
+  const effects = createOrderCreationPostCommitService({
+    OrderModel,
+    fulfillmentProcessor: async () => ({ notified: true }),
+    invoiceExecutor: async () => {
+      invoiceCalls += 1;
+      throw Object.assign(new Error('invoice failed'), { code: errorCode });
+    },
+    now: () => clock,
+    logger: { error() {}, info() {} },
+  });
+  const worker = createOrderPostCommitOutboxWorker({
+    OrderModel,
+    effectProcessor: effects.processPaidOrderEffects,
+    now: () => clock,
+    logger: { error() {}, info() {} },
+  });
+
+  await worker.runOnce();
+  assert.equal(state.payment.status, 'paid');
+  assert.equal(state.paymentProcessing.invoice.status, 'needs_review');
+  assert.equal(state.paymentProcessing.invoice.attempts, 1);
+  assert.equal((await worker.runOnce()).scanned, 0);
+  assert.equal(invoiceCalls, 1);
+  ok('si falta el apellido, el pago permanece y no se repite una emisión que requiere corrección');
+
+  state.paymentProcessing.invoice = { status: 'pending', attempts: 0 };
+  errorCode = 'INVOICE_TEMPORARY_FAILURE';
+  for (const delay of [60_000, 120_000, 300_000, 900_000]) {
+    await worker.runOnce();
+    assert.equal(state.paymentProcessing.invoice.status, 'failed');
+    assert.equal(state.paymentProcessing.invoice.nextAttemptAt.getTime(), clock.getTime() + delay);
+    assert.equal((await worker.runOnce()).scanned, 0);
+    clock = new Date(clock.getTime() + delay);
+  }
+  await worker.runOnce();
+  assert.equal(state.paymentProcessing.invoice.status, 'needs_review');
+  assert.equal(state.paymentProcessing.invoice.attempts, 5);
+  assert.equal((await worker.runOnce()).scanned, 0);
+  assert.equal(invoiceCalls, 6);
+  ok('los fallos temporales esperan entre intentos y se detienen tras cinco emisiones fallidas');
+}
+
 async function testLifecycleHasNoOrphanTimers() {
   const state = paidState();
   const OrderModel = createSharedOrderModel(state);
@@ -436,6 +488,7 @@ async function run() {
   await testInvalidIdentitiesCannotStarveValidCandidates();
   await testTwoWorkersShareAtomicClaims();
   await testCrashLeaseRecovery();
+  await testInvoiceReviewAndBoundedRetry();
   await testLifecycleHasNoOrphanTimers();
   await testIndexesAndMigration();
   console.log(`\nOutbox post-pago: ${passed}/${passed} controles aprobados.`);

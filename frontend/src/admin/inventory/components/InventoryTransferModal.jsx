@@ -307,11 +307,20 @@ function getBranchesFromResponse(response) {
 
 function buildMergedBranches(branches = [], stockRows = []) {
   const branchMap = new Map();
+  const unavailableIds = new Set(
+    branches
+      .filter((branch) =>
+        branch?.active === false ||
+        (branch?.status && branch.status !== 'active') ||
+        branch?.settings?.allowInventoryMovements === false
+      )
+      .map(getBranchId)
+  );
 
   branches.forEach((branch) => {
     const branchId = getBranchId(branch);
 
-    if (!branchId) return;
+    if (!branchId || unavailableIds.has(branchId)) return;
 
     branchMap.set(branchId, {
       ...branch,
@@ -325,7 +334,7 @@ function buildMergedBranches(branches = [], stockRows = []) {
   stockRows.forEach((row) => {
     const branchId = getBranchId(row);
 
-    if (!branchId || branchMap.has(branchId)) return;
+    if (!branchId || unavailableIds.has(branchId) || branchMap.has(branchId)) return;
 
     branchMap.set(branchId, {
       _id: branchId,
@@ -407,14 +416,16 @@ export default function InventoryTransferModal({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const sourceOptions = useMemo(
-    () => buildSourceOptions(stockRows),
-    [stockRows]
-  );
-
   const branchOptions = useMemo(
     () => buildMergedBranches(branches, stockRows),
     [branches, stockRows]
+  );
+
+  const sourceOptions = useMemo(
+    () => buildSourceOptions(stockRows).filter((row) =>
+      branchOptions.some((branch) => getBranchId(branch) === getBranchId(row))
+    ),
+    [stockRows, branchOptions]
   );
 
   const selectedSourceStock = useMemo(() => {
@@ -550,8 +561,18 @@ export default function InventoryTransferModal({
       return;
     }
 
+    if (!branchOptions.some((branch) => getBranchId(branch) === selectedSourceBranchId)) {
+      setError('La sede origen no está habilitada para manejar inventario.');
+      return;
+    }
+
     if (!form.destinationBranchId) {
       setError('Selecciona la sede o bodega destino.');
+      return;
+    }
+
+    if (!selectedDestinationBranch) {
+      setError('La sede destino no está habilitada para manejar inventario.');
       return;
     }
 
@@ -641,7 +662,8 @@ export default function InventoryTransferModal({
     !saving &&
     !referenceLoading &&
     Boolean(selectedSourceStock) &&
-    Boolean(form.destinationBranchId) &&
+    branchOptions.some((branch) => getBranchId(branch) === selectedSourceBranchId) &&
+    Boolean(selectedDestinationBranch) &&
     Boolean(form.quantity) &&
     Boolean(form.reason);
 

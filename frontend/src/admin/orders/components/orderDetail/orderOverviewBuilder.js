@@ -19,9 +19,19 @@ function getInventoryOverview(order, summary) {
     ? order.inventoryAllocations
     : [];
   const branch = getOrderBranchInfo(order);
-  const reserved = sumAllocationField(allocations, 'reservedQuantity');
+  const reserved = allocations.reduce((total, allocation) =>
+    total + Math.max(0,
+      Number(allocation?.reservedQuantity ?? allocation?.quantity ?? 0) -
+      Number(allocation?.releasedQuantity || 0) -
+      Number(allocation?.soldQuantity || 0)
+    ), 0);
+  const released = sumAllocationField(allocations, 'releasedQuantity');
   const sold = sumAllocationField(allocations, 'soldQuantity');
   const delivered = sumAllocationField(allocations, 'deliveredQuantity');
+  const releasedAt = latestDate(
+    allocations.map((allocation) => allocation?.releasedAt),
+    order?.inventoryControl?.restockedAt
+  );
   const hasOnlyNonPhysicalItems =
     summary.items.length > 0 &&
     summary.items.every((item) => {
@@ -65,12 +75,25 @@ function getInventoryOverview(order, summary) {
     };
   }
 
+  if (released > 0 && reserved === 0) {
+    return {
+      value: `Liberado en ${branch.name}`,
+      movementTitle: 'Inventario liberado',
+      movementDescription: `La sede ${branch.name} liberó ${released} unidad(es).`,
+      eventDate: releasedAt,
+    };
+  }
+
   if (reserved > 0) {
     return {
-      value: `Reservado en ${branch.name}`,
-      movementTitle: 'Inventario reservado',
-      movementDescription: `La sede ${branch.name} reservó ${reserved} unidad(es).`,
-      eventDate,
+      value: released > 0
+        ? `${reserved} unidad(es) reservada(s) y ${released} liberada(s) en ${branch.name}`
+        : `Reservado en ${branch.name}`,
+      movementTitle: released > 0 ? 'Inventario parcialmente liberado' : 'Inventario reservado',
+      movementDescription: released > 0
+        ? `La sede ${branch.name} liberó ${released} unidad(es); ${reserved} siguen reservadas.`
+        : `La sede ${branch.name} reservó ${reserved} unidad(es).`,
+      eventDate: released > 0 ? releasedAt : eventDate,
     };
   }
 
@@ -102,6 +125,8 @@ export function buildOrderOverview(order, refunds = []) {
   const paymentPhase = story.phases.find((phase) => phase.id === 'payment');
   const operationPhase = story.phases.find((phase) => phase.id === 'operation');
   const paymentComplete = paymentPhase?.state === 'complete';
+  const orderStatus = normalizeText(order?.status);
+  const preparationStopped = ['failed', 'cancelled', 'canceled'].includes(orderStatus);
 
   const situation = [
     {
@@ -123,16 +148,18 @@ export function buildOrderOverview(order, refunds = []) {
       label: 'Inventario',
       value: inventory.value,
       icon: OrderDetailIcons.Store,
-      tone: 'primary',
+      tone: inventory.movementTitle === 'Inventario liberado' ? 'success' : 'primary',
     },
     {
       id: 'preparation',
       label: 'Preparación',
-      value: paymentComplete
-        ? operationPhase?.title || 'Pendiente de preparación'
-        : 'Bloqueada hasta confirmar el pago',
+      value: preparationStopped
+        ? 'Preparación detenida; orden cerrada'
+        : paymentComplete
+          ? operationPhase?.title || 'Pendiente de preparación'
+          : 'Bloqueada hasta confirmar el pago',
       icon: OrderDetailIcons.PackageCheck,
-      tone: operationPhase?.state === 'attention' ? 'danger' : 'primary',
+      tone: preparationStopped || operationPhase?.state === 'attention' ? 'danger' : 'primary',
     },
   ];
 

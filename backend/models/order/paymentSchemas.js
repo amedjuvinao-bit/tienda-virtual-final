@@ -154,7 +154,7 @@ const PaymentInvoiceProcessingSchema = new mongoose.Schema(
   {
     status: {
       type: String,
-      enum: ['pending', 'scheduling', 'scheduled', 'not_required', 'failed'],
+      enum: ['pending', 'scheduling', 'scheduled', 'not_required', 'failed', 'needs_review'],
       default: 'pending',
     },
     claimId: { type: String, trim: true, default: '' },
@@ -163,6 +163,8 @@ const PaymentInvoiceProcessingSchema = new mongoose.Schema(
     transactionId: { type: String, trim: true, default: '' },
     outcomeCode: { type: String, trim: true, default: '' },
     errorCode: { type: String, trim: true, default: '' },
+    attempts: { type: Number, default: 0, min: 0 },
+    nextAttemptAt: { type: Date, default: null },
   },
   { _id: false }
 );

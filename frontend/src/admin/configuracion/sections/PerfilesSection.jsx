@@ -1,6 +1,7 @@
 // frontend/src/admin/configuracion/sections/PerfilesSection.jsx
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,6 +14,8 @@ import {
 } from 'lucide-react';
 
 import InfoCard from '../components/InfoCard';
+import { useAuth } from '../../../context/AuthContext';
+import { hasAdminPermission } from '../../security/adminPermissions';
 
 import {
   createAdminRole,
@@ -76,22 +79,6 @@ function getAvailablePermissionsFromMeta(meta) {
   return [];
 }
 
-function getRoleSearchText(role) {
-  return [
-    role?.name,
-    role?.code,
-    role?.description,
-    role?.scope,
-    role?.status,
-    role?.isSystem ? 'sistema' : 'personalizado',
-    role?.isDefault ? 'predeterminado' : '',
-    ...(Array.isArray(role?.permissions) ? role.permissions : []),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-
 function CompactMetricCard({ icon: Icon, label, value }) {
   return (
     <div
@@ -138,6 +125,23 @@ function CompactMetricCard({ icon: Icon, label, value }) {
   );
 }
 export default function PerfilesSection() {
+  const navigate = useNavigate();
+  const { adminUser } = useAuth();
+  const currentAdminRole = String(
+    adminUser?.adminRole || adminUser?.actualRole || adminUser?.role || ''
+  ).toLowerCase();
+  const canCreate = hasAdminPermission(adminUser, 'roles:create');
+  const canEdit = hasAdminPermission(adminUser, 'roles:update');
+  const canDisable = hasAdminPermission(adminUser, 'roles:disable');
+  const canViewUsers = hasAdminPermission(adminUser, 'admin-users:view');
+  const canManageTarget = (role) => {
+    if (currentAdminRole === 'owner' || currentAdminRole === 'admin') return true;
+    const actorRole = adminUser?.roleRef;
+    if (!actorRole || !Number.isFinite(Number(actorRole.level))) return false;
+    if (Number(role.level) < Number(actorRole.level)) return false;
+    if (actorRole.scope !== 'global' && role.scope === 'global') return false;
+    return (role.permissions || []).every((permission) => hasAdminPermission(adminUser, permission));
+  };
   const [roles, setRoles] = useState([]);
   const [meta, setMeta] = useState(null);
 
@@ -152,6 +156,11 @@ export default function PerfilesSection() {
   const [successMessage, setSuccessMessage] = useState('');
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const requestId = useRef(0);
   const [selectedPermissionsRole, setSelectedPermissionsRole] = useState(null);
   const [formModal, setFormModal] = useState(EMPTY_FORM_MODAL);
   const [confirmModal, setConfirmModal] = useState(EMPTY_CONFIRM_MODAL);
@@ -159,14 +168,6 @@ export default function PerfilesSection() {
   const availablePermissions = useMemo(() => {
     return getAvailablePermissionsFromMeta(meta);
   }, [meta]);
-
-  const filteredRoles = useMemo(() => {
-    const q = search.trim().toLowerCase();
-
-    if (!q) return roles;
-
-    return roles.filter((role) => getRoleSearchText(role).includes(q));
-  }, [roles, search]);
 
   const totalPermissions = availablePermissions.length;
   const customRolesCount = roles.filter((role) => !role.isSystem).length;
@@ -191,23 +192,30 @@ export default function PerfilesSection() {
   };
 
   const loadRoles = async () => {
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
       setError('');
 
       const response = await getAdminRoles({
-        page: 1,
-        limit: 100,
+        page,
+        limit: 20,
         sort: 'level',
+        q: debouncedSearch.trim(),
       });
 
+      if (currentRequest !== requestId.current) return;
       setRoles(response?.data || []);
+      setTotal(response?.total || 0);
+      setTotalPages(response?.totalPages || 1);
+      if (page > (response?.totalPages || 1)) setPage(response?.totalPages || 1);
     } catch (err) {
+      if (currentRequest !== requestId.current) return;
       console.error('❌ Error cargando perfiles:', err);
 
       setError(err?.userMessage || 'No se pudieron cargar los perfiles.');
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   };
 
@@ -375,8 +383,21 @@ export default function PerfilesSection() {
   };
 
   useEffect(() => {
-    reloadAll();
+    loadMeta();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    loadRoles();
+    return () => { requestId.current += 1; };
+  }, [page, debouncedSearch]);
 
   return (
     <div className="grid gap-4">
@@ -451,7 +472,7 @@ export default function PerfilesSection() {
                 <button
                   type="button"
                   onClick={openCreateModal}
-                  disabled={metaLoading || totalPermissions === 0}
+                  disabled={!canCreate || metaLoading || totalPermissions === 0}
                   className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-md transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     background: THEME.primaryBg,
@@ -487,7 +508,7 @@ export default function PerfilesSection() {
               <CompactMetricCard
                 icon={UsersRound}
                 label="Perfiles cargados"
-                value={filteredRoles.length}
+                value={total}
               />
 
               <CompactMetricCard
@@ -498,7 +519,7 @@ export default function PerfilesSection() {
 
               <CompactMetricCard
                 icon={Wand2}
-                label="Personalizados"
+                label="Personalizados en esta página"
                 value={customRolesCount}
               />
             </div>
@@ -559,6 +580,7 @@ export default function PerfilesSection() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar perfil, permiso, código o estado..."
+                aria-label="Buscar perfiles"
                 className="w-full rounded-2xl border px-4 py-2.5 text-sm font-bold outline-none transition focus:ring-2 lg:max-w-md"
                 style={{
                   background: THEME.inputBg,
@@ -570,16 +592,30 @@ export default function PerfilesSection() {
             </div>
 
             <div className="mt-4">
-              <RolesTable
-                roles={filteredRoles}
-                loading={loading || metaLoading}
-                currentAdminRole="owner"
-                onViewPermissions={openPermissionsModal}
+                <RolesTable
+                roles={roles}
+                  loading={loading || metaLoading}
+                  currentAdminRole={currentAdminRole}
+                  canEdit={canEdit}
+                  canDisable={canDisable}
+                  canViewUsers={canViewUsers}
+                  canManageTarget={canManageTarget}
+                  onViewPermissions={openPermissionsModal}
+                  onViewUsers={(role) => navigate(`/admin/configuracion/usuarios?role=${encodeURIComponent(role.code)}`)}
                 onEdit={openEditModal}
                 onToggleStatus={openToggleStatusModal}
                 onDelete={openDeleteModal}
               />
             </div>
+            {totalPages > 1 && (
+              <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm font-bold" aria-label="Páginas de perfiles">
+                <span>Página {page} de {totalPages} · {total} perfiles</span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={loading || page <= 1} className="rounded-xl border px-3 py-2 disabled:opacity-50" style={{ borderColor: THEME.border }}>Anterior</button>
+                  <button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={loading || page >= totalPages} className="rounded-xl border px-3 py-2 disabled:opacity-50" style={{ borderColor: THEME.border }}>Siguiente</button>
+                </div>
+              </nav>
+            )}
           </section>
         </div>
       </InfoCard>
@@ -589,6 +625,7 @@ export default function PerfilesSection() {
         mode={formModal.mode}
         role={formModal.role}
         availablePermissions={availablePermissions}
+        permissionCatalog={meta?.permissionCatalog}
         loading={saving}
         error={formError}
         onClose={closeFormModal}
@@ -608,6 +645,7 @@ export default function PerfilesSection() {
       <RolePermissionsModal
         open={Boolean(selectedPermissionsRole)}
         role={selectedPermissionsRole}
+        permissionCatalog={meta?.permissionCatalog}
         onClose={closePermissionsModal}
       />
     </div>

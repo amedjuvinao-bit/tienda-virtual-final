@@ -154,7 +154,7 @@ async function verifyLoginChallenge(req, res, code) {
     .select(
       '+passwordHash +twoFactorSecret +twoFactorRecoveryCodeHashes +tokenVersion +failedLoginAttempts +lockedUntil'
     )
-    .populate('roleRef', 'name code level scope permissions');
+    .populate('roleRef', 'name code level scope permissions active status deletedAt');
 
   if (
     !adminUser ||

@@ -100,7 +100,6 @@ async function seedRoles() {
       scope: role.scope,
       level: role.level,
       isSystem: true,
-      isDefault: Boolean(role.isDefault),
       status: 'active',
       active: true,
     };
@@ -113,6 +112,8 @@ async function seedRoles() {
       $set: setPayload,
       $setOnInsert: {
         code: role.code,
+        // A later seed must not overwrite the owner's chosen default role.
+        isDefault: Boolean(role.isDefault),
         permissions: role.permissions,
         createdAt: new Date(),
       },

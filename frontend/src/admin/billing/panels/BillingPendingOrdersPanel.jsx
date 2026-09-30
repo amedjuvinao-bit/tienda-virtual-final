@@ -314,7 +314,7 @@ export default function BillingPendingOrdersPanel() {
                         <p className="mt-1 break-words text-xs font-bold leading-5 [overflow-wrap:anywhere]" style={{ color: 'var(--admin-card-muted-text)' }}>{order.customerEmail || 'Sin correo'}</p>
                         {issueMessage ? (
                           <div className="mt-2 rounded-xl border px-2.5 py-2 text-[11px] font-bold leading-4" style={{ borderColor: 'rgba(220, 38, 38, 0.28)', background: 'rgba(220, 38, 38, 0.08)', color: '#b91c1c' }}>
-                            <p className="font-black uppercase tracking-[0.06em]">Emisión rechazada</p>
+                            <p className="font-black uppercase tracking-[0.06em]">{order.billingIssue?.status === 'deferred' ? 'Emisión omitida al confirmar el pago' : order.billingIssue?.status === 'blocked' ? 'Facturación desactivada para esta sede' : order.billingIssue?.invoiceId ? 'Emisión rechazada' : 'Factura pendiente de corrección'}</p>
                             <p className="mt-1 break-words [overflow-wrap:anywhere]">{issueMessage}</p>
                           </div>
                         ) : null}

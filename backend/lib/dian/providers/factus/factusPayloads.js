@@ -213,6 +213,7 @@ function allocateFactusDiscounts(orderItems = [], totalDiscount = 0) {
 
 function buildFactusInvoicePayload(invoiceData = {}) {
   const order = invoiceData?.order || {};
+  const customerSnapshot = invoiceData?.customerSnapshot || {};
   const transaction = invoiceData?.transaction || {};
   const orderItems = Array.isArray(order?.items) ? order.items : [];
 
@@ -335,7 +336,10 @@ function buildFactusInvoicePayload(invoiceData = {}) {
     send_email: false,
     observation: 'Factura generada desde tienda virtual.',
 
-    customer: buildFactusCustomer(order),
+    customer: buildFactusCustomer({
+      ...order,
+      billing: { ...(order.billing || {}), ...customerSnapshot },
+    }),
     payment_details: [
       {
         payment_form: '1',

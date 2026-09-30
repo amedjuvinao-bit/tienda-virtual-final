@@ -6,6 +6,10 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const {
+  resolveBranchElectronicInvoicePolicy,
+} = require('./branchElectronicInvoicePolicyService');
+const { needsFactusLastName } = require('../lib/billing/factusCustomerValidation');
 const { generateCUFE } = require('../lib/dian/cufe');
 const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
 const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
@@ -549,6 +553,7 @@ function isDuplicateKeyError(error) {
 function createElectronicInvoiceIssuanceService(overrides = {}) {
   const InvoiceModel = overrides.ElectronicInvoice || ElectronicInvoice;
   const OrderModel = overrides.Order || Order;
+  const BranchModel = overrides.Branch;
   const SettingsModel = overrides.SiteSettings || SiteSettings;
   const createCufe = overrides.generateCUFE || generateCUFE;
   const createXml = overrides.generateInvoiceXML || generateInvoiceXML;
@@ -636,6 +641,22 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
       retryInvoice = previousInvoice;
     }
 
+    const branchPolicy = await resolveBranchElectronicInvoicePolicy(order, { BranchModel });
+    if (!branchPolicy.allowed) {
+      if (skipWhenElectronicBillingIsInactive) {
+        return {
+          created: false,
+          reused: retryInvoice !== null,
+          retried: false,
+          skipped: true,
+          reasonCode: branchPolicy.code,
+          invoice: retryInvoice,
+          message: branchPolicy.message,
+        };
+      }
+      throw createBillingError(branchPolicy.message, 422, branchPolicy.code);
+    }
+
     const settings = await lean(SettingsModel.findOne());
     const settingsForInvoice = buildSettingsForInvoice(settings || {});
     const billing = settingsForInvoice.billing || {};
@@ -685,6 +706,13 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     const customerSnapshot = buildCustomerSnapshot(order, {
       requireMunicipality: isExternalProvider && providerName === 'factus',
     });
+    if (isExternalProvider && providerName === 'factus' && needsFactusLastName(customerSnapshot)) {
+      throw createBillingError(
+        'Falta el apellido fiscal del comprador. Corrígelo en la orden antes de emitir la factura.',
+        422,
+        'BILLING_CUSTOMER_LAST_NAME_REQUIRED'
+      );
+    }
     const now = nowFactory();
     const issueDate = now.toISOString().slice(0, 10);
     const issueTime = now.toISOString().slice(11, 19);
@@ -886,6 +914,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
           provider: providerName,
           invoiceData: {
             order: providerOrder,
+            customerSnapshot,
             settings: settingsForInvoice,
             cufeData,
             xmlContent,

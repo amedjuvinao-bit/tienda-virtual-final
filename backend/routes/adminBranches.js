@@ -8,6 +8,7 @@ const requirePermission = require('../middleware/requirePermission');
 
 const Branch = require('../models/Branch');
 const AdminUser = require('../models/AdminUser');
+const { saveBranchSelection, selectionError } = require('../services/branchSelectionService');
 
 const router = express.Router();
 
@@ -104,6 +105,23 @@ function sendError(res, status, message, extra = {}) {
     message,
     ...extra,
   });
+}
+
+function sendBranchWriteError(res, error, fallbackMessage, duplicateCodeMessage) {
+  const resolved = selectionError(error);
+  if (resolved.code === 'BRANCH_SELECTION_INDEX_CONFLICT' || resolved.code === 'BRANCH_SELECTION_CONFLICT') {
+    return sendError(res, 409, resolved.message);
+  }
+  if (resolved.code === 'BRANCH_SELECTION_INACTIVE') {
+    return sendError(res, 400, resolved.message);
+  }
+  if (resolved.code === 'BRANCH_SELECTION_INDEX_UNAVAILABLE') {
+    return sendError(res, 503, resolved.message);
+  }
+  if (resolved.code === 11000) {
+    return sendError(res, 409, duplicateCodeMessage);
+  }
+  return sendError(res, 500, resolved.message || fallbackMessage);
 }
 
 function normalizeCode(value) {
@@ -487,38 +505,6 @@ function buildSchedulePayload(schedule = {}, currentSchedule = {}) {
   return result;
 }
 
-async function applyUniqueMainAndOnlineFlags(branch) {
-  if (branch.isMain) {
-    await Branch.updateMany(
-      {
-        _id: { $ne: branch._id },
-        deletedAt: null,
-        isMain: true,
-      },
-      {
-        $set: {
-          isMain: false,
-        },
-      }
-    );
-  }
-
-  if (branch.isDefaultForOnlineOrders) {
-    await Branch.updateMany(
-      {
-        _id: { $ne: branch._id },
-        deletedAt: null,
-        isDefaultForOnlineOrders: true,
-      },
-      {
-        $set: {
-          isDefaultForOnlineOrders: false,
-        },
-      }
-    );
-  }
-}
-
 /* ============================
  * META
  * ============================ */
@@ -700,8 +686,7 @@ router.post(
         updatedBy: getCurrentAdminId(req),
       });
 
-      await branch.save();
-      await applyUniqueMainAndOnlineFlags(branch);
+      await saveBranchSelection(branch);
 
       return res.status(201).json({
         ok: true,
@@ -711,11 +696,7 @@ router.post(
     } catch (error) {
       console.error('❌ Error creando sede:', error.message);
 
-      if (error?.code === 11000) {
-        return sendError(res, 409, 'Ya existe una sede con ese código.');
-      }
-
-      return sendError(res, 500, error.message || 'Error creando sede.');
+      return sendBranchWriteError(res, error, 'Error creando sede.', 'Ya existe una sede con ese código.');
     }
   }
 );
@@ -779,11 +760,19 @@ router.put(
       }
 
       if (body.status !== undefined || body.active !== undefined) {
+        const changesStatus =
+          (body.status !== undefined && cleanLower(body.status) !== branch.status) ||
+          (body.active !== undefined && (body.active === true) !== branch.active);
+
+        if (changesStatus && !await requirePermission.hasEffectivePermission(req, 'branches:disable')) {
+          return sendError(res, 403, 'No tienes permiso para cambiar el estado de esta sede.');
+        }
+
         const wantsDisable =
           body.active === false ||
           (body.status !== undefined && cleanLower(body.status) !== 'active');
 
-        if (wantsDisable) {
+        if (wantsDisable && changesStatus) {
           const allowed = await ensureCanDisableOrDeleteBranch(branch, 'disable');
 
           if (!allowed.ok) {
@@ -873,8 +862,7 @@ router.put(
 
       branch.updatedBy = getCurrentAdminId(req);
 
-      await branch.save();
-      await applyUniqueMainAndOnlineFlags(branch);
+      await saveBranchSelection(branch);
 
       const savedBranch = await Branch.findById(branch._id).populate(
         'manager',
@@ -889,11 +877,7 @@ router.put(
     } catch (error) {
       console.error('❌ Error actualizando sede:', error.message);
 
-      if (error?.code === 11000) {
-        return sendError(res, 409, 'Ya existe otra sede con ese código.');
-      }
-
-      return sendError(res, 500, error.message || 'Error actualizando sede.');
+      return sendBranchWriteError(res, error, 'Error actualizando sede.', 'Ya existe otra sede con ese código.');
     }
   }
 );
@@ -934,8 +918,7 @@ router.patch(
       branch.isMain = true;
       branch.updatedBy = getCurrentAdminId(req);
 
-      await branch.save();
-      await applyUniqueMainAndOnlineFlags(branch);
+      await saveBranchSelection(branch);
 
       return res.json({
         ok: true,
@@ -945,11 +928,7 @@ router.patch(
     } catch (error) {
       console.error('❌ Error marcando sede principal:', error.message);
 
-      return sendError(
-        res,
-        500,
-        error.message || 'Error marcando sede principal.'
-      );
+      return sendBranchWriteError(res, error, 'Error marcando sede principal.', 'Ya existe otra sede con ese código.');
     }
   }
 );
@@ -990,8 +969,7 @@ router.patch(
       branch.isDefaultForOnlineOrders = true;
       branch.updatedBy = getCurrentAdminId(req);
 
-      await branch.save();
-      await applyUniqueMainAndOnlineFlags(branch);
+      await saveBranchSelection(branch);
 
       return res.json({
         ok: true,
@@ -1001,11 +979,7 @@ router.patch(
     } catch (error) {
       console.error('❌ Error marcando sede online:', error.message);
 
-      return sendError(
-        res,
-        500,
-        error.message || 'Error marcando sede online predeterminada.'
-      );
+      return sendBranchWriteError(res, error, 'Error marcando sede online predeterminada.', 'Ya existe otra sede con ese código.');
     }
   }
 );

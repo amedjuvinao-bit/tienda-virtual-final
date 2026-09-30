@@ -190,7 +190,9 @@ function main() {
   );
   assert.ok(adminStylesSource.includes('inset: auto'));
   assert.ok(adminStylesSource.includes('overflow: visible'));
-  assert.ok(!adminStylesSource.includes('overflow-y: auto'));
+  const desktopControlPanel = adminStylesSource.match(/\.orders-control-panel\s*\{([^}]+)\}/)?.[1];
+  assert.ok(desktopControlPanel?.includes('overflow: visible'));
+  assert.ok(!desktopControlPanel.includes('overflow-y: auto'));
   assert.ok(boardSource.includes('role="tooltip"'));
   assert.ok(boardSource.includes('group-hover:opacity-100'));
   ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');

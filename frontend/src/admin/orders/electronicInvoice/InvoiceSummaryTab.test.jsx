@@ -2,11 +2,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/api', () => ({
-  default: { patch: vi.fn() },
+  default: { patch: vi.fn(), get: vi.fn() },
 }));
 
 import api from '../../../lib/api';
 import InvoiceSummaryTab from './InvoiceSummaryTab';
+import buildInvoiceModalData from '../../billing/buildInvoiceModalData';
 
 const order = {
   _id: 'order-invoice-summary-1',
@@ -61,6 +62,37 @@ describe('InvoiceSummaryTab composition', () => {
     expect(screen.getByText('Wompi')).toBeInTheDocument();
   });
 
+  it('muestra la copia fiscal de la factura aunque la ficha de la orden cambie después', async () => {
+    const issuedInvoice = {
+      ...invoice,
+      id: 'invoice-1',
+      orderId: order._id,
+      customer: {
+        firstName: 'Amed',
+        lastName: 'Barros',
+        documentNumber: '0000000000',
+      },
+    };
+    const changedOrder = {
+      ...order,
+      billing: {
+        firstName: 'Otro',
+        lastName: 'Apellido',
+        documentNumber: '0000000000',
+      },
+      electronicInvoice: { id: 'invoice-1', status: 'validated' },
+    };
+    api.get.mockResolvedValueOnce({ data: changedOrder });
+
+    const modalData = await buildInvoiceModalData(issuedInvoice);
+    expect(modalData.invoice).toBe(issuedInvoice);
+    render(<InvoiceSummaryTab {...modalData} />);
+
+    expect(screen.getByText('Amed Barros')).toBeInTheDocument();
+    expect(screen.getByText('Comprador registrado al emitir la factura')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('datos actuales de la orden son diferentes');
+  });
+
   it('conserva el endpoint y la fotografía customer/billing al guardar', async () => {
     render(<InvoiceSummaryTab order={order} invoice={invoice} />);
 
@@ -75,19 +107,32 @@ describe('InvoiceSummaryTab composition', () => {
       '/api/orders/order-invoice-summary-1/customer-data',
       {
         customer: {
-          ...order.customer,
+          name: order.customer.name,
+          lastname: order.customer.lastname,
+          id: order.customer.id,
           email: 'actualizado@example.invalid',
           emailOrPhone: 'actualizado@example.invalid',
+          phone: order.customer.phone,
+          address: order.customer.address,
+          city: order.customer.city,
+          department: order.customer.department,
+          country: order.customer.country,
         },
         billing: {
-          ...order.customer,
+          firstName: order.customer.name,
+          lastName: order.customer.lastname,
+          documentNumber: order.customer.id,
           email: 'actualizado@example.invalid',
-          emailOrPhone: 'actualizado@example.invalid',
+          phone: order.customer.phone,
+          address: order.customer.address,
+          city: order.customer.city,
+          department: order.customer.department,
+          country: order.customer.country,
         },
       }
     );
     expect(
-      await screen.findByText('Datos de facturación actualizados correctamente.')
+      await screen.findByText(/Datos actuales de la orden guardados/)
     ).toBeInTheDocument();
   });
 

@@ -114,9 +114,8 @@ function validateRoutingAndMenu() {
   );
   assertMatches(app, /<Route\s+path="cupones"\s+element=\{protectAdminContent\(<AdminCouponsPage\s*\/?\>\)\}/, 'App.jsx no registra la ruta /admin/cupones');
 
-  const layout = readProjectFile('frontend/src/admin/AdminLayout.js');
-  assertIncludes(layout, '/admin/cupones', 'AdminLayout.js no contiene enlace /admin/cupones');
-  assertIncludes(layout, "label: 'Cupones'", 'AdminLayout.js no contiene label Cupones');
+  const layout = readProjectFile('frontend/src/admin/AdminLayout.jsx');
+  assertIncludes(layout, "{ to: '/admin/cupones', label: 'Cupones'", 'AdminLayout.jsx no contiene enlace Cupones');
 
   const permissions = readProjectFile('frontend/src/admin/security/adminPermissions.js');
   assertIncludes(permissions, "cupones: ['coupons:view']", 'adminPermissions.js no registra permisos de cupones');

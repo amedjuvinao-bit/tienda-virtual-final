@@ -176,6 +176,9 @@ function applyUpdate(target, update = {}) {
   for (const [dottedPath, value] of Object.entries(update.$set || {})) {
     setDotted(target, dottedPath, value);
   }
+  for (const [dottedPath, value] of Object.entries(update.$inc || {})) {
+    setDotted(target, dottedPath, Number(getDotted(target, dottedPath) || 0) + value);
+  }
   for (const dottedPath of Object.keys(update.$unset || {})) {
     setDotted(target, dottedPath, undefined);
   }
@@ -200,6 +203,9 @@ function matchesCondition(value, condition) {
     }
     if ('$lt' in condition) {
       return new Date(value).getTime() < new Date(condition.$lt).getTime();
+    }
+    if ('$lte' in condition) {
+      return value != null && new Date(value).getTime() <= new Date(condition.$lte).getTime();
     }
   }
   return String(value) === String(condition);
@@ -425,6 +431,14 @@ const fakeElectronicInvoiceIssuanceService = {
       return {
         skipped: true,
         message: 'Facturacion electronica inactiva en la fixture.',
+        invoice: null,
+      };
+    }
+    if (state.invoiceMode === 'skip-branch-disabled') {
+      return {
+        skipped: true,
+        reasonCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
+        message: 'La sede no emite facturas electrónicas.',
         invoice: null,
       };
     }
@@ -820,6 +834,11 @@ async function control(name, run) {
 
   await control('10/19 el fallo de factura puede reclamarse y completarse', async () => {
     state.invoiceMode = 'success';
+    const early = await invokeWebhook(invoiceFailureEvent);
+    assert.equal(early.statusCode, 200);
+    assert.equal(state.invoiceAttemptCount, 1);
+    assert.ok(state.order.paymentProcessing.invoice.nextAttemptAt > new Date());
+    state.order.paymentProcessing.invoice.nextAttemptAt = new Date(Date.now() - 1);
     const response = await invokeWebhook(invoiceFailureEvent);
     assert.equal(response.statusCode, 200);
     assert.equal(state.order.paymentProcessing.invoice.status, 'scheduled');
@@ -877,6 +896,24 @@ async function control(name, run) {
       'ELECTRONIC_BILLING_INACTIVE'
     );
     assert.equal(state.order.paymentProcessing.invoice.errorCode, '');
+
+    resetState(
+      { inventoryControl: { reservationRequired: false } },
+      'success',
+      'skip-branch-disabled'
+    );
+    const branchResponse = await invokeWebhook(
+      signedEvent('APPROVED', {
+        finalizedAt: FIRST_PAID_AT,
+        transactionId: 'tx-branch-billing-disabled',
+      })
+    );
+    assert.equal(branchResponse.statusCode, 200);
+    assert.equal(state.order.paymentProcessing.invoice.status, 'not_required');
+    assert.equal(
+      state.order.paymentProcessing.invoice.outcomeCode,
+      'BRANCH_ELECTRONIC_INVOICE_DISABLED'
+    );
 
     resetState(
       { inventoryControl: { reservationRequired: false } },
@@ -1208,6 +1245,10 @@ async function control(name, run) {
     assert.notEqual(failedClaimId, pendingClaimId);
 
     state.invoiceMode = 'success';
+    const early = await invokeWebhook(event);
+    assert.equal(early.statusCode, 200);
+    assert.equal(state.order.paymentProcessing.invoice.status, 'failed');
+    state.order.paymentProcessing.invoice.nextAttemptAt = new Date(Date.now() - 1);
     const retried = await invokeWebhook(event);
     assert.equal(retried.statusCode, 200);
     assert.equal(state.order.paymentProcessing.invoice.status, 'scheduled');

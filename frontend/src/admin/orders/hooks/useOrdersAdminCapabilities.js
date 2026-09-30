@@ -3,6 +3,7 @@ import useAdminPermissions from '../../security/useAdminPermissions';
 export default function useOrdersAdminCapabilities() {
   const { can } = useAdminPermissions();
   const capabilities = {
+    canCreate: can('orders:create'),
     canAddNotes: can('orders:notes'),
     canArchive: can('orders:archive'),
     canBulk: can('orders:bulk'),

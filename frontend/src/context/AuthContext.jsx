@@ -125,6 +125,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let alive = true;
+    let verifiedOnce = false;
+    let focusRefreshPromise = null;
 
     const verifyStoredSession = async () => {
       removeLegacySessionStorage();
@@ -150,6 +152,7 @@ export function AuthProvider({ children }) {
         setAdminSessionActive(true);
         setIsAuthenticated(true);
         setAdminUser(verifiedUser);
+        verifiedOnce = true;
       } catch {
         if (alive) clearClientSession();
       } finally {
@@ -188,9 +191,19 @@ export function AuthProvider({ children }) {
       }
     };
 
+    const handleSessionFocus = () => {
+      if (!verifiedOnce || document.visibilityState === 'hidden' ||
+          logoutObserved.current || isAdminLogoutPending() || focusRefreshPromise) return;
+      focusRefreshPromise = handleTwoFactorPolicyUpdated().finally(() => {
+        focusRefreshPromise = null;
+      });
+    };
+
     window.addEventListener('admin-session-expired', handleSessionExpired);
     window.addEventListener('online', handlePendingLogout);
     window.addEventListener('storage', handlePendingLogout);
+    window.addEventListener('focus', handleSessionFocus);
+    document.addEventListener('visibilitychange', handleSessionFocus);
     window.addEventListener(
       'admin-two-factor-policy-updated',
       handleTwoFactorPolicyUpdated
@@ -202,6 +215,8 @@ export function AuthProvider({ children }) {
       window.removeEventListener('admin-session-expired', handleSessionExpired);
       window.removeEventListener('online', handlePendingLogout);
       window.removeEventListener('storage', handlePendingLogout);
+      window.removeEventListener('focus', handleSessionFocus);
+      document.removeEventListener('visibilitychange', handleSessionFocus);
       window.removeEventListener(
         'admin-two-factor-policy-updated',
         handleTwoFactorPolicyUpdated
@@ -220,6 +235,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    logoutObserved.current = true;
     markAdminLogoutPending();
     clearClientSession();
     setLogoutPending(true);

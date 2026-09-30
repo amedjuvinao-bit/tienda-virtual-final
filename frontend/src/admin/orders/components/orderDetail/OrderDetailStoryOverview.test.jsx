@@ -8,6 +8,7 @@ import OrderDetailStoryOverview, {
   buildOrderStory,
 } from './OrderDetailStoryOverview';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
+import OrderDetailInventoryAllocations from './OrderDetailInventoryAllocations';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailHeader from './OrderDetailHeader';
 import OrderDetailTabs from './OrderDetailTabs';
@@ -95,6 +96,149 @@ describe('historia narrativa del detalle de la orden', () => {
     ]);
     expect(story.current.title).toBe('Pago pendiente');
     expect(story.next.title).toBe('Confirmar el pago');
+  });
+
+  it('no presenta como pagado el total de un pedido manual pendiente', () => {
+    render(<OrderDetailSummaryRail order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'pending',
+      payment: { status: 'pending_manual' },
+    }} />);
+
+    expect(screen.getByText('Total del pedido')).toBeInTheDocument();
+    expect(screen.queryByText('Total pagado')).not.toBeInTheDocument();
+  });
+
+  it('no presenta el importe ni la fecha de creación como pago recibido de un pedido manual pendiente', () => {
+    const order = {
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'pending',
+      updatedAt: BASE_ORDER.createdAt,
+      payment: { provider: 'manual', status: 'pending_manual', amount: BASE_ORDER.total },
+    };
+
+    render(<OrderDetailPaymentPanel order={order} />);
+    expect(screen.getByText('Total del pedido')).toBeInTheDocument();
+    expect(screen.getByText('Fecha de pago:').nextElementSibling).toHaveTextContent('—');
+    expect(screen.queryByText('Valor pagado')).not.toBeInTheDocument();
+  });
+
+  it('explica la factura rechazada por apellido y conduce a corregir el comprador sin repetir el pago', () => {
+    const onEditBilling = vi.fn();
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      status: 'paid',
+      payment: { status: 'paid' },
+      customer: { name: 'Cliente', lastname: '' },
+      billing: { firstName: 'Cliente', lastName: '', personType: 'natural' },
+      electronicInvoice: { status: 'failed', failureReason: 'La factura no se pudo emitir porque falta el apellido fiscal del comprador.' },
+    }} onEditBilling={onEditBilling} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Falta el apellido fiscal');
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir datos fiscales' }));
+    expect(onEditBilling).toHaveBeenCalledOnce();
+  });
+
+  it('presenta el fallo de municipio fiscal aunque no exista todavía una factura', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual', status: 'paid', payment: { status: 'paid' },
+      customer: { name: 'Ana', lastname: 'Prueba' },
+      billing: { firstName: 'Ana', lastName: 'Prueba' },
+      invoiceAutomation: { status: 'failed', failureReason: 'Falta el municipio fiscal. Selecciona departamento y municipio en Cliente e historial.' },
+    }} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Falta el municipio fiscal');
+  });
+
+  it('explica la omisión histórica por sede sin ofrecer corregir al cliente', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      status: 'paid', payment: { status: 'paid' },
+      electronicInvoice: { status: 'failed', failureReason: 'Rechazo anterior de Factus.' },
+      invoiceAutomation: {
+        status: 'not_required',
+        reasonCode: 'BRANCH_ELECTRONIC_INVOICE_DISABLED',
+        failureReason: 'La factura se omitió porque la sede tenía desactivada la facturación. Si ya la activaste en Configuración → Sedes, emite desde Facturación.',
+      },
+    }} onEditBilling={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Factura omitida al confirmar el pago');
+    expect(screen.getByRole('alert')).toHaveTextContent('Configuración → Sedes');
+    expect(screen.queryByRole('button', { name: 'Corregir datos fiscales' })).not.toBeInTheDocument();
+  });
+
+  it('avisa de datos incompletos antes de emitir, pero no interrumpe la conciliación de una factura enviada', () => {
+    const paidOrder = {
+      ...BASE_ORDER,
+      payment: { status: 'paid' },
+      customer: { name: 'Cliente', lastname: '' },
+      billing: { firstName: 'Cliente', lastName: '', personType: 'natural' },
+    };
+    const { rerender } = render(<OrderDetailPaymentPanel order={paidOrder} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Falta el apellido fiscal');
+
+    rerender(<OrderDetailPaymentPanel order={{
+      ...paidOrder,
+      electronicInvoice: { status: 'reconciliation_pending' },
+    }} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('advierte antes de confirmar el pago si la orden manual enlazó otro cliente', () => {
+    const onEditBilling = vi.fn();
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      payment: { status: 'pending_manual' },
+      customer: { name: 'Cliente', lastname: 'Anterior', id: '4234234234' },
+      billing: { firstName: 'Amed', lastName: 'Barros', documentNumber: '1234567890', personType: 'natural' },
+    }} onEditBilling={onEditBilling} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('El nombre o documento del cliente es diferente');
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir datos fiscales' }));
+    expect(onEditBilling).toHaveBeenCalledOnce();
+  });
+
+  it('muestra valor y fecha pagados una vez confirmado el pago manual', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'paid',
+      payment: {
+        provider: 'manual', status: 'paid', amount: BASE_ORDER.total,
+        paidAt: '2026-08-14T15:00:00.000Z',
+      },
+    }} />);
+
+    expect(screen.getByText('Valor pagado')).toBeInTheDocument();
+    expect(screen.getByText('Fecha de pago:').nextElementSibling).not.toHaveTextContent('—');
+  });
+
+  it('distingue pago confirmado de factura todavía en proceso', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'paid',
+      payment: { provider: 'manual', status: 'paid', amount: BASE_ORDER.total },
+      billing: { firstName: 'Ana', lastName: 'Prueba', personType: 'natural' },
+      invoiceAutomation: { status: 'pending' },
+    }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Facturación en proceso');
+    expect(screen.getByRole('status')).toHaveTextContent('El pago ya quedó confirmado');
+  });
+
+  it('distingue el reintento automático de una corrección fiscal requerida', () => {
+    render(<OrderDetailPaymentPanel order={{
+      ...BASE_ORDER,
+      status: 'paid',
+      payment: { status: 'paid' },
+      invoiceAutomation: {
+        status: 'failed',
+        failureReason: 'No se pudo emitir la factura. El sistema volverá a intentarlo.',
+      },
+    }} onEditBilling={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Reintento automático de factura');
+    expect(screen.queryByRole('button', { name: 'Corregir datos fiscales' })).not.toBeInTheDocument();
   });
 
   it('cierra la historia del reembolso cuando todas las etapas están conciliadas', () => {
@@ -186,6 +330,42 @@ describe('historia narrativa del detalle de la orden', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Revisar pago' }));
     expect(onNavigate).toHaveBeenCalledWith('payment');
+  });
+
+  it('muestra inventario liberado al vencer un pedido manual y cero unidades aún reservadas', () => {
+    const releasedAt = '2026-08-14T14:21:00.000Z';
+    const order = {
+      ...BASE_ORDER,
+      source: 'manual',
+      status: 'failed',
+      payment: { provider: 'manual', status: 'failed' },
+      inventoryControl: { restockedOnFailure: true, restockedAt: releasedAt },
+      inventoryAllocations: [{
+        quantity: 1,
+        reservedQuantity: 1,
+        releasedQuantity: 1,
+        status: 'released',
+        reservedAt: '2026-08-14T14:01:00.000Z',
+        releasedAt,
+        branchSnapshot: { name: 'Sede Principal', code: 'PRINCIPAL' },
+      }],
+    };
+    const overview = buildOrderOverview(order);
+
+    expect(overview.situation.find((item) => item.id === 'inventory')?.value)
+      .toBe('Liberado en Sede Principal');
+    expect(overview.situation.find((item) => item.id === 'preparation')?.value)
+      .toBe('Preparación detenida; orden cerrada');
+    expect(overview.movements.find((item) => item.id === 'inventory')).toMatchObject({
+      title: 'Inventario liberado',
+      date: new Date(releasedAt),
+    });
+
+    render(<><OrderDetailStoryOverview order={order} /><OrderDetailInventoryAllocations order={order} /></>);
+    expect(screen.getByText('Liberado en Sede Principal')).toBeInTheDocument();
+    expect(screen.getByText('Reservadas').nextElementSibling).toHaveTextContent('0');
+    expect(screen.getByText('Liberadas').nextElementSibling).toHaveTextContent('1');
+    expect(screen.queryByText('Bloqueada hasta confirmar el pago')).not.toBeInTheDocument();
   });
 
   it('indica preparar logística cuando hay pago e inventario vendido pero aún no existe envío', () => {

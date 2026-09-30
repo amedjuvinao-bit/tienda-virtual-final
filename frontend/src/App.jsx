@@ -14,6 +14,7 @@ import { normalizeGlobalConfig } from './admin/appearance/general/generalHelpers
 import GlobalPageLoader from './components/GlobalPageLoader';
 import RouteLoaderEffect from './components/RouteLoaderEffect';
 import AppToastContainer from './components/AppToastContainer';
+import BackupMaintenanceNotice from './components/BackupMaintenanceNotice';
 import { AppConfirmProvider } from './components/AppConfirmProvider';
 import AdminPermissionRoute from './admin/security/AdminPermissionRoute';
 import { AuthProvider } from './context/AuthContext';
@@ -239,6 +240,7 @@ export default function App() {
         <CartProvider>
           <BrowserRouter>
             <AdminDocumentRoute />
+            <BackupMaintenanceNotice adminPanelReady={themeReady} />
             <AppConfirmProvider>
               <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
                 <ScrollToHash />
@@ -298,6 +300,7 @@ export default function App() {
                     <Route path="configuracion/usuarios" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/perfiles" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/seguridad" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/respaldos" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/logs" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="paginas" element={protectAdminContent(<PagesAdmin />)} />
                     <Route path="paginas/:id" element={protectAdminContent(<PageEditor />)} />
