@@ -461,6 +461,8 @@ function deepEqual(a, b) {
 
 export default function AppearancePage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [serverSnapshot, setServerSnapshot] = useState(null);
 
   const [activeTab, setActiveTab] = useState("general");
@@ -513,9 +515,16 @@ export default function AppearancePage() {
   );
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const settings = await fetchSiteSettings();
+        if (!settings?.theme || !settings?.menus) {
+          throw new Error("La configuración de apariencia llegó incompleta.");
+        }
+        if (cancelled) return;
         const merged = buildThemeFromServer(settings?.theme);
         setTheme(merged);
         setServerSnapshot(merged);
@@ -524,11 +533,17 @@ export default function AppearancePage() {
         const mergedMenus = buildMenusFromServer(settings?.menus);
         setMenus(mergedMenus);
         setMenusSnapshot(mergedMenus);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("No se pudo cargar Apariencia:", error);
+          setLoadError(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [loadAttempt]);
 
   useEffect(() => {
     (async () => {
@@ -849,6 +864,17 @@ export default function AppearancePage() {
   };
 
   if (loading) return <div className="p-6">Cargando apariencia…</div>;
+  if (loadError) {
+    return (
+      <div className="admin-widget-surface mx-auto max-w-xl rounded-2xl p-6" role="alert">
+        <h1 className="text-xl font-semibold">No se pudo cargar Apariencia</h1>
+        <p className="mt-2 text-sm">La configuración guardada no está disponible. Vuelve a intentar para editarla sin perder el diseño vigente.</p>
+        <button type="button" className="mt-4 rounded-xl px-4 py-2 font-semibold" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+          Reintentar carga
+        </button>
+      </div>
+    );
+  }
 
   // ✅ Tabs: reemplazado Home/Body por Secciones
   const tabs = [
