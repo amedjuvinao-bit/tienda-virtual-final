@@ -127,9 +127,11 @@ async function reservePort(port) {
 
 async function writeRecord(file, record) {
   const temp = `${file}.writing`;
-  await fs.promises.writeFile(temp, JSON.stringify(record, null, 2), { mode: 0o600, flag: 'w' });
-  const handle = await fs.promises.open(temp, 'r');
-  try { await handle.sync(); } finally { await handle.close(); }
+  const handle = await fs.promises.open(temp, 'w', 0o600);
+  try {
+    await handle.writeFile(JSON.stringify(record, null, 2));
+    await handle.sync();
+  } finally { await handle.close(); }
   await fs.promises.rename(temp, file);
 }
 
@@ -263,4 +265,4 @@ if (require.main === module) {
   process.on('SIGTERM', interrupt);
   main().catch((error) => { console.error(`No se inició el respaldo: ${error.message}`); process.exitCode = 1; });
 }
-module.exports = { configuration, runTool, counts, reservePort };
+module.exports = { configuration, runTool, counts, reservePort, writeRecord };

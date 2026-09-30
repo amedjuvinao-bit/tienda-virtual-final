@@ -6,8 +6,31 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { resolveMongoTool } = require('../services/backupMongoTools');
+const { writeRecord } = require('./backupAtlasFree');
+
+async function testRecordSyncOnWindows() {
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'tv-backup-record-'));
+  const file = path.join(dir, 'backup-test.json');
+  const originalOpen = fs.promises.open;
+  try {
+    // Windows rejects fsync for a read-only handle. Emulate that behavior on Linux too.
+    fs.promises.open = async (...args) => {
+      const handle = await originalOpen(...args);
+      if (args[1] === 'r' && String(args[0]).endsWith('.writing')) {
+        handle.sync = async () => { const error = new Error('EPERM: operation not permitted, fsync'); error.code = 'EPERM'; throw error; };
+      }
+      return handle;
+    };
+    await writeRecord(file, { status: 'en_proceso' });
+    assert.deepEqual(JSON.parse(await fs.promises.readFile(file, 'utf8')), { status: 'en_proceso' });
+  } finally {
+    fs.promises.open = originalOpen;
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  }
+}
 
 async function main() {
+  await testRecordSyncOnWindows();
   const installedTool = 'C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe';
   assert.equal(resolveMongoTool('mongodump', {
     platform: 'win32', environment: { ProgramFiles: 'C:\\Program Files' },
