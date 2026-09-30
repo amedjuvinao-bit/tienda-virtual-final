@@ -39,7 +39,7 @@ async function run() {
     const restored = path.join(root, 'restored');
     await fs.promises.mkdir(restored);
     assert.deepEqual(await extractBundle(bundle, restored, inventory), inventory);
-    assert.equal(await fs.promises.readFile(path.join(restored, 'cloudinary/image/asset-1'), 'utf8'), data.toString());
+    assert.equal(await fs.promises.readFile(path.join(restored, 'cloudinary/image/asset-1.png'), 'utf8'), data.toString());
     assert.equal(await fs.promises.readFile(path.join(restored, 'uploads/nested/receipt.pdf'), 'utf8'), 'Local receipt data');
     const key = crypto.randomBytes(32);
     const encrypted = path.join(root, 'bundle.enc');

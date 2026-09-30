@@ -50,7 +50,7 @@ global.fetch = async () => process.env.TEST_MEDIA_DOWNLOAD_FAIL === 'true'
       path.join(process.env.BACKUP_DIRECTORY, `media-${id}.json`), extracted],
     { cwd: path.join(__dirname, '..'), env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8' });
     assert.equal(command.status, 0, command.stderr);
-    assert.equal(await fs.promises.readFile(path.join(extracted, 'cloudinary/image/test-asset'), 'utf8'), data);
+    assert.equal(await fs.promises.readFile(path.join(extracted, 'cloudinary/image/test-asset.jpg'), 'utf8'), data);
     assert.equal(fs.existsSync(path.join(process.env.BACKUP_DIRECTORY, '.backup-maintenance.json')), false);
     process.env.TEST_MEDIA_DOWNLOAD_FAIL = 'true';
     id = await maintenance.begin({ owner: 'test-owner', kind: 'media' });
