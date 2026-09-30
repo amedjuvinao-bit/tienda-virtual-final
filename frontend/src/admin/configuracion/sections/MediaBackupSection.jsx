@@ -7,6 +7,7 @@ export default function MediaBackupSection({ maintenance, enabled, onStarted = (
   const frontendCloud = String(import.meta.env.VITE_CLOUDINARY_CLOUD || '').trim();
   const [readiness, setReadiness] = useState(null);
   const [runs, setRuns] = useState([]);
+  const [showAllRuns, setShowAllRuns] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
@@ -135,9 +136,11 @@ export default function MediaBackupSection({ maintenance, enabled, onStarted = (
   }
 
   return <div className="rounded-2xl border p-4 text-sm">
-    <h2 className="font-semibold">Imágenes y archivos</h2>
-    <p className="mt-2">Esta copia incluye los originales de Cloudinary (imágenes, videos y archivos) y el contenido de <code>backend/uploads</code>. Se cifra, se prueba la extracción y se registra cada archivo. La copia de MongoDB se descarga por separado.</p>
-    <p className="mt-2">La tienda se pausa durante el proceso. También debes detener cualquier carga directa desde fuera de la tienda; Cloudinary puede recibir archivos aunque el backend esté pausado.</p>
+    <h2 className="font-semibold">Copia de imágenes y archivos</h2>
+    <p className="mt-2">Incluye originales de Cloudinary y archivos del servidor. Se cifra y se comprueba que se puedan extraer. La base de datos se copia por separado.</p>
+    <details className="mt-2"><summary className="cursor-pointer underline">Qué ocurre durante esta copia</summary>
+      <p className="mt-2">La tienda se pausa. El sistema comprueba cada archivo y reabre al finalizar. Detén también las cargas directas desde fuera de la tienda: Cloudinary puede recibir archivos aunque el backend esté pausado.</p>
+    </details>
     {frontendCloud && readiness?.cloudName && frontendCloud !== readiness.cloudName &&
       <p role="alert" className="mt-2 text-red-700">La cuenta Cloudinary de productos no coincide con la del backend. Corrige la configuración antes de copiar.</p>}
     {readiness && !readiness.ready && <p className="mt-2 text-amber-700">Preparación pendiente: {(readiness.checks || []).join(' ')}</p>}
@@ -155,13 +158,16 @@ export default function MediaBackupSection({ maintenance, enabled, onStarted = (
     </form>}
     <h3 className="mt-5 font-semibold">Historial de archivos</h3>
     {!runs.length && <p className="mt-2">Aún no hay copias de archivos en este servidor.</p>}
-    <ul className="mt-2 space-y-3">{runs.map((run) => <li key={run.id} className="rounded-xl border p-3">
+    <ul className="mt-2 space-y-3">{(showAllRuns ? runs : runs.slice(0, 3)).map((run) => <li key={run.id} className="rounded-xl border p-3">
       <strong>{run.status === 'verificado' ? 'Verificado' : run.status === 'fallido' ? 'Fallido' : 'En proceso'}</strong>
-      <p>{new Date(run.startedAt).toLocaleString('es-CO')} · {run.id}</p>
+      <p>{new Date(run.startedAt).toLocaleString('es-CO')}</p>
       {run.status === 'verificado' && <p>{run.cloudinaryCount} de Cloudinary · {run.localCount} del servidor</p>}
-      {run.sha256 && <p className="break-all">SHA-256: <code>{run.sha256}</code></p>}
       {run.status === 'verificado' && !run.available && <p className="text-red-700">El archivo no está disponible en este servidor.</p>}
-      <ol className="mt-2 list-inside list-decimal text-xs opacity-75">{run.steps.map((step, index) => <li key={index}>{step.name}</li>)}</ol>
+      <details className="mt-2 text-xs"><summary className="cursor-pointer underline">Ver prueba e información técnica</summary>
+        <p className="mt-2 break-all">ID: {run.id}</p>
+        {run.sha256 && <p className="break-all">SHA-256: <code>{run.sha256}</code></p>}
+        <ol className="mt-2 list-inside list-decimal opacity-75">{(run.steps || []).map((step, index) => <li key={index}>{step.name}</li>)}</ol>
+      </details>
       {run.status === 'verificado' && run.available && <button type="button" className="mt-2 inline-flex items-center gap-1 underline" onClick={() => { setSelected(run.id); setStartOpen(false); setError(''); }}><Download size={14} /> Descargar archivos cifrados</button>}
       {selected === run.id && <form ref={formRef} onSubmit={download} className="mt-3 space-y-3 rounded-xl border p-4">
         <strong>Confirmar descarga de archivos</strong>
@@ -176,5 +182,8 @@ export default function MediaBackupSection({ maintenance, enabled, onStarted = (
         <button type="button" className="mt-2 inline-flex items-center gap-1 underline" onClick={() => downloadRecord(run.id)}><Download size={14} /> Descargar inventario de archivos</button>
       </div>}
     </li>)}</ul>
+    {runs.length > 3 && <button type="button" onClick={() => setShowAllRuns((value) => !value)} className="mt-3 underline">
+      {showAllRuns ? 'Mostrar solo las 3 más recientes' : `Ver ${runs.length - 3} ${runs.length === 4 ? 'copia anterior' : 'copias anteriores'}`}
+    </button>}
   </div>;
 }

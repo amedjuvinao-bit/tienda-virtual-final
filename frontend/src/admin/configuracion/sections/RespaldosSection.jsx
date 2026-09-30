@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DatabaseBackup, Download, ExternalLink, ShieldAlert } from 'lucide-react';
+import { Database, DatabaseBackup, Download, ExternalLink, Images, Settings2, ShieldAlert } from 'lucide-react';
 import api from '../../../lib/api';
 import MediaBackupSection from './MediaBackupSection';
 
@@ -26,6 +26,13 @@ const cardStyle = {
   borderColor: 'var(--admin-card-border, #e5e7eb)',
 };
 
+const TABS = [
+  { id: 'guide', label: 'Resumen' },
+  { id: 'method', label: '1. Método' },
+  { id: 'database', label: '2. Base de datos' },
+  { id: 'media', label: '3. Imágenes y archivos' },
+];
+
 export default function RespaldosSection() {
   const [saved, setSaved] = useState(null);
   const [strategy, setStrategy] = useState(null);
@@ -34,6 +41,10 @@ export default function RespaldosSection() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [runs, setRuns] = useState([]);
+  const [mediaRuns, setMediaRuns] = useState([]);
+  const [mediaRunsError, setMediaRunsError] = useState('');
+  const [tab, setTab] = useState('guide');
+  const [showAllRuns, setShowAllRuns] = useState(false);
   const [runsError, setRunsError] = useState('');
   const [selectedRun, setSelectedRun] = useState(null);
   const [downloadedRunId, setDownloadedRunId] = useState(null);
@@ -68,6 +79,11 @@ export default function RespaldosSection() {
       } catch (historyError) {
         setRunsError(historyError?.response?.data?.message || 'No se pudo consultar el historial de copias.');
       }
+      try {
+        const history = await api.get('/api/admin/backup-preferences/media-runs');
+        setMediaRuns(history.data.runs || []);
+        setMediaRunsError('');
+      } catch { setMediaRunsError('No se pudo consultar las copias de archivos.'); }
     } catch (failure) {
       setError(failure?.response?.data?.message || failure?.userMessage || 'No se pudo consultar la preferencia de respaldo.');
     } finally {
@@ -190,6 +206,29 @@ export default function RespaldosSection() {
   }
 
   const latestVerified = runs.find((run) => run.status === 'verificado' && run.available);
+  const latestMediaVerified = mediaRuns.find((run) => run.status === 'verificado' && run.available);
+
+  function selectTab(next) {
+    if (next === tab) return;
+    setTab(next);
+    setShowStart(false);
+    setSelectedRun(null);
+    setPassword('');
+    setTwoFactorCode('');
+    setStartPassword('');
+    setStartCode('');
+    setDownloadError('');
+  }
+
+  function handleTabKey(event, index) {
+    const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!direction && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1
+      : (index + direction + TABS.length) % TABS.length;
+    selectTab(TABS[next].id);
+    document.getElementById(`backup-tab-${TABS[next].id}`)?.focus();
+  }
 
   async function save(event) {
     event.preventDefault();
@@ -203,7 +242,7 @@ export default function RespaldosSection() {
         revision: saved.revision,
       });
       setSaved(data);
-      setNotice('Preferencia guardada. El respaldo sigue pendiente hasta verificar una copia y su restauración.');
+      setNotice('Método guardado. Consulta el estado de cada copia en Resumen.');
     } catch (failure) {
       setError(failure?.response?.data?.message || failure?.userMessage || 'No se pudo guardar. Actualiza la página e inténtalo de nuevo.');
     } finally {
@@ -212,29 +251,72 @@ export default function RespaldosSection() {
   }
 
   return (
-    <section className="space-y-5 rounded-3xl border p-4 shadow-sm sm:p-6" style={cardStyle}>
+    <section className="space-y-4 rounded-3xl border p-4 shadow-sm sm:p-6" style={cardStyle}>
       <div className="flex items-start gap-3">
         <DatabaseBackup className="mt-1 shrink-0" aria-hidden="true" />
         <div>
-          <h1 className="text-xl font-bold">Respaldo de la base de datos</h1>
-          <p className="mt-1 text-sm opacity-75">Solo el propietario puede elegir el método de respaldo.</p>
+          <h1 className="text-xl font-bold">Respaldos</h1>
+          <p className="mt-1 text-sm opacity-75">Configura el método y consulta por separado las copias de datos e imágenes. Solo el propietario puede iniciar o descargar copias.</p>
         </div>
       </div>
+      <div role="tablist" aria-label="Pasos del respaldo" className="grid grid-cols-2 gap-2 rounded-2xl border p-2 sm:grid-cols-4" style={cardStyle}>
+        {TABS.map((item, index) => <button key={item.id} id={`backup-tab-${item.id}`} type="button"
+          role="tab" aria-selected={tab === item.id} aria-controls={`backup-panel-${item.id}`}
+          tabIndex={tab === item.id ? 0 : -1} onKeyDown={(event) => handleTabKey(event, index)}
+          onClick={() => selectTab(item.id)}
+          className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${tab === item.id ? 'border-current bg-cyan-500/15' : 'border-transparent hover:bg-cyan-500/10'}`}>
+          {item.label}
+        </button>)}
+      </div>
 
-      <div role="status" className="flex items-start gap-3 rounded-2xl border border-amber-500/60 bg-amber-500/10 p-4 text-sm">
+      {maintenance?.maintenance && <div role="status" className="flex items-start gap-3 rounded-2xl border border-amber-500/60 bg-amber-500/10 p-4 text-sm">
         <ShieldAlert className="shrink-0" size={20} aria-hidden="true" />
         <div>
-          <strong>{latestVerified ? 'Última copia verificada' : 'Respaldo sin verificar'}</strong>
-          <p className="mt-1">{latestVerified
-            ? `Copia ${latestVerified.id} verificada el ${new Date(latestVerified.completedAt).toLocaleString('es-CO')}. Comprueba que tengas también una copia fuera del servidor y la clave de cifrado.`
-            : 'Aún no hay una copia con restauración de prueba registrada. Elegir un método no crea un respaldo ni cambia tu suscripción a Atlas.'}</p>
+          <strong>Tienda en mantenimiento</strong>
+          <p>{maintenance.progress || 'Copia en curso…'}</p>
+          {maintenance.phase === 'requiere_revision' && <p className="mt-2">El servidor se interrumpió. La tienda sigue pausada para proteger los datos. {maintenance.recoverable ? 'Puedes reabrirla en Base de datos después de revisar el resultado.' : 'Un operador debe comprobar si el proceso sigue activo.'}</p>}
         </div>
+      </div>}
+      {notice && <p role="status" className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">{notice}</p>}
+      {error && <div role="alert" className="rounded-xl border border-red-500/50 p-3 text-sm">
+        {error} <button type="button" onClick={load} className="ml-2 underline">Reintentar</button>
+      </div>}
+
+      <div id="backup-panel-guide" role="tabpanel" aria-labelledby="backup-tab-guide" hidden={tab !== 'guide'} className="space-y-4">
+        <p className="text-sm">Para respaldar toda la tienda se necesitan <strong>dos copias separadas</strong>: una de la base de datos y otra de las imágenes y archivos. Elige un paso para ver sus acciones.</p>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <button type="button" onClick={() => selectTab('method')} className="rounded-2xl border p-4 text-left transition-colors hover:bg-cyan-500/10" style={cardStyle}>
+            <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Paso 1 · Elección</span>
+            <strong className="mt-1 flex items-center gap-2 text-base"><Settings2 size={18} aria-hidden="true" /> Método de respaldo</strong>
+            <span className="mt-2 block text-sm">{loading ? 'Consultando…' : saved?.strategy === 'free_manual' ? 'Atlas Free configurado' : saved?.strategy === 'atlas_managed' ? 'Atlas de pago seleccionado' : 'Pendiente de elegir'}</span>
+            <span className="mt-3 block text-xs opacity-75">Elegir el método no crea una copia ni cambia el plan de Atlas.</span>
+            <span className="mt-3 block text-xs font-semibold underline">Abrir método →</span>
+          </button>
+          <button type="button" onClick={() => selectTab('database')} className="rounded-2xl border p-4 text-left transition-colors hover:bg-cyan-500/10" style={cardStyle}>
+            <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Paso 2 · Datos</span>
+            <strong className="mt-1 flex items-center gap-2 text-base"><Database size={18} aria-hidden="true" /> Base de datos</strong>
+            <span className="mt-2 block text-sm">{loading ? 'Consultando…' : runsError ? 'Estado no disponible' : latestVerified ? `Verificada · ${new Date(latestVerified.completedAt || latestVerified.startedAt).toLocaleString('es-CO')}` : 'Sin copia verificada en este servidor'}</span>
+            <span className="mt-3 block text-xs opacity-75">Pedidos, clientes, facturas y configuración.</span>
+            <span className="mt-3 block text-xs font-semibold underline">Abrir base de datos →</span>
+          </button>
+          <button type="button" onClick={() => selectTab('media')} className="rounded-2xl border p-4 text-left transition-colors hover:bg-cyan-500/10" style={cardStyle}>
+            <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Paso 3 · Archivos</span>
+            <strong className="mt-1 flex items-center gap-2 text-base"><Images size={18} aria-hidden="true" /> Imágenes y archivos</strong>
+            <span className="mt-2 block text-sm">{loading ? 'Consultando…' : mediaRunsError ? 'Estado no disponible' : latestMediaVerified ? `Verificada · ${new Date(latestMediaVerified.completedAt || latestMediaVerified.startedAt).toLocaleString('es-CO')}` : 'Sin copia verificada en este servidor'}</span>
+            <span className="mt-3 block text-xs opacity-75">Originales de Cloudinary y archivos del servidor.</span>
+            <span className="mt-3 block text-xs font-semibold underline">Abrir archivos →</span>
+          </button>
+        </div>
+        {loading && <p className="text-sm">Consultando el estado de las copias…</p>}
+        {runsError && <p role="alert" className="text-sm text-red-700">{runsError}</p>}
+        {mediaRunsError && <p role="alert" className="text-sm text-red-700">{mediaRunsError}</p>}
       </div>
 
+      <div id="backup-panel-method" role="tabpanel" aria-labelledby="backup-tab-method" hidden={tab !== 'method'} className="space-y-4">
       {loading ? <p>Cargando configuración…</p> : saved ? (
         <form onSubmit={save} className="space-y-4">
           <fieldset className="space-y-3">
-            <legend className="mb-2 font-semibold">¿Qué método vas a configurar?</legend>
+            <legend className="mb-2 font-semibold">Elige cómo se harán las copias de la base de datos</legend>
             {OPTIONS.map((option) => (
               <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-2xl border p-4" style={cardStyle}>
                 <input type="radio" name="backup-strategy" value={option.value} checked={strategy === option.value}
@@ -242,43 +324,39 @@ export default function RespaldosSection() {
                 <span className="min-w-0 flex-1">
                   <strong>{option.title}</strong>
                   <span className="mt-1 block text-sm opacity-75">{option.detail}</span>
-                  <span className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                    <span className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3">
-                      <strong className="block">Ventajas</strong>
-                      <span className="mt-1 block">{option.advantage}</span>
-                    </span>
-                    <span className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-3">
-                      <strong className="block">Riesgos y límites</strong>
-                      <span className="mt-1 block">{option.risk}</span>
-                    </span>
-                  </span>
                 </span>
               </label>
             ))}
           </fieldset>
+          {strategy && <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3"><strong className="block">Ventajas</strong><p className="mt-1">{OPTIONS.find((option) => option.value === strategy)?.advantage}</p></div>
+            <div className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-3"><strong className="block">Riesgos y límites</strong><p className="mt-1">{OPTIONS.find((option) => option.value === strategy)?.risk}</p></div>
+          </div>}
           <button type="submit" disabled={!strategy || strategy === saved.strategy || saving}
             className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
             {saving ? 'Guardando…' : 'Guardar método elegido'}
           </button>
-          {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
         </form>
       ) : null}
 
-      {error && <div role="alert" className="rounded-xl border border-red-500/50 p-3 text-sm">
-        {error} <button type="button" onClick={load} className="ml-2 underline">Reintentar</button>
-      </div>}
-
       <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
-        <h2 className="font-semibold">Crear copia de seguridad</h2>
-        <p className="mt-2">Al iniciarla, la tienda hará una pausa. El sistema copiará los datos, comprobará que se pueden restaurar y reabrirá la tienda al terminar.</p>
-        {maintenance?.maintenance ? (
-          <div role="status" className="mt-3 rounded-xl border border-amber-500/60 bg-amber-500/10 p-3">
-            <strong>Tienda en mantenimiento</strong>
-            <p>{maintenance.progress || 'Copia en curso…'}</p>
-            {maintenance.phase === 'requiere_revision' && <p className="mt-2">El servidor se interrumpió. La tienda sigue pausada para proteger los datos. {maintenance.recoverable ? 'La copia tiene resultado final y puede reabrirse con tu confirmación.' : 'Un operador debe revisar si el proceso o un archivo temporal siguen activos.'}</p>}
-          </div>
-        ) : maintenance?.phase === 'completado' ? <p role="status" className="mt-3 text-emerald-700">Copia verificada. Descárgala desde el historial.</p>
-          : maintenance?.phase === 'fallido' ? <p role="alert" className="mt-3 text-red-700">La copia falló. Revisa el historial; la tienda ya está abierta.</p> : null}
+        <h2 className="font-semibold">Cambio de plan en Atlas</h2>
+        <p className="mt-2">El plan se cambia en MongoDB Atlas. Esta selección registra tu método previsto; no modifica la suscripción.</p>
+        <a className="mt-3 inline-flex items-center gap-1 underline" href="https://cloud.mongodb.com/" target="_blank" rel="noreferrer">
+          Abrir MongoDB Atlas <ExternalLink size={14} aria-hidden="true" />
+        </a>
+        <details className="mt-3"><summary className="cursor-pointer underline">Preparación para producción</summary>
+          <p className="mt-2">Comprueba una copia reciente y ensaya la restauración en una base aislada. Conserva por separado los archivos subidos y los secretos del servidor.</p>
+          <a className="mt-2 inline-flex items-center gap-1 underline" href="https://www.mongodb.com/docs/atlas/backup/cloud-backup/" target="_blank" rel="noreferrer">Documentación de Atlas <ExternalLink size={14} aria-hidden="true" /></a>
+        </details>
+      </div>
+      </div>
+
+      <div id="backup-panel-database" role="tabpanel" aria-labelledby="backup-tab-database" hidden={tab !== 'database'} className="space-y-4">
+      <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
+        <h2 className="font-semibold">Copia de la base de datos</h2>
+        <p className="mt-2">Guarda pedidos, clientes y facturas. Al iniciarla, la tienda se pausa, se ensaya la restauración y se reabre al terminar.</p>
+        {latestVerified && <p className="mt-3 text-emerald-700">Última copia verificada: {new Date(latestVerified.completedAt || latestVerified.startedAt).toLocaleString('es-CO')}.</p>}
         {readiness && !readiness.ready && !maintenance?.maintenance && <div className="mt-3 rounded-xl border border-amber-500/60 p-3">El servidor aún necesita preparación para iniciar copias desde aquí. <details className="mt-1"><summary className="cursor-pointer underline">Ver qué falta</summary><ul className="mt-2 list-inside list-disc">{(readiness.checks || []).map((check) => <li key={check}>{check}</li>)}</ul></details></div>}
         {!maintenance?.maintenance && <button type="button" disabled={!readiness?.ready || saved?.strategy !== 'free_manual'}
           onClick={() => setShowStart(true)} className="mt-3 rounded-xl bg-slate-950 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Crear copia ahora</button>}
@@ -294,18 +372,21 @@ export default function RespaldosSection() {
       </div>
 
       <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
-        <h2 className="font-semibold">Historial de copias</h2>
+        <h2 className="font-semibold">Historial de la base de datos</h2>
         {runsError && <p role="alert" className="mt-2 text-red-700">{runsError}</p>}
         {runs.length === 0 ? <p className="mt-2">Todavía no hay intentos registrados en este servidor.</p> : (
           <ul className="mt-3 space-y-3">
-            {runs.map((run) => <li key={run.id} className="rounded-xl border p-3">
+            {(showAllRuns ? runs : runs.slice(0, 3)).map((run) => <li key={run.id} className="rounded-xl border p-3">
               <strong>{run.status === 'verificado' ? 'Verificado' : run.status === 'fallido' ? 'Fallido' : 'En proceso'}</strong>
-              <span className="ml-2">{new Date(run.startedAt).toLocaleString('es-CO')} · {run.database} · {run.id}</span>
-              {run.sha256 && <p className="mt-1 break-all">SHA-256 del archivo cifrado: <code>{run.sha256}</code></p>}
+              <span className="ml-2">{new Date(run.startedAt).toLocaleString('es-CO')} · {run.database}</span>
               {run.status === 'verificado' && !run.available && <p className="text-red-700">Archivo ausente o tamaño distinto. Revisa el almacenamiento externo.</p>}
-              {run.restoreTest && <p>Restauración: {run.restoreTest.collections} colecciones, {run.restoreTest.documents} documentos y {run.restoreTest.indexes} índices en servidor separado.</p>}
-              {run.restoreTest?.contentSha256 && <p className="break-all">Huella del contenido restaurado: <code>{run.restoreTest.contentSha256}</code></p>}
-              <ol className="mt-2 list-inside list-decimal text-xs opacity-75">{run.steps.map((step, index) => <li key={index}>{step.name} · {new Date(step.at).toLocaleString('es-CO')}</li>)}</ol>
+              <details className="mt-2 text-xs"><summary className="cursor-pointer underline">Ver prueba e información técnica</summary>
+                <p className="mt-2 break-all">ID: {run.id}</p>
+                {run.sha256 && <p className="mt-1 break-all">SHA-256 del archivo cifrado: <code>{run.sha256}</code></p>}
+                {run.restoreTest && <p>Restauración: {run.restoreTest.collections} colecciones, {run.restoreTest.documents} documentos y {run.restoreTest.indexes} índices en servidor separado.</p>}
+                {run.restoreTest?.contentSha256 && <p className="break-all">Huella del contenido restaurado: <code>{run.restoreTest.contentSha256}</code></p>}
+                <ol className="mt-2 list-inside list-decimal opacity-75">{(run.steps || []).map((step, index) => <li key={index}>{step.name} · {new Date(step.at).toLocaleString('es-CO')}</li>)}</ol>
+              </details>
               {run.status === 'verificado' && run.available && <button type="button" className="mt-2 inline-flex items-center gap-1 underline" onClick={() => {
                 setSelectedRun(run.id);
                 setDownloadError('');
@@ -327,21 +408,15 @@ export default function RespaldosSection() {
             </li>)}
           </ul>
         )}
+        {runs.length > 3 && <button type="button" onClick={() => setShowAllRuns((value) => !value)} className="mt-3 underline">
+          {showAllRuns ? 'Mostrar solo las 3 más recientes' : `Ver ${runs.length - 3} ${runs.length === 4 ? 'copia anterior' : 'copias anteriores'}`}
+        </button>}
+      </div>
       </div>
 
-      <MediaBackupSection maintenance={maintenance} enabled={saved?.strategy === 'free_manual'}
-        onStarted={() => setMaintenance({ phase: 'pausando', maintenance: true, progress: 'Pausando la tienda para copiar los archivos.' })} />
-
-      <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
-        <h2 className="font-semibold">Cambio de plan en Atlas</h2>
-        <p className="mt-2">El propietario cambia el plan y configura las copias en la consola de MongoDB Atlas. Es una operación de facturación externa: esta selección solo registra el método previsto en la tienda.</p>
-        <a className="mt-3 inline-flex items-center gap-1 underline" href="https://cloud.mongodb.com/" target="_blank" rel="noreferrer">
-          Abrir MongoDB Atlas <ExternalLink size={14} aria-hidden="true" />
-        </a>
-        <p className="mt-2">Antes de usar producción, comprueba una copia reciente y restaúrala en una base aislada. Incluye por separado los archivos subidos y los secretos del servidor.</p>
-        <a className="mt-3 inline-flex items-center gap-1 underline" href="https://www.mongodb.com/docs/atlas/backup/cloud-backup/" target="_blank" rel="noreferrer">
-          Documentación de respaldos de Atlas <ExternalLink size={14} aria-hidden="true" />
-        </a>
+      <div id="backup-panel-media" role="tabpanel" aria-labelledby="backup-tab-media" hidden={tab !== 'media'}>
+      {tab === 'media' && <MediaBackupSection maintenance={maintenance} enabled={saved?.strategy === 'free_manual'}
+        onStarted={() => setMaintenance({ phase: 'pausando', maintenance: true, progress: 'Pausando la tienda para copiar los archivos.' })} />}
       </div>
     </section>
   );

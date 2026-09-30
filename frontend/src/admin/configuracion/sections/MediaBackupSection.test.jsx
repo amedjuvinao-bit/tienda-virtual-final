@@ -81,4 +81,22 @@ describe('copia de imágenes y archivos', () => {
       expect(api.post).not.toHaveBeenCalled();
     } finally { delete window.showSaveFilePicker; global.fetch = originalFetch; }
   });
+
+  it('resume el historial de archivos y muestra los detalles solo al solicitarlos', async () => {
+    const runs = Array.from({ length: 4 }, (_, index) => ({
+      id: String(index).repeat(24), status: 'verificado', available: true,
+      startedAt: '2026-09-30T10:00:00Z', cloudinaryCount: 2, localCount: 1,
+      sha256: 'f'.repeat(64), steps: [{ name: 'Extracción comprobada' }],
+    }));
+    api.get.mockImplementation(async (url) => url.endsWith('/media-readiness')
+      ? { data: { ready: true, checks: [] } } : { data: { runs } });
+    render(<MediaBackupSection enabled maintenance={{ phase: 'inactivo', maintenance: false }} />);
+    await waitFor(() => expect(screen.getAllByText('Ver prueba e información técnica')).toHaveLength(3));
+    expect(screen.getAllByText('Ver prueba e información técnica')[0].closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver 1 copia anterior' }));
+    expect(screen.getAllByText('Ver prueba e información técnica')).toHaveLength(4);
+    fireEvent.click(screen.getAllByText('Ver prueba e información técnica')[0]);
+    expect(screen.getAllByText('Ver prueba e información técnica')[0].closest('details')).toHaveAttribute('open');
+    expect(screen.getAllByText('Ver prueba e información técnica')[0].closest('details')).toHaveTextContent('Extracción comprobada');
+  });
 });

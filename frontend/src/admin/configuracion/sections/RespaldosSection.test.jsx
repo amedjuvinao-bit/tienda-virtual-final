@@ -21,26 +21,33 @@ describe('preferencia de respaldos', () => {
     api.put.mockResolvedValue({ data: { strategy: 'free_manual', revision: 1, backupVerified: false } });
     render(<RespaldosSection />);
 
-    expect(screen.getByText('Respaldo sin verificar')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('Sin copia verificada en este servidor')).toHaveLength(2));
+    expect(screen.queryByRole('button', { name: 'Crear copia ahora' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '1. Método' }));
     const freeOption = await screen.findByRole('radio', { name: /Atlas Free/ });
+    fireEvent.click(freeOption);
     expect(screen.getByText(/Atlas Free no ofrece copias administradas/)).toBeInTheDocument();
+    expect(screen.getAllByText('Ventajas')).toHaveLength(1);
+    expect(screen.getAllByText('Riesgos y límites')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('radio', { name: /Atlas de pago/ }));
     expect(screen.getByText(/Flex no ofrece recuperación a un instante preciso/)).toBeInTheDocument();
-    expect(screen.getAllByText('Ventajas')).toHaveLength(2);
-    expect(screen.getAllByText('Riesgos y límites')).toHaveLength(2);
     fireEvent.click(freeOption);
     fireEvent.click(screen.getByRole('button', { name: 'Guardar método elegido' }));
 
     await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/admin/backup-preferences', {
       strategy: 'free_manual', revision: 0,
     }));
-    expect(await screen.findByText(/El respaldo sigue pendiente/)).toBeInTheDocument();
-    expect(screen.getByText('Respaldo sin verificar')).toBeInTheDocument();
+    expect(await screen.findByText(/Método guardado/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Resumen' }));
+    expect(screen.getByText('Atlas Free configurado')).toBeInTheDocument();
+    expect(screen.getAllByText('Sin copia verificada en este servidor')).toHaveLength(2);
   });
 
   it('expone el conflicto entre dos sesiones sin afirmar que se guardó', async () => {
     api.put.mockRejectedValue({ response: { data: { message: 'La preferencia cambió en otra sesión. Actualiza la página.' } } });
     render(<RespaldosSection />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '1. Método' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Atlas de pago/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar método elegido' }));
 
@@ -50,13 +57,15 @@ describe('preferencia de respaldos', () => {
 
   it('muestra la evidencia de restauración y exige reautenticación antes de descargar', async () => {
     const id = 'a'.repeat(24);
-    api.get.mockImplementation(async (path) => path.endsWith('/runs')
+    api.get.mockImplementation(async (path) => path.endsWith('/backup-preferences/runs')
       ? { data: { runs: [{ id, status: 'verificado', available: true, database: 'tienda_virtual',
         startedAt: '2026-09-29T00:00:00.000Z', completedAt: '2026-09-29T00:01:00.000Z',
         sha256: 'b'.repeat(64), restoreTest: { collections: 2, documents: 10, indexes: 3 }, steps: [] }] } }
       : { data: { strategy: 'free_manual', revision: 1, backupVerified: false } });
     render(<RespaldosSection />);
-    expect(await screen.findByText('Última copia verificada')).toBeInTheDocument();
+    expect(await screen.findByText(/Verificada ·/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '2. Base de datos' }));
+    fireEvent.click(screen.getByText('Ver prueba e información técnica'));
     expect(screen.getByText(/2 colecciones, 10 documentos y 3 índices/)).toBeInTheDocument();
     const downloadButton = screen.getByRole('button', { name: 'Descargar copia cifrada' });
     fireEvent.click(downloadButton);
@@ -71,7 +80,7 @@ describe('preferencia de respaldos', () => {
     const run = { id, status: 'verificado', available: true, size: 3, database: 'tienda_virtual',
       startedAt: '2026-09-29T00:00:00.000Z', completedAt: '2026-09-29T00:01:00.000Z',
       sha256: 'b'.repeat(64), restoreTest: { collections: 2, documents: 10, indexes: 3 }, steps: [] };
-    api.get.mockImplementation(async (path) => path.endsWith('/runs') ? { data: { runs: [run] } }
+    api.get.mockImplementation(async (path) => path.endsWith('/backup-preferences/runs') ? { data: { runs: [run] } }
       : { data: { strategy: 'free_manual', revision: 1 } });
     api.post.mockResolvedValue({ data: new Blob(['abc']) });
     const createObjectURL = vi.fn(() => 'blob:backup-test');
@@ -81,6 +90,7 @@ describe('preferencia de respaldos', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     try {
       render(<RespaldosSection />);
+      fireEvent.click(screen.getByRole('tab', { name: '2. Base de datos' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Descargar copia cifrada' }));
       fireEvent.change(screen.getByLabelText('Contraseña actual'), { target: { value: 'correcta' } });
       fireEvent.change(screen.getByLabelText('Código de 6 dígitos'), { target: { value: '123456' } });
@@ -108,6 +118,7 @@ describe('preferencia de respaldos', () => {
     });
     api.post.mockResolvedValue({ data: { id: 'a'.repeat(24) } });
     render(<RespaldosSection />);
+    fireEvent.click(screen.getByRole('tab', { name: '2. Base de datos' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Crear copia ahora' }));
     fireEvent.change(screen.getByLabelText('Contraseña del propietario'), { target: { value: 'contraseña-segura' } });
     fireEvent.change(screen.getByLabelText('Código de 6 dígitos'), { target: { value: '123456' } });
@@ -116,5 +127,34 @@ describe('preferencia de respaldos', () => {
       currentPassword: 'contraseña-segura', twoFactorCode: '123456',
     }));
     expect(await screen.findByText('Tienda en mantenimiento')).toBeInTheDocument();
+  });
+
+  it('muestra el proceso en una vista corta y permite navegar con teclado', async () => {
+    render(<RespaldosSection />);
+    expect(screen.getByRole('tabpanel', { name: 'Resumen' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Paso 1 · Elección/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Paso 2 · Datos/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Paso 3 · Archivos/ })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Resumen' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: '1. Método' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: '1. Método' })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: '3. Imágenes y archivos' }));
+    expect(await screen.findByRole('heading', { name: 'Copia de imágenes y archivos' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Crear copia ahora' })).not.toBeInTheDocument();
+  });
+
+  it('resume el historial y permite consultar las copias anteriores', async () => {
+    const runs = Array.from({ length: 4 }, (_, index) => ({
+      id: String(index).repeat(24), status: 'fallido', database: 'tienda_virtual',
+      startedAt: '2026-09-29T00:00:00.000Z', steps: [],
+    }));
+    api.get.mockImplementation(async (path) => path.endsWith('/backup-preferences/runs')
+      ? { data: { runs } } : path.endsWith('/media-runs') ? { data: { runs: [] } }
+        : { data: { strategy: 'free_manual', revision: 1 } });
+    render(<RespaldosSection />);
+    fireEvent.click(screen.getByRole('tab', { name: '2. Base de datos' }));
+    await waitFor(() => expect(screen.getAllByText('Ver prueba e información técnica')).toHaveLength(3));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver 1 copia anterior' }));
+    expect(screen.getAllByText('Ver prueba e información técnica')).toHaveLength(4);
   });
 });
