@@ -50,20 +50,62 @@ function configuration() {
   return { source, staging, database, dir, key, port };
 }
 
+function toolFailure(binary, code, output) {
+  const text = String(output);
+  const destination = binary === 'mongorestore' ? 'clúster de prueba' : 'clúster de origen';
+  let reason;
+  if (/authentication failed|bad auth|unable to authenticate|authenticat(?:ion|e) error|SCRAM authentication failed/i.test(text)) {
+    reason = `No se aceptaron las credenciales del ${destination}. Revisa la URI configurada para ese clúster.`;
+  } else if (/not authorized|unauthorized|requires authentication|insufficient privileges/i.test(text)) {
+    reason = `El usuario del ${destination} no tiene permisos para esta operación.`;
+  } else if (/quota|storage limit|insufficient (?:disk |storage )?space|out of disk space|maximum storage/i.test(text)) {
+    reason = `El ${destination} no tiene espacio suficiente para esta operación.`;
+  } else if (/server selection|no servers|connection refused|i\/o timeout|network timeout|tls handshake|dns lookup|no such host/i.test(text)) {
+    reason = `No se pudo conectar al ${destination}. Comprueba el acceso de red y la URI.`;
+  } else if (/error parsing command line options|unknown option|unrecognized option|invalid option/i.test(text)) {
+    reason = 'MongoDB Database Tools rechazó una opción del comando. Revisa su versión e instalación.';
+  } else {
+    reason = 'Consulta el diagnóstico de mongorestore/mongodump en la consola del backend.';
+  }
+  return new Error(`${binary} terminó con código ${code}; ${reason} No se confirmó la copia.`);
+}
+
+function safeToolDiagnostic(output) {
+  // Never write a tool's raw output into the audit record or panel. The tool
+  // can include the connection URI, passwords, or a customer's document.
+  const text = String(output);
+  const categories = [
+    ['autenticación', /authentication failed|bad auth|unable to authenticate|authenticat(?:ion|e) error|SCRAM authentication failed/i],
+    ['permisos', /not authorized|unauthorized|requires authentication|insufficient privileges/i],
+    ['espacio', /quota|storage limit|insufficient (?:disk |storage )?space|out of disk space|maximum storage/i],
+    ['conexión', /server selection|no servers|connection refused|i\/o timeout|network timeout|tls handshake|dns lookup|no such host/i],
+    ['opción inválida', /error parsing command line options|unknown option|unrecognized option|invalid option/i],
+  ];
+  return categories.filter(([, pattern]) => pattern.test(text)).map(([name]) => name).join(', ') || 'sin categoría';
+}
+
 function runTool(binary, args) {
   return new Promise((resolve, reject) => {
     if (interrupted) return reject(new Error('Operación interrumpida.'));
-    const child = spawn(resolveMongoTool(binary), args, { shell: false, stdio: 'ignore', windowsHide: true });
+    const child = spawn(resolveMongoTool(binary), args, { shell: false, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
     activeChild = child;
     let timedOut = false;
+    let spawnError = null;
+    let stderr = '';
+    child.stderr?.on('data', (chunk) => { stderr = (stderr + String(chunk)).slice(-16384); });
     const timeout = setTimeout(() => { timedOut = true; child.kill(); }, 2 * 60 * 60 * 1000);
-    child.once('error', (error) => { activeChild = null; clearTimeout(timeout); reject(new Error(`${binary} no está disponible (${error.code || 'error'}).`)); });
-    child.once('exit', (code) => {
+    child.once('error', (error) => { spawnError = error; });
+    child.once('close', (code) => {
       activeChild = null;
       clearTimeout(timeout);
-      if (timedOut) reject(new Error(`${binary} superó el tiempo máximo de dos horas.`));
+      if (spawnError) reject(new Error(`${binary} no está disponible (${spawnError.code || 'error'}).`));
+      else if (timedOut) reject(new Error(`${binary} superó el tiempo máximo de dos horas.`));
       else if (code === 0 && !interrupted) resolve();
-      else reject(new Error(`${binary} terminó con código ${code}; no se confirmó la copia.`));
+      else if (interrupted) reject(new Error('Operación interrumpida. No se confirmó la copia.'));
+      else {
+        process.stderr.write(`[backup-tool] ${binary} código ${code}; diagnóstico: ${safeToolDiagnostic(stderr)}\n`);
+        reject(toolFailure(binary, code, stderr));
+      }
     });
   });
 }

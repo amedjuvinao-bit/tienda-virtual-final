@@ -92,6 +92,17 @@ mongoose.createConnection = () => ({ asPromise: async () => ({
     await fs.promises.writeFile(path.join(toolsDir, 'mongodump'),
       '#!/usr/bin/env node\nconst fs=require("fs"); const archive=process.argv.find(a=>a.startsWith("--archive=")); if(archive) fs.writeFileSync(archive.slice(10), "test-archive"); process.exit(0);\n', { mode: 0o755 });
     await fs.promises.chmod(path.join(toolsDir, 'mongodump'), 0o755);
+    await fs.promises.writeFile(path.join(toolsDir, 'mongorestore'),
+      '#!/usr/bin/env node\nif (process.argv.includes("--version")) process.exit(0); process.stderr.write("Failed: Authentication failed at mongodb+srv://user:FAKE_PASSWORD@cluster.example/test\\n"); process.exit(1);\n', { mode: 0o755 });
+    await fs.promises.chmod(path.join(toolsDir, 'mongorestore'), 0o755);
+    const failedRestoreId = await maintenance.begin({ owner: 'test-owner' });
+    await maintenance.launch(failedRestoreId);
+    assert.equal(maintenance.status().phase, 'fallido');
+    assert.equal(maintenance.status().maintenance, false);
+    const failedRestore = JSON.parse(await fs.promises.readFile(path.join(backupDir, `backup-${failedRestoreId}.json`), 'utf8'));
+    assert.ok(failedRestore.steps.some((step) => step.name.includes('credenciales del clúster de prueba')));
+    assert.equal(JSON.stringify(failedRestore).includes('FAKE_PASSWORD'), false);
+    assert.equal((await fs.promises.readdir(backupDir)).some((name) => name.startsWith(`.working-${failedRestoreId}-`)), false);
     await fs.promises.writeFile(path.join(toolsDir, 'mongorestore'), '#!/usr/bin/env node\nprocess.exit(0);\n', { mode: 0o755 });
     await fs.promises.chmod(path.join(toolsDir, 'mongorestore'), 0o755);
     const verifiedId = await maintenance.begin({ owner: 'test-owner' });
