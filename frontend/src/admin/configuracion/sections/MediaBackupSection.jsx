@@ -93,22 +93,20 @@ export default function MediaBackupSection({ maintenance, enabled, onStarted = (
           await writer.close();
         } catch (failure) { await writer.abort().catch(() => {}); throw failure; }
       } else {
-        if (record?.size > 250 * 1024 * 1024) {
-          throw new Error('Esta copia es grande. Abre el panel en Chrome o Edge actualizado para guardarla directamente en disco.');
+        // A short-lived HttpOnly ticket lets the browser stream the attachment
+        // to Downloads without buffering a large Blob or changing browsers.
+        const response = await api.post(`/api/admin/backup-preferences/media-runs/${selected}/native-download`,
+          { currentPassword: password, twoFactorCode: code });
+        const url = new URL(response.data?.url || '', API_BASE_URL);
+        if (url.origin !== new URL(API_BASE_URL).origin ||
+            url.pathname !== `/api/admin/backup-preferences/media-runs/${selected}/file`) {
+          throw new Error('El servidor devolvió una ruta de descarga inválida.');
         }
-        const response = await api.post(`/api/admin/backup-preferences/media-runs/${selected}/download`,
-          { currentPassword: password, twoFactorCode: code }, { responseType: 'blob', timeout: 0 });
-        if (!(response.data instanceof Blob) || response.data.size !== record?.size) {
-          throw new Error('El archivo descargado está incompleto.');
-        }
-        const url = URL.createObjectURL(response.data);
         const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
+        link.href = url.href;
         document.body.appendChild(link);
         link.click();
         link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
       }
       setDownloaded(selected);
       setSelected(null);

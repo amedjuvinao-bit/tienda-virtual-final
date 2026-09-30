@@ -34,7 +34,7 @@ describe('copia de imágenes y archivos', () => {
     api.get.mockImplementation(async (url) => url.endsWith('/media-readiness')
       ? { data: { ready: true, checks: [] } } : url.endsWith('/media-runs')
         ? { data: { runs: [run] } } : { data: { ...run, inventory: [] } });
-    api.post.mockResolvedValue({ data: new Blob(['abc']) });
+    api.post.mockResolvedValue({ data: { url: `/api/admin/backup-preferences/media-runs/${id}/file` } });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     URL.createObjectURL = vi.fn(() => 'blob:media-test');
     URL.revokeObjectURL = vi.fn();
@@ -44,10 +44,13 @@ describe('copia de imágenes y archivos', () => {
       fireEvent.change(screen.getByLabelText('Contraseña para descarga de archivos'), { target: { value: 'correcta' } });
       fireEvent.change(screen.getByLabelText('Código para descarga de archivos'), { target: { value: '123456' } });
       fireEvent.click(screen.getByRole('button', { name: 'Confirmar descarga de archivos' }));
-      await waitFor(() => expect(api.post).toHaveBeenCalledWith(`/api/admin/backup-preferences/media-runs/${id}/download`,
-        { currentPassword: 'correcta', twoFactorCode: '123456' }, { responseType: 'blob', timeout: 0 }));
+      await waitFor(() => expect(api.post).toHaveBeenCalledWith(`/api/admin/backup-preferences/media-runs/${id}/native-download`,
+        { currentPassword: 'correcta', twoFactorCode: '123456' }));
+      await waitFor(() => expect(click).toHaveBeenCalledOnce());
+      expect(click.mock.instances[0].href).toBe(`http://localhost:5000/api/admin/backup-preferences/media-runs/${id}/file`);
       fireEvent.click(await screen.findByRole('button', { name: 'Descargar inventario de archivos' }));
       await waitFor(() => expect(click).toHaveBeenCalledTimes(2));
+      expect(URL.createObjectURL).toHaveBeenCalledOnce();
     } finally {
       click.mockRestore();
       delete URL.createObjectURL;

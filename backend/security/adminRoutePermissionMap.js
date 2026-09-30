@@ -1338,6 +1338,16 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true, danger: true,
   },
   {
+    method: 'POST', path: '/api/admin/backup-preferences/media-runs/:id/native-download',
+    permission: 'settings:store', description: 'Autorizar una descarga de archivos del navegador con contraseña y 2FA.',
+    audit: true, danger: true,
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-runs/:id/file',
+    permission: 'settings:store', description: 'Transmitir un archivo cifrado con autorización de un solo uso.',
+    audit: true, danger: true,
+  },
+  {
     method: 'POST',
     path: '/api/admin/backup-preferences/start',
     permission: 'settings:store',

@@ -9,6 +9,7 @@
     "backup:media:extract": "node scripts/extractMediaBackup.js",
     "test:backup-media": "node scripts/testMediaBackup.js",
     "test:backup-media-panel": "node scripts/testMediaBackupPanel.js",
+    "test:backup-media-download": "node scripts/testMediaDownloadTicket.js",
     "test:backup-archive": "node scripts/testFreeBackupArchive.js",
     "test:backup-maintenance": "node scripts/testBackupMaintenanceGate.js",
     "test:backup-panel-flow": "node scripts/testBackupPanelStart.js",
