@@ -1316,6 +1316,28 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Comprobar si el servidor puede iniciar un respaldo desde el panel.',
   },
   {
+    method: 'GET', path: '/api/admin/backup-preferences/media-readiness',
+    permission: 'settings:store', description: 'Comprobar la preparación de la copia de archivos.',
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-runs',
+    permission: 'settings:store', description: 'Consultar el historial de copias de archivos.',
+  },
+  {
+    method: 'GET', path: '/api/admin/backup-preferences/media-runs/:id/record',
+    permission: 'settings:store', description: 'Consultar el inventario verificado de una copia de archivos.',
+  },
+  {
+    method: 'POST', path: '/api/admin/backup-preferences/media-start',
+    permission: 'settings:store', description: 'Pausar la tienda y crear una copia cifrada de archivos.',
+    audit: true, danger: true,
+  },
+  {
+    method: 'POST', path: '/api/admin/backup-preferences/media-runs/:id/download',
+    permission: 'settings:store', description: 'Descargar una copia cifrada de archivos con reautenticación.',
+    audit: true, danger: true,
+  },
+  {
     method: 'POST',
     path: '/api/admin/backup-preferences/start',
     permission: 'settings:store',

@@ -7,6 +7,8 @@ const { spawn } = require('node:child_process');
 const { backupDirectory } = require('./freeBackupArchive');
 const { resolveMongoTool } = require('./backupMongoTools');
 const { configuration } = require('../scripts/backupAtlasFree');
+const { env } = require('../config/env');
+const { encryptionKey } = require('./freeBackupArchive');
 const adminAccessGate = require('../middleware/adminAccessGate');
 
 const STATUS_PATH = '/api/backup-maintenance/status';
@@ -45,7 +47,7 @@ function recoverableNow() {
       catch (error) { if (error.code !== 'ESRCH') return false; }
     }
     if (fs.readdirSync(backupDirectory()).some((file) => file.startsWith(`.working-${lock.id}-`))) return false;
-    const record = JSON.parse(fs.readFileSync(path.join(backupDirectory(), `backup-${lock.id}.json`), 'utf8'));
+    const record = JSON.parse(fs.readFileSync(path.join(backupDirectory(), `${lock.kind === 'media' ? 'media' : 'backup'}-${lock.id}.json`), 'utf8'));
     return record.id === lock.id && ['verificado', 'fallido'].includes(record.status);
   } catch { return false; }
 }
@@ -93,17 +95,28 @@ function toolAvailable(binary) {
   });
 }
 
-async function readiness() {
+async function readiness(kind = 'database') {
   const checks = [];
   if (process.env.BACKUP_PANEL_SINGLE_INSTANCE !== 'true') {
     checks.push('El servidor debe confirmar que esta es la única instancia del backend y que no hay otros clientes que escriban en MongoDB (BACKUP_PANEL_SINGLE_INSTANCE=true).');
   }
-  try { configuration(); }
+  try {
+    if (kind === 'media') {
+      backupDirectory();
+      encryptionKey();
+      if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
+        checks.push('Configura CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en el backend.');
+      }
+    } else configuration();
+  }
   catch (error) { checks.push(error.message); }
-  const [dump, restore] = await Promise.all([toolAvailable('mongodump'), toolAvailable('mongorestore')]);
-  if (!dump || !restore) checks.push('Instala MongoDB Database Tools en el servidor (mongodump y mongorestore).');
+  if (kind === 'database') {
+    const [dump, restore] = await Promise.all([toolAvailable('mongodump'), toolAvailable('mongorestore')]);
+    if (!dump || !restore) checks.push('Instala MongoDB Database Tools en el servidor (mongodump y mongorestore).');
+  }
   if (active) checks.push('Ya hay una copia o un mantenimiento pendiente de revisión.');
-  return { ready: checks.length === 0, checks };
+  return { ready: checks.length === 0, checks,
+    ...(kind === 'media' ? { cloudName: env.cloudinary.cloudName || null } : {}) };
 }
 
 async function writeLock(lock) {
@@ -117,26 +130,27 @@ async function writeLock(lock) {
   } finally { await fs.promises.rm(temp, { force: true }).catch(() => {}); }
 }
 
-async function begin({ owner }) {
+async function begin({ owner, kind = 'database' }) {
   if (preparing || active) throw new Error('Ya hay una copia o mantenimiento en curso.');
   preparing = true;
   try {
-    const check = await readiness();
+    if (!['database', 'media'].includes(kind)) throw new Error('Tipo de copia inválido.');
+    const check = await readiness(kind);
     if (!check.ready) throw new Error(check.checks.join(' '));
     const dir = backupDirectory();
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     backupDirectory(); // Validate the resolved path after creation, including symlinks.
     await fs.promises.chmod(dir, 0o700);
     const id = crypto.randomBytes(12).toString('hex');
-    const lock = { id, startedAt: new Date().toISOString(), parentPid: process.pid, childPid: null };
+    const lock = { id, kind, startedAt: new Date().toISOString(), parentPid: process.pid, childPid: null };
     const handle = await fs.promises.open(lockPath(), 'wx', 0o600);
     try { await handle.writeFile(JSON.stringify(lock)); await handle.sync(); }
     finally { await handle.close(); }
     state = { phase: 'pausando', id, progress: 'Pausando la tienda y esperando operaciones en curso.' };
     active = true;
-    const record = { id, database: process.env.BACKUP_DB_NAME, startedAt: lock.startedAt,
+    const record = { id, kind, ...(kind === 'database' ? { database: process.env.BACKUP_DB_NAME } : {}), startedAt: lock.startedAt,
       status: 'en_proceso', steps: [{ name: `Copia solicitada desde el panel por ${String(owner).slice(0, 120)}`, at: lock.startedAt }] };
-    await fs.promises.writeFile(path.join(dir, `backup-${id}.json`), JSON.stringify(record, null, 2), { flag: 'wx', mode: 0o600 });
+    await fs.promises.writeFile(path.join(dir, `${kind === 'media' ? 'media' : 'backup'}-${id}.json`), JSON.stringify(record, null, 2), { flag: 'wx', mode: 0o600 });
     return id;
   } catch (error) {
     if (active && state.phase === 'pausando') {
@@ -156,7 +170,8 @@ async function waitForDrain(timeoutMs = 120000) {
 }
 
 async function failBeforeChild(id, error) {
-  const file = path.join(backupDirectory(), `backup-${id}.json`);
+  const lock = JSON.parse(await fs.promises.readFile(lockPath(), 'utf8'));
+  const file = path.join(backupDirectory(), `${lock.kind === 'media' ? 'media' : 'backup'}-${id}.json`);
   const record = JSON.parse(await fs.promises.readFile(file, 'utf8'));
   record.status = 'fallido';
   record.completedAt = new Date().toISOString();
@@ -173,7 +188,7 @@ async function release(id, phase, progress) {
     if ((await fs.promises.readdir(dir)).some((name) => name.startsWith(`.working-${id}-`))) {
       throw new Error('Quedó un temporal de respaldo sin cifrar. Requiere revisión antes de reabrir.');
     }
-    const record = JSON.parse(await fs.promises.readFile(path.join(dir, `backup-${id}.json`), 'utf8'));
+    const record = JSON.parse(await fs.promises.readFile(path.join(dir, `${lock.kind === 'media' ? 'media' : 'backup'}-${id}.json`), 'utf8'));
     if (record.id !== id ||
         (phase === 'completado' && record.status !== 'verificado') ||
         (phase === 'fallido' && record.status !== 'fallido')) {
@@ -194,10 +209,13 @@ async function launch(id) {
   try {
     await waitForDrain();
     state = { id, phase: 'copiando', progress: 'Generando y comprobando la copia.' };
-    const script = path.join(__dirname, '..', 'scripts', 'backupAtlasFree.js');
+    const lockAtLaunch = JSON.parse(await fs.promises.readFile(lockPath(), 'utf8'));
+    const script = path.join(__dirname, '..', 'scripts', lockAtLaunch.kind === 'media' ? 'backupMedia.js' : 'backupAtlasFree.js');
     child = spawn(process.execPath, [script, '--managed-maintenance'], {
       cwd: path.join(__dirname, '..'), shell: false, windowsHide: true,
-      env: { ...process.env, BACKUP_RUN_ID: id }, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, BACKUP_RUN_ID: id,
+        BACKUP_SERVED_UPLOADS_DIRECTORY: path.join(process.cwd(), 'uploads') },
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     childDone = new Promise((resolve) => {
       child.once('error', () => resolve(1));
@@ -211,7 +229,7 @@ async function launch(id) {
     const code = await childDone;
     if (code !== 0) {
       try {
-        const record = JSON.parse(await fs.promises.readFile(path.join(backupDirectory(), `backup-${id}.json`), 'utf8'));
+        const record = JSON.parse(await fs.promises.readFile(path.join(backupDirectory(), `${lockAtLaunch.kind === 'media' ? 'media' : 'backup'}-${id}.json`), 'utf8'));
         if (record.status === 'en_proceso') await failBeforeChild(id, new Error('El proceso se interrumpió sin resultado final.'));
       } catch (error) { console.error('[backup-maintenance] No se pudo cerrar el registro:', error.message); }
     }
@@ -239,7 +257,7 @@ async function recover() {
   if (files.some((file) => file.startsWith(`.working-${lock.id}-`))) {
     throw new Error('Quedó un archivo temporal del respaldo. Un operador debe retirarlo antes de reabrir.');
   }
-  const record = JSON.parse(await fs.promises.readFile(path.join(dir, `backup-${lock.id}.json`), 'utf8'));
+  const record = JSON.parse(await fs.promises.readFile(path.join(dir, `${lock.kind === 'media' ? 'media' : 'backup'}-${lock.id}.json`), 'utf8'));
   if (record.id !== lock.id || !['verificado', 'fallido'].includes(record.status)) throw new Error('La copia no tiene resultado final. Revisa el proceso antes de reabrir.');
   await release(lock.id, record.status === 'verificado' ? 'completado' : 'fallido', 'Mantenimiento recuperado.');
   const result = status();

@@ -135,4 +135,26 @@ async function listBackups() {
   return records.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 50);
 }
 
-module.exports = { backupDirectory, encryptionKey, sha256, encryptArchive, decryptArchive, verifiedPlaintextDigest, safeBackupId, listBackups };
+async function listMediaBackups() {
+  const dir = backupDirectory();
+  let files;
+  try { files = await fs.promises.readdir(dir); }
+  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+  const records = await Promise.all(files.filter((file) => /^media-[a-f\d]{24}\.json$/.test(file)).map(async (file) => {
+    const record = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf8'));
+    let available = false;
+    if (record.status === 'verificado' && safeBackupId(record.id)) {
+      try {
+        const stat = await fs.promises.lstat(path.join(dir, `media-${record.id}.bundle.enc`));
+        available = stat.isFile() && !stat.isSymbolicLink() && stat.size === record.size;
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+    return { id: record.id, status: record.status, startedAt: record.startedAt,
+      completedAt: record.completedAt || null, cloudinaryCount: record.cloudinaryCount || 0,
+      localCount: record.localCount || 0, size: record.size || null,
+      sha256: record.sha256 || null, available, steps: record.steps || [] };
+  }));
+  return records.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 50);
+}
+
+module.exports = { backupDirectory, encryptionKey, sha256, encryptArchive, decryptArchive, verifiedPlaintextDigest, safeBackupId, listBackups, listMediaBackups };

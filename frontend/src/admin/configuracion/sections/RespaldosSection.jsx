@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DatabaseBackup, Download, ExternalLink, ShieldAlert } from 'lucide-react';
 import api from '../../../lib/api';
+import MediaBackupSection from './MediaBackupSection';
 
 const OPTIONS = [
   {
@@ -327,6 +328,9 @@ export default function RespaldosSection() {
           </ul>
         )}
       </div>
+
+      <MediaBackupSection maintenance={maintenance} enabled={saved?.strategy === 'free_manual'}
+        onStarted={() => setMaintenance({ phase: 'pausando', maintenance: true, progress: 'Pausando la tienda para copiar los archivos.' })} />
 
       <div className="rounded-2xl border p-4 text-sm" style={cardStyle}>
         <h2 className="font-semibold">Cambio de plan en Atlas</h2>

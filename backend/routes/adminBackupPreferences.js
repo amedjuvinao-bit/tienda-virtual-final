@@ -9,8 +9,9 @@ const requirePermission = require('../middleware/requirePermission');
 const BackupPreference = require('../models/BackupPreference');
 const AdminUser = require('../models/AdminUser');
 const { decryptTwoFactorSecret, verifyTotp } = require('../security/adminTwoFactorCrypto');
-const { backupDirectory, listBackups, safeBackupId, sha256 } = require('../services/freeBackupArchive');
+const { backupDirectory, listBackups, listMediaBackups, safeBackupId, sha256 } = require('../services/freeBackupArchive');
 const backupMaintenance = require('../services/backupMaintenanceService');
+const { env } = require('../config/env');
 
 const router = express.Router();
 const STRATEGIES = new Set(['free_manual', 'atlas_managed']);
@@ -86,6 +87,20 @@ router.get('/readiness', async (_req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+router.get('/media-readiness', async (_req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store, private');
+    return res.json(await backupMaintenance.readiness('media'));
+  } catch (error) { return next(error); }
+});
+
+router.get('/media-runs', async (_req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store, private');
+    return res.json({ runs: await listMediaBackups() });
+  } catch (error) { return next(error); }
+});
+
 async function verifyOwnerCredentials(req) {
   const owner = await AdminUser.findById(req.adminUserId).select('+passwordHash +twoFactorSecret');
   return Boolean(owner && owner.twoFactorEnabled && owner.twoFactorSecret &&
@@ -111,6 +126,32 @@ router.post('/start', startLimiter, async (req, res, next) => {
     return res.status(202).json({ id, message: 'La tienda está en mantenimiento y la copia ha comenzado.' });
   } catch (error) {
     if (/Ya hay una copia|BACKUP_PANEL_SINGLE_INSTANCE|Configura|Instala MongoDB/.test(error.message)) {
+      return res.status(409).json({ message: error.message });
+    }
+    return next(error);
+  }
+});
+
+router.post('/media-start', startLimiter, async (req, res, next) => {
+  try {
+    if (!(await verifyOwnerCredentials(req))) {
+      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
+    }
+    const frontendCloud = String(req.body?.frontendCloud || '').trim();
+    if (frontendCloud && frontendCloud !== env.cloudinary.cloudName) {
+      return res.status(409).json({ message: 'El frontend de productos y el backend usan cuentas Cloudinary distintas. Corrige la configuración antes de copiar.' });
+    }
+    const preference = await BackupPreference.findById('primary').lean();
+    if (preference?.strategy !== 'free_manual') {
+      return res.status(409).json({ message: 'Primero selecciona y guarda Atlas Free como método de respaldo.' });
+    }
+    const id = await backupMaintenance.begin({ owner: req.adminUsername || req.adminUserId, kind: 'media' });
+    res.once('finish', () => { setImmediate(() => backupMaintenance.launch(id).catch((error) =>
+      console.error('[backup-maintenance] Inicio de archivos fallido:', error.message))); });
+    res.set('Cache-Control', 'no-store, private');
+    return res.status(202).json({ id, message: 'La tienda está en mantenimiento y la copia de archivos ha comenzado.' });
+  } catch (error) {
+    if (/Ya hay una copia|BACKUP_PANEL_SINGLE_INSTANCE|Configura/.test(error.message)) {
       return res.status(409).json({ message: error.message });
     }
     return next(error);
@@ -153,6 +194,50 @@ router.post('/runs/:id/download', downloadLimiter, async (req, res, next) => {
     return res.download(file, filename, (error) => { if (error && !res.headersSent) next(error); });
   } catch (error) {
     if (error.code === 'ENOENT') return res.status(404).json({ message: 'No se encontró la copia en este servidor.' });
+    return next(error);
+  }
+});
+
+router.get('/media-runs/:id/record', async (req, res, next) => {
+  const { id } = req.params;
+  if (!safeBackupId(id)) return res.status(400).json({ message: 'Identificador inválido.' });
+  try {
+    const record = JSON.parse(await fs.promises.readFile(path.join(backupDirectory(), `media-${id}.json`), 'utf8'));
+    if (record.id !== id || record.kind !== 'media' || record.status !== 'verificado') {
+      return res.status(409).json({ message: 'El registro aún no está verificado.' });
+    }
+    res.set('Cache-Control', 'no-store, private');
+    return res.json(record);
+  } catch (error) {
+    if (error.code === 'ENOENT') return res.status(404).json({ message: 'Registro no encontrado.' });
+    return next(error);
+  }
+});
+
+router.post('/media-runs/:id/download', downloadLimiter, async (req, res, next) => {
+  const { id } = req.params;
+  if (!safeBackupId(id)) return res.status(400).json({ message: 'Identificador inválido.' });
+  try {
+    if (!(await verifyOwnerCredentials(req))) {
+      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
+    }
+    const directory = backupDirectory();
+    const record = JSON.parse(await fs.promises.readFile(path.join(directory, `media-${id}.json`), 'utf8'));
+    if (record.id !== id || record.kind !== 'media' || record.status !== 'verificado' || !record.sha256) {
+      return res.status(409).json({ message: 'La copia de archivos no está verificada.' });
+    }
+    const filename = `media-${id}.bundle.enc`;
+    const file = path.join(directory, filename);
+    const stat = await fs.promises.lstat(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size !== record.size || await sha256(file) !== record.sha256) {
+      return res.status(409).json({ message: 'El archivo no coincide con el registro. Revisa el almacenamiento.' });
+    }
+    res.set('Cache-Control', 'no-store, private');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Content-Type', 'application/octet-stream');
+    return res.download(file, filename, (error) => { if (error && !res.headersSent) next(error); });
+  } catch (error) {
+    if (error.code === 'ENOENT') return res.status(404).json({ message: 'Copia de archivos no encontrada.' });
     return next(error);
   }
 });
