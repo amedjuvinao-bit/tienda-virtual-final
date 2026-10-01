@@ -1,15 +1,52 @@
 const HEX_COLOR = /^#([\da-f]{3}|[\da-f]{6})$/i;
 
-export function resolveHeaderLogo(header = {}, fallback = '/LOGO1.png') {
-  const bg = String(header.bgColor || '').trim();
-  if (!HEX_COLOR.test(bg)) return header.logoLight || header.logoDark || fallback;
+export function isDarkHeaderBackground(bgColor) {
+  const bg = String(bgColor || '').trim();
+  if (!HEX_COLOR.test(bg)) return false;
   const digits = bg.slice(1).length === 3
     ? [...bg.slice(1)].map((digit) => digit + digit).join('')
     : bg.slice(1);
   const [red, green, blue] = [0, 2, 4].map((start) => parseInt(digits.slice(start, start + 2), 16));
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue < 140
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue < 140;
+}
+
+export function resolveHeaderLogo(header = {}, fallback = '') {
+  const bg = String(header.bgColor || '').trim();
+  if (!HEX_COLOR.test(bg)) return header.logoLight || header.logoDark || fallback;
+  return isDarkHeaderBackground(bg)
     ? header.logoLight || header.logoDark || fallback
     : header.logoDark || header.logoLight || fallback;
+}
+
+export const HEADER_FONT_PRESETS = {
+  classic: {
+    label: 'Editorial', description: 'Serif con presencia y ritmo de revista.',
+    family: '"Playfair Display", Georgia, serif', weight: 600, style: 'normal', spacing: '-0.035em', transform: 'none',
+  },
+  modern: {
+    label: 'Contemporáneo', description: 'Mayúsculas amplias y trazo preciso.',
+    family: 'Manrope, system-ui, sans-serif', weight: 800, style: 'normal', spacing: '0.14em', transform: 'uppercase',
+  },
+  elegant: {
+    label: 'Alta costura', description: 'Contraste fino y aire de boutique.',
+    family: '"Cormorant Garamond", Georgia, serif', weight: 700, style: 'italic', spacing: '0.04em', transform: 'none',
+  },
+  cute: {
+    label: 'Jovial', description: 'Curvas redondas con personalidad.',
+    family: '"Baloo 2", system-ui, sans-serif', weight: 700, style: 'normal', spacing: '0.015em', transform: 'none',
+  },
+};
+
+export function resolveHeaderTypography(header = {}, headingsFont = 'Georgia, serif') {
+  const preset = HEADER_FONT_PRESETS[header.fontPreset];
+  const custom = String(header.fontFamily || '').trim();
+  return {
+    fontFamily: custom || preset?.family || headingsFont,
+    fontWeight: preset?.weight || 700,
+    fontStyle: preset?.style || 'italic',
+    letterSpacing: preset?.spacing || 'normal',
+    textTransform: preset?.transform || 'none',
+  };
 }
 
 export function headerMenuDestination(value) {

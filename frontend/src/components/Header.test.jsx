@@ -45,4 +45,13 @@ describe('encabezado de la tienda', () => {
     await user.keyboard('{Escape}');
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('prueba el otro logo y muestra la marca en texto si ambos archivos fallan', async () => {
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const image = (await screen.findAllByAltText('Logo Rosa Boutique'))[0];
+    fireEvent.error(image);
+    expect(screen.getAllByAltText('Logo Rosa Boutique')[0]).toHaveAttribute('src', '/oscuro.png');
+    fireEvent.error(screen.getAllByAltText('Logo Rosa Boutique')[0]);
+    expect(screen.getAllByRole('img', { name: 'Rosa Boutique' })[0]).toHaveTextContent('Rosa Boutique');
+  });
 });

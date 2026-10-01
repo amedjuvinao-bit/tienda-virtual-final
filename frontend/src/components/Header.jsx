@@ -15,6 +15,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import CartSidebar from "./CartSidebar";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { normalizeHeaderMenu, resolveHeaderLogo, headerMenuDestination } from './headerPresentation';
+import HeaderBrand from './HeaderBrand';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -45,8 +46,8 @@ function Header() {
         const t = s?.theme || {};
         const h = t?.header || {};
 
-        const hl = h?.logoLight || t?.logo?.light || "/LOGO1.png";
-        const hd = h?.logoDark || t?.logo?.dark || "/LOGO1.png";
+        const hl = h?.logoLight || t?.logo?.light || "";
+        const hd = h?.logoDark || t?.logo?.dark || "";
         setLogoLight(hl);
         setLogoDark(hd);
 
@@ -62,8 +63,8 @@ function Header() {
         setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
         if (cancelled || requestId !== sequence) return;
-        setLogoLight("/LOGO1.png");
-        setLogoDark("/LOGO1.png");
+        setLogoLight("");
+        setLogoDark("");
         setHeaderBgHex("");
         setLogoHeightPx(80);
         setMenuItems([]);
@@ -141,6 +142,7 @@ function Header() {
   );
 
   const chosenLogo = useMemo(() => resolveHeaderLogo({ bgColor: headerBgHex, logoLight, logoDark }), [headerBgHex, logoLight, logoDark]);
+  const alternateLogo = chosenLogo === logoLight ? logoDark : logoLight;
 
   const logoStyle = useMemo(
     () => ({
@@ -400,17 +402,12 @@ function Header() {
           {/* Desktop */}
           <div className="hidden lg:flex w-full h-full items-center justify-between gap-4">
             <NavLink to="/" className="shrink-0 z-10">
-              <img
-                src={chosenLogo || "/LOGO1.png"}
-                alt="Logo Rosa Boutique"
-                style={logoStyle}
-                className="object-contain"
-              />
+              <HeaderBrand src={chosenLogo} alternateSrc={alternateLogo} style={logoStyle} className="object-contain" />
             </NavLink>
 
             <nav
               style={navStyle}
-              className="header-menu flex min-w-0 flex-1 items-center justify-center gap-3 overflow-x-auto whitespace-nowrap py-3 font-bold italic xl:gap-6"
+              className="header-menu flex min-w-0 flex-1 items-center justify-center gap-3 overflow-x-auto whitespace-nowrap py-3 xl:gap-6"
               aria-label="Navegación principal"
             >
               {menuItems.map((item, idx) => {
@@ -526,12 +523,7 @@ function Header() {
 
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <NavLink to="/" className="pointer-events-auto flex items-center justify-center">
-                <img
-                  src={chosenLogo || "/LOGO1.png"}
-                  alt="Logo Rosa Boutique"
-                  style={mobileLogoStyle}
-                  className="object-contain block"
-                />
+                <HeaderBrand src={chosenLogo} alternateSrc={alternateLogo} style={mobileLogoStyle} className="object-contain block" />
               </NavLink>
             </div>
           </div>
@@ -560,11 +552,7 @@ function Header() {
             borderBottom: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}`,
           }}
         >
-          <img
-            src={chosenLogo || "/LOGO1.png"}
-            alt="Logo Rosa Boutique"
-            className="h-12 object-contain"
-          />
+          <HeaderBrand src={chosenLogo} alternateSrc={alternateLogo} className="h-12 object-contain" />
 
           <button
             type="button"

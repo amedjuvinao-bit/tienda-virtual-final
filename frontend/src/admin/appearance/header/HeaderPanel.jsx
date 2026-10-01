@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { Image, Link2, Palette, Smartphone } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
+import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
 
@@ -151,6 +152,7 @@ export default function HeaderPanel({
   const [brandingSubTab, setBrandingSubTab] = useState("logo");
   const [stylesSubTab, setStylesSubTab] = useState("tipografia");
   const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
+  const preferredLogo = isDarkHeaderBackground(theme.header?.bgColor) ? 'claro' : 'oscuro';
 
   return (
     <div className="appearance-header min-w-0">
@@ -204,6 +206,7 @@ export default function HeaderPanel({
                         onChange={(url) => setPath('header.logoDark', url)} onUpload={uploadToCloudinaryViaBackend}
                         uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} /></div>
                   </div>
+                  <p className="appearance-header__logo-current">Con el fondo actual se muestra primero el <strong>logo {preferredLogo}</strong>. Si falta, se utiliza la otra versión.</p>
 
                   <PanelBlock title="Tamaño del logo" columns={1}>
                     <div className="rounded-2xl border bg-white p-4">
@@ -307,36 +310,32 @@ export default function HeaderPanel({
 
             <div className="space-y-4">
               {stylesSubTab === "tipografia" && (
-                <PanelBlock title="Tipografía del header">
-                  <Select
-                    label="Preset de fuente del Header"
-                    value={theme.header?.fontPreset || ""}
-                    onChange={(e) => setPath("header.fontPreset", e.target.value)}
-                  >
-                    <option value="">(Sin preset)</option>
-                    <option value="classic">Classic (Playfair)</option>
-                    <option value="modern">Modern (Inter)</option>
-                    <option value="elegant">Elegant (Cormorant)</option>
-                    <option value="cute">Cute (Baloo)</option>
-                  </Select>
-
-                  <Input
-                    label="Tamaño de fuente header (px)"
-                    type="number"
-                    min={12}
-                    max={30}
-                    step="1"
+                <PanelBlock title="Personalidad del menú" columns={1}>
+                  <div className="appearance-header__font-grid" role="group" aria-label="Modelos de tipografía">
+                    {Object.entries(HEADER_FONT_PRESETS).map(([key, preset]) => (
+                      <button key={key} type="button" className="appearance-header__font-option"
+                        aria-pressed={theme.header?.fontPreset === key && !theme.header?.fontFamily}
+                        onClick={() => { setPath('header.fontPreset', key); setPath('header.fontFamily', ''); }}>
+                        <span className="appearance-header__font-example" style={{ fontFamily: preset.family, fontWeight: preset.weight, fontStyle: preset.style, letterSpacing: preset.spacing, textTransform: preset.transform }}>Lo Nuevo</span>
+                        <strong>{preset.label}</strong><small>{preset.description}</small>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="appearance-header__font-detail">
+                    <strong>Así se leerá el menú</strong>
+                    <span style={{ ...resolveHeaderTypography(theme.header), fontSize: `${theme.header?.fontSizePx ?? 16}px` }}>Lo Nuevo · Colecciones · Boutique</span>
+                  </div>
+                  <Input label="Tamaño del texto del menú (px)" type="number" min={12} max={30} step="1"
                     value={theme.header?.fontSizePx ?? 16}
-                    onChange={(e) => setPath("header.fontSizePx", Number(e.target.value))}
-                  />
-
-                  <div className="xl:col-span-2">
+                    onChange={(e) => setPath("header.fontSizePx", Number(e.target.value))} />
+                  <div>
                     <Input
                       label="Fuente personalizada (CSS font-family) — opcional"
                       value={theme.header?.fontFamily || ""}
                       onChange={(e) => setPath("header.fontFamily", e.target.value)}
                       placeholder='"Playfair Display", Georgia, serif'
                     />
+                    {theme.header?.fontFamily && <p className="mt-2 text-xs text-gray-500">La fuente personalizada tiene prioridad. Selecciona un modelo para volver a usarlo.</p>}
                   </div>
                 </PanelBlock>
               )}

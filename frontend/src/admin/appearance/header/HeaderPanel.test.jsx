@@ -23,11 +23,11 @@ describe('edición del encabezado', () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
-    expect(within(preview).getByAltText('Logo del encabezado')).toHaveAttribute('src', '/claro.png');
+    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/claro.png');
     await user.click(screen.getByRole('button', { name: /Fondo/ }));
     await user.clear(screen.getByPlaceholderText('#FFFFFF'));
     await user.type(screen.getByPlaceholderText('#FFFFFF'), '#ffffff');
-    expect(within(preview).getByAltText('Logo del encabezado')).toHaveAttribute('src', '/oscuro.png');
+    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/oscuro.png');
     await user.click(screen.getByRole('button', { name: /Enlaces Destinos/ }));
     await user.clear(screen.getByPlaceholderText('Ej: Lo Nuevo'));
     await user.type(screen.getByPlaceholderText('Ej: Lo Nuevo'), 'Colección');
@@ -45,7 +45,23 @@ describe('edición del encabezado', () => {
     const file = new File(['imagen'], 'logo.png', { type: 'image/png' });
     await user.upload(input, file);
     expect(upload).toHaveBeenCalledWith(file, 'image');
-    expect(screen.getByAltText('Logo del encabezado')).toHaveAttribute('src', 'https://res.cloudinary.com/tienda/logo.png');
+    expect(within(screen.getByText('Vista previa en vivo').closest('.appearance-header__preview')).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', 'https://res.cloudinary.com/tienda/logo.png');
     expect(screen.getByText(/Pulsa “Guardar cambios”/)).toBeInTheDocument();
+  });
+
+  it('aplica cada modelo de letra a la vista previa y limpia la fuente personalizada al elegir otro', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    const nav = within(preview).getByRole('navigation', { name: 'Vista previa del menú' });
+    await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
+    await user.click(screen.getByRole('button', { name: /Contemporáneo/ }));
+    expect(nav).toHaveStyle({ fontWeight: '800', letterSpacing: '0.14em', textTransform: 'uppercase' });
+    expect(nav.parentElement).toHaveStyle({ fontFamily: 'Manrope, system-ui, sans-serif' });
+    await user.type(screen.getByPlaceholderText('"Playfair Display", Georgia, serif'), 'Arial');
+    expect(nav.parentElement).toHaveStyle({ fontFamily: 'Arial' });
+    await user.click(screen.getByRole('button', { name: /Alta costura/ }));
+    expect(nav.parentElement).toHaveStyle({ fontFamily: '"Cormorant Garamond", Georgia, serif' });
+    expect(nav).toHaveStyle({ fontStyle: 'italic', letterSpacing: '0.04em', textTransform: 'none' });
   });
 });

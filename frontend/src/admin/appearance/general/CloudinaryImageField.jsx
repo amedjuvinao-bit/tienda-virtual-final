@@ -10,6 +10,7 @@ export default function CloudinaryImageField({ label, value, onChange, onUpload,
   const [success, setSuccess] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   useEffect(() => setSuccess(false), [savedRevision]);
+  useEffect(() => setPreviewFailed(false), [value]);
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
