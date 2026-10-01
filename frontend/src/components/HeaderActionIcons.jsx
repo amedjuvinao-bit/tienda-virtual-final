@@ -1,37 +1,51 @@
-import roseAccount from '../assets/header-icons/rose-account.webp';
-import roseFavorites from '../assets/header-icons/rose-favorites.webp';
-import roseCart from '../assets/header-icons/rose-cart.webp';
-import noirAccount from '../assets/header-icons/noir-account.webp';
-import noirFavorites from '../assets/header-icons/noir-favorites.webp';
-import noirCart from '../assets/header-icons/noir-cart.webp';
+import goldAccount from '../assets/header-icons/gold-account.webp';
+import goldFavorites from '../assets/header-icons/gold-favorites.webp';
+import goldCart from '../assets/header-icons/gold-cart.webp';
+import wineAccount from '../assets/header-icons/wine-account.webp';
+import wineFavorites from '../assets/header-icons/wine-favorites.webp';
+import wineCart from '../assets/header-icons/wine-cart.webp';
+import satinAccount from '../assets/header-icons/satin-account.webp';
+import satinFavorites from '../assets/header-icons/satin-favorites.webp';
+import satinCart from '../assets/header-icons/satin-cart.webp';
+import porcelainAccount from '../assets/header-icons/porcelain-account.webp';
+import porcelainFavorites from '../assets/header-icons/porcelain-favorites.webp';
+import porcelainCart from '../assets/header-icons/porcelain-cart.webp';
 import './headerActionIcons.css';
 
 const ICON_IMAGES = {
-  rose: { account: roseAccount, favorites: roseFavorites, cart: roseCart },
-  noir: { account: noirAccount, favorites: noirFavorites, cart: noirCart },
+  gold: { account: goldAccount, favorites: goldFavorites, cart: goldCart },
+  wine: { account: wineAccount, favorites: wineFavorites, cart: wineCart },
+  satin: { account: satinAccount, favorites: satinFavorites, cart: satinCart },
+  porcelain: { account: porcelainAccount, favorites: porcelainFavorites, cart: porcelainCart },
 };
 
 export const HEADER_ICON_SETS = [
-  { value: 'rose', label: 'Cristal rosa', description: 'Cristal, perla y oro rosa.' },
-  { value: 'noir', label: 'Noir dorado', description: 'Esmalte negro y oro pulido.' },
-  { value: 'custom', label: 'Mis imágenes', description: 'Carga tus tres iconos.' },
+  { value: 'gold', label: 'Oro satinado', description: 'Metal cálido de líneas limpias.' },
+  { value: 'wine', label: 'Esmalte vino', description: 'Rojo profundo con filo dorado.' },
+  { value: 'satin', label: 'Satén rosa', description: 'Pliegues de tela con filo dorado.' },
+  { value: 'porcelain', label: 'Porcelana rosa', description: 'Esmalte suave y oro rosa.' },
 ];
 
 export function resolveHeaderIcons(header = {}) {
-  // Configuraciones antiguas siguen funcionando y muestran el nuevo diseño.
-  return HEADER_ICON_SETS.some(({ value }) => value === header.iconSet) ? header.iconSet : 'rose';
+  if (header.iconSet === 'custom') return 'custom'; // Conserva las imágenes propias guardadas antes.
+  return ICON_IMAGES[header.iconSet] ? header.iconSet : 'gold';
 }
 
-export function HeaderActionGlyph({ kind, iconSet = 'rose', iconImages }) {
-  const fallback = ICON_IMAGES.rose[kind] || roseFavorites;
-  const src = iconSet === 'custom' ? (iconImages?.[kind] || fallback) : (ICON_IMAGES[iconSet]?.[kind] || fallback);
+export function getHeaderIconSource(iconSet, kind) {
+  return (ICON_IMAGES[iconSet] || ICON_IMAGES.gold)[kind] || goldFavorites;
+}
+
+export function HeaderActionGlyph({ kind, iconSet = 'gold', iconImages, iconOverrides }) {
+  const fallback = getHeaderIconSource(iconSet, kind);
+  const custom = iconSet === 'custom' ? iconImages?.[kind] : iconOverrides?.[iconSet]?.[kind];
+  const src = custom || fallback;
 
   return <img
     className="storefront-action-glyph storefront-action-glyph--image"
     data-icon-style={iconSet}
     src={src}
-    width="40"
-    height="40"
+    width="34"
+    height="34"
     alt=""
     aria-hidden="true"
     draggable="false"

@@ -4,7 +4,7 @@ import { Image, Link2, Palette, Smartphone } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
 import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
-import { HEADER_ICON_SETS, HeaderActionGlyph, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
+import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
 
@@ -444,33 +444,38 @@ export default function HeaderPanel({
 
               {stylesSubTab === "iconos" && (
                 <div className="appearance-header__icon-editor">
-                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Cuenta, favoritos y carrito cambian juntos en la vista previa y en la tienda.</span></div>
+                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Compara cuatro juegos completos. Puedes cambiar cada imagen por separado debajo de las opciones.</span></div>
                   <div className="appearance-header__icon-options" role="group" aria-label="Modelo de íconos">
                     {HEADER_ICON_SETS.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection === value}
                       onClick={() => setPath('header.iconSet', value)} className="appearance-header__icon-option">
                       <span className="appearance-header__icon-samples" aria-hidden="true">
-                        {value === 'custom' && !['account', 'favorites', 'cart'].some((kind) => theme.header?.iconImages?.[kind])
-                          ? <span className="appearance-header__icon-placeholder">Tus imágenes aquí</span>
-                          : ['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}><HeaderActionGlyph kind={kind} iconSet={value} iconImages={theme.header?.iconImages} /></span>)}
+                        {['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}>
+                          <HeaderActionGlyph kind={kind} iconSet={value} iconOverrides={theme.header?.iconOverrides} /></span>)}
                       </span><strong>{label}</strong><small>{description}</small>
                     </button>)}
                   </div>
-                  {iconSelection === 'custom' && <div className="appearance-header__custom-icons">
-                    <strong>Carga tres imágenes sin fondo</strong>
-                    <p>Una para cada acción. Usa PNG o WebP transparente, cuadrado y de al menos 192 × 192 px. La tienda mostrará las tres cuando guardes.</p>
+                  <div className="appearance-header__custom-icons">
+                    <strong>Personaliza {HEADER_ICON_SETS.find(({ value }) => value === iconSelection)?.label || 'este juego'}</strong>
+                    <p>Selecciona una imagen para reemplazar solo ese icono. Si la quitas, vuelve al diseño original del juego. Se recomienda PNG o WebP transparente y cuadrado.</p>
                     <div className="appearance-header__custom-icon-fields">
                       {[
                         ['account', 'Cuenta'],
                         ['favorites', 'Favoritos'],
                         ['cart', 'Bolsa de compras'],
-                      ].map(([kind, label]) => <CloudinaryImageField key={kind} label={`Icono de ${label}`}
-                        value={theme.header?.iconImages?.[kind] || ''} onChange={(url) => setPath(`header.iconImages.${kind}`, url)}
-                        onUpload={uploadToCloudinaryViaBackend} uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} />)}
+                      ].map(([kind, label]) => <CloudinaryImageField key={`${iconSelection}-${kind}`} label={`Icono de ${label}`}
+                        value={theme.header?.iconOverrides?.[iconSelection]?.[kind] || ''}
+                        fallbackPreview={getHeaderIconSource(iconSelection, kind)}
+                        onChange={(url) => setPath(`header.iconOverrides.${iconSelection}.${kind}`, url)}
+                        onUpload={uploadToCloudinaryViaBackend} uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} transparentOnly />)}
                     </div>
-                  </div>}
+                  </div>
                   <div className="appearance-header__icon-controls">
-                    <strong>Movimiento</strong>
-                    <p>Los colores pertenecen a cada imagen; el movimiento se aplica a las tres.</p>
+                    <strong>Tamaño y movimiento</strong>
+                    <label className="appearance-header__icon-size">
+                      <span>Tamaño en la tienda <output>{theme.header?.iconSizePx ?? 34} px</output></span>
+                      <input type="range" aria-label="Tamaño en la tienda" min="28" max="40" step="1" value={theme.header?.iconSizePx ?? 34}
+                        onChange={(e) => setPath('header.iconSizePx', Number(e.target.value))} />
+                    </label>
                   <div>
                     <Select
                       label="Animación de íconos"

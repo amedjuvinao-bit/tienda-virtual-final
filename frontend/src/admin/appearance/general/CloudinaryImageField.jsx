@@ -4,13 +4,13 @@ import { ImagePlus, Trash2 } from "lucide-react";
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-export default function CloudinaryImageField({ label, value, onChange, onUpload, uploading, setUploading, savedRevision }) {
+export default function CloudinaryImageField({ label, value, onChange, onUpload, uploading, setUploading, savedRevision, transparentOnly = false, fallbackPreview = '' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   useEffect(() => setSuccess(false), [savedRevision]);
-  useEffect(() => setPreviewFailed(false), [value]);
+  useEffect(() => setPreviewFailed(false), [value, fallbackPreview]);
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
@@ -18,8 +18,8 @@ export default function CloudinaryImageField({ label, value, onChange, onUpload,
     if (!file) return;
     setError("");
     setSuccess(false);
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError("Elige una imagen PNG, JPG o WebP.");
+    if (!(transparentOnly ? ["image/png", "image/webp"] : ACCEPTED_TYPES).includes(file.type)) {
+      setError(transparentOnly ? "Elige un PNG o WebP con fondo transparente." : "Elige una imagen PNG, JPG o WebP.");
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
@@ -50,8 +50,8 @@ export default function CloudinaryImageField({ label, value, onChange, onUpload,
   return (
     <div className="appearance-general__upload-field xl:col-span-2">
       <div className="appearance-general__upload-preview">
-        {value && !previewFailed ? (
-          <img src={value} alt={`Imagen de ${label}`} onError={() => setPreviewFailed(true)} />
+        {(value || fallbackPreview) && !previewFailed ? (
+          <img src={value || fallbackPreview} alt={`Imagen de ${label}`} onError={() => setPreviewFailed(true)} />
         ) : (
           <ImagePlus size={29} aria-hidden="true" />
         )}
@@ -63,7 +63,7 @@ export default function CloudinaryImageField({ label, value, onChange, onUpload,
           <label className="appearance-general__upload-pick">
             <ImagePlus size={16} aria-hidden="true" />
             {busy ? "Subiendo imagen…" : value ? "Cambiar imagen" : "Seleccionar imagen"}
-            <input type="file" accept="image/png,image/jpeg,image/webp"
+            <input type="file" accept={transparentOnly ? "image/png,image/webp" : "image/png,image/jpeg,image/webp"}
               aria-label={`Seleccionar imagen para ${label}`}
               disabled={uploading || busy} onChange={handleFile} />
           </label>
@@ -75,7 +75,7 @@ export default function CloudinaryImageField({ label, value, onChange, onUpload,
         {error && <p className="appearance-general__upload-error" role="alert">{error}</p>}
         {success && !error && <p className="appearance-general__upload-success" role="status">Imagen subida. Pulsa “Guardar cambios” para publicarla.</p>}
         {previewFailed && <p className="appearance-general__upload-error" role="alert">La imagen actual no se puede mostrar. Selecciona otra.</p>}
-        <small>PNG, JPG o WebP · máximo 8 MB</small>
+        <small>{transparentOnly ? 'PNG o WebP transparente' : 'PNG, JPG o WebP'} · máximo 8 MB</small>
       </div>
     </div>
   );

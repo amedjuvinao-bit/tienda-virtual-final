@@ -300,8 +300,8 @@ function buildThemeFromServer(themeRaw) {
       iconColor: "",
       iconHoverColor: "",
       iconAnimation: "soft",
-      iconSet: "rose",
       iconImages: { account: "", favorites: "", cart: "" },
+      iconSizePx: 34,
 
       fontPreset: "",
       fontFamily: "",
@@ -341,6 +341,11 @@ function buildThemeFromServer(themeRaw) {
       mobileMenuWidthPercent: 88,
 
       ...(t.header || {}),
+      iconSet: ['gold', 'wine', 'satin', 'porcelain'].includes(t.header?.iconSet) ? t.header.iconSet : 'gold',
+      iconOverrides: {
+        ...(t.header?.iconOverrides || {}),
+        ...(t.header?.iconSet === 'custom' ? { gold: { ...(t.header?.iconImages || {}), ...(t.header?.iconOverrides?.gold || {}) } } : {}),
+      },
     },
 
     // ✅ SECCIONES (Estrategia B)
@@ -786,14 +791,18 @@ export default function AppearancePage() {
         return;
       }
 
-      if (changedTheme.header && !['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence', 'rose', 'noir', 'custom'].includes(h.iconSet)) {
+      if (changedTheme.header && !['gold', 'wine', 'satin', 'porcelain'].includes(h.iconSet)) {
         showValidation('Selecciona un modelo válido para los íconos.');
         return;
       }
-      if (changedTheme.header && h.iconSet === 'custom' && !['account', 'favorites', 'cart'].every((kind) =>
-        /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(h.iconImages?.[kind] || '')
+      if (changedTheme.header && (!Number.isInteger(h.iconSizePx) || h.iconSizePx < 28 || h.iconSizePx > 40)) {
+        showValidation('El tamaño de los íconos debe estar entre 28 y 40 px.');
+        return;
+      }
+      if (changedTheme.header && !Object.values(h.iconOverrides || {}).every((icons) =>
+        Object.values(icons || {}).every((url) => !url || /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url))
       )) {
-        showValidation('Carga las tres imágenes de los iconos en Cloudinary antes de guardar.');
+        showValidation('Carga las imágenes personalizadas en Cloudinary.');
         return;
       }
 

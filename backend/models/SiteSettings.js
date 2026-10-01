@@ -289,8 +289,15 @@ const ThemeSchema = new Schema(
 
       iconColor: String,
       iconHoverColor: String,
-      iconSet: { type: String, enum: ['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence', 'rose', 'noir', 'custom'], default: 'rose' },
+      iconSet: { type: String, enum: ['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence', 'rose', 'noir', 'custom', 'gold', 'wine', 'satin', 'porcelain'], default: 'gold' },
       iconImages: { account: String, favorites: String, cart: String },
+      iconOverrides: {
+        gold: { account: String, favorites: String, cart: String },
+        wine: { account: String, favorites: String, cart: String },
+        satin: { account: String, favorites: String, cart: String },
+        porcelain: { account: String, favorites: String, cart: String },
+      },
+      iconSizePx: { type: Number, min: 28, max: 40, default: 34 },
 
       menuAnimation: String,
       iconAnimation: String,

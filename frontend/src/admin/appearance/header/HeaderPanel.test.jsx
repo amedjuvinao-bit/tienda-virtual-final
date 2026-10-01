@@ -97,38 +97,53 @@ describe('edición del encabezado', () => {
     expect(header).toHaveAttribute('data-glass', 'false');
   });
 
-  it('muestra los dos acabados tridimensionales en escritorio y móvil', async () => {
+  it('muestra cuatro juegos distintos en escritorio y móvil con tamaño fiel', async () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
     const options = within(screen.getByRole('group', { name: 'Modelo de íconos' })).getAllByRole('button');
-    expect(options).toHaveLength(3);
+    expect(options).toHaveLength(4);
     const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
-    await user.click(gallery.getByRole('button', { name: /Cristal rosa/ }));
+    await user.click(gallery.getByRole('button', { name: /Oro satinado/ }));
     const favorite = within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img');
-    expect(favorite).toHaveAttribute('data-icon-style', 'rose');
-    expect(favorite.getAttribute('src')).toContain('rose-favorites');
-    await user.click(gallery.getByRole('button', { name: /Noir dorado/ }));
+    expect(favorite).toHaveAttribute('data-icon-style', 'gold');
+    expect(favorite.getAttribute('src')).toContain('gold-favorites');
+    await user.click(gallery.getByRole('button', { name: /Esmalte vino/ }));
     const cart = within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img');
-    expect(cart).toHaveAttribute('data-icon-style', 'noir');
-    expect(cart.getAttribute('src')).toContain('noir-cart');
+    expect(cart).toHaveAttribute('data-icon-style', 'wine');
+    expect(cart.getAttribute('src')).toContain('wine-cart');
+    await user.click(gallery.getByRole('button', { name: /Satén rosa/ }));
+    expect(cart.getAttribute('src')).toContain('satin-cart');
+    await user.click(gallery.getByRole('button', { name: /Porcelana rosa/ }));
+    expect(cart.getAttribute('src')).toContain('porcelain-cart');
+    fireEvent.change(screen.getByRole('slider', { name: /Tamaño en la tienda/ }), { target: { value: '30' } });
+    expect(preview.querySelector('.appearance-header__store-header').style.getPropertyValue('--storefront-action-size')).toBe('30px');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
-    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img')).toHaveAttribute('data-icon-style', 'noir');
+    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img')).toHaveAttribute('data-icon-style', 'porcelain');
   });
 
-  it('carga iconos propios y los refleja en la vista previa', async () => {
+  it('carga cada icono por separado y lo conserva solo en el juego elegido', async () => {
     const user = userEvent.setup();
     const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
     render(<Editor upload={upload} />);
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
-    await user.click(screen.getByRole('button', { name: /Mis imágenes/ }));
+    const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
+    await user.click(gallery.getByRole('button', { name: /Satén rosa/ }));
     await user.upload(screen.getByLabelText('Seleccionar imagen para Icono de Cuenta'), new File(['icono'], 'cuenta.webp', { type: 'image/webp' }));
     expect(upload).toHaveBeenCalled();
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img'))
       .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img').getAttribute('src')).toContain('satin-favorites');
+    await user.click(gallery.getByRole('button', { name: /Esmalte vino/ }));
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img').getAttribute('src')).toContain('wine-account');
+    await user.click(gallery.getByRole('button', { name: /Satén rosa/ }));
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img'))
+      .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
+    await user.click(screen.getByRole('button', { name: /Quitar/ }));
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img').getAttribute('src')).toContain('satin-account');
   });
 });

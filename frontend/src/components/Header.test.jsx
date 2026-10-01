@@ -81,16 +81,17 @@ describe('encabezado de la tienda', () => {
   it('usa los iconos tridimensionales guardados en escritorio y móvil sin contenedores', async () => {
     fetchSiteSettings.mockResolvedValue({
       ...settings('Lo Nuevo'),
-      theme: { header: { ...settings('Lo Nuevo').theme.header, iconSet: 'noir' } },
+      theme: { header: { ...settings('Lo Nuevo').theme.header, iconSet: 'wine', iconSizePx: 32 } },
     });
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByRole('banner').querySelector('[data-icon-style="noir"]')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('banner').querySelector('[data-icon-style="wine"]')).toBeInTheDocument());
+    expect(screen.getByRole('banner').style.getPropertyValue('--storefront-action-size')).toBe('32px');
     const cartButtons = screen.getAllByRole('button', { name: 'Abrir carrito' });
     expect(cartButtons).toHaveLength(2);
     cartButtons.forEach((button) => {
-      expect(button.querySelector('img')).toHaveAttribute('data-icon-style', 'noir');
-      expect(button.querySelector('img')).toHaveAttribute('width', '40');
-      expect(button.querySelector('img').getAttribute('src')).toContain('noir-cart');
+      expect(button.querySelector('img')).toHaveAttribute('data-icon-style', 'wine');
+      expect(button.querySelector('img')).toHaveAttribute('width', '34');
+      expect(button.querySelector('img').getAttribute('src')).toContain('wine-cart');
     });
   });
 
@@ -102,5 +103,15 @@ describe('encabezado de la tienda', () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Abrir carrito' })[0].querySelector('img')).toHaveAttribute('src', image));
     screen.getAllByRole('button', { name: 'Abrir carrito' }).forEach((button) => expect(button.querySelector('img')).toHaveAttribute('src', image));
+  });
+
+  it('aplica una imagen propia solo al icono elegido dentro del juego', async () => {
+    const image = 'https://res.cloudinary.com/tienda/image/upload/v1/corazon.webp';
+    fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: {
+      ...settings('Lo Nuevo').theme.header, iconSet: 'satin', iconOverrides: { satin: { favorites: image } },
+    } } });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Favoritos' })[0].querySelector('img')).toHaveAttribute('src', image));
+    expect(screen.getAllByRole('button', { name: 'Abrir carrito' })[0].querySelector('img').getAttribute('src')).toContain('satin-cart');
   });
 });

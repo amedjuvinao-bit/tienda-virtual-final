@@ -72,8 +72,10 @@ function buildDefaultSettings() {
         iconColor: "",
         iconHoverColor: "",
         iconAnimation: "soft",
-        iconSet: "rose",
+        iconSet: "gold",
         iconImages: { account: "", favorites: "", cart: "" },
+        iconOverrides: {},
+        iconSizePx: 34,
         fontPreset: "",
         fontFamily: "",
         fontSizePx: 16,
@@ -635,6 +637,20 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       if (!['account', 'favorites', 'cart'].every((kind) => validCloudinaryImage(iconImages?.[kind]))) {
         return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_IMAGES', message: 'Carga los tres iconos en Cloudinary antes de guardar.' });
       }
+    }
+    if (theme?.header?.iconOverrides !== undefined) {
+      const overrides = theme.header.iconOverrides;
+      const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
+      const validKinds = ['account', 'favorites', 'cart'];
+      const validSets = ['gold', 'wine', 'satin', 'porcelain'];
+      const valid = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+        && Object.entries(overrides).every(([set, images]) => validSets.includes(set)
+          && images && typeof images === 'object' && !Array.isArray(images)
+          && Object.entries(images).every(([kind, url]) => validKinds.includes(kind) && (url === '' || validCloudinaryImage(url))));
+      if (!valid) return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_OVERRIDES', message: 'Los iconos personalizados deben ser imágenes de Cloudinary.' });
+    }
+    if (theme?.header?.iconSizePx !== undefined && (!Number.isInteger(theme.header.iconSizePx) || theme.header.iconSizePx < 28 || theme.header.iconSizePx > 40)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_SIZE', message: 'El tamaño de los iconos debe estar entre 28 y 40 px.' });
     }
     if (isInvalidSettingsSection(menus)) {
       return res.status(400).json({ error: "menus debe ser un objeto" });

@@ -137,6 +137,7 @@ function Header() {
     ...headerSurface.style,
     '--header-icon-color': headerConfig.iconColor || headerConfig.textColor || (isDarkHeaderBackground(headerBgHex) ? '#ffffff' : '#9d4268'),
     '--header-icon-hover': headerConfig.iconHoverColor || '#c62d6a',
+    '--storefront-action-size': `${Math.max(28, Math.min(40, Number(headerConfig.iconSizePx) || 34))}px`,
     backgroundColor: `rgba(var(--header-bg-rgb, 255, 227, 236), ${headerSurface.opacity})`,
   };
 
@@ -445,14 +446,14 @@ function Header() {
                 onClick={() => navigate("/admin/login")}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="account" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
+                <HeaderActionGlyph kind="account" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
               </button>
 
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {favorites.length > 0 && (
                   <span className="storefront-action-badge">
                     {favorites.length}
@@ -464,7 +465,7 @@ function Header() {
                 onClick={() => setCartOpen(true)}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {cart.length > 0 && (
                   <span className="storefront-action-badge">
                     {cart.length}
@@ -501,7 +502,7 @@ function Header() {
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {favorites.length > 0 && (
                   <span className="storefront-action-badge">
                     {favorites.length}
@@ -513,7 +514,7 @@ function Header() {
                 onClick={() => setCartOpen(true)}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {cart.length > 0 && (
                   <span className="storefront-action-badge">
                     {cart.length}
