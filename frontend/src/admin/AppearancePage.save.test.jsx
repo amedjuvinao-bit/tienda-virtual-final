@@ -28,8 +28,7 @@ vi.mock('./appearance/header/HeaderPanel', () => ({
       setPath('header.cornerRadiusPx', 32);
       setPath('header.liquidGlassEnabled', true);
       setPath('header.glassStrength', 85);
-      setPath('header.iconSet', 'atelier');
-      setPath('header.iconFinish', 'jewel');
+      setPath('header.iconSet', 'silk');
     }}>Configurar vidrio</button>
   </>,
 }));
@@ -109,7 +108,7 @@ describe('guardado seguro de Apariencia', () => {
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
     expect(saveSiteSettings.mock.calls[0][0].theme.header).toMatchObject({
       surfaceShape: 'floating', cornerRadiusPx: 32, liquidGlassEnabled: true, glassStrength: 85,
-      iconSet: 'atelier', iconFinish: 'jewel',
+      iconSet: 'silk',
     });
   });
 

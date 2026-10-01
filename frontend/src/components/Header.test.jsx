@@ -78,18 +78,18 @@ describe('encabezado de la tienda', () => {
     expect(header.style.backgroundColor).toContain('0.62');
   });
 
-  it('usa el modelo y acabado guardados en escritorio y móvil', async () => {
+  it('usa los íconos finos guardados en escritorio y móvil sin contenedores', async () => {
     fetchSiteSettings.mockResolvedValue({
       ...settings('Lo Nuevo'),
-      theme: { header: { ...settings('Lo Nuevo').theme.header, iconSet: 'atelier', iconFinish: 'jewel', iconColor: '#da3977' } },
+      theme: { header: { ...settings('Lo Nuevo').theme.header, iconSet: 'silk', iconFinish: 'jewel', iconColor: '#da3977' } },
     });
     render(<MemoryRouter><Header /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole('banner').style.getPropertyValue('--header-icon-color')).toBe('#da3977'));
     const cartButtons = screen.getAllByRole('button', { name: 'Abrir carrito' });
     expect(cartButtons).toHaveLength(2);
     cartButtons.forEach((button) => {
-      expect(button).toHaveAttribute('data-finish', 'jewel');
-      expect(button.querySelector('svg')).toHaveClass('lucide-shopping-basket');
+      expect(button).not.toHaveAttribute('data-finish');
+      expect(button.querySelector('svg')).toHaveClass('lucide-shopping-bag');
     });
   });
 });

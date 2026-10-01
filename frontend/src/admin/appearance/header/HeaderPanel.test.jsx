@@ -90,17 +90,18 @@ describe('edición del encabezado', () => {
     expect(header).toHaveAttribute('data-glass', 'false');
   });
 
-  it('permite elegir símbolos y acabados con vista previa de escritorio y móvil', async () => {
+  it('permite elegir seis modelos finos sin contenedores y los muestra en escritorio y móvil', async () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
-    await user.click(within(screen.getByRole('group', { name: 'Modelo de íconos' })).getByRole('button', { name: /Atelier/ }));
-    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveClass('lucide-shopping-basket');
-    await user.click(within(screen.getByRole('group', { name: 'Acabado de íconos' })).getByRole('button', { name: /Joya/ }));
-    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' })).toHaveAttribute('data-finish', 'jewel');
+    const options = within(screen.getByRole('group', { name: 'Modelo de íconos' })).getAllByRole('button');
+    expect(options).toHaveLength(6);
+    await user.click(within(screen.getByRole('group', { name: 'Modelo de íconos' })).getByRole('button', { name: /Seda/ }));
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveClass('lucide-user-round');
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' })).not.toHaveAttribute('data-finish');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
-    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveClass('lucide-shopping-basket');
+    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveClass('lucide-shopping-bag');
   });
 });

@@ -289,8 +289,7 @@ const ThemeSchema = new Schema(
 
       iconColor: String,
       iconHoverColor: String,
-      iconSet: { type: String, enum: ['classic', 'boutique', 'atelier'], default: 'boutique' },
-      iconFinish: { type: String, enum: ['minimal', 'glass', 'jewel'], default: 'glass' },
+      iconSet: { type: String, enum: ['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence'], default: 'boutique' },
 
       menuAnimation: String,
       iconAnimation: String,

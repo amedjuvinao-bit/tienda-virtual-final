@@ -443,16 +443,16 @@ function Header() {
             <div className="header-icons flex shrink-0 items-center gap-2 text-xl xl:gap-3">
               <button type="button" aria-label="Administración"
                 onClick={() => navigate("/admin/login")}
-                className="storefront-action-button" data-finish={iconPresentation.finish}
+                className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="account" iconSet={iconPresentation.set} />
+                <HeaderActionGlyph kind="account" iconSet={iconPresentation} />
               </button>
 
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="storefront-action-button" data-finish={iconPresentation.finish}
+                className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation.set} />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} />
                 {favorites.length > 0 && (
                   <span className="storefront-action-badge">
                     {favorites.length}
@@ -462,9 +462,9 @@ function Header() {
 
               <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="storefront-action-button" data-finish={iconPresentation.finish}
+                className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="cart" iconSet={iconPresentation.set} />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} />
                 {cart.length > 0 && (
                   <span className="storefront-action-badge">
                     {cart.length}
@@ -499,9 +499,9 @@ function Header() {
             <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2">
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="storefront-action-button" data-finish={iconPresentation.finish}
+                className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation.set} />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} />
                 {favorites.length > 0 && (
                   <span className="storefront-action-badge">
                     {favorites.length}
@@ -511,9 +511,9 @@ function Header() {
 
               <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="storefront-action-button" data-finish={iconPresentation.finish}
+                className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="cart" iconSet={iconPresentation.set} />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} />
                 {cart.length > 0 && (
                   <span className="storefront-action-badge">
                     {cart.length}

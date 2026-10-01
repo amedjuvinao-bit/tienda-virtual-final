@@ -41,9 +41,9 @@ export default function HeaderPreview({ theme, menus }) {
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
           {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <span key={`${link.to}-${index}`}>{link.name}</span>) : <em>Tu menú aparecerá aquí</em>}</nav>}
           <div className="appearance-header__actions">
-            {!mobile && <button type="button" className="storefront-action-button" data-finish={icons.finish} aria-label="Administración (vista previa)"><HeaderActionGlyph kind="account" iconSet={icons.set} /></button>}
-            <button type="button" className="storefront-action-button" data-finish={icons.finish} aria-label="Favoritos (vista previa)"><HeaderActionGlyph kind="favorites" iconSet={icons.set} /></button>
-            <button type="button" className="storefront-action-button" data-finish={icons.finish} aria-label="Carrito (vista previa)"><HeaderActionGlyph kind="cart" iconSet={icons.set} /></button>
+            {!mobile && <button type="button" className="storefront-action-button" aria-label="Administración (vista previa)"><HeaderActionGlyph kind="account" iconSet={icons} /></button>}
+            <button type="button" className="storefront-action-button" aria-label="Favoritos (vista previa)"><HeaderActionGlyph kind="favorites" iconSet={icons} /></button>
+            <button type="button" className="storefront-action-button" aria-label="Carrito (vista previa)"><HeaderActionGlyph kind="cart" iconSet={icons} /></button>
           </div>
         </div>
         {mobile && drawerOpen && <div className="appearance-header__drawer" style={{ backgroundColor: header.mobileMenuBgColor || '#fffdfd', color: header.mobileMenuTextColor || '#1f1f1f', fontFamily: header.mobileMenuFontFamily || typography.fontFamily, fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>

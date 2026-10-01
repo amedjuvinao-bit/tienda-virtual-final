@@ -301,7 +301,6 @@ function buildThemeFromServer(themeRaw) {
       iconHoverColor: "",
       iconAnimation: "soft",
       iconSet: "boutique",
-      iconFinish: "glass",
 
       fontPreset: "",
       fontFamily: "",
@@ -786,8 +785,8 @@ export default function AppearancePage() {
         return;
       }
 
-      if (changedTheme.header && (!['classic', 'boutique', 'atelier'].includes(h.iconSet) || !['minimal', 'glass', 'jewel'].includes(h.iconFinish))) {
-        showValidation('Selecciona un modelo y un acabado válidos para los íconos.');
+      if (changedTheme.header && !['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence'].includes(h.iconSet)) {
+        showValidation('Selecciona un modelo válido para los íconos.');
         return;
       }
 
