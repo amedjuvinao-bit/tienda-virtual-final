@@ -26,16 +26,16 @@ export const HEADER_FONT_PRESETS = {
     family: '"Playfair Display", Georgia, serif', weight: 500, style: 'normal', spacing: '-0.02em', transform: 'none',
   },
   modern: {
-    label: 'Contemporáneo', description: 'Mayúsculas espaciadas.',
-    family: 'Manrope, system-ui, sans-serif', weight: 600, style: 'normal', spacing: '0.1em', transform: 'uppercase',
+    label: 'Condensado', description: 'Trazo estrecho en mayúsculas.',
+    family: '"Barlow Condensed", "Arial Narrow", sans-serif', weight: 600, style: 'normal', spacing: '0.08em', transform: 'uppercase',
   },
   elegant: {
-    label: 'Alta costura', description: 'Cursiva ligera.',
-    family: '"Cormorant Garamond", Georgia, serif', weight: 600, style: 'italic', spacing: '0.02em', transform: 'none',
+    label: 'Firma', description: 'Caligrafía fluida.',
+    family: '"Dancing Script", cursive', weight: 600, style: 'normal', spacing: '0', transform: 'none',
   },
   cute: {
-    label: 'Esencial', description: 'Geometría discreta.',
-    family: '"Space Grotesk", system-ui, sans-serif', weight: 500, style: 'normal', spacing: '-0.025em', transform: 'none',
+    label: 'Atelier', description: 'Monoespaciada de estudio.',
+    family: '"IBM Plex Mono", ui-monospace, monospace', weight: 500, style: 'normal', spacing: '-0.035em', transform: 'none',
   },
 };
 

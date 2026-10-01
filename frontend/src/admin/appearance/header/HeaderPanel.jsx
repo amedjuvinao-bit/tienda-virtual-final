@@ -375,7 +375,7 @@ export default function HeaderPanel({
             <div className="space-y-4">
               {stylesSubTab === "tipografia" && (
                 <PanelBlock title="Personalidad del menú" columns={1}>
-                  <p className="appearance-header__font-intro">Compara las letras a tamaño de menú. La vista previa de arriba muestra el resultado en tu tienda.</p>
+                  <p className="appearance-header__font-intro">Cuatro formas de letra distintas, mostradas a tamaño de menú. Elige una y mira arriba cómo queda.</p>
                   <div className="appearance-header__font-grid" role="group" aria-label="Modelos de tipografía">
                     {Object.entries(HEADER_FONT_PRESETS).map(([key, preset]) => (
                       <button key={key} type="button" className="appearance-header__font-option"

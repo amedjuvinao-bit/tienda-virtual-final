@@ -68,17 +68,17 @@ describe('edición del encabezado', () => {
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     const nav = within(preview).getByRole('navigation', { name: 'Vista previa del menú' });
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
-    await user.click(screen.getByRole('button', { name: /Contemporáneo/ }));
-    expect(nav).toHaveStyle({ fontWeight: '600', letterSpacing: '0.1em', textTransform: 'uppercase' });
-    expect(nav.parentElement).toHaveStyle({ fontFamily: 'Manrope, system-ui, sans-serif' });
+    await user.click(screen.getByRole('button', { name: /Condensado/ }));
+    expect(nav).toHaveStyle({ fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase' });
+    expect(nav.parentElement).toHaveStyle({ fontFamily: '"Barlow Condensed", "Arial Narrow", sans-serif' });
     await user.type(screen.getByPlaceholderText('"Playfair Display", Georgia, serif'), 'Arial');
     expect(nav.parentElement).toHaveStyle({ fontFamily: 'Arial' });
-    await user.click(screen.getByRole('button', { name: /Alta costura/ }));
-    expect(nav.parentElement).toHaveStyle({ fontFamily: '"Cormorant Garamond", Georgia, serif' });
-    expect(nav).toHaveStyle({ fontStyle: 'italic', letterSpacing: '0.02em', textTransform: 'none' });
-    await user.click(screen.getByRole('button', { name: /Esencial/ }));
-    expect(nav.parentElement).toHaveStyle({ fontFamily: '"Space Grotesk", system-ui, sans-serif' });
-    expect(nav).toHaveStyle({ fontWeight: '500', fontStyle: 'normal', textTransform: 'none' });
+    await user.click(screen.getByRole('button', { name: /Firma/ }));
+    expect(nav.parentElement).toHaveStyle({ fontFamily: '"Dancing Script", cursive' });
+    expect(nav).toHaveStyle({ fontStyle: 'normal', textTransform: 'none' });
+    await user.click(screen.getByRole('button', { name: /Atelier/ }));
+    expect(nav.parentElement).toHaveStyle({ fontFamily: '"IBM Plex Mono", ui-monospace, monospace' });
+    expect(nav).toHaveStyle({ fontWeight: '500', letterSpacing: '-0.035em', textTransform: 'none' });
   });
 
   it('cambia forma, redondeo y vidrio de la vista previa antes de guardar', async () => {
