@@ -141,7 +141,7 @@ function Header() {
     []
   );
 
-  const chosenLogo = useMemo(() => resolveHeaderLogo({ bgColor: headerBgHex, logoLight, logoDark }), [headerBgHex, logoLight, logoDark]);
+  const chosenLogo = useMemo(() => resolveHeaderLogo({ bgColor: headerBgHex, logoLight, logoDark, logoMode: headerConfig.logoMode }), [headerBgHex, logoLight, logoDark, headerConfig.logoMode]);
   const alternateLogo = chosenLogo === logoLight ? logoDark : logoLight;
 
   const logoStyle = useMemo(

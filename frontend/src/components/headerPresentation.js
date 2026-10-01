@@ -11,6 +11,8 @@ export function isDarkHeaderBackground(bgColor) {
 }
 
 export function resolveHeaderLogo(header = {}, fallback = '') {
+  if (header.logoMode === 'light') return header.logoLight || header.logoDark || fallback;
+  if (header.logoMode === 'dark') return header.logoDark || header.logoLight || fallback;
   const bg = String(header.bgColor || '').trim();
   if (!HEX_COLOR.test(bg)) return header.logoLight || header.logoDark || fallback;
   return isDarkHeaderBackground(bg)

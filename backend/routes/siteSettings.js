@@ -77,6 +77,7 @@ function buildDefaultSettings() {
         fontSizePx: 16,
         logoLight: "",
         logoDark: "",
+        logoMode: "auto",
         logoHeightPx: 80,
       },
 

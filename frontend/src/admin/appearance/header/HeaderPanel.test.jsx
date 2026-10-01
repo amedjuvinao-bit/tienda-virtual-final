@@ -28,6 +28,12 @@ describe('edición del encabezado', () => {
     await user.clear(screen.getByPlaceholderText('#FFFFFF'));
     await user.type(screen.getByPlaceholderText('#FFFFFF'), '#ffffff');
     expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/oscuro.png');
+    await user.click(screen.getByRole('button', { name: 'Logo' }));
+    await user.click(screen.getByRole('button', { name: /Logo claro Siempre priorizar claro/ }));
+    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/claro.png');
+    expect(screen.getByRole('button', { name: /Logo claro Siempre priorizar claro/ })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: /Logo oscuro Siempre priorizar oscuro/ }));
+    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/oscuro.png');
     await user.click(screen.getByRole('button', { name: /Enlaces Destinos/ }));
     await user.clear(screen.getByPlaceholderText('Ej: Lo Nuevo'));
     await user.type(screen.getByPlaceholderText('Ej: Lo Nuevo'), 'Colección');

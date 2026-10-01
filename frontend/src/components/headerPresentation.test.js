@@ -7,6 +7,8 @@ describe('encabezado público y editor', () => {
     expect(resolveHeaderLogo({ ...logos, bgColor: '#18181b' })).toBe('/claro.png');
     expect(resolveHeaderLogo({ ...logos, bgColor: '#fff' })).toBe('/oscuro.png');
     expect(resolveHeaderLogo({ bgColor: '#fff', logoLight: '/solo.png' })).toBe('/solo.png');
+    expect(resolveHeaderLogo({ ...logos, bgColor: '#fff', logoMode: 'light' })).toBe('/claro.png');
+    expect(resolveHeaderLogo({ ...logos, bgColor: '#18181b', logoMode: 'dark' })).toBe('/oscuro.png');
   });
 
   it('acepta páginas y URL externas, y evita rutas internas y protocolos inseguros', () => {

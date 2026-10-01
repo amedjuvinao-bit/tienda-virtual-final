@@ -152,7 +152,12 @@ export default function HeaderPanel({
   const [brandingSubTab, setBrandingSubTab] = useState("logo");
   const [stylesSubTab, setStylesSubTab] = useState("tipografia");
   const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
-  const preferredLogo = isDarkHeaderBackground(theme.header?.bgColor) ? 'claro' : 'oscuro';
+  const logoMode = theme.header?.logoMode || 'auto';
+  const preferredLogo = logoMode === 'auto'
+    ? (isDarkHeaderBackground(theme.header?.bgColor) ? 'claro' : 'oscuro')
+    : (logoMode === 'light' ? 'claro' : 'oscuro');
+  const lightLogo = theme.header?.logoLight || theme.logo?.light || '';
+  const darkLogo = theme.header?.logoDark || theme.logo?.dark || '';
 
   return (
     <div className="appearance-header min-w-0">
@@ -206,7 +211,21 @@ export default function HeaderPanel({
                         onChange={(url) => setPath('header.logoDark', url)} onUpload={uploadToCloudinaryViaBackend}
                         uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} /></div>
                   </div>
-                  <p className="appearance-header__logo-current">Con el fondo actual se muestra primero el <strong>logo {preferredLogo}</strong>. Si falta, se utiliza la otra versión.</p>
+                  <div className="appearance-header__logo-choice">
+                    <strong>¿Qué logo debe mostrar el encabezado?</strong>
+                    <div role="group" aria-label="Versión de logo visible" className="appearance-header__logo-options">
+                      {[
+                        { value: 'auto', title: 'Automático', detail: 'Según el color del fondo' },
+                        { value: 'light', title: 'Logo claro', detail: 'Siempre priorizar claro' },
+                        { value: 'dark', title: 'Logo oscuro', detail: 'Siempre priorizar oscuro' },
+                      ].map(({ value, title, detail }) => <button type="button" key={value} aria-pressed={logoMode === value}
+                        onClick={() => setPath('header.logoMode', value)}><strong>{title}</strong><small>{detail}</small></button>)}
+                    </div>
+                    <p className="appearance-header__logo-current">Ahora se prioriza el <strong>logo {preferredLogo}</strong>.{logoMode === 'auto' && ' En fondos transparentes puedes elegir una versión fija.'}</p>
+                    {preferredLogo === 'claro' && !lightLogo && darkLogo && <p role="status" className="appearance-header__logo-warning">No has cargado el logo claro. Se verá el oscuro hasta que lo cargues.</p>}
+                    {preferredLogo === 'oscuro' && !darkLogo && lightLogo && <p role="status" className="appearance-header__logo-warning">No has cargado el logo oscuro. Se verá el claro hasta que lo cargues.</p>}
+                    {lightLogo && darkLogo && lightLogo === darkLogo && <p role="status" className="appearance-header__logo-warning">Ambas versiones usan la misma imagen. Carga archivos diferentes para ver el cambio.</p>}
+                  </div>
 
                   <PanelBlock title="Tamaño del logo" columns={1}>
                     <div className="rounded-2xl border bg-white p-4">

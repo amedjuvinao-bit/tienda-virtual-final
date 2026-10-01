@@ -299,6 +299,7 @@ const ThemeSchema = new Schema(
 
       logoLight: String,
       logoDark: String,
+      logoMode: { type: String, enum: ["auto", "light", "dark"], default: "auto" },
 
       logoHeightPx: Number,
     },

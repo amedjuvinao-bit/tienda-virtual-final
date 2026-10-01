@@ -54,4 +54,14 @@ describe('encabezado de la tienda', () => {
     fireEvent.error(screen.getAllByAltText('Logo Rosa Boutique')[0]);
     expect(screen.getAllByRole('img', { name: 'Rosa Boutique' })[0]).toHaveTextContent('Rosa Boutique');
   });
+
+  it('respeta la versión clara elegida aunque el fondo sea claro', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      ...settings('Lo Nuevo'),
+      theme: { header: { bgColor: '#ffffff', logoMode: 'light', logoLight: '/claro.png', logoDark: '/oscuro.png' } },
+    });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const image = (await screen.findAllByAltText('Logo Rosa Boutique'))[0];
+    expect(image).toHaveAttribute('src', '/claro.png');
+  });
 });

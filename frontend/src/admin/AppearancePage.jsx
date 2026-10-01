@@ -307,6 +307,7 @@ function buildThemeFromServer(themeRaw) {
 
       logoLight: "",
       logoDark: "",
+      logoMode: "auto",
       logoHeightPx: 80,
 
       // ✅ NUEVO: menú móvil premium
