@@ -47,28 +47,13 @@ const ColorInput = ({ value, onChange }) => {
   );
 };
 
-const SectionHeader = ({ title, description, onPreview }) => (
-  <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+const SectionHeader = ({ title, description }) => (
+  <div className="mb-3">
     <div>
       <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
       <p className="mt-1 text-sm text-gray-500">{description}</p>
     </div>
 
-    <button
-      type="button"
-      onClick={onPreview}
-      className="inline-flex shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
-      title="Aplica cambios en vista previa"
-    >
-      Ver cambios
-    </button>
-  </div>
-);
-
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
   </div>
 );
 
@@ -76,15 +61,12 @@ const MainTabButton = ({ active, label, description, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      "rounded-2xl border px-4 py-3 text-left transition-all duration-200",
-      active
-        ? "border-pink-300 bg-gradient-to-r from-pink-50 to-rose-50 shadow-sm"
-        : "border-gray-200 bg-white hover:border-pink-200 hover:bg-pink-50/40",
-    ].join(" ")}
+    className="appearance-panel-main-tab"
+    aria-pressed={active}
+    data-active={active}
   >
-    <div className="text-sm font-semibold text-gray-900">{label}</div>
-    <div className="mt-1 text-xs leading-5 text-gray-500">{description}</div>
+    <strong>{label}</strong>
+    <small>{description}</small>
   </button>
 );
 
@@ -92,12 +74,9 @@ const SubTabButton = ({ active, label, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      "rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200",
-      active
-        ? "border-pink-300 bg-pink-600 text-white shadow-sm"
-        : "border-gray-200 bg-white text-gray-700 hover:border-pink-200 hover:text-pink-700",
-    ].join(" ")}
+    className="appearance-panel-sub-tab"
+    aria-pressed={active}
+    data-active={active}
   >
     {label}
   </button>
@@ -123,7 +102,6 @@ export default function HeaderPanel({
   menus,
   routeOptions,
   uploading,
-  onPreview,
   onUploadLogo,
   setLogoLightFile,
   setLogoDarkFile,
@@ -167,15 +145,14 @@ export default function HeaderPanel({
   const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div className="rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
+    <div className="min-w-0">
+      <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
         <SectionHeader
-          title="Header"
-          description="Organiza el logo, fondo, tipografía, estilos del menú y la configuración responsive del header sin sobrecargar al usuario."
-          onPreview={onPreview}
+          title="Logo y menú"
+          description="Elige qué parte del encabezado quieres cambiar."
         />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {mainTabs.map((tab) => (
             <MainTabButton
               key={tab.id}
@@ -189,15 +166,8 @@ export default function HeaderPanel({
 
         <fieldset disabled={!canEditTheme}>
         {activeMainTab === "branding" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo visual"
-                text="Primero define el logo y su tamaño. Después sube archivos o pega las URLs. Al final ajusta el fondo y la transparencia del header."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={brandingSubTab === "logo"}
                 label="Logo"
@@ -403,15 +373,8 @@ export default function HeaderPanel({
         )}
 
         {activeMainTab === "styles" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo de diseño"
-                text="Aquí separé la fuente del header, el estilo del menú y el estilo de los íconos para que el usuario solo abra el grupo que necesita y no haga scroll innecesario."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={stylesSubTab === "tipografia"}
                 label="Tipografía"
@@ -545,15 +508,8 @@ export default function HeaderPanel({
         )}
 
         {activeMainTab === "responsive" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Responsive y menú móvil"
-                text="Aquí defines cómo se comporta el header en pantallas pequeñas: estilo del botón hamburguesa, transición del panel, fondo, bordes, botones y acabados visuales."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={responsiveSubTab === "estructura"}
                 label="Estructura"
@@ -1214,14 +1170,7 @@ export default function HeaderPanel({
 
         <fieldset disabled={!canEditMenus}>
         {activeMainTab === "menu" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo funcional"
-                text="Toda la administración de botones del menú quedó concentrada en un solo bloque, con más ancho útil y sin competir con otros formularios del header."
-              />
-            </div>
-
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>

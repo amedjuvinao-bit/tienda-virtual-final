@@ -13,7 +13,6 @@ import { API_BASE_URL } from "../config/apiBaseUrl";
 import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
-import AdminModuleHero from "./components/AdminModuleHero";
 import "./appearance/appearanceWorkspace.css";
 import useAdminPermissions from './security/useAdminPermissions';
 import {
@@ -954,11 +953,11 @@ export default function AppearancePage() {
   }
 
   const tabs = [
-    { id: "general", label: "General", detail: "WhatsApp, carga y navegación", icon: Palette, help: "Configura los controles que acompañan a toda la tienda." },
-    { id: "header", label: "Encabezado", detail: "Logo y menú", icon: LayoutTemplate, help: "Organiza el logo, los enlaces y el menú móvil." },
-    { id: "banner", label: "Banner", detail: "Portada de inicio", icon: Image, help: "Elige la imagen, el video o las diapositivas de la portada." },
-    { id: "sections", label: "Secciones", detail: "Contenido de inicio", icon: Rows3, help: "Ordena el contenido que aparece debajo de la portada." },
-    { id: "footer", label: "Pie de página", detail: "Información final", icon: Type, help: "Edita la información y los enlaces del final de cada página." },
+    { id: "general", label: "General", detail: "WhatsApp y carga", icon: Palette, help: "Configura WhatsApp, navegación y pantalla de carga." },
+    { id: "header", label: "Encabezado", detail: "Logo y menú", icon: LayoutTemplate, help: "Configura el logo y los enlaces del menú." },
+    { id: "banner", label: "Portada", detail: "Imagen o video", icon: Image, help: "Configura la primera imagen o video que ve el cliente." },
+    { id: "sections", label: "Secciones", detail: "Página de inicio", icon: Rows3, help: "Organiza el contenido debajo de la portada." },
+    { id: "footer", label: "Pie de página", detail: "Datos y enlaces", icon: Type, help: "Configura la información del final de la tienda." },
   ];
   const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
   const canEditCurrentArea = activeTab === 'sections'
@@ -968,7 +967,7 @@ export default function AppearancePage() {
       : canEditAppearance;
 
   return (
-    <div className="appearance-workspace mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+    <div className="appearance-workspace mx-auto max-w-6xl p-4 md:p-6">
       {saveConflict && (
         <div className="admin-widget-surface rounded-2xl p-4" role="alert">
           <p>La Apariencia guardada cambió mientras editabas. Tus cambios siguen en este panel; no se sobrescribió la versión guardada.</p>
@@ -977,13 +976,13 @@ export default function AppearancePage() {
           </button>
         </div>
       )}
-      <AdminModuleHero
-        icon={Palette}
-        eyebrow="Identidad visual de la tienda"
-        title="Apariencia del sitio"
-        description="Elige un área, ajusta su contenido y guarda al terminar. Puedes cambiar de área sin perder lo que estás editando."
-      >
-        <nav className="admin-module-hero__metrics appearance-navigation" aria-label="Áreas de apariencia">
+      <header className="appearance-workspace__header">
+        <div>
+          <h1>Apariencia de la tienda</h1>
+          <p>{currentTab.help}</p>
+        </div>
+      </header>
+        <nav className="appearance-navigation" aria-label="Áreas de apariencia">
           {tabs.map((tab) => {
             const TabIcon = tab.icon;
             const selected = activeTab === tab.id;
@@ -991,12 +990,12 @@ export default function AppearancePage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="admin-module-hero__metric admin-module-hero__nav-card"
+                className="appearance-navigation__item"
                 data-active={selected}
                 aria-pressed={selected}
                 type="button"
               >
-                <TabIcon size={19} />
+                <TabIcon size={18} aria-hidden="true" />
                 <span>
                   <strong>{tab.label}</strong>
                   <small>{tab.detail}</small>
@@ -1006,26 +1005,27 @@ export default function AppearancePage() {
             );
           })}
         </nav>
-      </AdminModuleHero>
-
-      <div className="appearance-progress" role="status" aria-live="polite">
-        <span className="appearance-progress__marker" data-dirty={changedAreas.length > 0} />
-        <div>
-          <strong>{saving ? 'Guardando cambios…' : changedAreas.length ? `${changedAreas.length} ${changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar` : 'Todo está guardado'}</strong>
-          <p>{changedAreas.length ? `Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.` : 'Selecciona un área para editar la tienda.'}</p>
+      <div className="appearance-action-bar">
+        <div className="appearance-action-bar__inner">
+          <div className="appearance-action-bar__status" data-feedback={saveMessage?.type || ''} role="status" aria-live="polite">
+            <span className="appearance-action-bar__marker" data-dirty={changedAreas.length > 0} />
+            <div>
+              <strong>{saving ? 'Guardando…' : changedAreas.length ? `${changedAreas.length} ${changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar` : 'Todo está guardado'}</strong>
+              <small>{saveMessage ? saveMessage.text : !canEditCurrentArea ? 'Esta área es de solo lectura para tu perfil.' : changedAreas.length ? `Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.` : 'Los cambios se publican al guardar.'}</small>
+            </div>
+          </div>
+          <div className="appearance-action-bar__buttons">
+            <button onClick={onPreview} disabled={saving || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" title="Aplica el diseño en esta pantalla sin guardarlo"><Eye size={17} /> Aplicar aquí</button>
+            <button onClick={onReset} disabled={saving || saveConflict || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button"><RotateCcw size={17} /> Descartar cambios</button>
+            <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length} className="appearance-action appearance-action--primary" type="button"><Save size={17} /> {saving ? 'Guardando…' : 'Guardar cambios'}</button>
+          </div>
         </div>
       </div>
 
       {/* Contenido */}
-      <main className="admin-widget-surface min-w-0 overflow-hidden rounded-[28px] border">
-        <div className="appearance-editor-heading">
-          <div><span>Área seleccionada</span><h2>{currentTab.label}</h2><p>{currentTab.help}</p></div>
-          {!canEditCurrentArea
-            ? <strong className="appearance-editor-heading__badge">Solo lectura</strong>
-            : changedAreas.includes(activeTab) && <strong className="appearance-editor-heading__badge">Cambios sin guardar</strong>}
-        </div>
+      <main className="appearance-workspace__editor min-w-0">
         <fieldset disabled={saving} className="min-w-0">
-        <div className="p-4 md:p-5 min-w-0">
+        <div className="min-w-0">
           {/* GENERAL */}
           {activeTab === "general" && <fieldset disabled={!canEditAppearance}><GeneralPanel theme={theme} setPath={setPath} /></fieldset>}
 
@@ -1037,7 +1037,6 @@ export default function AppearancePage() {
               menus={menus}
               routeOptions={routeOptions}
               uploading={uploading}
-              onPreview={onPreview}
               onUploadLogo={onUploadLogo}
               setLogoLightFile={setLogoLightFile}
               setLogoDarkFile={setLogoDarkFile}
@@ -1092,39 +1091,6 @@ export default function AppearancePage() {
         </div>
         </fieldset>
       </main>
-        <div className="appearance-action-bar">
-          <div className="appearance-action-bar__inner">
-            <p className={saveMessage ? `appearance-action-bar__message appearance-action-bar__message--${saveMessage.type}` : ''} role="status" aria-live="polite">
-              {saveMessage ? saveMessage.text : <>Vista previa aplica el diseño solo en esta sesión. <strong>Guardar cambios</strong> lo publica en la tienda.</>}
-            </p>
-            <div className="appearance-action-bar__buttons">
-              <button
-                onClick={onPreview}
-                disabled={saving || !changedAreas.length}
-                className="appearance-action appearance-action--secondary"
-                type="button"
-              >
-                <Eye size={17} /> Vista previa
-              </button>
-              <button
-                onClick={onSave}
-                disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length}
-                className="appearance-action appearance-action--primary"
-                type="button"
-              >
-                <Save size={17} /> {saving ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-              <button
-                onClick={onReset}
-                disabled={saving || saveConflict || !changedAreas.length}
-                className="appearance-action appearance-action--secondary"
-                type="button"
-              >
-                <RotateCcw size={17} /> Descartar cambios
-              </button>
-            </div>
-          </div>
-        </div>
     </div>
   );
 }

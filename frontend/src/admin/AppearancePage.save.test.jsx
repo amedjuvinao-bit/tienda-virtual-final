@@ -57,7 +57,7 @@ describe('guardado seguro de Apariencia', () => {
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
     expect(screen.getByRole('button', { name: 'Cambiar WhatsApp' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: /Secciones Contenido de inicio/ }));
+    await user.click(screen.getByRole('button', { name: /Secciones Página de inicio/ }));
     expect(screen.getByRole('button', { name: 'Cambiar sección' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Cambiar sección' }));
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
@@ -125,7 +125,7 @@ describe('guardado seguro de Apariencia', () => {
     window.dispatchEvent(unloadEvent);
     expect(unloadEvent.defaultPrevented).toBe(true);
 
-    await user.click(screen.getByRole('button', { name: /Secciones Contenido de inicio/ }));
+    await user.click(screen.getByRole('button', { name: /Secciones Página de inicio/ }));
     await user.click(screen.getByRole('button', { name: 'Cambiar sección' }));
     expect(screen.getByText('2 áreas pendientes por guardar')).toBeInTheDocument();
     expect(screen.getByText('Pendiente: General, Secciones.')).toBeInTheDocument();

@@ -39,6 +39,8 @@ describe('carga inicial de Apariencia', () => {
       await user.click(screen.getByRole('button', { name: 'Reintentar carga' }));
       expect(await screen.findByText('Editor general')).toBeInTheDocument();
       expect(fetchAppearanceSettings).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('heading', { name: 'Apariencia de la tienda' })).toBeInTheDocument();
+      expect(screen.queryByText('Área seleccionada')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
     } finally {
       consoleError.mockRestore();

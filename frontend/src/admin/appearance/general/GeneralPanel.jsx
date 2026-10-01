@@ -67,26 +67,16 @@ const SectionHeader = ({ title, description }) => (
   </div>
 );
 
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
-
 const MainTabButton = ({ active, label, description, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      "rounded-2xl border px-4 py-3 text-left transition-all duration-200",
-      active
-        ? "border-pink-300 bg-gradient-to-r from-pink-50 to-rose-50 shadow-sm"
-        : "border-gray-200 bg-white hover:border-pink-200 hover:bg-pink-50/40",
-    ].join(" ")}
+    className="appearance-panel-main-tab"
+    aria-pressed={active}
+    data-active={active}
   >
-    <div className="text-sm font-semibold text-gray-900">{label}</div>
-    <div className="mt-1 text-xs leading-5 text-gray-500">{description}</div>
+    <strong>{label}</strong>
+    <small>{description}</small>
   </button>
 );
 
@@ -94,12 +84,9 @@ const SubTabButton = ({ active, label, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      "rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200",
-      active
-        ? "border-pink-300 bg-pink-600 text-white shadow-sm"
-        : "border-gray-200 bg-white text-gray-700 hover:border-pink-200 hover:text-pink-700",
-    ].join(" ")}
+    className="appearance-panel-sub-tab"
+    aria-pressed={active}
+    data-active={active}
   >
     {label}
   </button>
@@ -149,17 +136,14 @@ export default function GeneralPanel({ theme, setPath }) {
   const [loaderSubTab, setLoaderSubTab] = useState("basico");
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div className="rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-        <div className="mb-5">
-          <h2 className="text-xl font-semibold text-gray-900">Configuración general</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Organiza los elementos globales con una estructura más compacta, clara y rápida de
-            usar.
-          </p>
+    <div className="min-w-0">
+      <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">Herramientas de la tienda</h2>
+          <p className="mt-1 text-sm text-gray-500">Elige qué herramienta quieres configurar.</p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-3">
           {mainTabs.map((tab) => (
             <MainTabButton
               key={tab.id}
@@ -172,20 +156,13 @@ export default function GeneralPanel({ theme, setPath }) {
         </div>
 
         {activeMainTab === "whatsapp" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
             <SectionHeader
               title="Botón de WhatsApp"
               description="Define visibilidad, contacto, apariencia, imagen y animación del botón flotante."
             />
 
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo visual"
-                text="Aquí todo está separado por grupos para que el usuario no tenga que bajar demasiado. Primero configura contacto, luego estilo y por último imagen o animación."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={whatsSubTab === "contacto"}
                 label="Contacto"
@@ -361,20 +338,13 @@ export default function GeneralPanel({ theme, setPath }) {
         )}
 
         {activeMainTab === "scroll" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
             <SectionHeader
               title="Navegación entre secciones"
               description="Controla visibilidad, posición, estilo, imágenes y animación de los botones flotantes."
             />
 
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo funcional"
-                text="Se dividió esta parte en grupos cortos para evitar formularios largos. Así el usuario entra directo a general, estilo, botón subir o botón bajar."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={scrollSubTab === "general"}
                 label="General"
@@ -640,20 +610,13 @@ export default function GeneralPanel({ theme, setPath }) {
         )}
 
         {activeMainTab === "loader" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
             <SectionHeader
               title="Loader global"
               description="Personaliza la pantalla de carga de la tienda con estilos profesionales, colores, íconos, animaciones y logo opcional."
             />
 
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo visual"
-                text="Esta parte se reorganizó para que el usuario entre solo al grupo que necesita: básico, identidad, visual o movimiento. Así se reduce mucho el scroll."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={loaderSubTab === "basico"}
                 label="Básico"
