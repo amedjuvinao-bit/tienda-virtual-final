@@ -4,10 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppearancePage from "./AppearancePage";
 import { fetchAppearanceSettings, saveSiteSettings } from "../lib/siteSettingsApi";
-import { adminFetch } from "../lib/api";
+import api, { adminFetch } from "../lib/api";
 
 vi.mock("../lib/siteSettingsApi", () => ({ fetchAppearanceSettings: vi.fn(), saveSiteSettings: vi.fn() }));
-vi.mock("../lib/api", () => ({ adminFetch: vi.fn() }));
+vi.mock("../lib/api", () => ({ default: { post: vi.fn() }, adminFetch: vi.fn() }));
 vi.mock("../theme/applyTheme", () => ({ applyTheme: vi.fn() }));
 vi.mock("./security/useAdminPermissions", () => ({ default: () => ({ can: () => true }) }));
 vi.mock("./appearance/header/HeaderPanel", () => ({ default: () => null }));
@@ -20,9 +20,8 @@ describe("carga de imagen en Apariencia", () => {
     vi.clearAllMocks();
     fetchAppearanceSettings.mockResolvedValue({ theme: {}, menus: { header: [], footer: [], social: [] }, appearanceRevision: 7 });
     saveSiteSettings.mockResolvedValue({ theme: {}, menus: { header: [], footer: [], social: [] }, appearanceRevision: 8 });
-    adminFetch.mockImplementation(async (url, options) => options?.method === "POST"
-      ? { ok: true, json: async () => ({ url: "https://res.cloudinary.com/demo/image/upload/whatsapp.webp" }) }
-      : { ok: true, json: async () => [] });
+    api.post.mockResolvedValue({ data: { url: "https://res.cloudinary.com/demo/image/upload/whatsapp.webp" } });
+    adminFetch.mockResolvedValue({ ok: true, json: async () => [] });
   });
   afterEach(cleanup);
 
@@ -34,12 +33,28 @@ describe("carga de imagen en Apariencia", () => {
     await user.click(screen.getByRole("checkbox", { name: "Usar imagen personalizada" }));
     await user.upload(screen.getByLabelText("Seleccionar imagen para Botón de WhatsApp"), new File(["imagen"], "whatsapp.png", { type: "image/png" }));
     expect(await screen.findByText(/Imagen subida.*Guardar cambios/)).toBeInTheDocument();
-    const uploadCall = adminFetch.mock.calls.find(([, options]) => options?.method === "POST");
-    expect(uploadCall[0]).toContain("/api/uploads");
-    expect(uploadCall[1].body.get("image")).toBeInstanceOf(File);
+    expect(api.post).toHaveBeenCalledWith('/api/uploads', expect.any(FormData));
+    expect(api.post.mock.calls[0][1].get("image")).toBeInstanceOf(File);
+    expect(adminFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
     expect(saveSiteSettings.mock.calls[0][0].theme.global.whatsapp.imageUrl).toBe("https://res.cloudinary.com/demo/image/upload/whatsapp.webp");
     await waitFor(() => expect(screen.queryByText(/Imagen subida.*Guardar cambios/)).not.toBeInTheDocument());
+  });
+
+  it("muestra el error de sesión del backend y permite volver a subir", async () => {
+    api.post.mockRejectedValueOnce({ userMessage: "La sesión venció. Inicia sesión de nuevo." });
+    const user = userEvent.setup();
+    render(<AppearancePage />);
+    await screen.findByRole("heading", { name: "Herramientas de la tienda" });
+    await user.click(screen.getByRole("button", { name: "Imagen y animación" }));
+    await user.click(screen.getByRole("checkbox", { name: "Usar imagen personalizada" }));
+    const input = screen.getByLabelText("Seleccionar imagen para Botón de WhatsApp");
+    await user.upload(input, new File(["imagen"], "whatsapp.png", { type: "image/png" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("La sesión venció. Inicia sesión de nuevo.");
+
+    await user.upload(input, new File(["imagen"], "whatsapp.png", { type: "image/png" }));
+    expect(await screen.findByText(/Imagen subida.*Guardar cambios/)).toBeInTheDocument();
+    expect(screen.queryByText("La sesión venció. Inicia sesión de nuevo.")).not.toBeInTheDocument();
   });
 });

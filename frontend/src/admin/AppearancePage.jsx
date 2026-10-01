@@ -1,4 +1,4 @@
-import { adminFetch } from '../lib/api';
+import api, { adminFetch } from '../lib/api';
 // src/admin/AppearancePage.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
@@ -706,21 +706,16 @@ export default function AppearancePage() {
 
   // ✅ Subir archivo a Cloudinary usando tu backend (campo por defecto: "image")
   const uploadToCloudinaryViaBackend = async (file, fieldName = "image") => {
-    const url = `${API_BASE}/api/uploads`;
     const form = new FormData();
     form.append(fieldName, file);
 
-    const res = await adminFetch(url, {
-      method: "POST",
-      body: form,
-    });
-
-    if (!res.ok) {
-      const response = await res.json().catch(() => null);
-      throw new Error(response?.message || response?.error || `No se pudo subir la imagen (HTTP ${res.status}).`);
+    let data;
+    try {
+      ({ data } = await api.post('/api/uploads', form));
+    } catch (error) {
+      throw new Error(error?.userMessage || error?.response?.data?.message || error?.response?.data?.error || 'No se pudo subir la imagen. Inténtalo de nuevo.');
     }
 
-    const data = await res.json();
     if (!data?.url) throw new Error("El backend no devolvió { url }");
     return data.url;
   };
