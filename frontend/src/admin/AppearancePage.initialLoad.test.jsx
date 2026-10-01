@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +22,21 @@ vi.mock('./appearance/footer/FooterPanel', () => ({ default: () => null }));
 describe('carga inicial de Apariencia', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(cleanup);
+
+  it('usa el loader configurado para el panel mientras carga la configuración', async () => {
+    let complete;
+    fetchAppearanceSettings.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    localStorage.setItem('rb_admin_loader_model', 'orbit');
+    try {
+      render(<AppearancePage />);
+      expect(screen.getByRole('status', { name: 'Cargando Apariencia…' })).toHaveClass('admin-loading--orbit');
+      expect(screen.queryByText('Cargando apariencia…')).not.toBeInTheDocument();
+      complete({ theme: {}, menus: { header: [], footer: [], social: [] }, appearanceRevision: 0 });
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Apariencia de la tienda' })).toBeInTheDocument());
+    } finally {
+      localStorage.removeItem('rb_admin_loader_model');
+    }
+  });
 
   it('impide guardar valores iniciales si la carga falla y permite reintentar', async () => {
     const user = userEvent.setup();

@@ -15,6 +15,8 @@ import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
 import "./appearance/appearanceWorkspace.css";
 import useAdminPermissions from './security/useAdminPermissions';
+import AdminLoadingScreen from './loading/AdminLoadingScreen';
+import { getRememberedAdminLoader } from './loading/adminLoaderConfig';
 import {
   LOOK_SECTION_DEFAULTS,
   normalizeLookSection,
@@ -934,7 +936,7 @@ export default function AppearancePage() {
     }
   };
 
-  if (loading) return <div className="p-6">Cargando apariencia…</div>;
+  if (loading) return <AdminLoadingScreen compact model={getRememberedAdminLoader()} message="Cargando Apariencia…" />;
   if (loadError) {
     return (
       <div className="admin-widget-surface mx-auto max-w-xl rounded-2xl p-6" role="alert">
