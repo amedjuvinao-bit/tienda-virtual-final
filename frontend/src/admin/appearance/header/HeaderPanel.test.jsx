@@ -69,13 +69,16 @@ describe('edición del encabezado', () => {
     const nav = within(preview).getByRole('navigation', { name: 'Vista previa del menú' });
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
     await user.click(screen.getByRole('button', { name: /Contemporáneo/ }));
-    expect(nav).toHaveStyle({ fontWeight: '800', letterSpacing: '0.14em', textTransform: 'uppercase' });
+    expect(nav).toHaveStyle({ fontWeight: '600', letterSpacing: '0.1em', textTransform: 'uppercase' });
     expect(nav.parentElement).toHaveStyle({ fontFamily: 'Manrope, system-ui, sans-serif' });
     await user.type(screen.getByPlaceholderText('"Playfair Display", Georgia, serif'), 'Arial');
     expect(nav.parentElement).toHaveStyle({ fontFamily: 'Arial' });
     await user.click(screen.getByRole('button', { name: /Alta costura/ }));
     expect(nav.parentElement).toHaveStyle({ fontFamily: '"Cormorant Garamond", Georgia, serif' });
-    expect(nav).toHaveStyle({ fontStyle: 'italic', letterSpacing: '0.04em', textTransform: 'none' });
+    expect(nav).toHaveStyle({ fontStyle: 'italic', letterSpacing: '0.02em', textTransform: 'none' });
+    await user.click(screen.getByRole('button', { name: /Esencial/ }));
+    expect(nav.parentElement).toHaveStyle({ fontFamily: '"Space Grotesk", system-ui, sans-serif' });
+    expect(nav).toHaveStyle({ fontWeight: '500', fontStyle: 'normal', textTransform: 'none' });
   });
 
   it('cambia forma, redondeo y vidrio de la vista previa antes de guardar', async () => {

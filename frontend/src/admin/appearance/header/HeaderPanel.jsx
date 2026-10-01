@@ -375,18 +375,19 @@ export default function HeaderPanel({
             <div className="space-y-4">
               {stylesSubTab === "tipografia" && (
                 <PanelBlock title="Personalidad del menú" columns={1}>
+                  <p className="appearance-header__font-intro">Compara las letras a tamaño de menú. La vista previa de arriba muestra el resultado en tu tienda.</p>
                   <div className="appearance-header__font-grid" role="group" aria-label="Modelos de tipografía">
                     {Object.entries(HEADER_FONT_PRESETS).map(([key, preset]) => (
                       <button key={key} type="button" className="appearance-header__font-option"
                         aria-pressed={theme.header?.fontPreset === key && !theme.header?.fontFamily}
                         onClick={() => { setPath('header.fontPreset', key); setPath('header.fontFamily', ''); }}>
-                        <span className="appearance-header__font-example" style={{ fontFamily: preset.family, fontWeight: preset.weight, fontStyle: preset.style, letterSpacing: preset.spacing, textTransform: preset.transform }}>Lo Nuevo</span>
-                        <strong>{preset.label}</strong><small>{preset.description}</small>
+                        <span className="appearance-header__font-option-heading"><strong>{preset.label}</strong><small>{preset.description}</small></span>
+                        <span className="appearance-header__font-example" style={{ fontFamily: preset.family, fontWeight: preset.weight, fontStyle: preset.style, letterSpacing: preset.spacing, textTransform: preset.transform }}>Lo Nuevo · Boutique</span>
                       </button>
                     ))}
                   </div>
                   <div className="appearance-header__font-detail">
-                    <strong>Así se leerá el menú</strong>
+                    <strong>Texto seleccionado · tamaño real</strong>
                     <span style={{ ...resolveHeaderTypography(theme.header), fontSize: `${theme.header?.fontSizePx ?? 16}px` }}>Lo Nuevo · Colecciones · Boutique</span>
                   </div>
                   <Input label="Tamaño del texto del menú (px)" type="number" min={12} max={30} step="1"

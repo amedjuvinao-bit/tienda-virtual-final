@@ -22,20 +22,20 @@ export function resolveHeaderLogo(header = {}, fallback = '') {
 
 export const HEADER_FONT_PRESETS = {
   classic: {
-    label: 'Editorial', description: 'Serif con presencia y ritmo de revista.',
-    family: '"Playfair Display", Georgia, serif', weight: 600, style: 'normal', spacing: '-0.035em', transform: 'none',
+    label: 'Editorial', description: 'Serif de revista.',
+    family: '"Playfair Display", Georgia, serif', weight: 500, style: 'normal', spacing: '-0.02em', transform: 'none',
   },
   modern: {
-    label: 'Contemporáneo', description: 'Mayúsculas amplias y trazo preciso.',
-    family: 'Manrope, system-ui, sans-serif', weight: 800, style: 'normal', spacing: '0.14em', transform: 'uppercase',
+    label: 'Contemporáneo', description: 'Mayúsculas espaciadas.',
+    family: 'Manrope, system-ui, sans-serif', weight: 600, style: 'normal', spacing: '0.1em', transform: 'uppercase',
   },
   elegant: {
-    label: 'Alta costura', description: 'Contraste fino y aire de boutique.',
-    family: '"Cormorant Garamond", Georgia, serif', weight: 700, style: 'italic', spacing: '0.04em', transform: 'none',
+    label: 'Alta costura', description: 'Cursiva ligera.',
+    family: '"Cormorant Garamond", Georgia, serif', weight: 600, style: 'italic', spacing: '0.02em', transform: 'none',
   },
   cute: {
-    label: 'Jovial', description: 'Curvas redondas con personalidad.',
-    family: '"Baloo 2", system-ui, sans-serif', weight: 700, style: 'normal', spacing: '0.015em', transform: 'none',
+    label: 'Esencial', description: 'Geometría discreta.',
+    family: '"Space Grotesk", system-ui, sans-serif', weight: 500, style: 'normal', spacing: '-0.025em', transform: 'none',
   },
 };
 
