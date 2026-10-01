@@ -29,13 +29,29 @@ describe('encabezado de la tienda', () => {
     expect(buttons[0].querySelector('img').getAttribute('src')).toContain('gold-search');
     expect(buttons[0].querySelector('img')).toHaveAttribute('data-icon-source', 'builtin');
     await user.click(buttons[0]);
-    expect(screen.getByRole('dialog', { name: 'Buscar productos' })).toBeInTheDocument();
+    expect(within(buttons[0].closest('.header-search-anchor')).getByRole('dialog', { name: 'Buscar productos' })).toBeInTheDocument();
+    expect(document.querySelector('.header-search-backdrop')).not.toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Buscar productos' })).toHaveFocus();
+    fireEvent.mouseLeave(buttons[0].closest('.header-search-anchor'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(buttons[0]);
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.click(buttons[1]);
-    await user.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), 'vestido rosa{Enter}');
+    const input = screen.getByRole('searchbox', { name: 'Buscar productos' });
+    await user.type(input, 'vestido rosa');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(input).toHaveValue('vestido rosa');
+    await user.keyboard('{Enter}');
     expect(screen.getByTestId('location')).toHaveTextContent('/buscar?q=vestido%20rosa');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it('cierra el widget compacto al pulsar fuera de la lupa', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('usa el logo de contraste, conserva enlaces seguros y actualiza el menú después de guardar', async () => {

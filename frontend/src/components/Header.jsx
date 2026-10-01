@@ -21,7 +21,12 @@ function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTarget, setSearchTarget] = useState('desktop');
   const searchTriggerRef = useRef(null);
+  const searchCloseTimerRef = useRef(null);
+  const desktopSearchAnchorRef = useRef(null);
+  const mobileSearchAnchorRef = useRef(null);
+  useEffect(() => () => window.clearTimeout(searchCloseTimerRef.current), []);
   const { cart } = useCart();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
@@ -102,7 +107,7 @@ function Header() {
   }, [menuOpen, cartOpen, searchOpen]);
 
   useEffect(() => {
-    if (menuOpen || cartOpen || searchOpen) {
+    if (menuOpen || cartOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -111,7 +116,7 @@ function Header() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen, cartOpen, searchOpen]);
+  }, [menuOpen, cartOpen]);
 
   useEffect(() => {
     setShowHeader(true);
@@ -340,12 +345,25 @@ function Header() {
     navigate(to);
   };
   const openSearch = (event) => {
+    if (searchCloseTimerRef.current) window.clearTimeout(searchCloseTimerRef.current);
     searchTriggerRef.current = event.currentTarget;
-    setSearchOpen(true);
+    const target = event.currentTarget.dataset.searchPlacement;
+    setSearchOpen((current) => target === searchTarget ? !current : true);
+    setSearchTarget(target);
   };
-  const closeSearch = () => {
+  const cancelSearchClose = () => {
+    if (searchCloseTimerRef.current) window.clearTimeout(searchCloseTimerRef.current);
+    searchCloseTimerRef.current = null;
+  };
+  const scheduleSearchClose = (event) => {
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+    cancelSearchClose();
+    searchCloseTimerRef.current = window.setTimeout(() => setSearchOpen(false), 120);
+  };
+  const closeSearch = (restoreFocus = false) => {
+    cancelSearchClose();
     setSearchOpen(false);
-    searchTriggerRef.current?.focus();
+    if (restoreFocus) searchTriggerRef.current?.focus();
   };
   const submitSearch = (term) => {
     setSearchOpen(false);
@@ -408,11 +426,17 @@ function Header() {
             </nav>
 
             <div className="header-icons flex shrink-0 items-center gap-0 text-xl">
-              <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen}
-                onClick={openSearch} className="storefront-action-button"
-              >
-                <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
-              </button>
+              <div className="header-search-anchor" ref={desktopSearchAnchorRef}
+                onMouseEnter={cancelSearchClose}
+                onMouseLeave={scheduleSearchClose}
+                onBlur={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) closeSearch(false); }}>
+                <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen && searchTarget === 'desktop'}
+                  data-search-placement="desktop" onClick={openSearch} className="storefront-action-button"
+                >
+                  <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
+                </button>
+                <HeaderSearch open={searchOpen && searchTarget === 'desktop'} anchorRef={desktopSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onPointerEnter={cancelSearchClose} />
+              </div>
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
@@ -462,11 +486,17 @@ function Header() {
             </div>
 
             <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-0">
-              <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen}
-                onClick={openSearch} className="storefront-action-button"
-              >
-                <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
-              </button>
+              <div className="header-search-anchor" ref={mobileSearchAnchorRef}
+                onMouseEnter={cancelSearchClose}
+                onMouseLeave={scheduleSearchClose}
+                onBlur={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) closeSearch(false); }}>
+                <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen && searchTarget === 'mobile'}
+                  data-search-placement="mobile" onClick={openSearch} className="storefront-action-button"
+                >
+                  <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
+                </button>
+                <HeaderSearch open={searchOpen && searchTarget === 'mobile'} anchorRef={mobileSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onPointerEnter={cancelSearchClose} />
+              </div>
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
@@ -606,7 +636,6 @@ function Header() {
         </div>
       </aside>
 
-      <HeaderSearch open={searchOpen} onClose={closeSearch} onSearch={submitSearch} />
       <CartSidebar isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );
