@@ -1,5 +1,6 @@
 // src/components/WhatsAppButton.jsx
 import React from "react";
+import "./storefrontLiquidGlass.css";
 
 function getShadowValue(shadow) {
   if (shadow === "none") return "none";
@@ -83,16 +84,16 @@ export default function WhatsAppButton({ config }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed flex items-center justify-center transition-transform hover:scale-110"
+        className="storefront-liquid-icon fixed transition-transform hover:scale-105"
         style={{
           bottom: `${bottomPx}px`,
           width: `${sizePx}px`,
           height: `${sizePx}px`,
-          backgroundColor: bgColor,
+          "--liquid-tint": bgColor,
           zIndex: 9999,
           borderRadius: `${borderRadiusPx}px`,
           border: `${borderWidthPx}px solid ${borderColor}`,
-          boxShadow: getShadowValue(shadow),
+          boxShadow: shadow === "none" ? "none" : getShadowValue(shadow),
           animation: animationName ? `${animationName} 2s ease-in-out infinite` : "none",
           [isLeft ? "left" : "right"]: "24px",
           overflow: "hidden",

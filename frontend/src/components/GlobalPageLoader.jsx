@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   Gem,
 } from "lucide-react";
+import "./storefrontLiquidGlass.css";
 
 function isValidHex(value) {
   return typeof value === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim());
@@ -155,9 +156,16 @@ function CenterIcon({ icon, color, size, animationCssName, durationMs }) {
 
   return (
     <div
+      className="storefront-liquid-icon"
       style={{
         position: "absolute",
-        inset: 0,
+        width: Math.max(26, Math.round(size * 0.55)),
+        height: Math.max(26, Math.round(size * 0.55)),
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        borderRadius: "50%",
+        "--liquid-tint": color,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -166,7 +174,7 @@ function CenterIcon({ icon, color, size, animationCssName, durationMs }) {
     >
       <IconComp
         size={Math.max(14, Math.round(size * 0.34))}
-        strokeWidth={2}
+        strokeWidth={1.8}
         style={{
           color,
           animation: `${animationCssName} ${durationMs}ms ease-in-out infinite`,
@@ -304,7 +312,17 @@ function DualRingLoader({
   );
 }
 
-function DotsLoader({ color, secondaryColor, size, durationMs }) {
+function InlineIcon({ icon, color, size }) {
+  const IconComp = getIconComponent(icon);
+  if (!IconComp) return null;
+  return (
+    <span className="storefront-liquid-icon" style={{ width: Math.max(28, size * 0.55), height: Math.max(28, size * 0.55), borderRadius: "50%", "--liquid-tint": color }}>
+      <IconComp size={Math.max(16, size * 0.32)} strokeWidth={1.8} />
+    </span>
+  );
+}
+
+function DotsLoader({ color, secondaryColor, size, durationMs, icon }) {
   const dot = Math.max(8, Math.round(size * 0.16));
   const gap = Math.max(8, Math.round(size * 0.08));
 
@@ -312,60 +330,67 @@ function DotsLoader({ color, secondaryColor, size, durationMs }) {
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         gap: `${gap}px`,
         minHeight: `${dot}px`,
       }}
-    >
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            width: `${dot}px`,
-            height: `${dot}px`,
-            borderRadius: "999px",
-            background: i === 1 ? secondaryColor : color,
-            animation: `rbLoaderDotBounce ${durationMs}ms ease-in-out ${i * 120}ms infinite`,
-            display: "inline-block",
-          }}
-        />
-      ))}
+      >
+      <InlineIcon icon={icon} color={color} size={size} />
+      <div style={{ display: "flex", gap: `${gap}px` }}>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: `${dot}px`,
+              height: `${dot}px`,
+              borderRadius: "999px",
+              background: i === 1 ? secondaryColor : color,
+              animation: `rbLoaderDotBounce ${durationMs}ms ease-in-out ${i * 120}ms infinite`,
+              display: "inline-block",
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-function BarsLoader({ color, secondaryColor, size, durationMs }) {
+function BarsLoader({ color, secondaryColor, size, durationMs, icon }) {
   const width = Math.max(42, Math.round(size * 0.82));
   const barWidth = Math.max(5, Math.round(size * 0.1));
   const barHeight = Math.max(20, Math.round(size * 0.58));
   const gap = Math.max(4, Math.round(size * 0.06));
 
   return (
-    <div
-      style={{
-        width: `${width}px`,
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        gap: `${gap}px`,
-        height: `${barHeight}px`,
-      }}
-    >
-      {[0, 1, 2, 3].map((i) => (
-        <span
-          key={i}
-          style={{
-            width: `${barWidth}px`,
-            height: `${barHeight}px`,
-            borderRadius: "999px",
-            background: i % 2 === 0 ? color : secondaryColor,
-            transformOrigin: "bottom center",
-            animation: `rbLoaderBarScale ${Math.max(650, durationMs)}ms ease-in-out ${i * 120}ms infinite`,
-            display: "inline-block",
-          }}
-        />
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: `${gap}px` }}>
+      <InlineIcon icon={icon} color={color} size={size} />
+      <div
+        style={{
+          width: `${width}px`,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          gap: `${gap}px`,
+          height: `${barHeight}px`,
+        }}
+      >
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: `${barWidth}px`,
+              height: `${barHeight}px`,
+              borderRadius: "999px",
+              background: i % 2 === 0 ? color : secondaryColor,
+              transformOrigin: "bottom center",
+              animation: `rbLoaderBarScale ${Math.max(650, durationMs)}ms ease-in-out ${i * 120}ms infinite`,
+              display: "inline-block",
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -607,6 +632,7 @@ function LoaderVisual({
         secondaryColor={secondaryColor}
         size={sizePx}
         durationMs={durationMs}
+        icon={icon}
       />
     );
   }
@@ -618,6 +644,7 @@ function LoaderVisual({
         secondaryColor={secondaryColor}
         size={sizePx}
         durationMs={durationMs}
+        icon={icon}
       />
     );
   }

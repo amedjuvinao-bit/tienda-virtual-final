@@ -1,6 +1,20 @@
 // src/admin/appearance/general/GeneralPanel.jsx
 import React, { useMemo, useState } from "react";
+import { CircleOff, Crown, Flower2, Gem, Heart, LoaderCircle, MessageCircle, ShoppingBag, Sparkles, Star, ChevronsUpDown } from "lucide-react";
 import { normalizeGlobalConfig } from "./generalHelpers";
+import AppearanceToolPreview from "./AppearanceToolPreview";
+import "./appearanceGeneral.css";
+
+const LOADER_ICONS = [
+  { value: "none", label: "Sin ícono", Icon: CircleOff },
+  { value: "sparkles", label: "Destellos", Icon: Sparkles },
+  { value: "star", label: "Estrella", Icon: Star },
+  { value: "heart", label: "Corazón", Icon: Heart },
+  { value: "diamond", label: "Diamante", Icon: Gem },
+  { value: "crown", label: "Corona", Icon: Crown },
+  { value: "flower", label: "Flor", Icon: Flower2 },
+  { value: "bag", label: "Bolsa", Icon: ShoppingBag },
+];
 
 const Input = ({ label, ...rest }) => (
   <label className="block min-w-0">
@@ -25,13 +39,13 @@ const Select = ({ label, children, ...rest }) => (
 );
 
 const Toggle = ({ label, checked, onChange }) => (
-  <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+  <label className="appearance-general__toggle flex items-center justify-between gap-3 rounded-xl px-4 py-3">
     <span className="text-sm text-gray-700">{label}</span>
     <input
       type="checkbox"
       checked={!!checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="h-4 w-4 shrink-0 accent-pink-600"
+      className="h-5 w-5 shrink-0 accent-pink-600"
     />
   </label>
 );
@@ -61,13 +75,13 @@ const ColorInput = ({ value, onChange }) => {
 };
 
 const SectionHeader = ({ title, description }) => (
-  <div className="mb-5">
-    <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-    <p className="mt-1 text-sm text-gray-500">{description}</p>
+  <div className="appearance-general__section-header">
+    <h3>{title}</h3>
+    <p>{description}</p>
   </div>
 );
 
-const MainTabButton = ({ active, label, description, onClick }) => (
+const MainTabButton = ({ active, label, description, status, Icon, onClick }) => (
   <button
     type="button"
     onClick={onClick}
@@ -75,8 +89,9 @@ const MainTabButton = ({ active, label, description, onClick }) => (
     aria-pressed={active}
     data-active={active}
   >
-    <strong>{label}</strong>
-    <small>{description}</small>
+    <span className="appearance-general__tab-icon" aria-hidden="true"><Icon size={23} strokeWidth={1.75} /></span>
+    <span className="appearance-general__tab-copy"><strong>{label}</strong><small>{description}</small></span>
+    <span className="appearance-general__tab-status">{status}</span>
   </button>
 );
 
@@ -93,7 +108,7 @@ const SubTabButton = ({ active, label, onClick }) => (
 );
 
 const PanelBlock = ({ title, children, columns = 2 }) => (
-  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+  <div className="appearance-general__block rounded-2xl p-4">
     <div className="mb-4 text-sm font-semibold text-gray-800">{title}</div>
     <div
       className={[
@@ -114,17 +129,20 @@ export default function GeneralPanel({ theme, setPath }) {
       {
         id: "whatsapp",
         label: "WhatsApp",
-        description: "Botón flotante, contacto, estilo e imagen.",
+        description: "Contacto y botón flotante",
+        Icon: MessageCircle,
       },
       {
         id: "scroll",
         label: "Navegación",
-        description: "Botones subir y bajar, posición y comportamiento.",
+        description: "Subir y bajar por la tienda",
+        Icon: ChevronsUpDown,
       },
       {
         id: "loader",
         label: "Loader",
-        description: "Pantalla de carga, estilos, colores, logo y animaciones.",
+        description: "Pantalla de carga",
+        Icon: LoaderCircle,
       },
     ],
     []
@@ -136,27 +154,38 @@ export default function GeneralPanel({ theme, setPath }) {
   const [loaderSubTab, setLoaderSubTab] = useState("basico");
 
   return (
-    <div className="min-w-0">
-      <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold text-gray-900">Herramientas de la tienda</h2>
-          <p className="mt-1 text-sm text-gray-500">Elige qué herramienta quieres configurar.</p>
+    <div className="appearance-general min-w-0">
+      <div className="appearance-general__shell rounded-2xl p-3 md:p-4">
+        <div className="appearance-general__intro">
+          <div>
+            <span className="appearance-general__eyebrow">EXPERIENCIA DE LA TIENDA</span>
+            <h2>Herramientas de la tienda</h2>
+            <p>Elige una herramienta, ajusta sus opciones y mira el resultado aquí mismo.</p>
+          </div>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-3">
+        <div className="appearance-general__tabs">
           {mainTabs.map((tab) => (
             <MainTabButton
               key={tab.id}
               active={activeMainTab === tab.id}
               label={tab.label}
               description={tab.description}
+              Icon={tab.Icon}
+              status={tab.id === "whatsapp"
+                ? (globalConfig.whatsapp.enabled ? (globalConfig.whatsapp.phone ? "Activo" : "Falta número") : "Apagado")
+                : tab.id === "scroll" ? (globalConfig.scrollButtons.enabled ? "Activo" : "Apagado")
+                : (globalConfig.loader.enabled ? "Activo" : "Apagado")}
               onClick={() => setActiveMainTab(tab.id)}
             />
           ))}
         </div>
 
+        <div className="appearance-general__workspace">
+          <div className="appearance-general__form">
+
         {activeMainTab === "whatsapp" && (
-          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+          <section className="appearance-general__section">
             <SectionHeader
               title="Botón de WhatsApp"
               description="Define visibilidad, contacto, apariencia, imagen y animación del botón flotante."
@@ -313,12 +342,12 @@ export default function GeneralPanel({ theme, setPath }) {
                     <option value="bounce">Bounce</option>
                   </Select>
 
-                  <Input
+                  {globalConfig.whatsapp.useCustomImage && <Input
                     label="URL de imagen personalizada"
                     value={globalConfig.whatsapp.imageUrl || ""}
                     onChange={(e) => setPath("global.whatsapp.imageUrl", e.target.value)}
                     placeholder="https://.../mi-icono-whatsapp.png"
-                  />
+                  />}
 
                   <Input
                     type="number"
@@ -338,7 +367,7 @@ export default function GeneralPanel({ theme, setPath }) {
         )}
 
         {activeMainTab === "scroll" && (
-          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+          <section className="appearance-general__section">
             <SectionHeader
               title="Navegación entre secciones"
               description="Controla visibilidad, posición, estilo, imágenes y animación de los botones flotantes."
@@ -545,14 +574,14 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(value) => setPath("global.scrollButtons.upUseCustomImage", value)}
                   />
 
-                  <Input
+                  {globalConfig.scrollButtons.upUseCustomImage && <Input
                     label="URL imagen botón subir"
                     value={globalConfig.scrollButtons.upImageUrl || ""}
                     onChange={(e) => setPath("global.scrollButtons.upImageUrl", e.target.value)}
                     placeholder="https://.../boton-subir.png"
-                  />
+                  />}
 
-                  <Input
+                  {globalConfig.scrollButtons.upUseCustomImage && <Input
                     type="number"
                     min={20}
                     max={100}
@@ -562,7 +591,7 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(e) =>
                       setPath("global.scrollButtons.upImageSizePercent", Number(e.target.value))
                     }
-                  />
+                  />}
                 </PanelBlock>
               )}
 
@@ -585,14 +614,14 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(value) => setPath("global.scrollButtons.downUseCustomImage", value)}
                   />
 
-                  <Input
+                  {globalConfig.scrollButtons.downUseCustomImage && <Input
                     label="URL imagen botón bajar"
                     value={globalConfig.scrollButtons.downImageUrl || ""}
                     onChange={(e) => setPath("global.scrollButtons.downImageUrl", e.target.value)}
                     placeholder="https://.../boton-bajar.png"
-                  />
+                  />}
 
-                  <Input
+                  {globalConfig.scrollButtons.downUseCustomImage && <Input
                     type="number"
                     min={20}
                     max={100}
@@ -602,7 +631,7 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(e) =>
                       setPath("global.scrollButtons.downImageSizePercent", Number(e.target.value))
                     }
-                  />
+                  />}
                 </PanelBlock>
               )}
             </div>
@@ -610,7 +639,7 @@ export default function GeneralPanel({ theme, setPath }) {
         )}
 
         {activeMainTab === "loader" && (
-          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+          <section className="appearance-general__section">
             <SectionHeader
               title="Loader global"
               description="Personaliza la pantalla de carga de la tienda con estilos profesionales, colores, íconos, animaciones y logo opcional."
@@ -665,12 +694,12 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(value) => setPath("global.loader.showLogo", value)}
                   />
 
-                  <Input
+                  {globalConfig.loader?.showText && <Input
                     label="Texto de carga"
                     value={globalConfig.loader?.text || ""}
                     onChange={(e) => setPath("global.loader.text", e.target.value)}
                     placeholder="Cargando colección..."
-                  />
+                  />}
                 </PanelBlock>
               )}
 
@@ -691,29 +720,28 @@ export default function GeneralPanel({ theme, setPath }) {
                     <option value="orbit">Órbita</option>
                   </Select>
 
-                  <Select
-                    label="Ícono visual"
-                    value={globalConfig.loader?.icon || "none"}
-                    onChange={(e) => setPath("global.loader.icon", e.target.value)}
-                  >
-                    <option value="none">Sin ícono</option>
-                    <option value="sparkles">Destellos</option>
-                    <option value="star">Estrella</option>
-                    <option value="heart">Corazón</option>
-                    <option value="diamond">Diamante</option>
-                    <option value="crown">Corona</option>
-                    <option value="flower">Flor</option>
-                    <option value="bag">Bolsa de compras</option>
-                  </Select>
+                  <div className="appearance-general__icon-field xl:col-span-2">
+                    <span className="mb-2 block text-sm font-medium text-gray-700">Ícono visual</span>
+                    <div className="appearance-general__icon-grid" role="group" aria-label="Ícono visual del Loader">
+                      {LOADER_ICONS.map(({ value, label, Icon }) => (
+                        <button type="button" key={value} className="appearance-general__icon-option"
+                          aria-pressed={(globalConfig.loader?.icon || "none") === value}
+                          onClick={() => setPath("global.loader.icon", value)}>
+                          <span className="appearance-general__icon-orb" aria-hidden="true"><Icon size={22} strokeWidth={1.7} /></span>
+                          <span>{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                  <Input
+                  {globalConfig.loader?.showLogo && <Input
                     label="URL logo o imagen"
                     value={globalConfig.loader?.logoUrl || ""}
                     onChange={(e) => setPath("global.loader.logoUrl", e.target.value)}
                     placeholder="https://.../logo-loader.png"
-                  />
+                  />}
 
-                  <Input
+                  {globalConfig.loader?.showLogo && <Input
                     type="number"
                     min={20}
                     max={400}
@@ -721,7 +749,7 @@ export default function GeneralPanel({ theme, setPath }) {
                     label="Tamaño del logo (px)"
                     value={globalConfig.loader?.logoSizePx ?? 72}
                     onChange={(e) => setPath("global.loader.logoSizePx", Number(e.target.value))}
-                  />
+                  />}
                 </PanelBlock>
               )}
 
@@ -903,6 +931,9 @@ export default function GeneralPanel({ theme, setPath }) {
             </div>
           </section>
         )}
+          </div>
+          <AppearanceToolPreview activeTool={activeMainTab} config={globalConfig} />
+        </div>
       </div>
     </div>
   );
