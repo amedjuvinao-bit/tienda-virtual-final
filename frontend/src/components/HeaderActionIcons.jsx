@@ -47,6 +47,8 @@ export function HeaderActionGlyph({ kind, iconSet = 'gold', iconImages, iconOver
   return <img
     className="storefront-action-glyph storefront-action-glyph--image"
     data-icon-style={iconSet}
+    data-icon-kind={kind}
+    data-icon-source={custom ? 'custom' : 'builtin'}
     src={src}
     width="34"
     height="34"
@@ -55,7 +57,10 @@ export function HeaderActionGlyph({ kind, iconSet = 'gold', iconImages, iconOver
     draggable="false"
     decoding="async"
     onError={(event) => {
-      if (!event.currentTarget.src.endsWith(fallback)) event.currentTarget.src = fallback;
+      if (!event.currentTarget.src.endsWith(fallback)) {
+        event.currentTarget.src = fallback;
+        event.currentTarget.dataset.iconSource = 'builtin';
+      }
     }}
   />;
 }

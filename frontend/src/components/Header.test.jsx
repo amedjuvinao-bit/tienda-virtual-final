@@ -27,6 +27,7 @@ describe('encabezado de la tienda', () => {
     const buttons = screen.getAllByRole('button', { name: 'Buscar productos' });
     expect(buttons).toHaveLength(2);
     expect(buttons[0].querySelector('img').getAttribute('src')).toContain('gold-search');
+    expect(buttons[0].querySelector('img')).toHaveAttribute('data-icon-source', 'builtin');
     await user.click(buttons[0]);
     expect(screen.getByRole('dialog', { name: 'Buscar productos' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Buscar productos' })).toHaveFocus();
@@ -136,5 +137,17 @@ describe('encabezado de la tienda', () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Favoritos' })[0].querySelector('img')).toHaveAttribute('src', image));
     expect(screen.getAllByRole('button', { name: 'Abrir carrito' })[0].querySelector('img').getAttribute('src')).toContain('satin-cart');
+  });
+
+  it('conserva el tamaño original de una lupa personalizada', async () => {
+    const image = 'https://res.cloudinary.com/tienda/image/upload/v1/lupa.webp';
+    fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: {
+      ...settings('Lo Nuevo').theme.header, iconSet: 'gold', iconOverrides: { gold: { search: image } },
+    } } });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Buscar productos' })[0].querySelector('img')).toHaveAttribute('src', image));
+    screen.getAllByRole('button', { name: 'Buscar productos' }).forEach((button) => {
+      expect(button.querySelector('img')).toHaveAttribute('data-icon-source', 'custom');
+    });
   });
 });

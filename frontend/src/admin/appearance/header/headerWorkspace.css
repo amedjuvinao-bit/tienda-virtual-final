@@ -37,7 +37,7 @@
 .appearance-header__icon-option[aria-pressed="true"] { border-color: var(--tool-accent); border-bottom-width: 2px; color: var(--tool-accent); }
 .appearance-header__icon-option strong { font-size: 13px; }
 .appearance-header__icon-option small { color: var(--tool-muted); font-size: 11px; }
-.appearance-header__icon-samples { display: flex; flex-wrap: wrap; align-items: center; min-height: 54px; gap: 3px; margin-bottom: 7px; --header-icon-color: currentColor; }
+.appearance-header__icon-samples { display: flex; flex-wrap: wrap; align-items: center; min-height: 54px; gap: 3px; margin-bottom: 7px; --header-icon-color: currentColor; --storefront-action-size: 45px; }
 .appearance-header__icon-samples .storefront-action-button { width: 51px; height: 54px; color: inherit; cursor: inherit; }
 .appearance-header__icon-samples .storefront-action-glyph { width: 45px; height: 45px; }
 .appearance-header__icon-option .storefront-action-button:hover .storefront-action-glyph { transform: none; }
