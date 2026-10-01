@@ -68,14 +68,14 @@ export default function AppearanceToolPreview({ activeTool, config }) {
         )}
         {activeTool === "loader" && loader.enabled && (
           <div className="appearance-general__preview-loader" style={{
-            background: loader.visualStyle === "dark" ? "rgba(53,32,57,.9)" : loader.visualStyle === "glass" ? "rgba(255,255,255,.42)" : (loader.backgroundColor || "#fff"),
+            background: "transparent",
             color: loader.textColor || "#23212e",
           }}>
-            {loader.showLogo && loader.logoUrl && <PreviewImage className="appearance-general__preview-logo" url={loader.logoUrl} fallback={null} />}
+            {loader.showLogo && loader.logoUrl && <PreviewImage className="appearance-general__preview-logo" style={{ width: bounded(loader.logoSizePx, 20, 140, 72), height: bounded(loader.logoSizePx, 20, 140, 72) }} url={loader.logoUrl} fallback={null} />}
             <span className={`appearance-general__loader-mark appearance-general__loader-mark--${loader.type || "spinner"}`} style={{
               "--loader-color": loader.color || "#ec4899", "--loader-secondary": loader.secondaryColor || "#f9a8d4",
             }}>
-              {Icon && <span className="storefront-liquid-icon appearance-general__preview-loader-icon" style={{ "--liquid-tint": loader.color }}><Icon size={22} strokeWidth={1.7} /></span>}
+              {Icon && <span className="appearance-general__preview-loader-icon" style={{ color: loader.color }}><Icon size={22} strokeWidth={1.7} /></span>}
             </span>
             {loader.showText && <span className="appearance-general__preview-loader-text">{loader.text || "Cargando..."}</span>}
           </div>
@@ -84,7 +84,7 @@ export default function AppearanceToolPreview({ activeTool, config }) {
       <p className="appearance-general__preview-note">
         {activeTool === "whatsapp" && (whatsapp.enabled ? (whatsapp.phone ? "El botón abre el chat con el número configurado." : "Añade un número para que el botón aparezca en la tienda.") : "El botón está apagado en la tienda.")}
         {activeTool === "scroll" && (navigation.enabled ? "Los botones permiten moverse entre secciones de la portada." : "La navegación está apagada en la tienda.")}
-        {activeTool === "loader" && (loader.enabled ? "La pantalla aparece mientras carga una página de la tienda." : "La pantalla de carga está apagada.")}
+        {activeTool === "loader" && (loader.enabled ? "La figura elegida se muestra directamente sobre la tienda, sin fondo ni tarjeta." : "La pantalla de carga está apagada.")}
       </p>
     </aside>
   );

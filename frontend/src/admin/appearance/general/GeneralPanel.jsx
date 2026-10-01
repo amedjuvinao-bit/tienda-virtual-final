@@ -652,7 +652,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
           <section className="appearance-general__section">
             <SectionHeader
               title="Loader global"
-              description="Personaliza la pantalla de carga de la tienda con estilos profesionales, colores, íconos, animaciones y logo opcional."
+              description="Las figuras, los íconos y la imagen se muestran sobre la tienda sin fondo ni tarjeta."
             />
 
             <div className="mb-3 flex flex-wrap gap-2">
@@ -668,18 +668,13 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
               />
               <SubTabButton
                 active={loaderSubTab === "visual"}
-                label="Color y visual"
+                label="Colores"
                 onClick={() => setLoaderSubTab("visual")}
               />
               <SubTabButton
                 active={loaderSubTab === "movimiento"}
                 label="Movimiento"
                 onClick={() => setLoaderSubTab("movimiento")}
-              />
-              <SubTabButton
-                active={loaderSubTab === "avanzado"}
-                label="Avanzado"
-                onClick={() => setLoaderSubTab("avanzado")}
               />
             </div>
 
@@ -693,15 +688,15 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                   />
 
                   <Toggle
-                    label="Mostrar texto de carga"
-                    checked={globalConfig.loader?.showText}
-                    onChange={(value) => setPath("global.loader.showText", value)}
+                    label="Añadir mi imagen transparente"
+                    checked={globalConfig.loader?.showLogo}
+                    onChange={(value) => setPath("global.loader.showLogo", value)}
                   />
 
                   <Toggle
-                    label="Mostrar logo o imagen personalizada"
-                    checked={globalConfig.loader?.showLogo}
-                    onChange={(value) => setPath("global.loader.showLogo", value)}
+                    label="Mostrar texto de carga"
+                    checked={globalConfig.loader?.showText}
+                    onChange={(value) => setPath("global.loader.showText", value)}
                   />
 
                   {globalConfig.loader?.showText && <Input
@@ -714,7 +709,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
               )}
 
               {loaderSubTab === "identidad" && (
-                <PanelBlock title="Tipo, ícono y logo">
+                <PanelBlock title="Figura, ícono e imagen">
                   <Select
                     label="Tipo de loader"
                     value={globalConfig.loader?.type || "spinner"}
@@ -745,7 +740,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                   </div>
 
                   {globalConfig.loader?.showLogo && <CloudinaryImageField
-                    label="Logo de carga"
+                    label="Imagen transparente del Loader"
                     value={globalConfig.loader?.logoUrl || ""}
                     onChange={(url) => setPath("global.loader.logoUrl", url)}
                     onUpload={uploadToCloudinaryViaBackend}
@@ -754,12 +749,14 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     savedRevision={savedRevision}
                   />}
 
+                  {globalConfig.loader?.showLogo && <p className="appearance-general__loader-hint xl:col-span-2">Usa un PNG o WebP transparente. Se verá junto a la figura elegida, sin cuadros ni fondo.</p>}
+
                   {globalConfig.loader?.showLogo && <Input
                     type="number"
                     min={20}
                     max={400}
                     step="1"
-                    label="Tamaño del logo (px)"
+                    label="Tamaño de la imagen (px)"
                     value={globalConfig.loader?.logoSizePx ?? 72}
                     onChange={(e) => setPath("global.loader.logoSizePx", Number(e.target.value))}
                   />}
@@ -767,7 +764,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
               )}
 
               {loaderSubTab === "visual" && (
-                <PanelBlock title="Colores, fondo y contraste">
+                <PanelBlock title="Colores de la figura y del texto">
                   <label className="block min-w-0">
                     <span className="mb-1 block text-sm font-medium text-gray-700">
                       Color principal
@@ -790,16 +787,6 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
 
                   <label className="block min-w-0">
                     <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Color del fondo
-                    </span>
-                    <ColorInput
-                      value={globalConfig.loader?.backgroundColor || "#ffffff"}
-                      onChange={(e) => setPath("global.loader.backgroundColor", e.target.value)}
-                    />
-                  </label>
-
-                  <label className="block min-w-0">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
                       Color del texto
                     </span>
                     <ColorInput
@@ -808,29 +795,6 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     />
                   </label>
 
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="1"
-                    label="Opacidad del fondo (%)"
-                    value={globalConfig.loader?.overlayOpacity ?? 100}
-                    onChange={(e) =>
-                      setPath("global.loader.overlayOpacity", Number(e.target.value))
-                    }
-                  />
-
-                  <Select
-                    label="Estilo visual"
-                    value={globalConfig.loader?.visualStyle || "soft"}
-                    onChange={(e) => setPath("global.loader.visualStyle", e.target.value)}
-                  >
-                    <option value="minimal">Minimal</option>
-                    <option value="soft">Suave</option>
-                    <option value="luxury">Luxury</option>
-                    <option value="glass">Glass</option>
-                    <option value="dark">Oscuro elegante</option>
-                  </Select>
                 </PanelBlock>
               )}
 
@@ -895,52 +859,6 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                 </PanelBlock>
               )}
 
-              {loaderSubTab === "avanzado" && (
-                <PanelBlock title="Ajustes avanzados">
-                  <Select
-                    label="Forma del contenedor"
-                    value={globalConfig.loader?.shape || "circle"}
-                    onChange={(e) => setPath("global.loader.shape", e.target.value)}
-                  >
-                    <option value="circle">Circular</option>
-                    <option value="rounded">Redondeado</option>
-                    <option value="square">Cuadrado</option>
-                  </Select>
-
-                  <Select
-                    label="Sombra"
-                    value={globalConfig.loader?.shadow || "soft"}
-                    onChange={(e) => setPath("global.loader.shadow", e.target.value)}
-                  >
-                    <option value="none">Sin sombra</option>
-                    <option value="soft">Suave</option>
-                    <option value="strong">Fuerte</option>
-                    <option value="glow">Glow</option>
-                  </Select>
-
-                  <Input
-                    type="number"
-                    min={0}
-                    max={999}
-                    step="1"
-                    label="Radio de bordes (px)"
-                    value={globalConfig.loader?.borderRadiusPx ?? 999}
-                    onChange={(e) =>
-                      setPath("global.loader.borderRadiusPx", Number(e.target.value))
-                    }
-                  />
-
-                  <Input
-                    type="number"
-                    min={0}
-                    max={20}
-                    step="1"
-                    label="Separación entre logo y loader (px)"
-                    value={globalConfig.loader?.gapPx ?? 16}
-                    onChange={(e) => setPath("global.loader.gapPx", Number(e.target.value))}
-                  />
-                </PanelBlock>
-              )}
             </div>
           </section>
         )}

@@ -9,7 +9,6 @@ import {
   ShoppingBag,
   Gem,
 } from "lucide-react";
-import "./storefrontLiquidGlass.css";
 
 function isValidHex(value) {
   return typeof value === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim());
@@ -34,71 +33,6 @@ function getSpeedMs(speed, durationMs) {
   if (speed === "slow") return Math.round(safeDuration * 1.25);
   if (speed === "fast") return Math.round(safeDuration * 0.78);
   return safeDuration;
-}
-
-function getShadowStyle(shadow, color) {
-  switch (shadow) {
-    case "none":
-      return "none";
-    case "strong":
-      return "0 18px 40px rgba(0,0,0,0.22)";
-    case "glow":
-      return `0 0 0 1px rgba(255,255,255,0.05), 0 0 28px ${color}55, 0 10px 30px rgba(0,0,0,0.18)`;
-    case "soft":
-    default:
-      return "0 10px 26px rgba(0,0,0,0.14)";
-  }
-}
-
-function getVisualSurfaceStyle(visualStyle, backgroundColor, borderRadiusPx, shadow, color) {
-  const base = {
-    borderRadius: `${borderRadiusPx}px`,
-    boxShadow: getShadowStyle(shadow, color),
-    border: "1px solid rgba(255,255,255,0.18)",
-  };
-
-  switch (visualStyle) {
-    case "minimal":
-      return {
-        ...base,
-        background: "transparent",
-        border: "none",
-        boxShadow: "none",
-      };
-
-    case "luxury":
-      return {
-        ...base,
-        background:
-          "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,244,230,0.92))",
-        border: "1px solid rgba(212,175,55,0.22)",
-      };
-
-    case "glass":
-      return {
-        ...base,
-        background: "rgba(255,255,255,0.18)",
-        border: "1px solid rgba(255,255,255,0.28)",
-        backdropFilter: "blur(18px)",
-        WebkitBackdropFilter: "blur(18px)",
-      };
-
-    case "dark":
-      return {
-        ...base,
-        background: "rgba(17,24,39,0.88)",
-        border: "1px solid rgba(255,255,255,0.08)",
-      };
-
-    case "soft":
-    default:
-      return {
-        ...base,
-        background: isValidCssColor(backgroundColor)
-          ? backgroundColor
-          : "rgba(255,255,255,0.94)",
-      };
-  }
 }
 
 function getAnimationName(animation, fallback = "rbLoaderSpin") {
@@ -156,7 +90,7 @@ function CenterIcon({ icon, color, size, animationCssName, durationMs }) {
 
   return (
     <div
-      className="storefront-liquid-icon"
+      className="storefront-loader-icon"
       style={{
         position: "absolute",
         width: Math.max(26, Math.round(size * 0.55)),
@@ -164,8 +98,6 @@ function CenterIcon({ icon, color, size, animationCssName, durationMs }) {
         left: "50%",
         top: "50%",
         transform: "translate(-50%, -50%)",
-        borderRadius: "50%",
-        "--liquid-tint": color,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -177,6 +109,7 @@ function CenterIcon({ icon, color, size, animationCssName, durationMs }) {
         strokeWidth={1.8}
         style={{
           color,
+          filter: `drop-shadow(0 2px 4px ${color}66)`,
           animation: `${animationCssName} ${durationMs}ms ease-in-out infinite`,
         }}
       />
@@ -316,8 +249,8 @@ function InlineIcon({ icon, color, size }) {
   const IconComp = getIconComponent(icon);
   if (!IconComp) return null;
   return (
-    <span className="storefront-liquid-icon" style={{ width: Math.max(28, size * 0.55), height: Math.max(28, size * 0.55), borderRadius: "50%", "--liquid-tint": color }}>
-      <IconComp size={Math.max(16, size * 0.32)} strokeWidth={1.8} />
+    <span className="storefront-loader-icon" style={{ display: "grid", placeItems: "center", width: Math.max(28, size * 0.55), height: Math.max(28, size * 0.55) }}>
+      <IconComp size={Math.max(16, size * 0.32)} strokeWidth={1.8} color={color} />
     </span>
   );
 }
@@ -538,54 +471,6 @@ function OrbitLoader({ color, secondaryColor, size, durationMs, icon }) {
   );
 }
 
-function LogoBlock({
-  logoUrl,
-  logoSizePx,
-  borderRadiusPx,
-  animationCssName,
-  durationMs,
-  textColor,
-  visualStyle,
-}) {
-  if (!logoUrl) return null;
-
-  const bg =
-    visualStyle === "dark"
-      ? "rgba(255,255,255,0.06)"
-      : visualStyle === "glass"
-      ? "rgba(255,255,255,0.18)"
-      : "rgba(255,255,255,0.72)";
-
-  return (
-    <div
-      style={{
-        width: `${logoSizePx}px`,
-        height: `${logoSizePx}px`,
-        borderRadius: `${Math.min(borderRadiusPx, 28)}px`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        background: bg,
-        border: "1px solid rgba(255,255,255,0.2)",
-        animation: `${animationCssName} ${Math.max(700, durationMs)}ms ease-in-out infinite`,
-      }}
-    >
-      <img
-        src={logoUrl}
-        alt="Logo de carga"
-        style={{
-          width: "82%",
-          height: "82%",
-          objectFit: "contain",
-          display: "block",
-          filter: textColor === "#ffffff" ? "brightness(1.02)" : "none",
-        }}
-      />
-    </div>
-  );
-}
-
 function LoaderVisual({
   type,
   color,
@@ -700,6 +585,7 @@ function LoaderVisual({
 
 export default function GlobalPageLoader({ config, visible = false }) {
   const safeConfig = config && typeof config === "object" ? config : {};
+  const [logoFailed, setLogoFailed] = React.useState(false);
 
   const enabled = safeConfig.enabled !== false;
 
@@ -720,14 +606,9 @@ export default function GlobalPageLoader({ config, visible = false }) {
     ? safeConfig.secondaryColor
     : "#f9a8d4";
 
-  const overlayBaseColor = isValidCssColor(safeConfig.backgroundColor)
-    ? safeConfig.backgroundColor
-    : "#ffffff";
-
   const textColor = isValidCssColor(safeConfig.textColor) ? safeConfig.textColor : "#111827";
   const sizePx = clampNumber(safeConfig.sizePx, 24, 220, 64);
   const strokeWidth = clampNumber(safeConfig.strokeWidth, 1, 20, 4);
-  const overlayOpacity = clampNumber(safeConfig.overlayOpacity, 0, 100, 100);
   const durationMs = getSpeedMs(
     safeConfig.speed,
     safeConfig.durationMs
@@ -735,6 +616,7 @@ export default function GlobalPageLoader({ config, visible = false }) {
 
   const logoUrl =
     typeof safeConfig.logoUrl === "string" ? safeConfig.logoUrl.trim() : "";
+  React.useEffect(() => setLogoFailed(false), [logoUrl]);
   const logoSizePx = clampNumber(safeConfig.logoSizePx, 20, 400, 72);
   const gapPx = clampNumber(safeConfig.gapPx, 0, 80, 16);
   const showLogo = safeConfig.showLogo !== false;
@@ -745,40 +627,6 @@ export default function GlobalPageLoader({ config, visible = false }) {
       : "Cargando...";
   const animation = safeConfig.animation || "spin";
   const icon = safeConfig.icon || "none";
-  const visualStyle = safeConfig.visualStyle || "soft";
-  const shape = safeConfig.shape || "circle";
-  const shadow = safeConfig.shadow || "soft";
-
-  const borderRadiusPx =
-    shape === "square"
-      ? clampNumber(safeConfig.borderRadiusPx, 0, 64, 14)
-      : shape === "rounded"
-      ? clampNumber(safeConfig.borderRadiusPx, 8, 80, 28)
-      : 999;
-
-  const overlayBackground =
-    isValidCssColor(overlayBaseColor) && isValidHex(overlayBaseColor)
-      ? `${overlayBaseColor}${Math.round((overlayOpacity / 100) * 255)
-          .toString(16)
-          .padStart(2, "0")}`
-      : isValidCssColor(overlayBaseColor)
-      ? overlayBaseColor
-      : "rgba(255,255,255,0.96)";
-
-  const panelSurfaceStyle = getVisualSurfaceStyle(
-    visualStyle,
-    overlayBaseColor,
-    borderRadiusPx,
-    shadow,
-    color
-  );
-
-  const textMutedColor =
-    visualStyle === "dark"
-      ? "rgba(255,255,255,0.78)"
-      : isValidCssColor(textColor)
-      ? textColor
-      : "#111827";
 
   if (!enabled || !visible) return null;
 
@@ -856,47 +704,40 @@ export default function GlobalPageLoader({ config, visible = false }) {
       `}</style>
 
       <div
+        role="status"
+        aria-label="Cargando tienda"
         aria-live="polite"
         aria-busy="true"
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 99999,
-          background: overlayBackground,
+          background: "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           animation: "rbLoaderFadeIn 180ms ease-out",
-          backdropFilter: visualStyle === "glass" ? "blur(8px)" : "blur(2px)",
-          WebkitBackdropFilter: visualStyle === "glass" ? "blur(8px)" : "blur(2px)",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
           padding: "20px",
         }}
       >
         <div
           style={{
-            ...panelSurfaceStyle,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             gap: `${gapPx}px`,
-            padding: "24px 26px",
-            minWidth: "min(92vw, 220px)",
             maxWidth: "92vw",
           }}
         >
-          {showLogo && logoUrl ? (
-            <LogoBlock
-              logoUrl={logoUrl}
-              logoSizePx={logoSizePx}
-              borderRadiusPx={borderRadiusPx}
-              animationCssName={getAnimationCssName(animation, "rbLoaderPulse")}
-              durationMs={durationMs}
-              textColor={textColor}
-              visualStyle={visualStyle}
-            />
-          ) : null}
-
+          {showLogo && logoUrl && !logoFailed && <img
+            src={logoUrl}
+            alt=""
+            onError={() => setLogoFailed(true)}
+            style={{ width: `${logoSizePx}px`, height: `${logoSizePx}px`, maxWidth: "80vw", maxHeight: "80vh", objectFit: "contain", display: "block" }}
+          />}
           <LoaderVisual
             type={type}
             color={color}
@@ -913,7 +754,7 @@ export default function GlobalPageLoader({ config, visible = false }) {
               style={{
                 fontSize: "14px",
                 fontWeight: 600,
-                color: textMutedColor,
+                color: textColor,
                 letterSpacing: "0.02em",
                 textAlign: "center",
                 animation:

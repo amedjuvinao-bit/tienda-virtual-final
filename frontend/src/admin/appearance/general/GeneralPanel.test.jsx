@@ -59,10 +59,10 @@ describe("herramientas de Apariencia", () => {
     expect(await screen.findByAltText("Imagen de Botón bajar")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Loader Pantalla de carga/ }));
-    await user.click(screen.getByRole("checkbox", { name: "Mostrar logo o imagen personalizada" }));
+    await user.click(screen.getByRole("checkbox", { name: "Añadir mi imagen transparente" }));
     await user.click(screen.getByRole("button", { name: "Identidad" }));
-    await user.upload(screen.getByLabelText("Seleccionar imagen para Logo de carga"), file);
-    expect(await screen.findByAltText("Imagen de Logo de carga")).toBeInTheDocument();
+    await user.upload(screen.getByLabelText("Seleccionar imagen para Imagen transparente del Loader"), file);
+    expect(await screen.findByAltText("Imagen de Imagen transparente del Loader")).toBeInTheDocument();
     expect(upload).toHaveBeenCalledTimes(4);
     expect(upload).toHaveBeenCalledWith(file, "image");
   });
@@ -105,7 +105,7 @@ describe("herramientas de Apariencia", () => {
     expect(screen.getByLabelText("Vista previa de la herramienta").querySelector(".appearance-general__preview-loader-icon")).toBeInTheDocument();
   });
 
-  it("usa el acabado de cristal en los tres componentes públicos", () => {
+  it("usa cristal en los botones y deja el icono del Loader sin parche", () => {
     const { container } = render(<>
       <WhatsAppButton config={{ phone: "573001234567" }} />
       <ScrollButton config={{ enabled: true }} />
@@ -114,13 +114,16 @@ describe("herramientas de Apariencia", () => {
     expect(container.querySelector('a[aria-label="WhatsApp"]')).toHaveClass("storefront-liquid-icon");
     expect(container.querySelector('a[aria-label="WhatsApp"] svg')).toBeInTheDocument();
     expect(container.querySelectorAll('button.storefront-liquid-icon')).toHaveLength(2);
-    expect(container.querySelector("[aria-busy=true] .storefront-liquid-icon")).toBeInTheDocument();
+    const loader = container.querySelector("[aria-busy=true]");
+    expect(loader.style.background).toBe("transparent");
+    expect(loader.querySelector(".storefront-loader-icon")).toBeInTheDocument();
+    expect(loader.querySelector(".storefront-liquid-icon")).not.toBeInTheDocument();
   });
 
   it("mantiene visible el ícono elegido con todos los tipos de loader", () => {
     for (const type of ["spinner", "ring", "dual-ring", "dots", "bars", "pulse", "diamond", "orbit"]) {
       const { container, unmount } = render(<GlobalPageLoader config={{ type, icon: "crown" }} visible />);
-      expect(container.querySelector("[aria-busy=true] .storefront-liquid-icon svg")).toBeInTheDocument();
+      expect(container.querySelector("[aria-busy=true] .storefront-loader-icon svg")).toBeInTheDocument();
       unmount();
     }
   });
