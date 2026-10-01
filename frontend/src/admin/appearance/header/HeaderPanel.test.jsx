@@ -108,6 +108,7 @@ describe('edición del encabezado', () => {
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
     const options = within(screen.getByRole('group', { name: 'Modelo de íconos' })).getAllByRole('button');
     expect(options).toHaveLength(4);
+    options.forEach((option) => expect(option.querySelectorAll('.storefront-action-glyph')).toHaveLength(2));
     const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
     await user.click(gallery.getByRole('button', { name: /Oro satinado/ }));
     const favorite = within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img');
@@ -129,24 +130,26 @@ describe('edición del encabezado', () => {
 
   it('carga cada icono por separado y lo conserva solo en el juego elegido', async () => {
     const user = userEvent.setup();
-    const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
+    const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/image/upload/v1/corazon.webp');
     render(<Editor upload={upload} />);
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
     const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
     await user.click(gallery.getByRole('button', { name: /Satén rosa/ }));
-    await user.upload(screen.getByLabelText('Seleccionar imagen para Icono de Cuenta'), new File(['icono'], 'cuenta.webp', { type: 'image/webp' }));
+    expect(screen.queryByLabelText('Seleccionar imagen para Icono de Cuenta')).not.toBeInTheDocument();
+    await user.upload(screen.getByLabelText('Seleccionar imagen para Icono de Favoritos'), new File(['icono'], 'corazon.webp', { type: 'image/webp' }));
     expect(upload).toHaveBeenCalled();
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img'))
-      .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
-    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img').getAttribute('src')).toContain('satin-favorites');
+    expect(within(preview).queryByRole('button', { name: 'Administración (vista previa)' })).not.toBeInTheDocument();
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img'))
+      .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/corazon.webp');
+    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img').getAttribute('src')).toContain('satin-cart');
     await user.click(gallery.getByRole('button', { name: /Esmalte vino/ }));
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img').getAttribute('src')).toContain('wine-account');
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img').getAttribute('src')).toContain('wine-favorites');
     await user.click(gallery.getByRole('button', { name: /Satén rosa/ }));
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img'))
-      .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img'))
+      .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/corazon.webp');
     await user.click(screen.getByRole('button', { name: /Quitar/ }));
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img').getAttribute('src')).toContain('satin-account');
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img').getAttribute('src')).toContain('satin-favorites');
   });
 });

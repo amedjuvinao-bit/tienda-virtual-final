@@ -445,12 +445,12 @@ export default function HeaderPanel({
 
               {stylesSubTab === "iconos" && (
                 <div className="appearance-header__icon-editor">
-                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Compara cuatro juegos completos. Puedes cambiar cada imagen por separado debajo de las opciones.</span></div>
+                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Compara favoritos y carrito en cuatro estilos. Puedes cambiar cada imagen por separado.</span></div>
                   <div className="appearance-header__icon-options" role="group" aria-label="Modelo de íconos">
                     {HEADER_ICON_SETS.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection === value}
                       onClick={() => setPath('header.iconSet', value)} className="appearance-header__icon-option">
                       <span className="appearance-header__icon-samples" aria-hidden="true">
-                        {['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}>
+                        {['favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}>
                           <HeaderActionGlyph kind={kind} iconSet={value} iconOverrides={theme.header?.iconOverrides} /></span>)}
                       </span><strong>{label}</strong><small>{description}</small>
                     </button>)}
@@ -460,7 +460,6 @@ export default function HeaderPanel({
                     <p>Selecciona una imagen para reemplazar solo ese icono. Si la quitas, vuelve al diseño original del juego. Se recomienda PNG o WebP transparente y cuadrado.</p>
                     <div className="appearance-header__custom-icon-fields">
                       {[
-                        ['account', 'Cuenta'],
                         ['favorites', 'Favoritos'],
                         ['cart', 'Bolsa de compras'],
                       ].map(([kind, label]) => <CloudinaryImageField key={`${iconSelection}-${kind}`} label={`Icono de ${label}`}
@@ -517,7 +516,7 @@ export default function HeaderPanel({
               />
               <SubTabButton
                 active={responsiveSubTab === "botones"}
-                label="Botones y redes"
+                label="Redes y pie"
                 onClick={() => setResponsiveSubTab("botones")}
               />
               <SubTabButton
@@ -670,16 +669,6 @@ export default function HeaderPanel({
                       <ColorInput
                         value={theme.header?.mobileMenuMutedColor || ""}
                         onChange={(e) => setPath("header.mobileMenuMutedColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color del título
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuTitleColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuTitleColor", e.target.value)}
                       />
                     </label>
 
@@ -839,7 +828,7 @@ export default function HeaderPanel({
                     />
                   </PanelBlock>
 
-                  <PanelBlock title="Radios de botones y panel">
+                  <PanelBlock title="Redondeo de los botones del menú">
                     <Input
                       label="Radio botón hamburguesa (px)"
                       type="number"
@@ -864,142 +853,12 @@ export default function HeaderPanel({
                       }
                     />
 
-                    <Input
-                      label="Radio botón principal (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuButtonRadiusPx ?? 999}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuButtonRadiusPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Radio botón secundario (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuSecondaryButtonRadiusPx ?? 999}
-                      onChange={(e) =>
-                        setPath(
-                          "header.mobileMenuSecondaryButtonRadiusPx",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
                   </PanelBlock>
                 </>
               )}
 
               {responsiveSubTab === "botones" && (
                 <>
-                  <PanelBlock title="Botón principal">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo botón principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuButtonBg || ""}
-                        onChange={(e) => setPath("header.mobileMenuButtonBg", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Texto botón principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuButtonTextColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuButtonTextColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color borde botón principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuButtonBorderColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuButtonBorderColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor borde botón principal (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuButtonBorderWidthPx ?? 0}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuButtonBorderWidthPx", Number(e.target.value))
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Botón secundario">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo botón secundario
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSecondaryButtonBg || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuSecondaryButtonBg", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Texto botón secundario
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSecondaryButtonTextColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuSecondaryButtonTextColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color borde botón secundario
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSecondaryButtonBorderColor || ""}
-                        onChange={(e) =>
-                          setPath(
-                            "header.mobileMenuSecondaryButtonBorderColor",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor borde botón secundario (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuSecondaryButtonBorderWidthPx ?? 1}
-                      onChange={(e) =>
-                        setPath(
-                          "header.mobileMenuSecondaryButtonBorderWidthPx",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </PanelBlock>
-
                   <PanelBlock title="Redes sociales y pie">
                     <label className="block min-w-0">
                       <span className="mb-1 block text-sm font-medium text-gray-700">

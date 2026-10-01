@@ -40,6 +40,11 @@ describe('encabezado de la tienda', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     expect(drawer).toHaveAttribute('aria-hidden', 'false');
+    expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument();
+    expect(within(drawer).queryByText('Mi cuenta')).not.toBeInTheDocument();
+    expect(within(drawer).queryByRole('button', { name: 'Inicia sesión' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Favoritos' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Abrir carrito' })).toHaveLength(2);
     expect(within(drawer).queryByText('Registro')).not.toBeInTheDocument();
     expect(within(drawer).queryByRole('link', { name: 'Facebook' })).not.toBeInTheDocument();
     await user.keyboard('{Escape}');
@@ -86,6 +91,7 @@ describe('encabezado de la tienda', () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole('banner').querySelector('[data-icon-style="wine"]')).toBeInTheDocument());
     expect(screen.getByRole('banner').style.getPropertyValue('--storefront-action-size')).toBe('32px');
+    expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument();
     const cartButtons = screen.getAllByRole('button', { name: 'Abrir carrito' });
     expect(cartButtons).toHaveLength(2);
     cartButtons.forEach((button) => {

@@ -166,33 +166,6 @@ function Header() {
   const mobileMenuBorderColor = headerConfig?.mobileMenuBorderColor || "#e7c2cf";
   const mobileMenuAccentColor = headerConfig?.mobileMenuAccentColor || "#b76e79";
   const mobileMenuMutedColor = headerConfig?.mobileMenuMutedColor || "#8a6b74";
-  const mobileMenuTitleColor = headerConfig?.mobileMenuTitleColor || "#1f1f1f";
-
-  const mobileMenuButtonBg = headerConfig?.mobileMenuButtonBg || "#d8b2bf";
-  const mobileMenuButtonTextColor =
-    headerConfig?.mobileMenuButtonTextColor || "#7b4f5f";
-  const mobileMenuButtonBorderColor =
-    headerConfig?.mobileMenuButtonBorderColor || mobileMenuButtonBg;
-  const mobileMenuButtonBorderWidthPx = Number(
-    headerConfig?.mobileMenuButtonBorderWidthPx ?? 0
-  );
-  const mobileMenuButtonRadiusPx = Number(
-    headerConfig?.mobileMenuButtonRadiusPx ?? 999
-  );
-
-  const mobileMenuSecondaryButtonBg =
-    headerConfig?.mobileMenuSecondaryButtonBg || "#ffffff";
-  const mobileMenuSecondaryButtonTextColor =
-    headerConfig?.mobileMenuSecondaryButtonTextColor || "#9d6275";
-  const mobileMenuSecondaryButtonBorderColor =
-    headerConfig?.mobileMenuSecondaryButtonBorderColor || "#c88ca1";
-  const mobileMenuSecondaryButtonBorderWidthPx = Number(
-    headerConfig?.mobileMenuSecondaryButtonBorderWidthPx ?? 1
-  );
-  const mobileMenuSecondaryButtonRadiusPx = Number(
-    headerConfig?.mobileMenuSecondaryButtonRadiusPx ?? 999
-  );
-
   const mobileMenuSocialBg = headerConfig?.mobileMenuSocialBg || "#c98ea2";
   const mobileMenuSocialIconColor =
     headerConfig?.mobileMenuSocialIconColor || "#ffffff";
@@ -266,13 +239,6 @@ function Header() {
     mobileMenuTriggerRadiusPx === 999 ? "999px" : `${mobileMenuTriggerRadiusPx}px`;
   const mobileMenuCloseRadius =
     mobileMenuCloseRadiusPx === 999 ? "999px" : `${mobileMenuCloseRadiusPx}px`;
-  const mobileMenuButtonRadius =
-    mobileMenuButtonRadiusPx === 999 ? "999px" : `${mobileMenuButtonRadiusPx}px`;
-  const mobileMenuSecondaryRadius =
-    mobileMenuSecondaryButtonRadiusPx === 999
-      ? "999px"
-      : `${mobileMenuSecondaryButtonRadiusPx}px`;
-
   const drawerBorderRadius =
     mobileMenuRadiusPx > 0 ? `${mobileMenuRadiusPx}px` : "0px";
 
@@ -307,22 +273,6 @@ function Header() {
     height: `${mobileMenuSocialSizePx}px`,
     backgroundColor: mobileMenuSocialBg,
     color: mobileMenuSocialIconColor,
-  };
-
-  const primaryButtonStyle = {
-    backgroundColor: mobileMenuButtonBg,
-    color: mobileMenuButtonTextColor,
-    borderColor: mobileMenuButtonBorderColor,
-    borderWidth: `${mobileMenuButtonBorderWidthPx}px`,
-    borderRadius: mobileMenuButtonRadius,
-  };
-
-  const secondaryButtonStyle = {
-    backgroundColor: mobileMenuSecondaryButtonBg,
-    color: mobileMenuSecondaryButtonTextColor,
-    borderColor: mobileMenuSecondaryButtonBorderColor,
-    borderWidth: `${mobileMenuSecondaryButtonBorderWidthPx}px`,
-    borderRadius: mobileMenuSecondaryRadius,
   };
 
   const drawerWidth =
@@ -442,13 +392,6 @@ function Header() {
             </nav>
 
             <div className="header-icons flex shrink-0 items-center gap-0 text-xl">
-              <button type="button" aria-label="Administración"
-                onClick={() => navigate("/admin/login")}
-                className="storefront-action-button"
-              >
-                <HeaderActionGlyph kind="account" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
-              </button>
-
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
@@ -617,33 +560,12 @@ function Header() {
             )}
           </nav>
 
-          <div className="pt-8">
-            <div
-              className="mb-4 text-[18px] font-semibold"
-              style={{ color: mobileMenuTitleColor }}
-            >
-              Mi cuenta
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => closeMenuAndNavigate("/admin/login")}
-                className="w-full font-semibold py-3 px-4 transition hover:opacity-90"
-                style={primaryButtonStyle}
-              >
-                Inicia sesión
-              </button>
-
-            </div>
-
-            {socialLinks.length > 0 && <div className="pt-8 flex items-center gap-3">
-              {socialLinks.map(({ label, href, Icon }) => <a key={label} href={href}
-                aria-label={label} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center shadow-sm transition hover:scale-105"
-                style={socialButtonStyle}><Icon className="w-5 h-5" /></a>)}
-            </div>}
-          </div>
+          {socialLinks.length > 0 && <div className="pt-8 flex items-center gap-3">
+            {socialLinks.map(({ label, href, Icon }) => <a key={label} href={href}
+              aria-label={label} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center shadow-sm transition hover:scale-105"
+              style={socialButtonStyle}><Icon className="w-5 h-5" /></a>)}
+          </div>}
         </div>
 
         <div
