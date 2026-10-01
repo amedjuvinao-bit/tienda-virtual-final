@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu,
@@ -14,11 +14,14 @@ import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, headerMenuDestination } from './headerPresentation';
 import HeaderBrand from './HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
+import HeaderSearch from './HeaderSearch';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTriggerRef = useRef(null);
   const { cart } = useCart();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
@@ -88,7 +91,7 @@ function Header() {
     let previousY = window.scrollY;
     function handleScroll() {
       const currentY = window.scrollY;
-      if (!menuOpen && !cartOpen && Math.abs(currentY - previousY) > 4) {
+      if (!menuOpen && !cartOpen && !searchOpen && Math.abs(currentY - previousY) > 4) {
         setShowHeader(currentY < 80 || currentY < previousY);
       }
       previousY = currentY;
@@ -96,10 +99,10 @@ function Header() {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [menuOpen, cartOpen]);
+  }, [menuOpen, cartOpen, searchOpen]);
 
   useEffect(() => {
-    if (menuOpen || cartOpen) {
+    if (menuOpen || cartOpen || searchOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -108,11 +111,12 @@ function Header() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen, cartOpen]);
+  }, [menuOpen, cartOpen, searchOpen]);
 
   useEffect(() => {
     setShowHeader(true);
     setMenuOpen(false);
+    setSearchOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -156,7 +160,7 @@ function Header() {
     () => ({
       height: `${Math.max(26, Math.min(46, Number(logoHeightPx) || 40))}px`,
       width: "auto",
-      maxWidth: "120px",
+      maxWidth: "clamp(76px, 24vw, 120px)",
     }),
     [logoHeightPx]
   );
@@ -335,6 +339,18 @@ function Header() {
     setMenuOpen(false);
     navigate(to);
   };
+  const openSearch = (event) => {
+    searchTriggerRef.current = event.currentTarget;
+    setSearchOpen(true);
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    searchTriggerRef.current?.focus();
+  };
+  const submitSearch = (term) => {
+    setSearchOpen(false);
+    navigate(`/buscar?q=${encodeURIComponent(term)}`);
+  };
   const socialLinks = [
     { label: 'Facebook', href: footerConfig.facebook, Icon: Facebook },
     { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
@@ -392,6 +408,11 @@ function Header() {
             </nav>
 
             <div className="header-icons flex shrink-0 items-center gap-0 text-xl">
+              <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen}
+                onClick={openSearch} className="storefront-action-button"
+              >
+                <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
+              </button>
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
@@ -441,6 +462,11 @@ function Header() {
             </div>
 
             <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-0">
+              <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen}
+                onClick={openSearch} className="storefront-action-button"
+              >
+                <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
+              </button>
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
@@ -580,6 +606,7 @@ function Header() {
         </div>
       </aside>
 
+      <HeaderSearch open={searchOpen} onClose={closeSearch} onSearch={submitSearch} />
       <CartSidebar isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );

@@ -445,12 +445,12 @@ export default function HeaderPanel({
 
               {stylesSubTab === "iconos" && (
                 <div className="appearance-header__icon-editor">
-                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Compara favoritos y carrito en cuatro estilos. Puedes cambiar cada imagen por separado.</span></div>
+                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Compara búsqueda, favoritos y carrito en cuatro estilos. Puedes cambiar cada imagen por separado.</span></div>
                   <div className="appearance-header__icon-options" role="group" aria-label="Modelo de íconos">
                     {HEADER_ICON_SETS.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection === value}
                       onClick={() => setPath('header.iconSet', value)} className="appearance-header__icon-option">
                       <span className="appearance-header__icon-samples" aria-hidden="true">
-                        {['favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}>
+                        {['search', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}>
                           <HeaderActionGlyph kind={kind} iconSet={value} iconOverrides={theme.header?.iconOverrides} /></span>)}
                       </span><strong>{label}</strong><small>{description}</small>
                     </button>)}
@@ -460,6 +460,7 @@ export default function HeaderPanel({
                     <p>Selecciona una imagen para reemplazar solo ese icono. Si la quitas, vuelve al diseño original del juego. Se recomienda PNG o WebP transparente y cuadrado.</p>
                     <div className="appearance-header__custom-icon-fields">
                       {[
+                        ['search', 'Búsqueda'],
                         ['favorites', 'Favoritos'],
                         ['cart', 'Bolsa de compras'],
                       ].map(([kind, label]) => <CloudinaryImageField key={`${iconSelection}-${kind}`} label={`Icono de ${label}`}

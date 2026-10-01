@@ -2,7 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import Header from './Header';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 
@@ -20,6 +20,23 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(cleanup);
 
 describe('encabezado de la tienda', () => {
+  it('abre la búsqueda desde la lupa, permite cerrarla y envía la consulta a resultados', async () => {
+    const user = userEvent.setup();
+    function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    const buttons = screen.getAllByRole('button', { name: 'Buscar productos' });
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0].querySelector('img').getAttribute('src')).toContain('gold-search');
+    await user.click(buttons[0]);
+    expect(screen.getByRole('dialog', { name: 'Buscar productos' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Buscar productos' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(buttons[1]);
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), 'vestido rosa{Enter}');
+    expect(screen.getByTestId('location')).toHaveTextContent('/buscar?q=vestido%20rosa');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
   it('usa el logo de contraste, conserva enlaces seguros y actualiza el menú después de guardar', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });

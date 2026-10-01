@@ -215,6 +215,8 @@ function buildPublicProductListFilter(options) {
     clauses.push({
       $or: [
         { title: regex },
+        { category: regex },
+        { categories: regex },
         { sku: regex },
         { barcode: regex },
         { 'variants.sku': regex },

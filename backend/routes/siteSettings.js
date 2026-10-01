@@ -641,7 +641,7 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (theme?.header?.iconOverrides !== undefined) {
       const overrides = theme.header.iconOverrides;
       const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
-      const validKinds = ['account', 'favorites', 'cart'];
+      const validKinds = ['account', 'search', 'favorites', 'cart'];
       const validSets = ['gold', 'wine', 'satin', 'porcelain'];
       const valid = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
         && Object.entries(overrides).every(([set, images]) => validSets.includes(set)

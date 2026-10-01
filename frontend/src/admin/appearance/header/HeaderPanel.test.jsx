@@ -108,24 +108,29 @@ describe('edición del encabezado', () => {
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
     const options = within(screen.getByRole('group', { name: 'Modelo de íconos' })).getAllByRole('button');
     expect(options).toHaveLength(4);
-    options.forEach((option) => expect(option.querySelectorAll('.storefront-action-glyph')).toHaveLength(2));
+    options.forEach((option) => expect(option.querySelectorAll('.storefront-action-glyph')).toHaveLength(3));
     const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
     await user.click(gallery.getByRole('button', { name: /Oro satinado/ }));
     const favorite = within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img');
+    const search = within(preview).getByRole('button', { name: 'Buscar (vista previa)' }).querySelector('img');
+    expect(search.getAttribute('src')).toContain('gold-search');
     expect(favorite).toHaveAttribute('data-icon-style', 'gold');
     expect(favorite.getAttribute('src')).toContain('gold-favorites');
     await user.click(gallery.getByRole('button', { name: /Esmalte vino/ }));
     const cart = within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img');
     expect(cart).toHaveAttribute('data-icon-style', 'wine');
     expect(cart.getAttribute('src')).toContain('wine-cart');
+    expect(search.getAttribute('src')).toContain('wine-search');
     await user.click(gallery.getByRole('button', { name: /Satén rosa/ }));
     expect(cart.getAttribute('src')).toContain('satin-cart');
     await user.click(gallery.getByRole('button', { name: /Porcelana rosa/ }));
     expect(cart.getAttribute('src')).toContain('porcelain-cart');
+    expect(search.getAttribute('src')).toContain('porcelain-search');
     fireEvent.change(screen.getByRole('slider', { name: /Tamaño en la tienda/ }), { target: { value: '30' } });
     expect(preview.querySelector('.appearance-header__store-header').style.getPropertyValue('--storefront-action-size')).toBe('30px');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img')).toHaveAttribute('data-icon-style', 'porcelain');
+    expect(within(preview).getByRole('button', { name: 'Buscar (vista previa)' }).querySelector('img')).toHaveAttribute('data-icon-style', 'porcelain');
   });
 
   it('carga cada icono por separado y lo conserva solo en el juego elegido', async () => {
