@@ -1,0 +1,34 @@
+.storefront-action-button {
+  position: relative; display: inline-grid; flex: none; place-items: center;
+  width: 42px; height: 42px; padding: 0; border: 1px solid transparent;
+  border-radius: 15px; color: var(--header-icon-color, currentColor);
+  background: transparent; isolation: isolate; cursor: pointer;
+  transition: transform .24s ease, box-shadow .24s ease, color .24s ease, background .24s ease;
+}
+.storefront-action-button[data-finish="glass"] {
+  border-color: rgba(255,255,255,.72); border-radius: 16px;
+  background: radial-gradient(circle at 26% 13%, rgba(255,255,255,.94), transparent 38%), linear-gradient(145deg, rgba(255,255,255,.56), rgba(255,255,255,.11) 62%, rgba(255,255,255,.36));
+  box-shadow: inset 0 2px 2px rgba(255,255,255,.92), inset 0 -3px 6px rgba(73,26,60,.13), 0 6px 14px rgba(63,30,58,.16);
+  -webkit-backdrop-filter: blur(14px) saturate(1.65); backdrop-filter: blur(14px) saturate(1.65);
+}
+.storefront-action-button[data-finish="jewel"] {
+  border-color: rgba(255,255,255,.92); border-radius: 50%;
+  background: radial-gradient(circle at 24% 14%, rgba(255,255,255,1), transparent 42%), linear-gradient(145deg, rgba(255,255,255,.89), color-mix(in srgb, currentColor 17%, white) 74%);
+  box-shadow: inset 0 2px 2px white, inset 0 -5px 8px color-mix(in srgb, currentColor 19%, transparent), 0 2px 0 color-mix(in srgb, currentColor 15%, transparent), 0 9px 18px rgba(60,30,55,.2);
+}
+.storefront-header-surface[data-tone="dark"] .storefront-action-button[data-finish="glass"] { background: radial-gradient(circle at 26% 13%, rgba(255,255,255,.3), transparent 45%), linear-gradient(145deg, rgba(69,25,56,.7), rgba(26,10,24,.42)); }
+.storefront-header-surface[data-tone="dark"] .storefront-action-button[data-finish="jewel"] { background: radial-gradient(circle at 24% 14%, rgba(255,255,255,.32), transparent 42%), linear-gradient(145deg, #803954, #3b1839 78%); }
+.storefront-action-button[data-finish="glass"]::before,
+.storefront-action-button[data-finish="jewel"]::before {
+  content: ''; position: absolute; inset: 3px 5px auto; height: 32%; border-radius: inherit;
+  background: linear-gradient(rgba(255,255,255,.58), transparent); pointer-events: none;
+}
+.storefront-action-glyph { position: relative; z-index: 1; flex: none; transition: transform .24s ease, filter .24s ease; }
+.storefront-action-button:hover { color: var(--header-icon-hover, currentColor); transform: translateY(-3px); }
+.storefront-action-button[data-finish="glass"]:hover,
+.storefront-action-button[data-finish="jewel"]:hover { box-shadow: inset 0 2px 2px white, inset 0 -4px 8px color-mix(in srgb, currentColor 17%, transparent), 0 12px 24px rgba(60,30,55,.24); }
+.storefront-action-button:hover .storefront-action-glyph { transform: scale(var(--header-icon-hover-scale, 1.08)) rotate(var(--header-icon-hover-rot, 0deg)); filter: drop-shadow(0 2px 5px currentColor); }
+.storefront-action-button:active { transform: translateY(1px) scale(.96); }
+.storefront-action-button:focus-visible { outline: 3px solid var(--header-icon-color, currentColor); outline-offset: 3px; }
+.storefront-action-badge { position: absolute; z-index: 2; top: -6px; right: -7px; display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 4px; border: 2px solid white; border-radius: 99px; background: #bd2d69; color: white; font: 700 11px/1 system-ui, sans-serif; box-shadow: 0 3px 7px rgba(72,18,43,.22); }
+@media (prefers-reduced-motion: reduce) { .storefront-action-button, .storefront-action-glyph { transition: none; } }

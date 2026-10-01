@@ -72,6 +72,8 @@ function buildDefaultSettings() {
         iconColor: "",
         iconHoverColor: "",
         iconAnimation: "soft",
+        iconSet: "boutique",
+        iconFinish: "glass",
         fontPreset: "",
         fontFamily: "",
         fontSizePx: 16,

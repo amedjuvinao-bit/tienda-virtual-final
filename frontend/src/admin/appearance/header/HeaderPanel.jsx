@@ -4,6 +4,7 @@ import { Image, Link2, Palette, Smartphone } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
 import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
+import { HEADER_ICON_FINISHES, HEADER_ICON_SETS, HeaderActionGlyph, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
 
@@ -152,6 +153,7 @@ export default function HeaderPanel({
   const [brandingSubTab, setBrandingSubTab] = useState("logo");
   const [stylesSubTab, setStylesSubTab] = useState("tipografia");
   const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
+  const iconSelection = resolveHeaderIcons(theme.header);
   const logoMode = theme.header?.logoMode || 'auto';
   const preferredLogo = logoMode === 'auto'
     ? (isDarkHeaderBackground(theme.header?.bgColor) ? 'claro' : 'oscuro')
@@ -441,7 +443,26 @@ export default function HeaderPanel({
               )}
 
               {stylesSubTab === "iconos" && (
-                <PanelBlock title="Íconos (colores y animación)">
+                <div className="appearance-header__icon-editor">
+                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Cuenta, favoritos y carrito cambian juntos en la vista previa y en la tienda.</span></div>
+                  <div className="appearance-header__icon-options" role="group" aria-label="Modelo de íconos">
+                    {HEADER_ICON_SETS.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection.set === value}
+                      onClick={() => setPath('header.iconSet', value)} className="appearance-header__icon-option">
+                      <span className="appearance-header__icon-samples" aria-hidden="true">
+                        {['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" data-finish={iconSelection.finish} key={kind}><HeaderActionGlyph kind={kind} iconSet={value} /></span>)}
+                      </span><strong>{label}</strong><small>{description}</small>
+                    </button>)}
+                  </div>
+                  <div className="appearance-header__icon-heading"><strong>Acabado</strong><span>Escoge el relieve de los botones.</span></div>
+                  <div className="appearance-header__icon-options" role="group" aria-label="Acabado de íconos">
+                    {HEADER_ICON_FINISHES.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection.finish === value}
+                      onClick={() => setPath('header.iconFinish', value)} className="appearance-header__icon-option">
+                      <span className="appearance-header__icon-samples" aria-hidden="true">
+                        {['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" data-finish={value} key={kind}><HeaderActionGlyph kind={kind} iconSet={iconSelection.set} /></span>)}
+                      </span><strong>{label}</strong><small>{description}</small>
+                    </button>)}
+                  </div>
+                  <PanelBlock title="Color y movimiento">
                   <label className="block min-w-0">
                     <span className="mb-1 block text-sm font-medium text-gray-700">
                       Color de íconos
@@ -475,7 +496,8 @@ export default function HeaderPanel({
                       <option value="pop">Pop (más fuerte)</option>
                     </Select>
                   </div>
-                </PanelBlock>
+                  </PanelBlock>
+                </div>
               )}
             </div>
           </section>

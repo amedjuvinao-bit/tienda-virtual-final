@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  Heart,
-  ShoppingCart,
-  User,
   Menu,
   X,
   ChevronRight,
@@ -14,8 +11,9 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import CartSidebar from "./CartSidebar";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
-import { normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, headerMenuDestination } from './headerPresentation';
+import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, headerMenuDestination } from './headerPresentation';
 import HeaderBrand from './HeaderBrand';
+import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -32,6 +30,7 @@ function Header() {
   const [logoHeightPx, setLogoHeightPx] = useState(80);
   const [menuItems, setMenuItems] = useState([]);
   const [headerConfig, setHeaderConfig] = useState({});
+  const iconPresentation = resolveHeaderIcons(headerConfig);
   const [footerConfig, setFooterConfig] = useState({});
 
   useEffect(() => {
@@ -136,6 +135,8 @@ function Header() {
   const headerSurface = useMemo(() => resolveHeaderSurface(headerConfig), [headerConfig]);
   const headerInlineStyle = {
     ...headerSurface.style,
+    '--header-icon-color': headerConfig.iconColor || headerConfig.textColor || (isDarkHeaderBackground(headerBgHex) ? '#ffffff' : '#9d4268'),
+    '--header-icon-hover': headerConfig.iconHoverColor || '#c62d6a',
     backgroundColor: `rgba(var(--header-bg-rgb, 255, 227, 236), ${headerSurface.opacity})`,
   };
 
@@ -394,6 +395,7 @@ function Header() {
         style={headerInlineStyle}
         data-shape={headerSurface.shape}
         data-glass={headerSurface.glass}
+        data-tone={isDarkHeaderBackground(headerBgHex) ? 'dark' : 'light'}
         data-visible={showHeader}
         className="theme-header storefront-header-surface px-4 fixed z-50"
       >
@@ -438,21 +440,21 @@ function Header() {
               })}
             </nav>
 
-            <div className="header-icons flex shrink-0 items-center gap-3 text-xl xl:gap-4">
+            <div className="header-icons flex shrink-0 items-center gap-2 text-xl xl:gap-3">
               <button type="button" aria-label="Administración"
                 onClick={() => navigate("/admin/login")}
-                className="header-icon relative rounded-full p-2 focus-visible:outline focus-visible:outline-2"
+                className="storefront-action-button" data-finish={iconPresentation.finish}
               >
-                <User className="w-5 h-5" />
+                <HeaderActionGlyph kind="account" iconSet={iconPresentation.set} />
               </button>
 
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="header-icon relative rounded-full p-2 focus-visible:outline focus-visible:outline-2"
+                className="storefront-action-button" data-finish={iconPresentation.finish}
               >
-                <Heart className="w-5 h-5" />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation.set} />
                 {favorites.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-[#D4AF37] text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {favorites.length}
                   </span>
                 )}
@@ -460,11 +462,11 @@ function Header() {
 
               <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="header-icon relative rounded-full p-2 focus-visible:outline focus-visible:outline-2"
+                className="storefront-action-button" data-finish={iconPresentation.finish}
               >
-                <ShoppingCart className="w-5 h-5" />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation.set} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {cart.length}
                   </span>
                 )}
@@ -497,11 +499,11 @@ function Header() {
             <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2">
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="relative cursor-pointer text-[#8d5c6b] bg-white shadow-sm border border-[#e7c2cf] rounded-full w-10 h-10 flex items-center justify-center"
+                className="storefront-action-button" data-finish={iconPresentation.finish}
               >
-                <Heart className="w-5 h-5" />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation.set} />
                 {favorites.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#D4AF37] text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {favorites.length}
                   </span>
                 )}
@@ -509,11 +511,11 @@ function Header() {
 
               <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="relative cursor-pointer text-[#8d5c6b] bg-white shadow-sm border border-[#e7c2cf] rounded-full w-10 h-10 flex items-center justify-center"
+                className="storefront-action-button" data-finish={iconPresentation.finish}
               >
-                <ShoppingCart className="w-5 h-5" />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation.set} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {cart.length}
                   </span>
                 )}

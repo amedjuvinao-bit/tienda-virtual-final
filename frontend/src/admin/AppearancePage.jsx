@@ -300,6 +300,8 @@ function buildThemeFromServer(themeRaw) {
       iconColor: "",
       iconHoverColor: "",
       iconAnimation: "soft",
+      iconSet: "boutique",
+      iconFinish: "glass",
 
       fontPreset: "",
       fontFamily: "",
@@ -781,6 +783,11 @@ export default function AppearancePage() {
 
       if (changedTheme.header && !headerColorList.every(hexOk)) {
         showValidation("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
+        return;
+      }
+
+      if (changedTheme.header && (!['classic', 'boutique', 'atelier'].includes(h.iconSet) || !['minimal', 'glass', 'jewel'].includes(h.iconFinish))) {
+        showValidation('Selecciona un modelo y un acabado válidos para los íconos.');
         return;
       }
 

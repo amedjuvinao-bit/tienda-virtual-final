@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Heart, Menu, Monitor, ShoppingCart, Smartphone, X } from 'lucide-react';
+import { Menu, Monitor, Smartphone, X } from 'lucide-react';
 import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, resolveHeaderTypography } from '../../../components/headerPresentation';
 import HeaderBrand from '../../../components/HeaderBrand';
+import { HeaderActionGlyph, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 
 export default function HeaderPreview({ theme, menus }) {
   const [viewport, setViewport] = useState('desktop');
@@ -16,6 +17,7 @@ export default function HeaderPreview({ theme, menus }) {
   useEffect(() => setFailedLogo(''), [logo, alternateLogo]);
   const typography = resolveHeaderTypography(header, theme?.fonts?.headings || 'Georgia, serif');
   const surface = resolveHeaderSurface(header);
+  const icons = resolveHeaderIcons(header);
   const mobile = viewport === 'mobile';
   const background = header.bgColor || '#ffe3ec';
   const opacity = surface.opacity;
@@ -34,11 +36,15 @@ export default function HeaderPreview({ theme, menus }) {
     </div>
     <div className="appearance-header__scene">
       <div className="appearance-header__device" data-viewport={viewport} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-        <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} style={{ ...surface.style, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
+        <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
           {mobile && <button type="button" aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} onClick={() => setDrawerOpen(!drawerOpen)} style={{ color: header.mobileMenuTriggerIconColor || header.iconColor, backgroundColor: header.mobileMenuTriggerBgColor || '#fff' }}>{drawerOpen ? <X size={18} /> : <Menu size={18} />}</button>}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
           {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <span key={`${link.to}-${index}`}>{link.name}</span>) : <em>Tu menú aparecerá aquí</em>}</nav>}
-          <div className="appearance-header__actions" style={{ color: header.iconColor || 'inherit' }}><Heart size={18} /><ShoppingCart size={18} /></div>
+          <div className="appearance-header__actions">
+            {!mobile && <button type="button" className="storefront-action-button" data-finish={icons.finish} aria-label="Administración (vista previa)"><HeaderActionGlyph kind="account" iconSet={icons.set} /></button>}
+            <button type="button" className="storefront-action-button" data-finish={icons.finish} aria-label="Favoritos (vista previa)"><HeaderActionGlyph kind="favorites" iconSet={icons.set} /></button>
+            <button type="button" className="storefront-action-button" data-finish={icons.finish} aria-label="Carrito (vista previa)"><HeaderActionGlyph kind="cart" iconSet={icons.set} /></button>
+          </div>
         </div>
         {mobile && drawerOpen && <div className="appearance-header__drawer" style={{ backgroundColor: header.mobileMenuBgColor || '#fffdfd', color: header.mobileMenuTextColor || '#1f1f1f', fontFamily: header.mobileMenuFontFamily || typography.fontFamily, fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>
           {links.length ? links.map((link, index) => <div key={`${link.to}-${index}`}>{link.name}</div>) : <p>Añade enlaces en la pestaña Menú.</p>}
