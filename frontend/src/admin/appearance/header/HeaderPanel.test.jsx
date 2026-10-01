@@ -9,7 +9,14 @@ afterEach(cleanup);
 function Editor({ upload = vi.fn() }) {
   const [theme, setTheme] = useState({ header: { bgColor: '#18181b', logoLight: '/claro.png', logoDark: '/oscuro.png', logoHeightPx: 80 } });
   const [menus, setMenus] = useState({ header: [{ title: 'Inicio', ref: '/' }] });
-  const setPath = (path, value) => setTheme((previous) => ({ ...previous, header: { ...previous.header, [path.split('.')[1]]: value } }));
+  const setPath = (path, value) => setTheme((previous) => {
+    const next = structuredClone(previous);
+    const parts = path.split('.');
+    let target = next;
+    for (const part of parts.slice(0, -1)) target = target[part] ||= {};
+    target[parts.at(-1)] = value;
+    return next;
+  });
   return <HeaderPanel theme={theme} setPath={setPath} menus={menus}
     routeOptions={{ public: [{ label: 'Inicio', value: '/' }, { label: 'Lo Nuevo', value: '/lo-nuevo' }] }}
     uploading={false} setUploading={() => {}} savedRevision={1} uploadToCloudinaryViaBackend={upload}
@@ -90,24 +97,38 @@ describe('edición del encabezado', () => {
     expect(header).toHaveAttribute('data-glass', 'false');
   });
 
-  it('muestra familias visualmente diferentes en escritorio y móvil', async () => {
+  it('muestra los dos acabados tridimensionales en escritorio y móvil', async () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
     const options = within(screen.getByRole('group', { name: 'Modelo de íconos' })).getAllByRole('button');
-    expect(options).toHaveLength(6);
+    expect(options).toHaveLength(3);
     const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
-    await user.click(gallery.getByRole('button', { name: /Silueta/ }));
-    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('svg').getAttribute('fill')).toMatch(/^url\(#.+\)$/);
-    await user.click(gallery.getByRole('button', { name: /Facetas/ }));
-    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'editorial');
-    await user.click(gallery.getByRole('button', { name: /Couture/ }));
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveAttribute('width', '26');
-    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' })).not.toHaveAttribute('data-finish');
+    await user.click(gallery.getByRole('button', { name: /Cristal rosa/ }));
+    const favorite = within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('img');
+    expect(favorite).toHaveAttribute('data-icon-style', 'rose');
+    expect(favorite.getAttribute('src')).toContain('rose-favorites');
+    await user.click(gallery.getByRole('button', { name: /Noir dorado/ }));
+    const cart = within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img');
+    expect(cart).toHaveAttribute('data-icon-style', 'noir');
+    expect(cart.getAttribute('src')).toContain('noir-cart');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
-    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
+    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('img')).toHaveAttribute('data-icon-style', 'noir');
+  });
+
+  it('carga iconos propios y los refleja en la vista previa', async () => {
+    const user = userEvent.setup();
+    const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
+    render(<Editor upload={upload} />);
+    await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
+    await user.click(screen.getByRole('button', { name: 'Íconos' }));
+    await user.click(screen.getByRole('button', { name: /Mis imágenes/ }));
+    await user.upload(screen.getByLabelText('Seleccionar imagen para Icono de Cuenta'), new File(['icono'], 'cuenta.webp', { type: 'image/webp' }));
+    expect(upload).toHaveBeenCalled();
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('img'))
+      .toHaveAttribute('src', 'https://res.cloudinary.com/tienda/image/upload/v1/cuenta.webp');
   });
 });

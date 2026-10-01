@@ -445,14 +445,14 @@ function Header() {
                 onClick={() => navigate("/admin/login")}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="account" iconSet={iconPresentation} />
+                <HeaderActionGlyph kind="account" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
               </button>
 
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
                 {favorites.length > 0 && (
                   <span className="storefront-action-badge">
                     {favorites.length}
@@ -464,7 +464,7 @@ function Header() {
                 onClick={() => setCartOpen(true)}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
                 {cart.length > 0 && (
                   <span className="storefront-action-badge">
                     {cart.length}
@@ -501,7 +501,7 @@ function Header() {
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
                 {favorites.length > 0 && (
                   <span className="storefront-action-badge">
                     {favorites.length}
@@ -513,7 +513,7 @@ function Header() {
                 onClick={() => setCartOpen(true)}
                 className="storefront-action-button"
               >
-                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} />
                 {cart.length > 0 && (
                   <span className="storefront-action-badge">
                     {cart.length}

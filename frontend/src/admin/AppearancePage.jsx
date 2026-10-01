@@ -300,7 +300,8 @@ function buildThemeFromServer(themeRaw) {
       iconColor: "",
       iconHoverColor: "",
       iconAnimation: "soft",
-      iconSet: "boutique",
+      iconSet: "rose",
+      iconImages: { account: "", favorites: "", cart: "" },
 
       fontPreset: "",
       fontFamily: "",
@@ -785,8 +786,14 @@ export default function AppearancePage() {
         return;
       }
 
-      if (changedTheme.header && !['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence'].includes(h.iconSet)) {
+      if (changedTheme.header && !['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence', 'rose', 'noir', 'custom'].includes(h.iconSet)) {
         showValidation('Selecciona un modelo válido para los íconos.');
+        return;
+      }
+      if (changedTheme.header && h.iconSet === 'custom' && !['account', 'favorites', 'cart'].every((kind) =>
+        /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(h.iconImages?.[kind] || '')
+      )) {
+        showValidation('Carga las tres imágenes de los iconos en Cloudinary antes de guardar.');
         return;
       }
 

@@ -78,19 +78,29 @@ describe('encabezado de la tienda', () => {
     expect(header.style.backgroundColor).toContain('0.62');
   });
 
-  it('usa los íconos finos guardados en escritorio y móvil sin contenedores', async () => {
+  it('usa los iconos tridimensionales guardados en escritorio y móvil sin contenedores', async () => {
     fetchSiteSettings.mockResolvedValue({
       ...settings('Lo Nuevo'),
-      theme: { header: { ...settings('Lo Nuevo').theme.header, iconSet: 'silk', iconFinish: 'jewel', iconColor: '#da3977' } },
+      theme: { header: { ...settings('Lo Nuevo').theme.header, iconSet: 'noir' } },
     });
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByRole('banner').style.getPropertyValue('--header-icon-color')).toBe('#da3977'));
+    await waitFor(() => expect(screen.getByRole('banner').querySelector('[data-icon-style="noir"]')).toBeInTheDocument());
     const cartButtons = screen.getAllByRole('button', { name: 'Abrir carrito' });
     expect(cartButtons).toHaveLength(2);
     cartButtons.forEach((button) => {
-      expect(button).not.toHaveAttribute('data-finish');
-      expect(button.querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
-      expect(button.querySelector('svg')).toHaveAttribute('width', '26');
+      expect(button.querySelector('img')).toHaveAttribute('data-icon-style', 'noir');
+      expect(button.querySelector('img')).toHaveAttribute('width', '40');
+      expect(button.querySelector('img').getAttribute('src')).toContain('noir-cart');
     });
+  });
+
+  it('muestra las imágenes propias guardadas en escritorio y móvil', async () => {
+    const image = 'https://res.cloudinary.com/tienda/image/upload/v1/carrito.webp';
+    fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: {
+      ...settings('Lo Nuevo').theme.header, iconSet: 'custom', iconImages: { cart: image },
+    } } });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Abrir carrito' })[0].querySelector('img')).toHaveAttribute('src', image));
+    screen.getAllByRole('button', { name: 'Abrir carrito' }).forEach((button) => expect(button.querySelector('img')).toHaveAttribute('src', image));
   });
 });

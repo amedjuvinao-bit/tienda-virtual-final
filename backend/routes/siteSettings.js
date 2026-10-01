@@ -72,7 +72,8 @@ function buildDefaultSettings() {
         iconColor: "",
         iconHoverColor: "",
         iconAnimation: "soft",
-        iconSet: "boutique",
+        iconSet: "rose",
+        iconImages: { account: "", favorites: "", cart: "" },
         fontPreset: "",
         fontFamily: "",
         fontSizePx: 16,
@@ -627,6 +628,13 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     }
     if (theme && Object.prototype.hasOwnProperty.call(theme, 'sections') && !Array.isArray(theme.sections)) {
       return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_SECTIONS', message: 'Las secciones deben ser una lista.' });
+    }
+    if (theme?.header?.iconSet === 'custom') {
+      const iconImages = theme.header.iconImages;
+      const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
+      if (!['account', 'favorites', 'cart'].every((kind) => validCloudinaryImage(iconImages?.[kind]))) {
+        return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_IMAGES', message: 'Carga los tres iconos en Cloudinary antes de guardar.' });
+      }
     }
     if (isInvalidSettingsSection(menus)) {
       return res.status(400).json({ error: "menus debe ser un objeto" });

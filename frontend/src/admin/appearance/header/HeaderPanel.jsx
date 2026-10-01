@@ -449,34 +449,29 @@ export default function HeaderPanel({
                     {HEADER_ICON_SETS.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection === value}
                       onClick={() => setPath('header.iconSet', value)} className="appearance-header__icon-option">
                       <span className="appearance-header__icon-samples" aria-hidden="true">
-                        {['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}><HeaderActionGlyph kind={kind} iconSet={value} /></span>)}
+                        {value === 'custom' && !['account', 'favorites', 'cart'].some((kind) => theme.header?.iconImages?.[kind])
+                          ? <span className="appearance-header__icon-placeholder">Tus imágenes aquí</span>
+                          : ['account', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}><HeaderActionGlyph kind={kind} iconSet={value} iconImages={theme.header?.iconImages} /></span>)}
                       </span><strong>{label}</strong><small>{description}</small>
                     </button>)}
                   </div>
+                  {iconSelection === 'custom' && <div className="appearance-header__custom-icons">
+                    <strong>Carga tres imágenes sin fondo</strong>
+                    <p>Una para cada acción. Usa PNG o WebP transparente, cuadrado y de al menos 192 × 192 px. La tienda mostrará las tres cuando guardes.</p>
+                    <div className="appearance-header__custom-icon-fields">
+                      {[
+                        ['account', 'Cuenta'],
+                        ['favorites', 'Favoritos'],
+                        ['cart', 'Bolsa de compras'],
+                      ].map(([kind, label]) => <CloudinaryImageField key={kind} label={`Icono de ${label}`}
+                        value={theme.header?.iconImages?.[kind] || ''} onChange={(url) => setPath(`header.iconImages.${kind}`, url)}
+                        onUpload={uploadToCloudinaryViaBackend} uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} />)}
+                    </div>
+                  </div>}
                   <div className="appearance-header__icon-controls">
-                    <strong>Color y movimiento</strong>
-                    <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
-                  <label className="block min-w-0">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Color de íconos
-                    </span>
-                    <ColorInput
-                      value={theme.header?.iconColor || ""}
-                      onChange={(e) => setPath("header.iconColor", e.target.value)}
-                    />
-                  </label>
-
-                  <label className="block min-w-0">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Color hover (íconos)
-                    </span>
-                    <ColorInput
-                      value={theme.header?.iconHoverColor || ""}
-                      onChange={(e) => setPath("header.iconHoverColor", e.target.value)}
-                    />
-                  </label>
-
-                  <div className="xl:col-span-2">
+                    <strong>Movimiento</strong>
+                    <p>Los colores pertenecen a cada imagen; el movimiento se aplica a las tres.</p>
+                  <div>
                     <Select
                       label="Animación de íconos"
                       value={theme.header?.iconAnimation || "soft"}
@@ -489,7 +484,6 @@ export default function HeaderPanel({
                       <option value="pop">Pop (más fuerte)</option>
                     </Select>
                   </div>
-                    </div>
                   </div>
                 </div>
               )}
