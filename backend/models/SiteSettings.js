@@ -302,6 +302,10 @@ const ThemeSchema = new Schema(
       logoMode: { type: String, enum: ["auto", "light", "dark"], default: "auto" },
 
       logoHeightPx: Number,
+      surfaceShape: { type: String, enum: ["attached", "floating"], default: "attached" },
+      cornerRadiusPx: { type: Number, min: 0, max: 48, default: 16 },
+      liquidGlassEnabled: { type: Boolean, default: false },
+      glassStrength: { type: Number, min: 0, max: 100, default: 75 },
     },
 
     home: {

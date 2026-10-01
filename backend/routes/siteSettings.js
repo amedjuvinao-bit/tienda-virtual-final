@@ -79,6 +79,10 @@ function buildDefaultSettings() {
         logoDark: "",
         logoMode: "auto",
         logoHeightPx: 80,
+        surfaceShape: "attached",
+        cornerRadiusPx: 16,
+        liquidGlassEnabled: false,
+        glassStrength: 75,
       },
 
       home: {

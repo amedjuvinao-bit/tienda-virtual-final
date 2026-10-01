@@ -196,6 +196,11 @@ export default function HeaderPanel({
                 label="Fondo"
                 onClick={() => setBrandingSubTab("fondo")}
               />
+              <SubTabButton
+                active={brandingSubTab === "forma"}
+                label="Forma y vidrio"
+                onClick={() => setBrandingSubTab("forma")}
+              />
             </div>
 
             <div className="space-y-4">
@@ -302,6 +307,44 @@ export default function HeaderPanel({
                     </div>
                   </div>
                 </PanelBlock>
+              )}
+
+              {brandingSubTab === "forma" && (
+                <div className="appearance-header__surface-editor">
+                  <div>
+                    <h3>Forma del encabezado</h3>
+                    <p>Elige cómo se integra con la parte superior de la tienda.</p>
+                  </div>
+                  <div className="appearance-header__surface-options" role="group" aria-label="Forma del encabezado">
+                    {[
+                      { value: 'attached', label: 'Ancho completo', detail: 'Unido a los bordes de la pantalla.' },
+                      { value: 'floating', label: 'Flotante', detail: 'Separado del borde, con relieve alrededor.' },
+                    ].map(({ value, label, detail }) => (
+                      <button key={value} type="button" aria-pressed={(theme.header?.surfaceShape || 'attached') === value}
+                        onClick={() => setPath('header.surfaceShape', value)}>
+                        <span className={`appearance-header__shape-icon appearance-header__shape-icon--${value}`} aria-hidden="true" />
+                        <strong>{label}</strong><small>{detail}</small>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="appearance-header__surface-slider">
+                    <span><strong>Redondeo de bordes</strong><output>{theme.header?.cornerRadiusPx ?? 16} px</output></span>
+                    <input type="range" aria-label="Redondeo de bordes" min="0" max="48" step="1" value={theme.header?.cornerRadiusPx ?? 16}
+                      onChange={(event) => setPath('header.cornerRadiusPx', Number(event.target.value))} />
+                  </label>
+                  <label className="appearance-header__glass-switch">
+                    <span><strong>Vidrio líquido con relieve 3D</strong><small>Reflejos, profundidad y transparencia sobre la imagen de la tienda.</small></span>
+                    <input type="checkbox" aria-label="Vidrio líquido con relieve 3D" checked={theme.header?.liquidGlassEnabled === true}
+                      onChange={(event) => setPath('header.liquidGlassEnabled', event.target.checked)} />
+                  </label>
+                  {theme.header?.liquidGlassEnabled && (
+                    <label className="appearance-header__surface-slider">
+                      <span><strong>Intensidad del brillo y desenfoque</strong><output>{theme.header?.glassStrength ?? 75}%</output></span>
+                      <input type="range" aria-label="Intensidad del brillo y desenfoque" min="0" max="100" step="1" value={theme.header?.glassStrength ?? 75}
+                        onChange={(event) => setPath('header.glassStrength', Number(event.target.value))} />
+                    </label>
+                  )}
+                </div>
               )}
             </div>
           </section>

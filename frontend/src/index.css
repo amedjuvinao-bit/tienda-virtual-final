@@ -143,6 +143,56 @@ video {
   font-size: var(--header-font-size);
 }
 
+.theme-header.storefront-header-surface {
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: 0 0 var(--header-surface-radius, 16px) var(--header-surface-radius, 16px);
+  box-shadow: 0 8px 18px rgba(88, 35, 76, .16);
+  transition: transform 300ms ease, box-shadow 300ms ease, border-radius 300ms ease;
+}
+.theme-header.storefront-header-surface[data-shape="floating"] {
+  top: 10px;
+  left: 16px;
+  right: 16px;
+  border-radius: var(--header-surface-radius, 16px);
+}
+.theme-header.storefront-header-surface[data-visible="false"] { transform: translateY(calc(-100% - 18px)); }
+
+.storefront-header-surface[data-glass="true"] {
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, .62);
+  -webkit-backdrop-filter: blur(var(--header-glass-blur, 31px)) saturate(var(--header-glass-saturation, 1.85));
+  backdrop-filter: blur(var(--header-glass-blur, 31px)) saturate(var(--header-glass-saturation, 1.85));
+  box-shadow: inset 0 2px 1px rgba(255, 255, 255, .86), inset 0 -12px 24px rgba(120, 45, 99, .14), 0 18px 38px rgba(92, 30, 73, .26), 0 3px 9px rgba(102, 35, 80, .14);
+}
+.storefront-header-surface[data-glass="true"]::before,
+.storefront-header-surface[data-glass="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.storefront-header-surface[data-glass="true"]::before {
+  background: radial-gradient(ellipse 48% 175% at 8% -24%, rgba(255, 255, 255, .95), transparent 72%),
+    radial-gradient(ellipse 22% 180% at 86% 140%, rgba(255, 213, 239, .43), transparent 84%),
+    linear-gradient(122deg, rgba(255, 255, 255, .4) 0%, rgba(255, 255, 255, .03) 32%, rgba(255, 255, 255, .21) 64%, rgba(255, 255, 255, .07) 100%);
+  opacity: var(--header-glass-shine, .68);
+}
+.storefront-header-surface[data-glass="true"]::after {
+  inset: 2px 3px auto;
+  height: 46%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .47), rgba(255, 255, 255, 0));
+  opacity: var(--header-glass-shine, .68);
+}
+.storefront-header-surface[data-glass="true"] > * { position: relative; z-index: 1; }
+
+@media (max-width: 640px) {
+  .theme-header.storefront-header-surface[data-shape="floating"] { top: 8px; left: 8px; right: 8px; }
+}
+
 /* ✅ MENÚ: color independiente */
 .header-menu a {
   color: var(--header-menu-text);

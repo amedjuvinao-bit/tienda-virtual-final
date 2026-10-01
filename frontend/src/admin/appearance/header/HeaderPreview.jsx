@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Heart, Menu, Monitor, ShoppingCart, Smartphone, X } from 'lucide-react';
-import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderTypography } from '../../../components/headerPresentation';
+import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, resolveHeaderTypography } from '../../../components/headerPresentation';
 import HeaderBrand from '../../../components/HeaderBrand';
 
 export default function HeaderPreview({ theme, menus }) {
@@ -15,9 +15,11 @@ export default function HeaderPreview({ theme, menus }) {
   const alternateLogo = logo === logoLight ? logoDark : logoLight;
   useEffect(() => setFailedLogo(''), [logo, alternateLogo]);
   const typography = resolveHeaderTypography(header, theme?.fonts?.headings || 'Georgia, serif');
+  const surface = resolveHeaderSurface(header);
   const mobile = viewport === 'mobile';
   const background = header.bgColor || '#ffe3ec';
-  const opacity = Number(header.bgOpacity ?? 1);
+  const opacity = surface.opacity;
+  const bannerImage = theme?.banner?.slides?.find((slide) => slide?.image)?.image || theme?.banner?.imageUrl || '';
   const headerColor = /^#([\da-f]{3}|[\da-f]{6})$/i.test(background)
     ? background + (background.length === 4 ? Math.round(Math.max(0, Math.min(1, opacity)) * 15).toString(16) : Math.round(Math.max(0, Math.min(1, opacity)) * 255).toString(16).padStart(2, '0'))
     : background;
@@ -31,8 +33,8 @@ export default function HeaderPreview({ theme, menus }) {
       </div>
     </div>
     <div className="appearance-header__scene">
-      <div className="appearance-header__device" data-viewport={viewport}>
-        <div className="appearance-header__store-header" style={{ backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
+      <div className="appearance-header__device" data-viewport={viewport} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+        <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} style={{ ...surface.style, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
           {mobile && <button type="button" aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} onClick={() => setDrawerOpen(!drawerOpen)} style={{ color: header.mobileMenuTriggerIconColor || header.iconColor, backgroundColor: header.mobileMenuTriggerBgColor || '#fff' }}>{drawerOpen ? <X size={18} /> : <Menu size={18} />}</button>}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
           {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <span key={`${link.to}-${index}`}>{link.name}</span>) : <em>Tu menú aparecerá aquí</em>}</nav>}

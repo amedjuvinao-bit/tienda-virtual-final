@@ -14,7 +14,7 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import CartSidebar from "./CartSidebar";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
-import { normalizeHeaderMenu, resolveHeaderLogo, headerMenuDestination } from './headerPresentation';
+import { normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, headerMenuDestination } from './headerPresentation';
 import HeaderBrand from './HeaderBrand';
 
 function Header() {
@@ -133,13 +133,11 @@ function Header() {
     []
   );
 
-  const headerInlineStyle = useMemo(
-    () => ({
-      backgroundColor:
-        "rgba(var(--header-bg-rgb, 255, 227, 236), var(--header-bg-alpha, 1))",
-    }),
-    []
-  );
+  const headerSurface = useMemo(() => resolveHeaderSurface(headerConfig), [headerConfig]);
+  const headerInlineStyle = {
+    ...headerSurface.style,
+    backgroundColor: `rgba(var(--header-bg-rgb, 255, 227, 236), ${headerSurface.opacity})`,
+  };
 
   const chosenLogo = useMemo(() => resolveHeaderLogo({ bgColor: headerBgHex, logoLight, logoDark, logoMode: headerConfig.logoMode }), [headerBgHex, logoLight, logoDark, headerConfig.logoMode]);
   const alternateLogo = chosenLogo === logoLight ? logoDark : logoLight;
@@ -394,9 +392,10 @@ function Header() {
     <>
       <header
         style={headerInlineStyle}
-        className={`theme-header px-4 rounded-b-2xl shadow-md fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
-          showHeader ? "translate-y-0" : "-translate-y-full"
-        }`}
+        data-shape={headerSurface.shape}
+        data-glass={headerSurface.glass}
+        data-visible={showHeader}
+        className="theme-header storefront-header-surface px-4 fixed z-50"
       >
         <div className="relative w-full h-[70px]">
           {/* Desktop */}

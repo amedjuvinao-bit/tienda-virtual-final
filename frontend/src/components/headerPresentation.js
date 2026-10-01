@@ -51,6 +51,29 @@ export function resolveHeaderTypography(header = {}, headingsFont = 'Georgia, se
   };
 }
 
+export function resolveHeaderSurface(header = {}) {
+  const shape = header.surfaceShape === 'floating' ? 'floating' : 'attached';
+  const radiusValue = Number(header.cornerRadiusPx ?? 16);
+  const radius = Number.isFinite(radiusValue) ? Math.max(0, Math.min(48, radiusValue)) : 16;
+  const strengthValue = Number(header.glassStrength ?? 75);
+  const strength = Number.isFinite(strengthValue) ? Math.max(0, Math.min(100, strengthValue)) : 75;
+  const opacityValue = Number(header.bgOpacity ?? 1);
+  const opacity = Number.isFinite(opacityValue) ? Math.max(0, Math.min(1, opacityValue)) : 1;
+  const glass = header.liquidGlassEnabled === true;
+
+  return {
+    shape,
+    glass,
+    opacity: glass ? Math.min(opacity, 0.62) : opacity,
+    style: {
+      '--header-surface-radius': `${radius}px`,
+      '--header-glass-blur': `${Math.round(16 + strength * 0.2)}px`,
+      '--header-glass-saturation': `${(1.25 + strength * 0.008).toFixed(2)}`,
+      '--header-glass-shine': `${(0.3 + strength * 0.005).toFixed(2)}`,
+    },
+  };
+}
+
 export function headerMenuDestination(value) {
   const ref = String(value || '').trim();
   if (!ref || /[\\\x00-\x1f\x7f]/.test(ref)) return null;

@@ -64,4 +64,17 @@ describe('encabezado de la tienda', () => {
     const image = (await screen.findAllByAltText('Logo Rosa Boutique'))[0];
     expect(image).toHaveAttribute('src', '/claro.png');
   });
+
+  it('muestra la forma flotante y el vidrio configurados en la tienda pública', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      ...settings('Lo Nuevo'),
+      theme: { header: { ...settings('Lo Nuevo').theme.header, surfaceShape: 'floating', cornerRadiusPx: 38, liquidGlassEnabled: true, glassStrength: 90, bgOpacity: 1 } },
+    });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const header = screen.getByRole('banner');
+    await waitFor(() => expect(header).toHaveAttribute('data-shape', 'floating'));
+    expect(header).toHaveAttribute('data-glass', 'true');
+    expect(header.style.getPropertyValue('--header-surface-radius')).toBe('38px');
+    expect(header.style.backgroundColor).toContain('0.62');
+  });
 });

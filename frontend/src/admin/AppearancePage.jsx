@@ -309,6 +309,10 @@ function buildThemeFromServer(themeRaw) {
       logoDark: "",
       logoMode: "auto",
       logoHeightPx: 80,
+      surfaceShape: "attached",
+      cornerRadiusPx: 16,
+      liquidGlassEnabled: false,
+      glassStrength: 75,
 
       // ✅ NUEVO: menú móvil premium
       mobileMenuBgColor: "#fffdfd",
@@ -799,6 +803,21 @@ export default function AppearancePage() {
       const lh = Number(h.logoHeightPx);
       if (changedTheme.header && (Number.isNaN(lh) || lh < 30 || lh > 160)) {
         showValidation("El tamaño del logo debe estar entre 30 y 160 px.");
+        return;
+      }
+
+      if (changedTheme.header && !['attached', 'floating'].includes(h.surfaceShape)) {
+        showValidation('Elige una forma válida para el encabezado.');
+        return;
+      }
+      if (changedTheme.header && (h.liquidGlassEnabled !== true && h.liquidGlassEnabled !== false)) {
+        showValidation('Revisa la opción de vidrio líquido.');
+        return;
+      }
+      const cornerRadius = Number(h.cornerRadiusPx);
+      const glassStrength = Number(h.glassStrength);
+      if (changedTheme.header && (!Number.isFinite(cornerRadius) || cornerRadius < 0 || cornerRadius > 48 || !Number.isFinite(glassStrength) || glassStrength < 0 || glassStrength > 100)) {
+        showValidation('El redondeo debe estar entre 0 y 48 px y la intensidad del vidrio entre 0 y 100%.');
         return;
       }
 

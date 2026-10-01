@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import HeaderPanel from './HeaderPanel';
@@ -69,5 +69,24 @@ describe('edición del encabezado', () => {
     await user.click(screen.getByRole('button', { name: /Alta costura/ }));
     expect(nav.parentElement).toHaveStyle({ fontFamily: '"Cormorant Garamond", Georgia, serif' });
     expect(nav).toHaveStyle({ fontStyle: 'italic', letterSpacing: '0.04em', textTransform: 'none' });
+  });
+
+  it('cambia forma, redondeo y vidrio de la vista previa antes de guardar', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    const header = preview.querySelector('.appearance-header__store-header');
+    await user.click(screen.getByRole('button', { name: 'Forma y vidrio' }));
+    await user.click(screen.getByRole('button', { name: /Flotante Separado/ }));
+    expect(header).toHaveAttribute('data-shape', 'floating');
+    fireEvent.change(screen.getByRole('slider', { name: /Redondeo de bordes/ }), { target: { value: '38' } });
+    expect(header.style.getPropertyValue('--header-surface-radius')).toBe('38px');
+    await user.click(screen.getByRole('checkbox', { name: /Vidrio líquido con relieve 3D/ }));
+    expect(header).toHaveAttribute('data-glass', 'true');
+    expect(header).toHaveStyle({ backgroundColor: '#18181b9e' });
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    expect(header).toHaveAttribute('data-shape', 'floating');
+    await user.click(screen.getByRole('checkbox', { name: /Vidrio líquido con relieve 3D/ }));
+    expect(header).toHaveAttribute('data-glass', 'false');
   });
 });
