@@ -60,7 +60,7 @@ describe('guardado seguro de Apariencia', () => {
     await user.click(screen.getByRole('button', { name: /Secciones Contenido de inicio/ }));
     expect(screen.getByRole('button', { name: 'Cambiar sección' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Cambiar sección' }));
-    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
     const payload = saveSiteSettings.mock.calls[0][0];
@@ -76,9 +76,9 @@ describe('guardado seguro de Apariencia', () => {
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
     expect(screen.getByRole('button', { name: 'Cambiar WhatsApp' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: /Encabezado Logo y navegación/ }));
+    await user.click(screen.getByRole('button', { name: /Encabezado Logo y menú/ }));
     await user.click(screen.getByRole('button', { name: 'Añadir enlace' }));
-    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
     expect(saveSiteSettings.mock.calls[0][0]).toEqual({
@@ -93,7 +93,7 @@ describe('guardado seguro de Apariencia', () => {
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
     await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
-    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
     const payload = saveSiteSettings.mock.calls[0][0];
@@ -108,7 +108,44 @@ describe('guardado seguro de Apariencia', () => {
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
     expect(screen.getByRole('button', { name: 'Cambiar WhatsApp' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('muestra las áreas pendientes, conserva los cambios al cambiar de área y permite descartarlos', async () => {
+    const user = userEvent.setup();
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
+    expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente: General.')).toBeInTheDocument();
+    const unloadEvent = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(unloadEvent);
+    expect(unloadEvent.defaultPrevented).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: /Secciones Contenido de inicio/ }));
+    await user.click(screen.getByRole('button', { name: 'Cambiar sección' }));
+    expect(screen.getByText('2 áreas pendientes por guardar')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente: General, Secciones.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+    expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    expect(saveSiteSettings).not.toHaveBeenCalled();
+  });
+
+  it('confirma el guardado en el panel y limpia el indicador pendiente', async () => {
+    const user = userEvent.setup();
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
+    expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
   });
 
   it('impide dos solicitudes de guardado simultáneas', async () => {
@@ -118,12 +155,11 @@ describe('guardado seguro de Apariencia', () => {
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
     await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
-    await user.click(screen.getByRole('button', { name: 'Guardar' }));
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled();
     expect(saveSiteSettings).toHaveBeenCalledTimes(1);
     complete({ theme: initial.theme, menus: initial.menus, appearanceRevision: 4 });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled());
   });
 
   it('presenta el conflicto sin sobrescribir y ofrece recargar explícitamente', async () => {
@@ -134,9 +170,9 @@ describe('guardado seguro de Apariencia', () => {
       render(<AppearancePage />);
       await screen.findByText('Cambiar WhatsApp');
       await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
-      await user.click(screen.getByRole('button', { name: 'Guardar' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
       expect(await screen.findByRole('alert')).toHaveTextContent('La Apariencia guardada cambió');
-      expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
       expect(fetchAppearanceSettings).toHaveBeenCalledTimes(1);
       await user.click(screen.getByRole('button', { name: 'Cargar versión actual y descartar mis cambios' }));
       await waitFor(() => expect(fetchAppearanceSettings).toHaveBeenCalledTimes(2));

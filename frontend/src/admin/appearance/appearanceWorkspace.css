@@ -1,0 +1,147 @@
+.appearance-workspace {
+  color: var(--admin-card-text);
+}
+
+.appearance-workspace .appearance-navigation {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.appearance-navigation .admin-module-hero__nav-card {
+  position: relative;
+  min-height: 86px;
+  padding: 14px;
+}
+
+.appearance-navigation .admin-module-hero__nav-card[data-active="true"] {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft-bg);
+}
+
+.appearance-navigation .admin-module-hero__nav-card:focus-visible,
+.appearance-action:focus-visible {
+  outline: 3px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.appearance-navigation__pending {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  box-shadow: 0 0 0 3px var(--admin-card-bg);
+}
+
+.appearance-progress,
+.appearance-editor-heading,
+.appearance-action-bar {
+  border-color: var(--admin-card-border);
+  background: var(--admin-widget-surface-bg, var(--admin-card-bg));
+  color: var(--admin-card-text);
+}
+
+.appearance-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 20px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 18px;
+}
+
+.appearance-progress__marker {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #15976e;
+}
+
+.appearance-progress__marker[data-dirty="true"] { background: var(--admin-primary); }
+.appearance-progress strong { font-size: 14px; }
+.appearance-progress p { margin-top: 2px; color: var(--admin-card-muted-text); font-size: 13px; }
+
+.appearance-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--admin-card-border);
+}
+
+.appearance-editor-heading span {
+  color: var(--admin-primary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.appearance-editor-heading h2 { margin-top: 3px; font-size: 22px; font-weight: 850; }
+.appearance-editor-heading p { margin-top: 3px; color: var(--admin-card-muted-text); font-size: 13px; }
+.appearance-editor-heading__badge {
+  flex: none;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-primary);
+  font-size: 12px;
+}
+
+.appearance-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  border-top: 1px solid var(--admin-card-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.appearance-action-bar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+}
+
+.appearance-action-bar p { max-width: 350px; color: var(--admin-card-muted-text); font-size: 12px; line-height: 1.45; }
+.appearance-action-bar p strong { color: var(--admin-card-text); }
+.appearance-action-bar__message { font-weight: 750; }
+.appearance-action-bar__message--success { color: #126f54 !important; }
+.appearance-action-bar__message--error { color: #b12844 !important; }
+.appearance-action-bar__buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.appearance-action {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.appearance-action--secondary { background: var(--admin-card-bg); color: var(--admin-card-text); }
+.appearance-action--primary { border-color: var(--admin-button-bg); background: var(--admin-button-bg); color: var(--admin-button-text); }
+.appearance-action:hover:not(:disabled) { filter: brightness(.96); }
+.appearance-action:disabled { cursor: not-allowed; opacity: .5; }
+
+@media (max-width: 1000px) {
+  .appearance-workspace .appearance-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .appearance-workspace .appearance-navigation { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .appearance-navigation .admin-module-hero__nav-card { min-height: 78px; padding: 12px; }
+  .appearance-editor-heading { align-items: flex-start; flex-direction: column; padding: 16px; }
+  .appearance-action-bar__inner { align-items: stretch; flex-direction: column; }
+  .appearance-action-bar__buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .appearance-action--primary { grid-column: 1 / -1; grid-row: 1; }
+}

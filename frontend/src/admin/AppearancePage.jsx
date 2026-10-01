@@ -14,6 +14,7 @@ import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
 import AdminModuleHero from "./components/AdminModuleHero";
+import "./appearance/appearanceWorkspace.css";
 import useAdminPermissions from './security/useAdminPermissions';
 import {
   LOOK_SECTION_DEFAULTS,
@@ -473,6 +474,7 @@ export default function AppearancePage() {
   const [appearanceRevision, setAppearanceRevision] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveConflict, setSaveConflict] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(null);
   const savingRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState("general");
@@ -481,6 +483,35 @@ export default function AppearancePage() {
   // ✅ Menú editable (Header)
   const [menus, setMenus] = useState(buildMenusFromServer(null));
   const [menusSnapshot, setMenusSnapshot] = useState(buildMenusFromServer(null));
+
+  const changedAreas = useMemo(() => {
+    if (!serverSnapshot) return [];
+    const current = normalizeThemeForSave(theme);
+    const original = normalizeThemeForSave(serverSnapshot);
+    const changed = new Set();
+    for (const key of Object.keys(current)) {
+      if (!deepEqual(current[key], original[key])) {
+        changed.add(['header', 'banner', 'sections', 'footer'].includes(key) ? key : 'general');
+      }
+    }
+    if (!deepEqual(menus.header, menusSnapshot.header)) changed.add('header');
+    if (!deepEqual(menus.footer, menusSnapshot.footer)) changed.add('footer');
+    return [...changed];
+  }, [theme, serverSnapshot, menus, menusSnapshot]);
+
+  useEffect(() => {
+    if (changedAreas.length && saveMessage?.type === 'success') setSaveMessage(null);
+  }, [changedAreas.length, saveMessage]);
+
+  useEffect(() => {
+    if (!changedAreas.length) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [changedAreas.length]);
 
   // ✅ Upload state (LOGO)
   const [logoLightFile, setLogoLightFile] = useState(null);
@@ -541,6 +572,7 @@ export default function AppearancePage() {
         setServerSnapshot(merged);
         setAppearanceRevision(settings.appearanceRevision);
         setSaveConflict(false);
+        setSaveMessage(null);
         applyTheme(merged);
 
         const mergedMenus = buildMenusFromServer(settings?.menus);
@@ -625,6 +657,7 @@ export default function AppearancePage() {
     }
     setLogoLightFile(null);
     setLogoDarkFile(null);
+    setSaveMessage(null);
   };
 
   // ✅ Helpers del menú header
@@ -734,6 +767,8 @@ export default function AppearancePage() {
     savingRef.current = true;
     setSaving(true);
     setSaveConflict(false);
+    setSaveMessage(null);
+    const showValidation = (message) => setSaveMessage({ type: 'error', text: message });
     try {
       const normalizedTheme = normalizeThemeForSave(theme);
       const originalTheme = normalizeThemeForSave(serverSnapshot);
@@ -760,7 +795,7 @@ export default function AppearancePage() {
       if (Object.keys(changedTheme).length) payload.theme = changedTheme;
       if (Object.keys(changedMenus).length) payload.menus = changedMenus;
       if (!payload.theme && !payload.menus) {
-        alert('No hay cambios por guardar.');
+        setSaveMessage({ type: 'info', text: 'No hay cambios por guardar.' });
         return;
       }
 
@@ -768,7 +803,7 @@ export default function AppearancePage() {
 
       const c = theme.colors || {};
       if (changedTheme.colors && ![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
-        alert("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
+        showValidation("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
         return;
       }
 
@@ -795,13 +830,13 @@ export default function AppearancePage() {
       ];
 
       if (changedTheme.header && !headerColorList.every(hexOk)) {
-        alert("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
+        showValidation("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
         return;
       }
 
       const op = Number(h.bgOpacity);
       if (changedTheme.header && (Number.isNaN(op) || op < 0 || op > 1)) {
-        alert("La transparencia del header debe estar entre 0 y 1.");
+        showValidation("La transparencia del header debe estar entre 0 y 1.");
         return;
       }
 
@@ -811,13 +846,13 @@ export default function AppearancePage() {
         mobileOverlayOpacity < 0 ||
         mobileOverlayOpacity > 1
       )) {
-        alert("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
+        showValidation("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
         return;
       }
 
       const lh = Number(h.logoHeightPx);
       if (changedTheme.header && (Number.isNaN(lh) || lh < 30 || lh > 160)) {
-        alert("El tamaño del logo debe estar entre 30 y 160 px.");
+        showValidation("El tamaño del logo debe estar entre 30 y 160 px.");
         return;
       }
 
@@ -827,13 +862,13 @@ export default function AppearancePage() {
         mobileAnimDuration < 120 ||
         mobileAnimDuration > 1200
       )) {
-        alert("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
+        showValidation("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
         return;
       }
 
       const mobileWidth = Number(h.mobileMenuWidthPercent);
       if (changedTheme.header && (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100)) {
-        alert("El ancho del menú móvil debe estar entre 60% y 100%.");
+        showValidation("El ancho del menú móvil debe estar entre 60% y 100%.");
         return;
       }
 
@@ -841,31 +876,31 @@ export default function AppearancePage() {
       const b = theme.banner || {};
       const bannerType = String(b.type || "slider");
       if (changedTheme.banner && !["slider", "image", "video"].includes(bannerType)) {
-        alert("El tipo de banner debe ser: slider, image o video.");
+        showValidation("El tipo de banner debe ser: slider, image o video.");
         return;
       }
       const hm = String(b.heightMode || "auto");
       if (changedTheme.banner && !["auto", "fullscreen"].includes(hm)) {
-        alert("heightMode debe ser: auto o fullscreen.");
+        showValidation("El modo de altura del banner debe ser automático o pantalla completa.");
         return;
       }
       if (changedTheme.banner && hm === "auto") {
         const hp = Number(b.heightPx);
         if (Number.isNaN(hp) || hp < 240 || hp > 1200) {
-          alert("La altura del banner (px) debe estar entre 240 y 1200.");
+          showValidation("La altura del banner debe estar entre 240 y 1200 px.");
           return;
         }
       }
       if (changedTheme.banner && bannerType === "slider") {
         const iv = Number(b.sliderIntervalMs);
         if (Number.isFinite(iv) && (iv < 1000 || iv > 15000)) {
-          alert("En slider: el intervalo (ms) debe estar entre 1000 y 15000.");
+          showValidation("El intervalo entre diapositivas debe estar entre 1000 y 15000 ms.");
           return;
         }
         const slides = Array.isArray(b.slides) ? b.slides : [];
         const bad = slides.find((s) => s && s.image === "");
         if (bad) {
-          alert("En slider: cada slide debe tener una imagen (o elimina el slide vacío).");
+          showValidation("Cada diapositiva debe tener una imagen; elimina las que estén vacías.");
           return;
         }
       }
@@ -891,13 +926,13 @@ export default function AppearancePage() {
         window.dispatchEvent(new Event("rb_site_settings_updated"));
       } catch (_) {}
 
-      alert("Apariencia guardada ✅");
+      setSaveMessage({ type: 'success', text: 'Cambios guardados. La tienda pública ya usa esta configuración.' });
     } catch (err) {
       console.error("❌ Error guardando apariencia:", err);
       if (['APPEARANCE_REVISION_CONFLICT', 'APPEARANCE_REVISION_REQUIRED'].includes(err?.response?.data?.error)) {
         setSaveConflict(true);
       } else {
-        alert(err.userMessage || err.message || "Error al guardar apariencia.");
+        setSaveMessage({ type: 'error', text: err.userMessage || err.message || 'Error al guardar apariencia.' });
       }
     } finally {
       savingRef.current = false;
@@ -918,17 +953,22 @@ export default function AppearancePage() {
     );
   }
 
-  // ✅ Tabs: reemplazado Home/Body por Secciones
   const tabs = [
-    { id: "general", label: "General", detail: "Colores y tipografías", icon: Palette },
-    { id: "header", label: "Encabezado", detail: "Logo y navegación", icon: LayoutTemplate },
-    { id: "banner", label: "Banner", detail: "Portada visual", icon: Image },
-    { id: "sections", label: "Secciones", detail: "Contenido de inicio", icon: Rows3 },
-    { id: "footer", label: "Pie de página", detail: "Cierre y enlaces", icon: Type },
+    { id: "general", label: "General", detail: "WhatsApp, carga y navegación", icon: Palette, help: "Configura los controles que acompañan a toda la tienda." },
+    { id: "header", label: "Encabezado", detail: "Logo y menú", icon: LayoutTemplate, help: "Organiza el logo, los enlaces y el menú móvil." },
+    { id: "banner", label: "Banner", detail: "Portada de inicio", icon: Image, help: "Elige la imagen, el video o las diapositivas de la portada." },
+    { id: "sections", label: "Secciones", detail: "Contenido de inicio", icon: Rows3, help: "Ordena el contenido que aparece debajo de la portada." },
+    { id: "footer", label: "Pie de página", detail: "Información final", icon: Type, help: "Edita la información y los enlaces del final de cada página." },
   ];
+  const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const canEditCurrentArea = activeTab === 'sections'
+    ? canEditSections
+    : activeTab === 'header'
+      ? canEditAppearance || canEditMenus
+      : canEditAppearance;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+    <div className="appearance-workspace mx-auto max-w-6xl space-y-5 p-4 md:p-6">
       {saveConflict && (
         <div className="admin-widget-surface rounded-2xl p-4" role="alert">
           <p>La Apariencia guardada cambió mientras editabas. Tus cambios siguen en este panel; no se sobrescribió la versión guardada.</p>
@@ -941,39 +981,9 @@ export default function AppearancePage() {
         icon={Palette}
         eyebrow="Identidad visual de la tienda"
         title="Apariencia del sitio"
-        description="Personaliza el estilo público de la tienda y revisa cada cambio antes de guardarlo."
-        actions={(
-          <>
-          <button
-            onClick={onPreview}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
-            type="button"
-          >
-            <Eye size={17} /> Aplicar
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving || uploading || saveConflict || !canEditAny}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white"
-            style={{ background: 'var(--admin-primary)' }}
-            type="button"
-          >
-            <Save size={17} /> Guardar
-          </button>
-          <button
-            onClick={onReset}
-            disabled={saving || saveConflict}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-            style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
-            type="button"
-          >
-            <RotateCcw size={17} /> Restaurar
-          </button>
-          </>
-        )}
+        description="Elige un área, ajusta su contenido y guarda al terminar. Puedes cambiar de área sin perder lo que estás editando."
       >
-        <nav className="admin-module-hero__metrics" aria-label="Áreas de apariencia">
+        <nav className="admin-module-hero__metrics appearance-navigation" aria-label="Áreas de apariencia">
           {tabs.map((tab) => {
             const TabIcon = tab.icon;
             const selected = activeTab === tab.id;
@@ -983,6 +993,7 @@ export default function AppearancePage() {
                 onClick={() => setActiveTab(tab.id)}
                 className="admin-module-hero__metric admin-module-hero__nav-card"
                 data-active={selected}
+                aria-pressed={selected}
                 type="button"
               >
                 <TabIcon size={19} />
@@ -990,14 +1001,29 @@ export default function AppearancePage() {
                   <strong>{tab.label}</strong>
                   <small>{tab.detail}</small>
                 </span>
+                {changedAreas.includes(tab.id) && <span className="appearance-navigation__pending" aria-label="Cambios sin guardar" title="Cambios sin guardar" />}
               </button>
             );
           })}
         </nav>
       </AdminModuleHero>
 
+      <div className="appearance-progress" role="status" aria-live="polite">
+        <span className="appearance-progress__marker" data-dirty={changedAreas.length > 0} />
+        <div>
+          <strong>{saving ? 'Guardando cambios…' : changedAreas.length ? `${changedAreas.length} ${changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar` : 'Todo está guardado'}</strong>
+          <p>{changedAreas.length ? `Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.` : 'Selecciona un área para editar la tienda.'}</p>
+        </div>
+      </div>
+
       {/* Contenido */}
       <main className="admin-widget-surface min-w-0 overflow-hidden rounded-[28px] border">
+        <div className="appearance-editor-heading">
+          <div><span>Área seleccionada</span><h2>{currentTab.label}</h2><p>{currentTab.help}</p></div>
+          {!canEditCurrentArea
+            ? <strong className="appearance-editor-heading__badge">Solo lectura</strong>
+            : changedAreas.includes(activeTab) && <strong className="appearance-editor-heading__badge">Cambios sin guardar</strong>}
+        </div>
         <fieldset disabled={saving} className="min-w-0">
         <div className="p-4 md:p-5 min-w-0">
           {/* GENERAL */}
@@ -1064,44 +1090,41 @@ export default function AppearancePage() {
             </fieldset>
           )}
         </div>
-
-        {/* Barra inferior sticky */}
-        <div className="border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="p-3 flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-end">
-            <div className="text-xs text-gray-500 md:mr-auto">
-              Consejo: usa <span className="font-medium">Ver cambios</span> para previsualizar y
-              luego <span className="font-medium">Guardar</span>.
-            </div>
-
-            <div className="flex gap-2">
+        </fieldset>
+      </main>
+        <div className="appearance-action-bar">
+          <div className="appearance-action-bar__inner">
+            <p className={saveMessage ? `appearance-action-bar__message appearance-action-bar__message--${saveMessage.type}` : ''} role="status" aria-live="polite">
+              {saveMessage ? saveMessage.text : <>Vista previa aplica el diseño solo en esta sesión. <strong>Guardar cambios</strong> lo publica en la tienda.</>}
+            </p>
+            <div className="appearance-action-bar__buttons">
               <button
                 onClick={onPreview}
-                className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
+                disabled={saving || !changedAreas.length}
+                className="appearance-action appearance-action--secondary"
                 type="button"
               >
-                Aplicar (vista previa)
+                <Eye size={17} /> Vista previa
               </button>
               <button
                 onClick={onSave}
-                disabled={saving || uploading || saveConflict || !canEditAny}
-                className="px-4 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700"
+                disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length}
+                className="appearance-action appearance-action--primary"
                 type="button"
               >
-                Guardar cambios
+                <Save size={17} /> {saving ? 'Guardando…' : 'Guardar cambios'}
               </button>
               <button
                 onClick={onReset}
-                disabled={saving || saveConflict}
-                className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50"
+                disabled={saving || saveConflict || !changedAreas.length}
+                className="appearance-action appearance-action--secondary"
                 type="button"
               >
-                Reset a valores del servidor
+                <RotateCcw size={17} /> Descartar cambios
               </button>
             </div>
           </div>
         </div>
-        </fieldset>
-      </main>
     </div>
   );
 }

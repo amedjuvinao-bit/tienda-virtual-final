@@ -33,13 +33,13 @@ describe('carga inicial de Apariencia', () => {
       render(<AppearancePage />);
 
       expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar Apariencia');
-      expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Guardar cambios' })).not.toBeInTheDocument();
       expect(saveSiteSettings).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole('button', { name: 'Reintentar carga' }));
       expect(await screen.findByText('Editor general')).toBeInTheDocument();
       expect(fetchAppearanceSettings).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
     } finally {
       consoleError.mockRestore();
     }
