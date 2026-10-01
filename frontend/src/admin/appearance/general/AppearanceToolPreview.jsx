@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Crown, Flower2, Gem, Heart, ShoppingBag, Sparkles, Star } from "lucide-react";
+import WhatsAppGlyph from "../../../components/WhatsAppGlyph";
 import "../../../components/storefrontLiquidGlass.css";
 
 const loaderIcons = { sparkles: Sparkles, star: Star, heart: Heart, diamond: Gem, crown: Crown, flower: Flower2, bag: ShoppingBag };
@@ -7,6 +8,14 @@ const bounded = (value, min, max, fallback) => {
   const number = Number(value);
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
 };
+
+function PreviewImage({ url, fallback, className, style }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  return url && !failed
+    ? <img src={url} alt="" className={className} style={style} onError={() => setFailed(true)} />
+    : fallback;
+}
 
 export default function AppearanceToolPreview({ activeTool, config }) {
   const whatsapp = config.whatsapp;
@@ -37,8 +46,9 @@ export default function AppearanceToolPreview({ activeTool, config }) {
               borderRadius: bounded(whatsapp.borderRadiusPx, 0, 999, 999),
               "--liquid-tint": whatsapp.bgColor || "#25D366",
             }}>
-            <img src={whatsapp.useCustomImage && whatsapp.imageUrl ? whatsapp.imageUrl : "/icons/Whatsapp.svg"}
-              alt="" style={{ width: `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, height: `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, objectFit: "contain" }} />
+            <PreviewImage url={whatsapp.useCustomImage ? whatsapp.imageUrl : ""}
+              style={{ width: `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, height: `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, objectFit: "contain" }}
+              fallback={<span style={{ color: "#0e7548" }}><WhatsAppGlyph size={30} /></span>} />
           </span>
         )}
         {activeTool === "scroll" && navigation.enabled && (
@@ -49,10 +59,10 @@ export default function AppearanceToolPreview({ activeTool, config }) {
             gap: bounded(navigation.gapPx, 0, 32, 16),
           }}>
             {navigation.showUp && <span className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
-              {navigation.upUseCustomImage && navigation.upImageUrl ? <img src={navigation.upImageUrl} alt="" /> : <ArrowUp size={21} color={navigation.iconColor} />}
+              <PreviewImage url={navigation.upUseCustomImage ? navigation.upImageUrl : ""} fallback={<ArrowUp size={21} color={navigation.iconColor} />} />
             </span>}
             {navigation.showDown && <span className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
-              {navigation.downUseCustomImage && navigation.downImageUrl ? <img src={navigation.downImageUrl} alt="" /> : <ArrowDown size={21} color={navigation.iconColor} />}
+              <PreviewImage url={navigation.downUseCustomImage ? navigation.downImageUrl : ""} fallback={<ArrowDown size={21} color={navigation.iconColor} />} />
             </span>}
           </div>
         )}
@@ -61,7 +71,7 @@ export default function AppearanceToolPreview({ activeTool, config }) {
             background: loader.visualStyle === "dark" ? "rgba(53,32,57,.9)" : loader.visualStyle === "glass" ? "rgba(255,255,255,.42)" : (loader.backgroundColor || "#fff"),
             color: loader.textColor || "#23212e",
           }}>
-            {loader.showLogo && loader.logoUrl && <img className="appearance-general__preview-logo" src={loader.logoUrl} alt="" />}
+            {loader.showLogo && loader.logoUrl && <PreviewImage className="appearance-general__preview-logo" url={loader.logoUrl} fallback={null} />}
             <span className={`appearance-general__loader-mark appearance-general__loader-mark--${loader.type || "spinner"}`} style={{
               "--loader-color": loader.color || "#ec4899", "--loader-secondary": loader.secondaryColor || "#f9a8d4",
             }}>

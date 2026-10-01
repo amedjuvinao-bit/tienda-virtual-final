@@ -1,5 +1,6 @@
 // src/components/WhatsAppButton.jsx
 import React from "react";
+import WhatsAppGlyph from "./WhatsAppGlyph";
 import "./storefrontLiquidGlass.css";
 
 function getShadowValue(shadow) {
@@ -37,6 +38,8 @@ export default function WhatsAppButton({ config }) {
 
   const useCustomImage = safeConfig.useCustomImage === true;
   const imageUrl = String(safeConfig.imageUrl || "").trim();
+  const [imageFailed, setImageFailed] = React.useState(false);
+  React.useEffect(() => setImageFailed(false), [imageUrl]);
 
   const iconSizePercent = Number.isFinite(Number(safeConfig.iconSizePercent))
     ? Number(safeConfig.iconSizePercent)
@@ -100,10 +103,11 @@ export default function WhatsAppButton({ config }) {
         }}
         aria-label="WhatsApp"
       >
-        {useCustomImage && imageUrl ? (
+        {useCustomImage && imageUrl && !imageFailed ? (
           <img
             src={imageUrl}
             alt="WhatsApp"
+            onError={() => setImageFailed(true)}
             style={{
               width: `${internalIconSizePx}px`,
               height: `${internalIconSizePx}px`,
@@ -111,15 +115,9 @@ export default function WhatsAppButton({ config }) {
             }}
           />
         ) : (
-          <img
-            src="/icons/Whatsapp.svg"
-            alt="WhatsApp"
-            style={{
-              width: `${internalIconSizePx}px`,
-              height: `${internalIconSizePx}px`,
-              objectFit: "contain",
-            }}
-          />
+          <span style={{ color: "#0e7548", display: "grid", placeItems: "center" }}>
+            <WhatsAppGlyph size={internalIconSizePx} />
+          </span>
         )}
       </a>
     </>

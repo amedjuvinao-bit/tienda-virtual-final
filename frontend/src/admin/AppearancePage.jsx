@@ -716,8 +716,8 @@ export default function AppearancePage() {
     });
 
     if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Error subiendo archivo: HTTP ${res.status} ${t}`);
+      const response = await res.json().catch(() => null);
+      throw new Error(response?.message || response?.error || `No se pudo subir la imagen (HTTP ${res.status}).`);
     }
 
     const data = await res.json();
@@ -1027,7 +1027,11 @@ export default function AppearancePage() {
         <fieldset disabled={saving} className="min-w-0">
         <div className="min-w-0">
           {/* GENERAL */}
-          {activeTab === "general" && <fieldset disabled={!canEditAppearance}><GeneralPanel theme={theme} setPath={setPath} /></fieldset>}
+          {activeTab === "general" && <fieldset disabled={!canEditAppearance}><GeneralPanel
+            theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading}
+            savedRevision={appearanceRevision}
+            uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
+          /></fieldset>}
 
           {/* HEADER */}
           {activeTab === "header" && (

@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { CircleOff, Crown, Flower2, Gem, Heart, LoaderCircle, MessageCircle, ShoppingBag, Sparkles, Star, ChevronsUpDown } from "lucide-react";
 import { normalizeGlobalConfig } from "./generalHelpers";
 import AppearanceToolPreview from "./AppearanceToolPreview";
+import CloudinaryImageField from "./CloudinaryImageField";
 import "./appearanceGeneral.css";
 
 const LOADER_ICONS = [
@@ -121,7 +122,7 @@ const PanelBlock = ({ title, children, columns = 2 }) => (
   </div>
 );
 
-export default function GeneralPanel({ theme, setPath }) {
+export default function GeneralPanel({ theme, setPath, uploading, setUploading, savedRevision, uploadToCloudinaryViaBackend }) {
   const globalConfig = normalizeGlobalConfig(theme?.global);
 
   const mainTabs = useMemo(
@@ -342,11 +343,14 @@ export default function GeneralPanel({ theme, setPath }) {
                     <option value="bounce">Bounce</option>
                   </Select>
 
-                  {globalConfig.whatsapp.useCustomImage && <Input
-                    label="URL de imagen personalizada"
+                  {globalConfig.whatsapp.useCustomImage && <CloudinaryImageField
+                    label="Botón de WhatsApp"
                     value={globalConfig.whatsapp.imageUrl || ""}
-                    onChange={(e) => setPath("global.whatsapp.imageUrl", e.target.value)}
-                    placeholder="https://.../mi-icono-whatsapp.png"
+                    onChange={(url) => setPath("global.whatsapp.imageUrl", url)}
+                    onUpload={uploadToCloudinaryViaBackend}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    savedRevision={savedRevision}
                   />}
 
                   <Input
@@ -574,11 +578,14 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(value) => setPath("global.scrollButtons.upUseCustomImage", value)}
                   />
 
-                  {globalConfig.scrollButtons.upUseCustomImage && <Input
-                    label="URL imagen botón subir"
+                  {globalConfig.scrollButtons.upUseCustomImage && <CloudinaryImageField
+                    label="Botón subir"
                     value={globalConfig.scrollButtons.upImageUrl || ""}
-                    onChange={(e) => setPath("global.scrollButtons.upImageUrl", e.target.value)}
-                    placeholder="https://.../boton-subir.png"
+                    onChange={(url) => setPath("global.scrollButtons.upImageUrl", url)}
+                    onUpload={uploadToCloudinaryViaBackend}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    savedRevision={savedRevision}
                   />}
 
                   {globalConfig.scrollButtons.upUseCustomImage && <Input
@@ -614,11 +621,14 @@ export default function GeneralPanel({ theme, setPath }) {
                     onChange={(value) => setPath("global.scrollButtons.downUseCustomImage", value)}
                   />
 
-                  {globalConfig.scrollButtons.downUseCustomImage && <Input
-                    label="URL imagen botón bajar"
+                  {globalConfig.scrollButtons.downUseCustomImage && <CloudinaryImageField
+                    label="Botón bajar"
                     value={globalConfig.scrollButtons.downImageUrl || ""}
-                    onChange={(e) => setPath("global.scrollButtons.downImageUrl", e.target.value)}
-                    placeholder="https://.../boton-bajar.png"
+                    onChange={(url) => setPath("global.scrollButtons.downImageUrl", url)}
+                    onUpload={uploadToCloudinaryViaBackend}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    savedRevision={savedRevision}
                   />}
 
                   {globalConfig.scrollButtons.downUseCustomImage && <Input
@@ -734,11 +744,14 @@ export default function GeneralPanel({ theme, setPath }) {
                     </div>
                   </div>
 
-                  {globalConfig.loader?.showLogo && <Input
-                    label="URL logo o imagen"
+                  {globalConfig.loader?.showLogo && <CloudinaryImageField
+                    label="Logo de carga"
                     value={globalConfig.loader?.logoUrl || ""}
-                    onChange={(e) => setPath("global.loader.logoUrl", e.target.value)}
-                    placeholder="https://.../logo-loader.png"
+                    onChange={(url) => setPath("global.loader.logoUrl", url)}
+                    onUpload={uploadToCloudinaryViaBackend}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    savedRevision={savedRevision}
                   />}
 
                   {globalConfig.loader?.showLogo && <Input
