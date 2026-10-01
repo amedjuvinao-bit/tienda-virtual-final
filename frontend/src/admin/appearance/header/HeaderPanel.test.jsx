@@ -90,7 +90,7 @@ describe('edición del encabezado', () => {
     expect(header).toHaveAttribute('data-glass', 'false');
   });
 
-  it('permite elegir seis modelos finos sin contenedores y los muestra en escritorio y móvil', async () => {
+  it('muestra familias visualmente diferentes en escritorio y móvil', async () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
@@ -98,10 +98,15 @@ describe('edición del encabezado', () => {
     await user.click(screen.getByRole('button', { name: 'Íconos' }));
     const options = within(screen.getByRole('group', { name: 'Modelo de íconos' })).getAllByRole('button');
     expect(options).toHaveLength(6);
-    await user.click(within(screen.getByRole('group', { name: 'Modelo de íconos' })).getByRole('button', { name: /Seda/ }));
-    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveClass('lucide-user-round');
+    const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
+    await user.click(gallery.getByRole('button', { name: /Silueta/ }));
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('svg')).toHaveAttribute('fill', 'currentColor');
+    await user.click(gallery.getByRole('button', { name: /Geométrico/ }));
+    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'editorial');
+    await user.click(gallery.getByRole('button', { name: /Destello/ }));
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
     expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' })).not.toHaveAttribute('data-finish');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
-    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveClass('lucide-shopping-bag');
+    expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
   });
 });

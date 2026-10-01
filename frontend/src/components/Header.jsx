@@ -440,7 +440,7 @@ function Header() {
               })}
             </nav>
 
-            <div className="header-icons flex shrink-0 items-center gap-2 text-xl xl:gap-3">
+            <div className="header-icons flex shrink-0 items-center gap-0 text-xl">
               <button type="button" aria-label="Administración"
                 onClick={() => navigate("/admin/login")}
                 className="storefront-action-button"
@@ -496,7 +496,7 @@ function Header() {
               </button>
             </div>
 
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-0">
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="storefront-action-button"

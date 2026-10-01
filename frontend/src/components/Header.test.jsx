@@ -89,7 +89,7 @@ describe('encabezado de la tienda', () => {
     expect(cartButtons).toHaveLength(2);
     cartButtons.forEach((button) => {
       expect(button).not.toHaveAttribute('data-finish');
-      expect(button.querySelector('svg')).toHaveClass('lucide-shopping-bag');
+      expect(button.querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
     });
   });
 });
