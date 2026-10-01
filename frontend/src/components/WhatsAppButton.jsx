@@ -87,8 +87,9 @@ export default function WhatsAppButton({ config }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="storefront-liquid-icon fixed transition-transform hover:scale-105"
+        className="storefront-liquid-icon transition-transform hover:scale-105"
         style={{
+          position: "fixed",
           bottom: `${bottomPx}px`,
           width: `${sizePx}px`,
           height: `${sizePx}px`,

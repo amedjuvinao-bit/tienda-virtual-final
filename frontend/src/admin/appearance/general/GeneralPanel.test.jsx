@@ -111,7 +111,10 @@ describe("herramientas de Apariencia", () => {
       <ScrollButton config={{ enabled: true }} />
       <GlobalPageLoader config={{ icon: "crown" }} visible />
     </>);
-    expect(container.querySelector('a[aria-label="WhatsApp"]')).toHaveClass("storefront-liquid-icon");
+    const whatsappButton = container.querySelector('a[aria-label="WhatsApp"]');
+    expect(whatsappButton).toHaveClass("storefront-liquid-icon");
+    expect(whatsappButton).toHaveAttribute("href", "https://wa.me/573001234567");
+    expect(whatsappButton).toHaveStyle({ position: "fixed", bottom: "24px", right: "24px" });
     expect(container.querySelector('a[aria-label="WhatsApp"] svg')).toBeInTheDocument();
     expect(container.querySelectorAll('button.storefront-liquid-icon')).toHaveLength(2);
     const loader = container.querySelector("[aria-busy=true]");
