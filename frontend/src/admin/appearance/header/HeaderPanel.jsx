@@ -1,5 +1,10 @@
 // frontend/src/admin/appearance/header/HeaderPanel.jsx
 import React, { useMemo, useState } from "react";
+import { Image, Link2, Palette, Smartphone } from 'lucide-react';
+import CloudinaryImageField from '../general/CloudinaryImageField';
+import HeaderPreview from './HeaderPreview';
+import './headerWorkspace.css';
+import '../general/appearanceGeneral.css';
 
 const Input = ({ label, ...rest }) => (
   <label className="block min-w-0">
@@ -57,7 +62,7 @@ const SectionHeader = ({ title, description }) => (
   </div>
 );
 
-const MainTabButton = ({ active, label, description, onClick }) => (
+const MainTabButton = ({ active, label, description, onClick, Icon }) => (
   <button
     type="button"
     onClick={onClick}
@@ -65,8 +70,8 @@ const MainTabButton = ({ active, label, description, onClick }) => (
     aria-pressed={active}
     data-active={active}
   >
-    <strong>{label}</strong>
-    <small>{description}</small>
+    <span className="appearance-header__tab-icon"><Icon size={22} aria-hidden="true" /></span>
+    <span><strong>{label}</strong><small>{description}</small></span>
   </button>
 );
 
@@ -102,9 +107,9 @@ export default function HeaderPanel({
   menus,
   routeOptions,
   uploading,
-  onUploadLogo,
-  setLogoLightFile,
-  setLogoDarkFile,
+  setUploading,
+  savedRevision,
+  uploadToCloudinaryViaBackend,
   addHeaderMenuItem,
   removeHeaderMenuItem,
   moveHeaderMenuItem,
@@ -116,24 +121,27 @@ export default function HeaderPanel({
     () => [
       {
         id: "branding",
-        label: "Logo y fondo",
-        description: "Logo, tamaño, subida, URLs manuales y fondo del header.",
+        label: "Identidad",
+        description: "Logos, tamaño y fondo.",
+        Icon: Image,
       },
       {
         id: "styles",
-        label: "Tipografía y estilos",
-        description: "Fuente, tamaños, colores del menú y animaciones visuales.",
+        label: "Estilo",
+        description: "Fuente, colores y movimiento.",
+        Icon: Palette,
       },
       {
         id: "responsive",
-        label: "Responsive y menú móvil",
-        description:
-          "Configura la experiencia en pantallas pequeñas, el botón hamburguesa y la transición del panel.",
+        label: "Menú móvil",
+        description: "Panel, controles y transición.",
+        Icon: Smartphone,
       },
       {
         id: "menu",
-        label: "Menú del header",
-        description: "Botones, textos, rutas, orden y eliminación.",
+        label: "Enlaces",
+        description: "Destinos y orden visibles.",
+        Icon: Link2,
       },
     ],
     []
@@ -145,11 +153,11 @@ export default function HeaderPanel({
   const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
 
   return (
-    <div className="min-w-0">
-      <div className="rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+    <div className="appearance-header min-w-0">
+      <div className="appearance-header__shell rounded-2xl p-3 md:p-4">
         <SectionHeader
           title="Logo y menú"
-          description="Elige qué parte del encabezado quieres cambiar."
+          description="Diseña y comprueba cómo queda el encabezado en escritorio y móvil."
         />
 
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
@@ -159,10 +167,13 @@ export default function HeaderPanel({
               active={activeMainTab === tab.id}
               label={tab.label}
               description={tab.description}
+              Icon={tab.Icon}
               onClick={() => setActiveMainTab(tab.id)}
             />
           ))}
         </div>
+
+        <div data-admin-storefront-preview="true"><HeaderPreview theme={theme} menus={menus} /></div>
 
         <fieldset disabled={!canEditTheme}>
         {activeMainTab === "branding" && (
@@ -174,11 +185,6 @@ export default function HeaderPanel({
                 onClick={() => setBrandingSubTab("logo")}
               />
               <SubTabButton
-                active={brandingSubTab === "subida"}
-                label="Subida y URLs"
-                onClick={() => setBrandingSubTab("subida")}
-              />
-              <SubTabButton
                 active={brandingSubTab === "fondo"}
                 label="Fondo"
                 onClick={() => setBrandingSubTab("fondo")}
@@ -188,43 +194,16 @@ export default function HeaderPanel({
             <div className="space-y-4">
               {brandingSubTab === "logo" && (
                 <>
-                  <PanelBlock title="Vista previa del logo">
-                    <div className="rounded-2xl border bg-white p-3">
-                      <div className="mb-2 text-xs text-gray-500">Vista previa (Light)</div>
-                      <div
-                        data-admin-storefront-preview="true"
-                        className="flex h-20 items-center justify-center rounded-xl border bg-gray-50"
-                      >
-                        {theme.header?.logoLight ? (
-                          <img
-                            src={theme.header.logoLight}
-                            alt="Logo Light"
-                            className="max-h-16 max-w-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">Sin logo</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border bg-white p-3">
-                      <div className="mb-2 text-xs text-gray-500">Vista previa (Dark)</div>
-                      <div
-                        data-admin-storefront-preview="true"
-                        className="flex h-20 items-center justify-center rounded-xl border bg-gray-50"
-                      >
-                        {theme.header?.logoDark ? (
-                          <img
-                            src={theme.header.logoDark}
-                            alt="Logo Dark"
-                            className="max-h-16 max-w-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">Sin logo</span>
-                        )}
-                      </div>
-                    </div>
-                  </PanelBlock>
+                  <div className="appearance-header__logo-grid">
+                    <div><p className="appearance-header__logo-hint">Para fondos oscuros · logo claro</p>
+                      <CloudinaryImageField label="Logo claro" value={theme.header?.logoLight || ''}
+                        onChange={(url) => setPath('header.logoLight', url)} onUpload={uploadToCloudinaryViaBackend}
+                        uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} /></div>
+                    <div><p className="appearance-header__logo-hint">Para fondos claros · logo oscuro</p>
+                      <CloudinaryImageField label="Logo oscuro" value={theme.header?.logoDark || ''}
+                        onChange={(url) => setPath('header.logoDark', url)} onUpload={uploadToCloudinaryViaBackend}
+                        uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} /></div>
+                  </div>
 
                   <PanelBlock title="Tamaño del logo" columns={1}>
                     <div className="rounded-2xl border bg-white p-4">
@@ -257,75 +236,9 @@ export default function HeaderPanel({
                         />
                       </div>
 
-                      <div className="mt-2 text-xs text-gray-500">
-                        Nota: mueve la barra, luego presiona{" "}
-                        <span className="font-medium">Guardar</span>.
-                      </div>
+                      <div className="mt-2 text-xs text-gray-500">La vista previa cambia al mover la barra. Guarda para publicarlo.</div>
                     </div>
                   </PanelBlock>
-                </>
-              )}
-
-              {brandingSubTab === "subida" && (
-                <>
-                  <PanelBlock title="Subir logo desde tu PC (Cloudinary)">
-                    <div className="rounded-2xl border bg-white p-4">
-                      <div className="mb-2 text-sm font-medium text-gray-800">Logo Light</div>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => setLogoLightFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={uploading}
-                        onClick={() => onUploadLogo("light")}
-                        className="mt-3 w-full rounded-xl bg-pink-600 px-3 py-2 text-sm text-white transition hover:bg-pink-700 disabled:opacity-60"
-                      >
-                        {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-                      </button>
-                    </div>
-
-                    <div className="rounded-2xl border bg-white p-4">
-                      <div className="mb-2 text-sm font-medium text-gray-800">Logo Dark</div>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => setLogoDarkFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={uploading}
-                        onClick={() => onUploadLogo("dark")}
-                        className="mt-3 w-full rounded-xl bg-pink-600 px-3 py-2 text-sm text-white transition hover:bg-pink-700 disabled:opacity-60"
-                      >
-                        {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-                      </button>
-                    </div>
-                  </PanelBlock>
-
-                  <PanelBlock title="URLs manuales del logo">
-                    <Input
-                      label="Logo del Header (Light) — URL"
-                      value={theme.header?.logoLight || ""}
-                      onChange={(e) => setPath("header.logoLight", e.target.value)}
-                      placeholder="https://.../logo_header_light.png"
-                    />
-
-                    <Input
-                      label="Logo del Header (Dark) — URL"
-                      value={theme.header?.logoDark || ""}
-                      onChange={(e) => setPath("header.logoDark", e.target.value)}
-                      placeholder="https://.../logo_header_dark.png"
-                    />
-                  </PanelBlock>
-
-                  <div className="text-xs text-gray-500">
-                    Nota: después de subir, presiona <span className="font-medium">Guardar</span>{" "}
-                    para que quede fijo.
-                  </div>
                 </>
               )}
 
@@ -1178,7 +1091,7 @@ export default function HeaderPanel({
                     Menú del Header (botones)
                   </div>
                   <p className="mt-1 text-sm text-gray-600">
-                    Edita texto y ruta. Luego presiona <span className="font-medium">Guardar</span>.
+                    Elige una página pública o escribe un enlace externo seguro. El orden se refleja arriba.
                   </p>
                 </div>
 
@@ -1211,7 +1124,7 @@ export default function HeaderPanel({
                         <div className="min-w-0">
                           <label className="block min-w-0">
                             <span className="mb-1 block text-sm font-medium text-gray-700">
-                              Ruta / link
+                              Página o destino
                             </span>
 
                             <select
@@ -1219,23 +1132,10 @@ export default function HeaderPanel({
                               value={item?.ref || ""}
                               onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
                             >
-                              <option value="">(Selecciona una ruta)</option>
-                              <optgroup label="Público">
+                              <option value="">Selecciona una página</option>
+                              {item?.ref && !routeOptions.public.some((route) => route.value === item.ref) && <option value={item.ref}>Enlace personalizado: {item.ref}</option>}
+                              <optgroup label="Páginas públicas">
                                 {routeOptions.public.map((r) => (
-                                  <option key={r.value} value={r.value}>
-                                    {r.label} — {r.value}
-                                  </option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Admin">
-                                {routeOptions.admin.map((r) => (
-                                  <option key={r.value} value={r.value}>
-                                    {r.label} — {r.value}
-                                  </option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Utilidades">
-                                {routeOptions.util.map((r) => (
                                   <option key={r.value} value={r.value}>
                                     {r.label} — {r.value}
                                   </option>
@@ -1247,7 +1147,7 @@ export default function HeaderPanel({
                               className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
                               value={item?.ref || ""}
                               onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
-                              placeholder="Ej: /lo-nuevo"
+                              placeholder="/lo-nuevo, #tendencia o https://sitio.com"
                             />
                           </label>
                         </div>
@@ -1281,8 +1181,7 @@ export default function HeaderPanel({
                       </div>
 
                       <div className="mt-2 text-xs text-gray-500">
-                        Tip: para productos usa <span className="font-mono">/producto/:id</span>{" "}
-                        o <span className="font-mono">/p/:id</span>.
+                        Para un producto específico, pega su ruta real, por ejemplo <span className="font-mono">/producto/123</span>. Las rutas con <span className="font-mono">:id</span> no sirven como enlace público.
                       </div>
                     </div>
                   ))}

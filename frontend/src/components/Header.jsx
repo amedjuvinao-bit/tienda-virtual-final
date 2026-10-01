@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  Search,
   Heart,
   ShoppingCart,
   User,
@@ -15,15 +14,16 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import CartSidebar from "./CartSidebar";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
+import { normalizeHeaderMenu, resolveHeaderLogo, headerMenuDestination } from './headerPresentation';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const { cart } = useCart();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [logoLight, setLogoLight] = useState("");
   const [logoDark, setLogoDark] = useState("");
@@ -31,11 +31,16 @@ function Header() {
   const [logoHeightPx, setLogoHeightPx] = useState(80);
   const [menuItems, setMenuItems] = useState([]);
   const [headerConfig, setHeaderConfig] = useState({});
+  const [footerConfig, setFooterConfig] = useState({});
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    let sequence = 0;
+    const refresh = async () => {
+      const requestId = ++sequence;
       try {
         const s = await fetchSiteSettings();
+        if (cancelled || requestId !== sequence) return;
 
         const t = s?.theme || {};
         const h = t?.header || {};
@@ -53,44 +58,45 @@ function Header() {
         else setLogoHeightPx(80);
 
         setHeaderConfig(h);
-
-        const headerMenu = Array.isArray(s?.menus?.header) ? s.menus.header : [];
-
-        const mapped = headerMenu
-          .map((it) => {
-            const name = String(it?.title || "").trim();
-            const to = String(it?.ref || "").trim();
-            if (!name || !to) return null;
-
-            const isExternal = /^https?:\/\//i.test(to);
-            return { name, to, isExternal };
-          })
-          .filter(Boolean);
-
-        setMenuItems(mapped);
+        setFooterConfig(t?.footer || {});
+        setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
+        if (cancelled || requestId !== sequence) return;
         setLogoLight("/LOGO1.png");
         setLogoDark("/LOGO1.png");
         setHeaderBgHex("");
         setLogoHeightPx(80);
         setMenuItems([]);
         setHeaderConfig({});
+        setFooterConfig({});
       }
-    })();
+    };
+    refresh();
+    const onStorage = (event) => {
+      if (event.key === 'rb_site_settings_tick') refresh();
+    };
+    window.addEventListener('rb_site_settings_updated', refresh);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('rb_site_settings_updated', refresh);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   useEffect(() => {
+    let previousY = window.scrollY;
     function handleScroll() {
-      if (window.scrollY > lastScrollY) setShowHeader(false);
-      else setShowHeader(true);
-
-      setLastScrollY(window.scrollY);
-      setMenuOpen(false);
+      const currentY = window.scrollY;
+      if (!menuOpen && !cartOpen && Math.abs(currentY - previousY) > 4) {
+        setShowHeader(currentY < 80 || currentY < previousY);
+      }
+      previousY = currentY;
     }
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY]);
+  }, [menuOpen, cartOpen]);
 
   useEffect(() => {
     if (menuOpen || cartOpen) {
@@ -103,6 +109,20 @@ function Header() {
       document.body.style.overflow = "";
     };
   }, [menuOpen, cartOpen]);
+
+  useEffect(() => {
+    setShowHeader(true);
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
 
   const navStyle = useMemo(
     () => ({
@@ -120,30 +140,7 @@ function Header() {
     []
   );
 
-  const chosenLogo = useMemo(() => {
-    const isHex = (v) =>
-      typeof v === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim());
-
-    const luminanceFromHex = (hex) => {
-      if (!isHex(hex)) return null;
-      let h = hex.replace("#", "").trim();
-      if (h.length === 3) h = h
-        .split("")
-        .map((c) => c + c)
-        .join("");
-      const r = parseInt(h.slice(0, 2), 16);
-      const g = parseInt(h.slice(2, 4), 16);
-      const b = parseInt(h.slice(4, 6), 16);
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-
-    const lum = luminanceFromHex(headerBgHex);
-    if (lum === null) return logoLight || "/LOGO1.png";
-
-    const isDark = lum < 140;
-    if (isDark) return logoLight || logoDark || "/LOGO1.png";
-    return logoDark || logoLight || "/LOGO1.png";
-  }, [headerBgHex, logoLight, logoDark]);
+  const chosenLogo = useMemo(() => resolveHeaderLogo({ bgColor: headerBgHex, logoLight, logoDark }), [headerBgHex, logoLight, logoDark]);
 
   const logoStyle = useMemo(
     () => ({
@@ -386,6 +383,10 @@ function Header() {
     setMenuOpen(false);
     navigate(to);
   };
+  const socialLinks = [
+    { label: 'Facebook', href: footerConfig.facebook, Icon: Facebook },
+    { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
+  ].filter((link) => headerMenuDestination(link.href)?.isExternal);
 
   return (
     <>
@@ -397,7 +398,7 @@ function Header() {
       >
         <div className="relative w-full h-[70px]">
           {/* Desktop */}
-          <div className="hidden md:flex w-full h-full items-center justify-between">
+          <div className="hidden lg:flex w-full h-full items-center justify-between gap-4">
             <NavLink to="/" className="shrink-0 z-10">
               <img
                 src={chosenLogo || "/LOGO1.png"}
@@ -409,7 +410,8 @@ function Header() {
 
             <nav
               style={navStyle}
-              className="header-menu flex justify-center space-x-6 font-bold italic drop-shadow-[0_0_3px_#FFFFFF]"
+              className="header-menu flex min-w-0 flex-1 items-center justify-center gap-3 overflow-x-auto whitespace-nowrap py-3 font-bold italic xl:gap-6"
+              aria-label="Navegación principal"
             >
               {menuItems.map((item, idx) => {
                 if (item.isExternal) {
@@ -440,24 +442,17 @@ function Header() {
               })}
             </nav>
 
-            <div className="header-icons flex items-center space-x-4 text-xl">
-              <div
+            <div className="header-icons flex shrink-0 items-center gap-3 text-xl xl:gap-4">
+              <button type="button" aria-label="Administración"
                 onClick={() => navigate("/admin/login")}
-                className="header-icon relative cursor-pointer"
+                className="header-icon relative rounded-full p-2 focus-visible:outline focus-visible:outline-2"
               >
                 <User className="w-5 h-5" />
-              </div>
+              </button>
 
-              <div
-                onClick={() => navigate("/")}
-                className="header-icon relative cursor-pointer"
-              >
-                <Search className="w-5 h-5" />
-              </div>
-
-              <div
+              <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="header-icon relative cursor-pointer"
+                className="header-icon relative rounded-full p-2 focus-visible:outline focus-visible:outline-2"
               >
                 <Heart className="w-5 h-5" />
                 {favorites.length > 0 && (
@@ -465,11 +460,11 @@ function Header() {
                     {favorites.length}
                   </span>
                 )}
-              </div>
+              </button>
 
-              <div
+              <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="header-icon relative cursor-pointer"
+                className="header-icon relative rounded-full p-2 focus-visible:outline focus-visible:outline-2"
               >
                 <ShoppingCart className="w-5 h-5" />
                 {cart.length > 0 && (
@@ -477,12 +472,12 @@ function Header() {
                     {cart.length}
                   </span>
                 )}
-              </div>
+              </button>
             </div>
           </div>
 
           {/* Mobile */}
-          <div className="md:hidden h-full">
+          <div className="lg:hidden h-full">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20">
               <button
                 type="button"
@@ -490,6 +485,8 @@ function Header() {
                 className="flex items-center justify-center shadow-sm"
                 style={triggerStyle}
                 aria-label="Abrir menú"
+                aria-expanded={menuOpen}
+                aria-controls="storefront-mobile-menu"
               >
                 <Menu
                   className="shrink-0"
@@ -502,7 +499,7 @@ function Header() {
             </div>
 
             <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2">
-              <div
+              <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
                 className="relative cursor-pointer text-[#8d5c6b] bg-white shadow-sm border border-[#e7c2cf] rounded-full w-10 h-10 flex items-center justify-center"
               >
@@ -512,9 +509,9 @@ function Header() {
                     {favorites.length}
                   </span>
                 )}
-              </div>
+              </button>
 
-              <div
+              <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
                 className="relative cursor-pointer text-[#8d5c6b] bg-white shadow-sm border border-[#e7c2cf] rounded-full w-10 h-10 flex items-center justify-center"
               >
@@ -524,7 +521,7 @@ function Header() {
                     {cart.length}
                   </span>
                 )}
-              </div>
+              </button>
             </div>
 
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -542,7 +539,7 @@ function Header() {
       </header>
 
       <div
-        className={`md:hidden fixed inset-0 z-[70] transition-all ${
+        className={`lg:hidden fixed inset-0 z-[70] transition-all ${
           menuOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
         style={overlayStyle}
@@ -550,7 +547,11 @@ function Header() {
       />
 
       <aside
-        className="md:hidden fixed z-[80] shadow-2xl flex flex-col transition-all"
+        id="storefront-mobile-menu"
+        className="lg:hidden fixed z-[80] shadow-2xl flex flex-col transition-all"
+        aria-label="Menú móvil"
+        aria-hidden={!menuOpen}
+        inert={!menuOpen ? '' : undefined}
         style={asideStyle}
       >
         <div
@@ -644,37 +645,14 @@ function Header() {
                 Inicia sesión
               </button>
 
-              <button
-                type="button"
-                onClick={() => closeMenuAndNavigate("/admin/login")}
-                className="w-full font-semibold py-3 px-4 transition"
-                style={secondaryButtonStyle}
-              >
-                Registro
-              </button>
             </div>
 
-            <div className="pt-8 flex items-center gap-3">
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noreferrer"
+            {socialLinks.length > 0 && <div className="pt-8 flex items-center gap-3">
+              {socialLinks.map(({ label, href, Icon }) => <a key={label} href={href}
+                aria-label={label} target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center shadow-sm transition hover:scale-105"
-                style={socialButtonStyle}
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
-
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-center shadow-sm transition hover:scale-105"
-                style={socialButtonStyle}
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-            </div>
+                style={socialButtonStyle}><Icon className="w-5 h-5" /></a>)}
+            </div>}
           </div>
         </div>
 
@@ -686,9 +664,7 @@ function Header() {
             borderTop: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}`,
           }}
         >
-          Todos los derechos reservados
-          <br />
-          © 2026, Rosa Boutique
+          {footerConfig.copyright || `© ${new Date().getFullYear()}`}
         </div>
       </aside>
 

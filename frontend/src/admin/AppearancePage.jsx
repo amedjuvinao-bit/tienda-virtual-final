@@ -6,6 +6,7 @@ import { fetchAppearanceSettings, saveSiteSettings } from "../lib/siteSettingsAp
 import { applyTheme } from "../theme/applyTheme";
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
+import { validateHeaderMenu } from '../components/headerPresentation';
 import { normalizeGlobalConfig } from "./appearance/general/generalHelpers";
 import { API_BASE_URL } from "../config/apiBaseUrl";
 
@@ -514,9 +515,6 @@ export default function AppearancePage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [changedAreas.length]);
 
-  // ✅ Upload state (LOGO)
-  const [logoLightFile, setLogoLightFile] = useState(null);
-  const [logoDarkFile, setLogoDarkFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
   // ✅ Páginas dinámicas para rutas del Header
@@ -526,32 +524,16 @@ export default function AppearancePage() {
   const routeOptions = useMemo(
     () => ({
       public: [
-        { label: "Home", value: "/" },
+        { label: "Inicio", value: "/" },
         { label: "Lo Nuevo", value: "/lo-nuevo" },
         { label: "Carrito", value: "/carrito" },
         { label: "Favoritos", value: "/favoritos" },
-        { label: "Checkout", value: "/checkout" },
-        { label: "Gracias", value: "/gracias" },
-        { label: "Producto (por id o slug)", value: "/producto/:id" },
-        { label: "Producto corto (por id o slug)", value: "/p/:id" },
 
         ...dynamicPages.map((page) => ({
           label: `Página · ${page.name}`,
           value: `/pagina/${page.slug}`,
         })),
       ],
-      admin: [
-        { label: "Login admin", value: "/admin/login" },
-        { label: "Admin · Dashboard", value: "/admin/dashboard" },
-        { label: "Admin · Productos", value: "/admin/productos" },
-        { label: "Admin · Productos (nuevo)", value: "/admin/productos/nuevo" },
-        { label: "Admin · Productos (editar)", value: "/admin/productos/editar/:id" },
-        { label: "Admin · Carritos", value: "/admin/carritos" },
-        { label: "Admin · Favoritos", value: "/admin/favoritos" },
-        { label: "Admin · Órdenes", value: "/admin/ordenes" },
-        { label: "Admin · Apariencia", value: "/admin/apariencia" },
-      ],
-      util: [{ label: "Probe Site Settings", value: "/probe-site-settings" }],
     }),
     [dynamicPages]
   );
@@ -656,8 +638,6 @@ export default function AppearancePage() {
       const mm = buildMenusFromServer(menusSnapshot);
       setMenus(mm);
     }
-    setLogoLightFile(null);
-    setLogoDarkFile(null);
     setSaveMessage(null);
   };
 
@@ -722,42 +702,6 @@ export default function AppearancePage() {
     return data.url;
   };
 
-  const onUploadLogo = async (which) => {
-    try {
-      const file = which === "light" ? logoLightFile : logoDarkFile;
-      if (!file) {
-        alert("Selecciona una imagen primero.");
-        return;
-      }
-
-      setUploading(true);
-      const uploadedUrl = await uploadToCloudinaryViaBackend(file, "image");
-
-      if (which === "light") {
-        setPath("header.logoLight", uploadedUrl);
-        setLogoLightFile(null);
-      } else {
-        setPath("header.logoDark", uploadedUrl);
-        setLogoDarkFile(null);
-      }
-
-      applyTheme({
-        ...theme,
-        header: {
-          ...(theme.header || {}),
-          [which === "light" ? "logoLight" : "logoDark"]: uploadedUrl,
-        },
-      });
-
-      alert("Logo subido a Cloudinary ✅ (ahora dale Guardar para dejarlo fijo)");
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || "Error subiendo logo");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const onSave = async () => {
     if (savingRef.current || saveConflict || serverSnapshot === null || appearanceRevision === null || uploading) return;
     savingRef.current = true;
@@ -793,6 +737,11 @@ export default function AppearancePage() {
       if (!payload.theme && !payload.menus) {
         setSaveMessage({ type: 'info', text: 'No hay cambios por guardar.' });
         return;
+      }
+
+      if (changedMenus.header) {
+        const menuError = validateHeaderMenu(changedMenus.header);
+        if (menuError) { showValidation(menuError); return; }
       }
 
       const hexOk = (v) => !v || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
@@ -1038,9 +987,9 @@ export default function AppearancePage() {
               menus={menus}
               routeOptions={routeOptions}
               uploading={uploading}
-              onUploadLogo={onUploadLogo}
-              setLogoLightFile={setLogoLightFile}
-              setLogoDarkFile={setLogoDarkFile}
+              setUploading={setUploading}
+              savedRevision={appearanceRevision}
+              uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
               addHeaderMenuItem={addHeaderMenuItem}
               removeHeaderMenuItem={removeHeaderMenuItem}
               moveHeaderMenuItem={moveHeaderMenuItem}
