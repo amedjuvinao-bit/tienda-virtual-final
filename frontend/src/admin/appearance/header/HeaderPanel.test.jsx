@@ -100,11 +100,12 @@ describe('edición del encabezado', () => {
     expect(options).toHaveLength(6);
     const gallery = within(screen.getByRole('group', { name: 'Modelo de íconos' }));
     await user.click(gallery.getByRole('button', { name: /Silueta/ }));
-    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('svg')).toHaveAttribute('fill', 'currentColor');
-    await user.click(gallery.getByRole('button', { name: /Geométrico/ }));
+    expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' }).querySelector('svg').getAttribute('fill')).toMatch(/^url\(#.+\)$/);
+    await user.click(gallery.getByRole('button', { name: /Facetas/ }));
     expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'editorial');
-    await user.click(gallery.getByRole('button', { name: /Destello/ }));
+    await user.click(gallery.getByRole('button', { name: /Couture/ }));
     expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
+    expect(within(preview).getByRole('button', { name: 'Administración (vista previa)' }).querySelector('svg')).toHaveAttribute('width', '26');
     expect(within(preview).getByRole('button', { name: 'Favoritos (vista previa)' })).not.toHaveAttribute('data-finish');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     expect(within(preview).getByRole('button', { name: 'Carrito (vista previa)' }).querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');

@@ -90,6 +90,7 @@ describe('encabezado de la tienda', () => {
     cartButtons.forEach((button) => {
       expect(button).not.toHaveAttribute('data-finish');
       expect(button.querySelector('svg')).toHaveAttribute('data-icon-style', 'silk');
+      expect(button.querySelector('svg')).toHaveAttribute('width', '26');
     });
   });
 });

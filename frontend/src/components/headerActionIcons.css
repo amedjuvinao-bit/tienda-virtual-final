@@ -1,11 +1,16 @@
 .storefront-action-button {
   position: relative; display: inline-grid; flex: none; place-items: center;
-  width: 36px; height: 40px; padding: 0; border: 0; border-radius: 0;
+  width: 38px; height: 42px; padding: 0; border: 0; border-radius: 0;
   color: var(--header-icon-color, currentColor); background: transparent;
   box-shadow: none; cursor: pointer;
   transition: color .18s ease, transform .18s ease;
 }
 .storefront-action-glyph { flex: none; transition: transform .18s ease; }
+.storefront-action-glyph[data-icon-style="atelier"] { filter: drop-shadow(0 1px 1px color-mix(in srgb, currentColor 20%, transparent)); }
+.storefront-action-glyph[data-icon-style="silk"] { filter: drop-shadow(0 1px 2px color-mix(in srgb, currentColor 24%, transparent)); }
+.storefront-action-glyph[data-icon-style="silk"] .storefront-action-accent { fill: var(--header-icon-highlight, #d6a55f); stroke: none; }
+.storefront-action-glyph[data-icon-style="editorial"] .storefront-action-facet { fill: var(--header-icon-highlight, #d6a55f); stroke: none; opacity: .7; }
+.storefront-action-glyph[data-icon-style="essence"] .storefront-action-accent { fill: none; stroke: var(--header-icon-highlight, #d6a55f); stroke-width: 1.4; }
 .storefront-action-button:hover { color: var(--header-icon-hover, currentColor); }
 .storefront-action-button:hover .storefront-action-glyph { transform: translateY(var(--header-icon-hover-ty, -1px)) scale(var(--header-icon-hover-scale, 1.03)) rotate(var(--header-icon-hover-rot, 0deg)); }
 .storefront-action-button:active .storefront-action-glyph { transform: scale(.94); }
