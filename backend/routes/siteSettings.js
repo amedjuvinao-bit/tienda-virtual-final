@@ -659,6 +659,12 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
           && Object.entries(images).every(([kind, url]) => validKinds.includes(kind) && (url === '' || validCloudinaryImage(url))));
       if (!valid) return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_OVERRIDES', message: 'Los iconos personalizados deben ser imágenes de Cloudinary.' });
     }
+    if (theme?.header?.mobileMenuFeatureImage !== undefined &&
+      theme.header.mobileMenuFeatureImage !== '' &&
+      (typeof theme.header.mobileMenuFeatureImage !== 'string' ||
+        !/^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(theme.header.mobileMenuFeatureImage))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_MOBILE_MENU_FEATURE_IMAGE', message: 'La imagen destacada del menú móvil debe estar en Cloudinary.' });
+    }
     if (theme?.header?.iconSizePx !== undefined && (!Number.isInteger(theme.header.iconSizePx) || theme.header.iconSizePx < 28 || theme.header.iconSizePx > 40)) {
       return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_SIZE', message: 'El tamaño de los iconos debe estar entre 28 y 40 px.' });
     }

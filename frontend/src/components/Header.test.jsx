@@ -155,7 +155,8 @@ describe('encabezado de la tienda', () => {
   it('muestra el cristal inferior con las categorías e íconos configurados, sin asumir que vende ropa', async () => {
     fetchSiteSettings.mockResolvedValue({
       ...settings('Lo Nuevo'),
-      theme: { header: { mobileMenuLayout: 'atelier-sheet', logoLight: '/claro.png' }, banner: { slides: [{ image: '/campana.webp' }] } },
+      store: { name: 'Tienda de prueba' },
+      theme: { header: { mobileMenuLayout: 'atelier-sheet', logoLight: '/claro.png', mobileMenuFeatureImage: '/promocion.webp', mobileMenuFeatureRef: '/pagina/cafe' }, banner: { slides: [{ image: '/campana.webp' }] } },
       menus: { header: [
         { title: 'Libros', ref: '/pagina/libros', icon: 'books' },
         { title: 'Café', ref: '/pagina/cafe', icon: 'food' },
@@ -170,10 +171,15 @@ describe('encabezado de la tienda', () => {
     expect(drawer).toHaveAttribute('aria-hidden', 'false');
     expect(drawer).toHaveStyle({ bottom: '0px', width: '100%' });
     expect(within(drawer).getByRole('navigation', { name: 'Navegación móvil' })).toBeInTheDocument();
+    expect(drawer.querySelector('.atelier-menu__brand')).toHaveTextContent('Tienda de prueba');
     expect(within(drawer).getByRole('button', { name: 'Libros' }).querySelector('[data-menu-icon]')).toHaveAttribute('data-menu-icon', 'books');
     expect(within(drawer).getByRole('button', { name: 'Café' }).querySelector('[data-menu-icon]')).toHaveAttribute('data-menu-icon', 'food');
     expect(within(drawer).getByRole('button', { name: 'Otra categoría' }).querySelector('[data-menu-icon]')).toHaveAttribute('data-menu-icon', 'grid');
-    expect(drawer.querySelector('.atelier-menu__feature').style.backgroundImage).toContain('/campana.webp');
+    expect(drawer.querySelector('.atelier-menu__feature').style.backgroundImage).toContain('/promocion.webp');
+    expect(drawer.querySelector('.atelier-menu__feature').style.backgroundImage).not.toContain('/campana.webp');
+    expect(drawer.querySelector('.atelier-menu__feature')).toHaveTextContent('Café');
+    expect(within(drawer).getByRole('button', { name: 'Buscar desde el menú' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: 'Carrito desde el menú' })).toBeInTheDocument();
     await user.click(within(drawer).getByRole('button', { name: 'Café' }));
     expect(screen.getByTestId('location')).toHaveTextContent('/pagina/cafe');
     expect(drawer).toHaveAttribute('aria-hidden', 'true');

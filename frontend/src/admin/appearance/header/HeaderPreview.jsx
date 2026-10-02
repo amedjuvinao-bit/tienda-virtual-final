@@ -55,7 +55,7 @@ export default function HeaderPreview({ theme, menus }) {
           </div>
         </div>
         {mobile && drawerOpen && atelier && <div className="appearance-header__atelier-preview" style={{ '--atelier-ink': header.mobileMenuTextColor || '#4e1e39', '--atelier-muted': header.mobileMenuMutedColor || '#815269', '--atelier-accent': header.mobileMenuAccentColor || '#ac7950', '--atelier-line': header.mobileMenuItemBorderColor || '#d2a997', '--atelier-surface': header.mobileMenuBgColor || '#fff4f3', '--atelier-font': header.mobileMenuFontFamily || 'Georgia, serif', '--atelier-separator-width': `${Math.max(0, Math.min(6, Number(header.mobileMenuItemBorderWidthPx ?? 1)))}px` }}>
-          <AtelierMobileMenu items={links} logo={logo} alternateLogo={alternateLogo} featureImage={bannerImage} preview
+          <AtelierMobileMenu items={links} storeName={theme?.store?.name || 'Rosa Boutique'} featureImage={header.mobileMenuFeatureImage || ''} featureLink={header.mobileMenuFeatureRef || ''} preview
             onClose={() => setDrawerOpen(false)} onSelect={() => setDrawerOpen(false)}
             onSearch={() => { setDrawerOpen(false); setSearchPreviewOpen(true); }}
             onFavorites={() => setDrawerOpen(false)} onCart={() => setDrawerOpen(false)} />

@@ -1,18 +1,18 @@
 import { ChevronRight, Heart, Search, ShoppingBag, X } from 'lucide-react';
-import HeaderBrand from './HeaderBrand';
 import { MobileMenuLinkIcon } from './mobileMenuIcons';
 import './atelierMobileMenu.css';
 
 export default function AtelierMobileMenu({
-  items = [], logo, alternateLogo, onClose, onSelect, onSearch, onFavorites, onCart,
-  cartCount = 0, featureImage = '', socialLinks = [], preview = false,
+  items = [], storeName = 'Rosa Boutique', onClose, onSelect, onSearch, onFavorites, onCart,
+  cartCount = 0, featureImage = '', featureLink = '', socialLinks = [], preview = false,
 }) {
-  const featured = items.find((item) => item.to !== '/' && !item.isExternal) || items[0];
+  const featured = items.find((item) => item.to === featureLink && !item.isExternal)
+    || items.find((item) => item.to !== '/' && !item.isExternal) || items[0];
 
   return <div className="atelier-menu" data-preview={preview ? 'true' : undefined}>
     <span className="atelier-menu__handle" aria-hidden="true" />
     <div className="atelier-menu__top">
-      <HeaderBrand src={logo} alternateSrc={alternateLogo} className="atelier-menu__brand" />
+      <span className="atelier-menu__brand">{storeName}</span>
       <button type="button" className="atelier-menu__close" onClick={onClose} aria-label="Cerrar menú"><X size={21} strokeWidth={1.4} /></button>
     </div>
 
@@ -28,9 +28,9 @@ export default function AtelierMobileMenu({
     {featured && <button type="button" className="atelier-menu__feature"
       style={featureImage ? { backgroundImage: `linear-gradient(90deg, rgba(58,18,39,.88), rgba(58,18,39,.36)), url(${JSON.stringify(featureImage)})` } : undefined}
       onClick={() => onSelect?.(featured)}>
-      <span className="atelier-menu__feature-eyebrow">DESCUBRE LA TIENDA</span>
+      <span className="atelier-menu__feature-eyebrow">DESTACADO</span>
       <strong>{featured.name}</strong>
-      <span className="atelier-menu__feature-action">Explorar <ChevronRight size={15} aria-hidden="true" /></span>
+      <span className="atelier-menu__feature-action">Descubrir <ChevronRight size={15} aria-hidden="true" /></span>
     </button>}
 
     <div className="atelier-menu__bottom">

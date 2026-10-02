@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { Image, Link2, Palette, Smartphone } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
-import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
+import { HEADER_FONT_PRESETS, headerMenuDestination, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
 import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import { headerSearchColorVariables, resolveHeaderSearchColors } from '../../../components/headerSearchTheme';
 import { MOBILE_MENU_ICON_OPTIONS, MobileMenuLinkIcon, normalizeMobileMenuIcon } from '../../../components/mobileMenuIcons';
@@ -636,7 +636,21 @@ export default function HeaderPanel({
                       <option value="full-screen">Pantalla completa</option>
                       <option value="atelier-sheet">Atelier · cristal inferior</option>
                     </Select>
-                    {isAtelierLayout ? <p className="self-center text-sm text-gray-700">Panel inferior de cristal con los enlaces reales de tu tienda. Elige los íconos en <strong>Enlaces</strong> y revisa la vista <strong>Móvil</strong> arriba.</p> : <>
+                    {isAtelierLayout ? <div className="space-y-3">
+                      <p className="text-sm text-gray-700">Panel inferior de cristal con tus enlaces reales. Los íconos se eligen en <strong>Enlaces</strong>; comprueba el resultado en la vista <strong>Móvil</strong>.</p>
+                      <p className="text-sm text-gray-700">La tarjeta destacada abre un enlace de tu menú. Si no cargas imagen, se mostrará la textura satinada del diseño.</p>
+                      <Select label="Enlace de la tarjeta destacada" value={theme.header?.mobileMenuFeatureRef || ''}
+                        onChange={(event) => setPath('header.mobileMenuFeatureRef', event.target.value)}>
+                        <option value="">Automático: primer enlace disponible</option>
+                        {(menus.header || []).filter((item) => item?.ref !== '/' && headerMenuDestination(item?.ref)?.isExternal === false).map((item, index) =>
+                          <option value={item.ref} key={`${item.ref}-${index}`}>{item.title || item.ref}</option>)}
+                      </Select>
+                      <CloudinaryImageField label="Imagen de tarjeta destacada del menú móvil"
+                        value={theme.header?.mobileMenuFeatureImage || ''}
+                        fallbackPreview="/atelier/feature-satin.webp"
+                        onChange={(url) => setPath('header.mobileMenuFeatureImage', url)}
+                        onUpload={uploadToCloudinaryViaBackend} uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} />
+                    </div> : <>
                       <Input
                         label="Ancho del menú móvil (%)" type="number" min={60} max={100} step="1"
                         value={theme.header?.mobileMenuWidthPercent ?? 88}

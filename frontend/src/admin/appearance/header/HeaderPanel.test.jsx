@@ -65,6 +65,22 @@ describe('edición del encabezado', () => {
     expect(preview.querySelector('[data-menu-icon="books"]')).toBeInTheDocument();
   });
 
+  it('permite cargar una imagen propia para la tarjeta Atelier y verla antes de guardar', async () => {
+    const user = userEvent.setup();
+    const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/image/upload/v1/tarjeta.webp');
+    render(<Editor upload={upload} />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
+    const feature = preview.querySelector('.atelier-menu__feature');
+    expect(feature.style.backgroundImage).toBe('');
+    await user.upload(screen.getByLabelText('Seleccionar imagen para Imagen de tarjeta destacada del menú móvil'),
+      new File(['imagen'], 'tarjeta.webp', { type: 'image/webp' }));
+    expect(upload).toHaveBeenCalled();
+    expect(feature.style.backgroundImage).toContain('/tarjeta.webp');
+  });
+
   it('sube un archivo de logo en un solo paso y lo muestra en la vista previa', async () => {
     const user = userEvent.setup();
     const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/logo.png');

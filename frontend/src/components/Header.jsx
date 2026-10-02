@@ -44,6 +44,7 @@ function Header() {
   const iconPresentation = resolveHeaderIcons(headerConfig);
   const [footerConfig, setFooterConfig] = useState({});
   const [mobileMenuFeatureImage, setMobileMenuFeatureImage] = useState('');
+  const [storeName, setStoreName] = useState('Rosa Boutique');
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +73,8 @@ function Header() {
         setHeaderConfig(h);
         setThemeColors(t?.colors || {});
         setFooterConfig(t?.footer || {});
-        setMobileMenuFeatureImage(t?.banner?.slides?.find((slide) => slide?.image)?.image || t?.banner?.imageUrl || '');
+        setMobileMenuFeatureImage(h?.mobileMenuFeatureImage || '');
+        setStoreName(s?.store?.name || 'Rosa Boutique');
         setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
         if (cancelled || requestId !== sequence) return;
@@ -85,6 +87,7 @@ function Header() {
         setThemeColors({});
         setFooterConfig({});
         setMobileMenuFeatureImage('');
+        setStoreName('Rosa Boutique');
       }
     };
     refresh();
@@ -351,7 +354,7 @@ function Header() {
     height: "100%",
     ...(isAtelierSheet ? {
       width: '100%', maxWidth: 'none', top: 'auto', bottom: 0, left: 0, right: 0,
-      height: 'min(78dvh, 760px)', maxHeight: 'calc(100dvh - 72px)',
+      height: 'auto', maxHeight: 'calc(100dvh - 68px)',
       paddingLeft: 0, paddingRight: 0, background: 'transparent', border: 0,
       boxShadow: 'none', opacity: 1,
       transform: menuOpen ? 'translateY(0)' : 'translateY(105%)',
@@ -585,8 +588,7 @@ function Header() {
       >
         {isAtelierSheet ? <AtelierMobileMenu
           items={menuItems}
-          logo={chosenLogo}
-          alternateLogo={alternateLogo}
+          storeName={storeName}
           onClose={() => setMenuOpen(false)}
           onSelect={selectAtelierItem}
           onSearch={() => { setMenuOpen(false); setSearchTarget('mobile'); setSearchOpen(true); }}
@@ -594,6 +596,7 @@ function Header() {
           onCart={() => { setMenuOpen(false); setCartOpen(true); }}
           cartCount={cart.length}
           featureImage={mobileMenuFeatureImage}
+          featureLink={headerConfig?.mobileMenuFeatureRef}
           socialLinks={socialLinks}
         /> : <>
         <div

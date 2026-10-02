@@ -60,21 +60,10 @@
 .appearance-header__device[data-viewport="mobile"] .appearance-header__store-header img { max-width: 96px; max-height: 46px; }
 .appearance-header__drawer { position: absolute; z-index: 3; top: 64px; bottom: 0; left: 0; width: 82%; overflow: auto; padding: 12px; box-shadow: 8px 5px 18px rgba(55,22,38,.17); font-size: 12px; }
 .appearance-header__drawer div { padding: 9px 4px; border-bottom: 1px solid rgba(173,96,133,.2); }
-.appearance-header__device[data-viewport="mobile"][data-menu-open="atelier"] { min-height: 490px; }
-.appearance-header__atelier-preview { position: absolute; z-index: 3; inset: auto 0 0; height: 77%; }
-.appearance-header__atelier-preview .atelier-menu { padding-right: 15px; padding-left: 15px; border-radius: 25px 25px 0 0; }
-.appearance-header__atelier-preview .atelier-menu__top { min-height: 54px; }
-.appearance-header__atelier-preview .atelier-menu__brand { max-height: 39px; }
-.appearance-header__atelier-preview .atelier-menu__top .header-brand-text { font-size: 17px; }
-.appearance-header__atelier-preview .atelier-menu__links { column-gap: 8px; }
-.appearance-header__atelier-preview .atelier-menu__link { min-height: 47px; gap: 5px; font-size: 12px; }
-.appearance-header__atelier-preview .atelier-menu__link > svg:first-child { width: 17px; }
-.appearance-header__atelier-preview .atelier-menu__chevron { width: 13px; }
-.appearance-header__atelier-preview .atelier-menu__feature { min-height: 70px; margin-top: 7px; padding: 9px 12px; }
-.appearance-header__atelier-preview .atelier-menu__feature strong { font-size: 15px; }
-.appearance-header__atelier-preview .atelier-menu__bottom { margin-top: 7px; }
-.appearance-header__atelier-preview .atelier-menu__bottom button { min-height: 42px; font-size: 10px; }
-.appearance-header__atelier-preview .atelier-menu__bottom button svg { width: 17px; height: 17px; }
+.appearance-header__device[data-viewport="mobile"][data-menu-open="atelier"] { min-height: 590px; }
+.appearance-header__atelier-preview { position: absolute; z-index: 3; inset: auto 0 0; display: flex; flex-direction: column; justify-content: flex-end; width: 100%; max-height: calc(100% - 70px); }
+.appearance-header__atelier-preview .atelier-menu { max-height: 100%; padding-right: 15px; padding-left: 15px; }
+.appearance-header__atelier-preview .atelier-menu__links { max-height: 200px; }
 .appearance-header__hero { display: grid; place-content: center; min-height: 75px; text-align: center; color: #773956; }
 .appearance-header__hero-label { font-family: Georgia, serif; font-size: 20px; font-style: italic; }
 .appearance-header__hero span { font-size: 10px; }
