@@ -62,6 +62,7 @@
 .atelier-menu__bottom button, .atelier-menu__bottom a { position: relative; display: grid; justify-items: center; align-content: center; gap: 3px; min-width: 0; min-height: 59px; padding: 2px; color: var(--atelier-ink); background: transparent; border: 0; font-family: var(--atelier-font, Georgia, serif); font-size: 12px; text-decoration: none; }
 .atelier-menu__bottom > :not(:first-child) { border-left: 1px solid color-mix(in srgb, var(--atelier-line) 55%, transparent); }
 .atelier-menu__bottom svg { width: 25px; height: 25px; }
+.atelier-menu__bottom .whatsapp-menu-icon > svg { width: var(--whatsapp-icon-size); height: var(--whatsapp-icon-size); }
 .atelier-menu__cart small { position: absolute; top: -2px; left: calc(50% + 10px); display: grid; place-items: center; min-width: 18px; height: 18px; border-radius: 50%; background: #68213c; color: #fff; font: 10px/1 system-ui, sans-serif; }
 .atelier-menu__social { position: relative; z-index: 1; display: flex; justify-content: center; gap: 15px; padding: 5px 0 0; }
 .atelier-menu__social a { color: var(--atelier-muted); }

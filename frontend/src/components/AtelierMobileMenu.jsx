@@ -42,7 +42,7 @@ export default function AtelierMobileMenu({
       <button type="button" onClick={onCart} aria-label="Carrito desde el menú" className="atelier-menu__cart"><ShoppingBag size={22} strokeWidth={1.6} /><span>Carrito</span>{cartCount > 0 && <small>{cartCount}</small>}</button>
       {whatsappHref && <a href={preview ? undefined : whatsappHref} target={preview ? undefined : '_blank'} rel={preview ? undefined : 'noopener noreferrer'}
         onClick={preview ? (event) => event.preventDefault() : onClose} aria-label="Contactar por WhatsApp">
-        <WhatsAppMenuIcon config={whatsappConfig} /><span>WhatsApp</span>
+        <WhatsAppMenuIcon config={whatsappConfig} size={34} slotSize={25} /><span>WhatsApp</span>
       </a>}
     </div>
     {socialLinks.length > 0 && <div className="atelier-menu__social">{socialLinks.map(({ label, href, Icon }) => <a key={label} href={preview ? undefined : href} target="_blank" rel="noopener noreferrer" aria-label={label} onClick={preview ? (event) => event.preventDefault() : undefined}><Icon size={15} strokeWidth={1.5} /></a>)}</div>}

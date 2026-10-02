@@ -212,6 +212,8 @@ describe('encabezado de la tienda', () => {
     const link = within(drawer).getByRole('link', { name: 'Contactar por WhatsApp' });
     expect(link).toHaveAttribute('href', 'https://wa.me/573001234567?text=Quiero%20informaci%C3%B3n');
     expect(link.querySelector('img')).toHaveAttribute('src', 'https://res.cloudinary.com/demo/image/upload/whatsapp.webp');
+    expect(link.querySelector('.whatsapp-menu-icon')).toHaveStyle({ width: '25px', height: '25px' });
+    expect(link.querySelector('img')).toHaveStyle({ width: '34px', height: '34px' });
     expect(drawer.querySelector('.atelier-menu__bottom')).toHaveAttribute('data-has-whatsapp', 'true');
     await user.click(link);
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
