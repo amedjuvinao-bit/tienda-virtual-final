@@ -358,7 +358,8 @@ function Header() {
     ...(isAtelierSheet ? {
       width: '100%', maxWidth: 'none', top: 'auto', bottom: 0, left: 0, right: 0,
       height: 'auto', maxHeight: 'calc(100dvh - 8px)',
-      paddingLeft: 0, paddingRight: 0, background: 'transparent', border: 0,
+      paddingLeft: 0, paddingRight: 0, backgroundColor: 'transparent',
+      borderColor: 'transparent', borderWidth: 0, borderStyle: 'none',
       boxShadow: 'none', opacity: 1,
       transform: menuOpen ? 'translateY(0)' : 'translateY(105%)',
       '--atelier-ink': mobileMenuTextColor,
