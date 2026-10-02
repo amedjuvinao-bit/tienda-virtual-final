@@ -189,7 +189,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
           <section className="appearance-general__section">
             <SectionHeader
               title="Botón de WhatsApp"
-              description="Define visibilidad, contacto, apariencia, imagen y animación del botón flotante."
+              description="En escritorio flota; en móvil aparece dentro del menú. Configura aquí el contacto y la imagen para ambos."
             />
 
             <div className="mb-3 flex flex-wrap gap-2">

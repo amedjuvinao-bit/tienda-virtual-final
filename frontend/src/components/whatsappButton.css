@@ -36,6 +36,10 @@
   transform: translateY(0);
 }
 
+@media (max-width: 1023px) {
+  .whatsapp-button, .whatsapp-button__greeting { display: none !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .whatsapp-button__greeting { transition: none; }
 }

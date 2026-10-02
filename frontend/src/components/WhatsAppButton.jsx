@@ -1,6 +1,7 @@
 // src/components/WhatsAppButton.jsx
 import React from "react";
 import WhatsAppGlyph from "./WhatsAppGlyph";
+import { resolveWhatsAppHref } from './whatsappLink';
 import "./storefrontLiquidGlass.css";
 import "./whatsappButton.css";
 
@@ -20,10 +21,7 @@ function getAnimationName(animation) {
 export default function WhatsAppButton({ config }) {
   const safeConfig = config && typeof config === "object" ? config : {};
 
-  const enabled = safeConfig.enabled !== false;
-
-  const phone = String(safeConfig.phone || "").replace(/\D/g, "");
-  const message = encodeURIComponent(safeConfig.message || "");
+  const href = resolveWhatsAppHref(safeConfig);
   const greeting = String(safeConfig.greeting ?? "¡Hola! ¿En qué podemos ayudarte?").trim().slice(0, 120);
   const greetingId = React.useId();
 
@@ -61,9 +59,7 @@ export default function WhatsAppButton({ config }) {
   const shadow = safeConfig.shadow || "soft";
   const animation = safeConfig.animation || "none";
 
-  if (!enabled || !phone) return null;
-
-  const href = `https://wa.me/${phone}${message ? `?text=${message}` : ""}`;
+  if (!href) return null;
   const internalIconSizePx = showBackground ? (sizePx * iconSizePercent) / 100 : sizePx;
   const animationName = getAnimationName(animation);
 

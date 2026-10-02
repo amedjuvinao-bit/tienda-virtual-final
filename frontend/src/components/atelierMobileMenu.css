@@ -58,9 +58,10 @@
 .atelier-menu__feature strong { max-width: 77%; font-family: var(--atelier-font, Georgia, serif); font-size: clamp(18px, 5vw, 23px); font-weight: 400; line-height: 1.15; overflow-wrap: anywhere; }
 .atelier-menu__feature-action { display: flex; align-items: center; gap: 3px; margin-top: 3px; font-size: 12px; }
 .atelier-menu__bottom { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: none; margin-top: 10px; padding-top: 5px; border-top: var(--atelier-separator-width, 1px) solid color-mix(in srgb, var(--atelier-line) 55%, transparent); }
-.atelier-menu__bottom button { position: relative; display: grid; justify-items: center; align-content: center; gap: 3px; min-height: 59px; padding: 2px; color: var(--atelier-ink); background: transparent; border: 0; font-family: var(--atelier-font, Georgia, serif); font-size: 12px; }
-.atelier-menu__bottom button + button { border-left: 1px solid color-mix(in srgb, var(--atelier-line) 55%, transparent); }
-.atelier-menu__bottom button svg { width: 25px; height: 25px; }
+.atelier-menu__bottom[data-has-whatsapp="true"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.atelier-menu__bottom button, .atelier-menu__bottom a { position: relative; display: grid; justify-items: center; align-content: center; gap: 3px; min-width: 0; min-height: 59px; padding: 2px; color: var(--atelier-ink); background: transparent; border: 0; font-family: var(--atelier-font, Georgia, serif); font-size: 12px; text-decoration: none; }
+.atelier-menu__bottom > :not(:first-child) { border-left: 1px solid color-mix(in srgb, var(--atelier-line) 55%, transparent); }
+.atelier-menu__bottom svg { width: 25px; height: 25px; }
 .atelier-menu__cart small { position: absolute; top: -2px; left: calc(50% + 10px); display: grid; place-items: center; min-width: 18px; height: 18px; border-radius: 50%; background: #68213c; color: #fff; font: 10px/1 system-ui, sans-serif; }
 .atelier-menu__social { position: relative; z-index: 1; display: flex; justify-content: center; gap: 15px; padding: 5px 0 0; }
 .atelier-menu__social a { color: var(--atelier-muted); }
@@ -70,7 +71,7 @@
   .atelier-menu__links { grid-auto-rows: minmax(52px, auto); max-height: min(34dvh, 180px); }
   .atelier-menu__link { min-height: 52px; }
   .atelier-menu__feature { min-height: 76px; }
-  .atelier-menu__bottom button { min-height: 48px; }
+  .atelier-menu__bottom button, .atelier-menu__bottom a { min-height: 48px; }
 }
 @media (max-width: 360px) { .atelier-menu__links { column-gap: 8px; } .atelier-menu__link { gap: 5px; font-size: 13px; } .atelier-menu__link > svg:first-child { width: 19px; } }
 @media (prefers-reduced-motion: reduce) { .atelier-menu__link { transition: none; } }

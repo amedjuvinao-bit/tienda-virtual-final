@@ -1,13 +1,16 @@
 import { ChevronRight, Heart, Search, ShoppingBag, X } from 'lucide-react';
 import { MobileMenuLinkIcon } from './mobileMenuIcons';
+import WhatsAppMenuIcon from './WhatsAppMenuIcon';
+import { resolveWhatsAppHref } from './whatsappLink';
 import './atelierMobileMenu.css';
 
 export default function AtelierMobileMenu({
   items = [], storeName = 'Rosa Boutique', onClose, onSelect, onSearch, onFavorites, onCart,
-  cartCount = 0, featureImage = '', featureLink = '', socialLinks = [], preview = false,
+  cartCount = 0, featureImage = '', featureLink = '', socialLinks = [], whatsappConfig = null, preview = false,
 }) {
   const featured = items.find((item) => item.to === featureLink && !item.isExternal)
     || items.find((item) => item.to !== '/' && !item.isExternal) || items[0];
+  const whatsappHref = resolveWhatsAppHref(whatsappConfig);
 
   return <div className="atelier-menu" data-preview={preview ? 'true' : undefined}>
     <span className="atelier-menu__handle" aria-hidden="true" />
@@ -33,10 +36,14 @@ export default function AtelierMobileMenu({
       <span className="atelier-menu__feature-action">Descubrir <ChevronRight size={15} aria-hidden="true" /></span>
     </button>}
 
-    <div className="atelier-menu__bottom">
+    <div className="atelier-menu__bottom" data-has-whatsapp={whatsappHref ? 'true' : undefined}>
       <button type="button" onClick={onSearch} aria-label="Buscar desde el menú"><Search size={22} strokeWidth={1.6} /><span>Buscar</span></button>
       <button type="button" onClick={onFavorites} aria-label="Favoritos desde el menú"><Heart size={22} strokeWidth={1.6} /><span>Favoritos</span></button>
       <button type="button" onClick={onCart} aria-label="Carrito desde el menú" className="atelier-menu__cart"><ShoppingBag size={22} strokeWidth={1.6} /><span>Carrito</span>{cartCount > 0 && <small>{cartCount}</small>}</button>
+      {whatsappHref && <a href={preview ? undefined : whatsappHref} target={preview ? undefined : '_blank'} rel={preview ? undefined : 'noopener noreferrer'}
+        onClick={preview ? (event) => event.preventDefault() : onClose} aria-label="Contactar por WhatsApp">
+        <WhatsAppMenuIcon config={whatsappConfig} /><span>WhatsApp</span>
+      </a>}
     </div>
     {socialLinks.length > 0 && <div className="atelier-menu__social">{socialLinks.map(({ label, href, Icon }) => <a key={label} href={preview ? undefined : href} target="_blank" rel="noopener noreferrer" aria-label={label} onClick={preview ? (event) => event.preventDefault() : undefined}><Icon size={15} strokeWidth={1.5} /></a>)}</div>}
   </div>;

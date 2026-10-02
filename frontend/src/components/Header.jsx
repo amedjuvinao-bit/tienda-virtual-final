@@ -18,6 +18,8 @@ import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
 import HeaderSearch from './HeaderSearch';
 import { headerSearchColorVariables } from './headerSearchTheme';
 import AtelierMobileMenu from './AtelierMobileMenu';
+import WhatsAppMenuIcon from './WhatsAppMenuIcon';
+import { resolveWhatsAppHref } from './whatsappLink';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -46,6 +48,7 @@ function Header() {
   const [footerConfig, setFooterConfig] = useState({});
   const [mobileMenuFeatureImage, setMobileMenuFeatureImage] = useState('');
   const [storeName, setStoreName] = useState('Rosa Boutique');
+  const [whatsappConfig, setWhatsAppConfig] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +79,7 @@ function Header() {
         setFooterConfig(t?.footer || {});
         setMobileMenuFeatureImage(h?.mobileMenuFeatureImage || '');
         setStoreName(s?.store?.name || 'Rosa Boutique');
+        setWhatsAppConfig(t?.global?.whatsapp || null);
         setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
         if (cancelled || requestId !== sequence) return;
@@ -89,6 +93,7 @@ function Header() {
         setFooterConfig({});
         setMobileMenuFeatureImage('');
         setStoreName('Rosa Boutique');
+        setWhatsAppConfig(null);
       }
     };
     refresh();
@@ -416,6 +421,7 @@ function Header() {
     { label: 'Facebook', href: footerConfig.facebook, Icon: Facebook },
     { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
   ].filter((link) => headerMenuDestination(link.href)?.isExternal);
+  const whatsappHref = resolveWhatsAppHref(whatsappConfig);
 
   return createPortal(
     <>
@@ -602,6 +608,7 @@ function Header() {
           featureImage={mobileMenuFeatureImage}
           featureLink={headerConfig?.mobileMenuFeatureRef}
           socialLinks={socialLinks}
+          whatsappConfig={whatsappConfig}
         /> : <>
         <div
           className="relative flex items-center justify-between pt-5 pb-4"
@@ -670,6 +677,13 @@ function Header() {
                 No hay opciones de menú configuradas.
               </div>
             )}
+            {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-3 py-4 text-[17px] font-semibold transition"
+              style={{ color: mobileMenuTextColor, borderBottom: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}` }}
+              aria-label="Contactar por WhatsApp">
+              <WhatsAppMenuIcon config={whatsappConfig} size={22} />
+              <span>WhatsApp</span><ChevronRight className="ml-auto w-4 h-4" style={{ color: mobileMenuMutedColor }} />
+            </a>}
           </nav>
 
           {socialLinks.length > 0 && <div className="pt-8 flex items-center gap-3">

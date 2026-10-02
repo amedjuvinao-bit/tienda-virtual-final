@@ -197,6 +197,38 @@ describe('encabezado de la tienda', () => {
     expect(drawer.previousElementSibling.style.backdropFilter).toBe('blur(4px)');
   });
 
+  it('integra WhatsApp al menú móvil con el contacto, mensaje e imagen configurados', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      ...settings('Lo Nuevo'),
+      theme: { header: { mobileMenuLayout: 'atelier-sheet' }, global: { whatsapp: {
+        enabled: true, phone: '+57 300 123 4567', message: 'Quiero información',
+        useCustomImage: true, imageUrl: 'https://res.cloudinary.com/demo/image/upload/whatsapp.webp',
+      } } },
+    });
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    const drawer = document.getElementById('storefront-mobile-menu');
+    const link = within(drawer).getByRole('link', { name: 'Contactar por WhatsApp' });
+    expect(link).toHaveAttribute('href', 'https://wa.me/573001234567?text=Quiero%20informaci%C3%B3n');
+    expect(link.querySelector('img')).toHaveAttribute('src', 'https://res.cloudinary.com/demo/image/upload/whatsapp.webp');
+    expect(drawer.querySelector('.atelier-menu__bottom')).toHaveAttribute('data-has-whatsapp', 'true');
+    await user.click(link);
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('también deja WhatsApp dentro del menú lateral cuando se elige otro diseño', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      ...settings('Lo Nuevo'),
+      theme: { header: { mobileMenuLayout: 'drawer-left' }, global: { whatsapp: { phone: '573001234567' } } },
+    });
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    const drawer = document.getElementById('storefront-mobile-menu');
+    expect(within(drawer).getByRole('link', { name: 'Contactar por WhatsApp' })).toHaveAttribute('href', 'https://wa.me/573001234567');
+  });
+
   it('prueba el otro logo y muestra la marca en texto si ambos archivos fallan', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     const image = (await screen.findAllByAltText('Logo Rosa Boutique'))[0];
