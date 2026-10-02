@@ -57,4 +57,17 @@ describe("carga de imagen en Apariencia", () => {
     expect(await screen.findByText(/Imagen subida.*Guardar cambios/)).toBeInTheDocument();
     expect(screen.queryByText("La sesión venció. Inicia sesión de nuevo.")).not.toBeInTheDocument();
   });
+
+  it("guarda el saludo de WhatsApp separado del mensaje que abre el chat", async () => {
+    const user = userEvent.setup();
+    render(<AppearancePage />);
+    await screen.findByRole("heading", { name: "Herramientas de la tienda" });
+    const greeting = screen.getByRole("textbox", { name: "Saludo al pasar el cursor" });
+    await user.clear(greeting);
+    await user.type(greeting, "¡Hola! Pregúntanos por tu talla.");
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    expect(saveSiteSettings.mock.calls[0][0].theme.global.whatsapp.greeting).toBe("¡Hola! Pregúntanos por tu talla.");
+    expect(saveSiteSettings.mock.calls[0][0].theme.global.whatsapp.message).toBe("");
+  });
 });

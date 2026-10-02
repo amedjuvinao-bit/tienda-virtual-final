@@ -51,6 +51,12 @@ export default function AppearanceToolPreview({ activeTool, config }) {
               fallback={<span style={{ color: "#0e7548" }}><WhatsAppGlyph size={whatsapp.showBackground === false ? bounded(whatsapp.sizePx, 44, 140, 56) : 30} /></span>} />
           </span>
         )}
+        {activeTool === "whatsapp" && whatsapp.enabled && String(whatsapp.greeting ?? "").trim() && (
+          <span className="appearance-general__preview-greeting"
+            style={{ [whatsapp.position === "left" ? "left" : "right"]: 18 }}>
+            {String(whatsapp.greeting).trim().slice(0, 120)}
+          </span>
+        )}
         {activeTool === "scroll" && navigation.enabled && (
           <div className="appearance-general__preview-nav" style={{
             left: navigation.position === "left" ? 18 : navigation.position === "right" ? "auto" : "50%",

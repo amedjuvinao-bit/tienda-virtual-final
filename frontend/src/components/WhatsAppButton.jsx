@@ -24,6 +24,8 @@ export default function WhatsAppButton({ config }) {
 
   const phone = String(safeConfig.phone || "").replace(/\D/g, "");
   const message = encodeURIComponent(safeConfig.message || "");
+  const greeting = String(safeConfig.greeting ?? "¡Hola! ¿En qué podemos ayudarte?").trim().slice(0, 120);
+  const greetingId = React.useId();
 
   const isLeft = safeConfig.position === "left";
 
@@ -89,7 +91,7 @@ export default function WhatsAppButton({ config }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={showBackground ? "storefront-liquid-icon transition-transform hover:scale-105" : "whatsapp-button--plain transition-transform hover:scale-105"}
+        className={showBackground ? "whatsapp-button storefront-liquid-icon transition-transform hover:scale-105" : "whatsapp-button whatsapp-button--plain transition-transform hover:scale-105"}
         style={{
           position: "fixed",
           bottom: `${bottomPx}px`,
@@ -105,6 +107,7 @@ export default function WhatsAppButton({ config }) {
           overflow: showBackground ? "hidden" : "visible",
         }}
         aria-label="WhatsApp"
+        aria-describedby={greeting ? greetingId : undefined}
       >
         {useCustomImage && imageUrl && !imageFailed ? (
           <img
@@ -123,6 +126,16 @@ export default function WhatsAppButton({ config }) {
           </span>
         )}
       </a>
+      {greeting && (
+        <span
+          id={greetingId}
+          role="tooltip"
+          className="whatsapp-button__greeting"
+          style={{ bottom: `min(${bottomPx + sizePx + 12}px, calc(100dvh - 96px))`, [isLeft ? "left" : "right"]: "24px" }}
+        >
+          {greeting}
+        </span>
+      )}
     </>
   );
 }

@@ -242,6 +242,20 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     placeholder="Hola, quiero más información"
                   />
 
+                  <div className="min-w-0 xl:col-span-2">
+                    <label className="block min-w-0">
+                      <span className="mb-1 block text-sm font-medium text-gray-700">Saludo al pasar el cursor</span>
+                      <input
+                        className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
+                        value={globalConfig.whatsapp.greeting ?? ""}
+                        onChange={(e) => setPath("global.whatsapp.greeting", e.target.value)}
+                        placeholder="¡Hola! ¿En qué podemos ayudarte?"
+                        maxLength={120}
+                      />
+                    </label>
+                    <p className="mt-1 text-xs text-gray-600">Aparece junto al botón al pasar el cursor. Déjalo vacío para ocultarlo. En celular, el botón abre WhatsApp directamente.</p>
+                  </div>
+
                   <Input
                     type="number"
                     min={0}

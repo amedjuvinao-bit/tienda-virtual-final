@@ -152,6 +152,32 @@ describe("herramientas de Apariencia", () => {
     expect(button.querySelector("img")).toHaveStyle({ width: "112px", height: "112px" });
   });
 
+  it("permite editar el saludo visible en la vista previa, independiente del texto del chat", async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const greeting = screen.getByRole("textbox", { name: "Saludo al pasar el cursor" });
+    expect(greeting).toHaveValue("¡Hola! ¿En qué podemos ayudarte?");
+    await user.clear(greeting);
+    await user.type(greeting, "¡Hola! Te ayudamos a elegir tu look.");
+    expect(screen.getByText("¡Hola! Te ayudamos a elegir tu look.")).toHaveClass("appearance-general__preview-greeting");
+    expect(screen.getByRole("textbox", { name: "Mensaje predeterminado" })).toHaveValue("");
+    await user.clear(greeting);
+    expect(screen.queryByText("¡Hola! Te ayudamos a elegir tu look.")).not.toBeInTheDocument();
+  });
+
+  it("muestra el saludo junto al botón al pasar el cursor o enfocar y permite ocultarlo", () => {
+    const { container, rerender } = render(<WhatsAppButton config={{ phone: "573001234567", greeting: "¡Hola! Escríbenos", message: "Quiero comprar" }} />);
+    const button = screen.getByRole("link", { name: "WhatsApp" });
+    const greeting = screen.getByRole("tooltip");
+    expect(button).toHaveAttribute("aria-describedby", greeting.id);
+    expect(greeting).toHaveTextContent("¡Hola! Escríbenos");
+    expect(button.nextElementSibling).toBe(greeting);
+    expect(button).toHaveAttribute("href", "https://wa.me/573001234567?text=Quiero%20comprar");
+    rerender(<WhatsAppButton config={{ phone: "573001234567", greeting: "" }} />);
+    expect(container.querySelector('[role="tooltip"]')).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "WhatsApp" })).not.toHaveAttribute("aria-describedby");
+  });
+
   it("mantiene visible el ícono elegido con todos los tipos de loader", () => {
     for (const type of ["spinner", "ring", "dual-ring", "dots", "bars", "pulse", "diamond", "orbit"]) {
       const { container, unmount } = render(<GlobalPageLoader config={{ type, icon: "crown" }} visible />);

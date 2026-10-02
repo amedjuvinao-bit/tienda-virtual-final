@@ -59,6 +59,7 @@
 .appearance-general__preview-product-lines i:nth-child(3) { width: 33%; background: #d481aa; }
 .appearance-general__preview-float { position: absolute; display: grid; place-items: center; }
 .appearance-general__preview-float--plain { overflow: visible; border: 0; box-shadow: none; background: transparent; backdrop-filter: none; }
+.appearance-general__preview-greeting { position: absolute; top: 34px; max-width: min(205px, calc(100% - 36px)); padding: 9px 12px; border: 1px solid rgba(212,175,55,.4); border-radius: 13px; background: linear-gradient(135deg,rgba(255,255,255,.97),rgba(255,242,249,.94)); box-shadow: 0 9px 24px rgba(82,30,60,.12); color: #52203b; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
 .appearance-general__preview-nav { position: absolute; bottom: 16px; display: flex; }
 .appearance-general__preview-nav .storefront-liquid-icon { border-radius: 50%; }
 .appearance-general__preview-nav img { width: 60%; height: 60%; object-fit: contain; }
