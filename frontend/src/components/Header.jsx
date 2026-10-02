@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from 'react-dom';
 import {
-  Search,
-  Heart,
-  ShoppingCart,
-  User,
   Menu,
   X,
   ChevronRight,
@@ -15,15 +12,30 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import CartSidebar from "./CartSidebar";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
+import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, headerMenuDestination } from './headerPresentation';
+import HeaderBrand from './HeaderBrand';
+import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
+import HeaderSearch from './HeaderSearch';
+import { headerSearchColorVariables } from './headerSearchTheme';
+import AtelierMobileMenu from './AtelierMobileMenu';
+import WhatsAppMenuIcon from './WhatsAppMenuIcon';
+import { resolveWhatsAppHref } from './whatsappLink';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTarget, setSearchTarget] = useState('desktop');
+  const searchTriggerRef = useRef(null);
+  const searchCloseTimerRef = useRef(null);
+  const desktopSearchAnchorRef = useRef(null);
+  const mobileSearchAnchorRef = useRef(null);
+  useEffect(() => () => window.clearTimeout(searchCloseTimerRef.current), []);
   const { cart } = useCart();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [logoLight, setLogoLight] = useState("");
   const [logoDark, setLogoDark] = useState("");
@@ -31,17 +43,27 @@ function Header() {
   const [logoHeightPx, setLogoHeightPx] = useState(80);
   const [menuItems, setMenuItems] = useState([]);
   const [headerConfig, setHeaderConfig] = useState({});
+  const [themeColors, setThemeColors] = useState({});
+  const iconPresentation = resolveHeaderIcons(headerConfig);
+  const [footerConfig, setFooterConfig] = useState({});
+  const [mobileMenuFeatureImage, setMobileMenuFeatureImage] = useState('');
+  const [storeName, setStoreName] = useState('Rosa Boutique');
+  const [whatsappConfig, setWhatsAppConfig] = useState(null);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    let sequence = 0;
+    const refresh = async () => {
+      const requestId = ++sequence;
       try {
         const s = await fetchSiteSettings();
+        if (cancelled || requestId !== sequence) return;
 
         const t = s?.theme || {};
         const h = t?.header || {};
 
-        const hl = h?.logoLight || t?.logo?.light || "/LOGO1.png";
-        const hd = h?.logoDark || t?.logo?.dark || "/LOGO1.png";
+        const hl = h?.logoLight || t?.logo?.light || "";
+        const hd = h?.logoDark || t?.logo?.dark || "";
         setLogoLight(hl);
         setLogoDark(hd);
 
@@ -53,44 +75,53 @@ function Header() {
         else setLogoHeightPx(80);
 
         setHeaderConfig(h);
-
-        const headerMenu = Array.isArray(s?.menus?.header) ? s.menus.header : [];
-
-        const mapped = headerMenu
-          .map((it) => {
-            const name = String(it?.title || "").trim();
-            const to = String(it?.ref || "").trim();
-            if (!name || !to) return null;
-
-            const isExternal = /^https?:\/\//i.test(to);
-            return { name, to, isExternal };
-          })
-          .filter(Boolean);
-
-        setMenuItems(mapped);
+        setThemeColors(t?.colors || {});
+        setFooterConfig(t?.footer || {});
+        setMobileMenuFeatureImage(h?.mobileMenuFeatureImage || '');
+        setStoreName(s?.store?.name || 'Rosa Boutique');
+        setWhatsAppConfig(t?.global?.whatsapp || null);
+        setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
-        setLogoLight("/LOGO1.png");
-        setLogoDark("/LOGO1.png");
+        if (cancelled || requestId !== sequence) return;
+        setLogoLight("");
+        setLogoDark("");
         setHeaderBgHex("");
         setLogoHeightPx(80);
         setMenuItems([]);
         setHeaderConfig({});
+        setThemeColors({});
+        setFooterConfig({});
+        setMobileMenuFeatureImage('');
+        setStoreName('Rosa Boutique');
+        setWhatsAppConfig(null);
       }
-    })();
+    };
+    refresh();
+    const onStorage = (event) => {
+      if (event.key === 'rb_site_settings_tick') refresh();
+    };
+    window.addEventListener('rb_site_settings_updated', refresh);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('rb_site_settings_updated', refresh);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   useEffect(() => {
+    let previousY = window.scrollY;
     function handleScroll() {
-      if (window.scrollY > lastScrollY) setShowHeader(false);
-      else setShowHeader(true);
-
-      setLastScrollY(window.scrollY);
-      setMenuOpen(false);
+      const currentY = window.scrollY;
+      if (!menuOpen && !cartOpen && !searchOpen && Math.abs(currentY - previousY) > 4) {
+        setShowHeader(currentY < 80 || currentY < previousY);
+      }
+      previousY = currentY;
     }
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY]);
+  }, [menuOpen, cartOpen, searchOpen]);
 
   useEffect(() => {
     if (menuOpen || cartOpen) {
@@ -104,6 +135,21 @@ function Header() {
     };
   }, [menuOpen, cartOpen]);
 
+  useEffect(() => {
+    setShowHeader(true);
+    setMenuOpen(false);
+    setSearchOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
+
   const navStyle = useMemo(
     () => ({
       fontFamily: "var(--header-font-family)",
@@ -112,38 +158,18 @@ function Header() {
     []
   );
 
-  const headerInlineStyle = useMemo(
-    () => ({
-      backgroundColor:
-        "rgba(var(--header-bg-rgb, 255, 227, 236), var(--header-bg-alpha, 1))",
-    }),
-    []
-  );
+  const headerSurface = useMemo(() => resolveHeaderSurface(headerConfig), [headerConfig]);
+  const headerInlineStyle = {
+    ...headerSurface.style,
+    ...headerSearchColorVariables(headerConfig, themeColors),
+    '--header-icon-color': headerConfig.iconColor || headerConfig.textColor || (isDarkHeaderBackground(headerBgHex) ? '#ffffff' : '#9d4268'),
+    '--header-icon-hover': headerConfig.iconHoverColor || '#c62d6a',
+    '--storefront-action-size': `${Math.max(28, Math.min(40, Number(headerConfig.iconSizePx) || 34))}px`,
+    backgroundColor: `rgba(var(--header-bg-rgb, 255, 227, 236), ${headerSurface.opacity})`,
+  };
 
-  const chosenLogo = useMemo(() => {
-    const isHex = (v) =>
-      typeof v === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim());
-
-    const luminanceFromHex = (hex) => {
-      if (!isHex(hex)) return null;
-      let h = hex.replace("#", "").trim();
-      if (h.length === 3) h = h
-        .split("")
-        .map((c) => c + c)
-        .join("");
-      const r = parseInt(h.slice(0, 2), 16);
-      const g = parseInt(h.slice(2, 4), 16);
-      const b = parseInt(h.slice(4, 6), 16);
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-
-    const lum = luminanceFromHex(headerBgHex);
-    if (lum === null) return logoLight || "/LOGO1.png";
-
-    const isDark = lum < 140;
-    if (isDark) return logoLight || logoDark || "/LOGO1.png";
-    return logoDark || logoLight || "/LOGO1.png";
-  }, [headerBgHex, logoLight, logoDark]);
+  const chosenLogo = useMemo(() => resolveHeaderLogo({ bgColor: headerBgHex, logoLight, logoDark, logoMode: headerConfig.logoMode }), [headerBgHex, logoLight, logoDark, headerConfig.logoMode]);
+  const alternateLogo = chosenLogo === logoLight ? logoDark : logoLight;
 
   const logoStyle = useMemo(
     () => ({
@@ -157,43 +183,18 @@ function Header() {
     () => ({
       height: `${Math.max(26, Math.min(46, Number(logoHeightPx) || 40))}px`,
       width: "auto",
-      maxWidth: "120px",
+      maxWidth: "clamp(76px, 24vw, 120px)",
     }),
     [logoHeightPx]
   );
 
-  const mobileMenuBgColor = headerConfig?.mobileMenuBgColor || "#fffdfd";
-  const mobileMenuTextColor = headerConfig?.mobileMenuTextColor || "#1f1f1f";
+  const mobileMenuLayout = headerConfig?.mobileMenuLayout || 'atelier-sheet';
+  const isAtelierSheet = mobileMenuLayout === 'atelier-sheet';
+  const mobileMenuBgColor = headerConfig?.mobileMenuBgColor || (isAtelierSheet ? '#fff4f3' : '#fffdfd');
+  const mobileMenuTextColor = headerConfig?.mobileMenuTextColor || (isAtelierSheet ? '#4e1e39' : '#1f1f1f');
   const mobileMenuBorderColor = headerConfig?.mobileMenuBorderColor || "#e7c2cf";
-  const mobileMenuAccentColor = headerConfig?.mobileMenuAccentColor || "#b76e79";
-  const mobileMenuMutedColor = headerConfig?.mobileMenuMutedColor || "#8a6b74";
-  const mobileMenuTitleColor = headerConfig?.mobileMenuTitleColor || "#1f1f1f";
-
-  const mobileMenuButtonBg = headerConfig?.mobileMenuButtonBg || "#d8b2bf";
-  const mobileMenuButtonTextColor =
-    headerConfig?.mobileMenuButtonTextColor || "#7b4f5f";
-  const mobileMenuButtonBorderColor =
-    headerConfig?.mobileMenuButtonBorderColor || mobileMenuButtonBg;
-  const mobileMenuButtonBorderWidthPx = Number(
-    headerConfig?.mobileMenuButtonBorderWidthPx ?? 0
-  );
-  const mobileMenuButtonRadiusPx = Number(
-    headerConfig?.mobileMenuButtonRadiusPx ?? 999
-  );
-
-  const mobileMenuSecondaryButtonBg =
-    headerConfig?.mobileMenuSecondaryButtonBg || "#ffffff";
-  const mobileMenuSecondaryButtonTextColor =
-    headerConfig?.mobileMenuSecondaryButtonTextColor || "#9d6275";
-  const mobileMenuSecondaryButtonBorderColor =
-    headerConfig?.mobileMenuSecondaryButtonBorderColor || "#c88ca1";
-  const mobileMenuSecondaryButtonBorderWidthPx = Number(
-    headerConfig?.mobileMenuSecondaryButtonBorderWidthPx ?? 1
-  );
-  const mobileMenuSecondaryButtonRadiusPx = Number(
-    headerConfig?.mobileMenuSecondaryButtonRadiusPx ?? 999
-  );
-
+  const mobileMenuAccentColor = headerConfig?.mobileMenuAccentColor || (isAtelierSheet ? '#ac7950' : '#b76e79');
+  const mobileMenuMutedColor = headerConfig?.mobileMenuMutedColor || (isAtelierSheet ? '#815269' : '#8a6b74');
   const mobileMenuSocialBg = headerConfig?.mobileMenuSocialBg || "#c98ea2";
   const mobileMenuSocialIconColor =
     headerConfig?.mobileMenuSocialIconColor || "#ffffff";
@@ -205,9 +206,9 @@ function Header() {
   );
 
   const mobileMenuOverlayColor =
-    headerConfig?.mobileMenuOverlayColor || "#000000";
+    headerConfig?.mobileMenuOverlayColor || (isAtelierSheet ? '#54233d' : '#000000');
   const mobileMenuOverlayOpacity = Number(
-    headerConfig?.mobileMenuOverlayOpacity ?? 0.35
+    headerConfig?.mobileMenuOverlayOpacity ?? (isAtelierSheet ? 0.22 : 0.35)
   );
 
   const mobileMenuFontFamily = headerConfig?.mobileMenuFontFamily || "";
@@ -255,32 +256,27 @@ function Header() {
     headerConfig?.mobileMenuBorderWidthPx ?? 0
   );
   const mobileMenuItemBorderColor =
-    headerConfig?.mobileMenuItemBorderColor || "#e7c2cf";
+    headerConfig?.mobileMenuItemBorderColor || (isAtelierSheet ? '#d2a997' : '#e7c2cf');
   const mobileMenuItemBorderWidthPx = Number(
     headerConfig?.mobileMenuItemBorderWidthPx ?? 1
   );
   const mobileMenuRadiusPx = Number(headerConfig?.mobileMenuRadiusPx ?? 0);
   const mobileMenuPaddingPx = Number(headerConfig?.mobileMenuPaddingPx ?? 20);
-  const mobileMenuLayout = headerConfig?.mobileMenuLayout || "drawer-left";
 
   const mobileMenuTriggerRadius =
     mobileMenuTriggerRadiusPx === 999 ? "999px" : `${mobileMenuTriggerRadiusPx}px`;
   const mobileMenuCloseRadius =
     mobileMenuCloseRadiusPx === 999 ? "999px" : `${mobileMenuCloseRadiusPx}px`;
-  const mobileMenuButtonRadius =
-    mobileMenuButtonRadiusPx === 999 ? "999px" : `${mobileMenuButtonRadiusPx}px`;
-  const mobileMenuSecondaryRadius =
-    mobileMenuSecondaryButtonRadiusPx === 999
-      ? "999px"
-      : `${mobileMenuSecondaryButtonRadiusPx}px`;
-
   const drawerBorderRadius =
     mobileMenuRadiusPx > 0 ? `${mobileMenuRadiusPx}px` : "0px";
 
   const overlayStyle = {
-    backgroundColor: mobileMenuOverlayColor,
-    opacity: menuOpen ? mobileMenuOverlayOpacity : 0,
+    backgroundColor: isAtelierSheet
+      ? `color-mix(in srgb, ${mobileMenuOverlayColor} ${Math.round(Math.max(0, Math.min(1, mobileMenuOverlayOpacity)) * 100)}%, transparent)`
+      : mobileMenuOverlayColor,
+    opacity: menuOpen ? (isAtelierSheet ? 1 : mobileMenuOverlayOpacity) : 0,
     transitionDuration: `${mobileMenuAnimationDurationMs}ms`,
+    backdropFilter: isAtelierSheet && menuOpen ? 'blur(4px)' : undefined,
   };
 
   const triggerStyle = {
@@ -308,22 +304,6 @@ function Header() {
     height: `${mobileMenuSocialSizePx}px`,
     backgroundColor: mobileMenuSocialBg,
     color: mobileMenuSocialIconColor,
-  };
-
-  const primaryButtonStyle = {
-    backgroundColor: mobileMenuButtonBg,
-    color: mobileMenuButtonTextColor,
-    borderColor: mobileMenuButtonBorderColor,
-    borderWidth: `${mobileMenuButtonBorderWidthPx}px`,
-    borderRadius: mobileMenuButtonRadius,
-  };
-
-  const secondaryButtonStyle = {
-    backgroundColor: mobileMenuSecondaryButtonBg,
-    color: mobileMenuSecondaryButtonTextColor,
-    borderColor: mobileMenuSecondaryButtonBorderColor,
-    borderWidth: `${mobileMenuSecondaryButtonBorderWidthPx}px`,
-    borderRadius: mobileMenuSecondaryRadius,
   };
 
   const drawerWidth =
@@ -380,36 +360,90 @@ function Header() {
     right: isRightLayout ? "0" : "auto",
     top: "0",
     height: "100%",
+    ...(isAtelierSheet ? {
+      width: '100%', maxWidth: 'none', top: 'auto', bottom: 0, left: 0, right: 0,
+      height: 'auto', maxHeight: 'calc(100dvh - 8px)',
+      paddingLeft: 0, paddingRight: 0, backgroundColor: 'transparent',
+      borderColor: 'transparent', borderWidth: 0, borderStyle: 'none',
+      boxShadow: 'none', opacity: 1,
+      transform: menuOpen ? 'translateY(0)' : 'translateY(105%)',
+      '--atelier-ink': mobileMenuTextColor,
+      '--atelier-muted': mobileMenuMutedColor,
+      '--atelier-accent': mobileMenuAccentColor,
+      '--atelier-line': mobileMenuItemBorderColor,
+      '--atelier-surface': mobileMenuBgColor,
+      '--atelier-font': mobileMenuFontFamily || 'Georgia, serif',
+      '--atelier-separator-width': `${Math.max(0, Math.min(6, mobileMenuItemBorderWidthPx))}px`,
+    } : {}),
   };
 
   const closeMenuAndNavigate = (to) => {
     setMenuOpen(false);
     navigate(to);
   };
+  const selectAtelierItem = (item) => {
+    setMenuOpen(false);
+    if (item.isExternal) window.open(item.to, '_blank', 'noopener,noreferrer');
+    else navigate(item.to);
+  };
+  const openSearch = (event) => {
+    if (searchCloseTimerRef.current) window.clearTimeout(searchCloseTimerRef.current);
+    searchTriggerRef.current = event.currentTarget;
+    const target = event.currentTarget.dataset.searchPlacement;
+    setSearchOpen((current) => target === searchTarget ? !current : true);
+    setSearchTarget(target);
+  };
+  const cancelSearchClose = () => {
+    if (searchCloseTimerRef.current) window.clearTimeout(searchCloseTimerRef.current);
+    searchCloseTimerRef.current = null;
+  };
+  const scheduleSearchClose = (event) => {
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+    cancelSearchClose();
+    searchCloseTimerRef.current = window.setTimeout(() => setSearchOpen(false), 120);
+  };
+  const closeSearch = (restoreFocus = false) => {
+    cancelSearchClose();
+    setSearchOpen(false);
+    if (restoreFocus) searchTriggerRef.current?.focus();
+  };
+  const submitSearch = (term) => {
+    setSearchOpen(false);
+    navigate(`/buscar?q=${encodeURIComponent(term)}`);
+  };
+  const selectSearchProduct = (product) => {
+    const key = product?.slug || product?._id;
+    if (!key) return;
+    setSearchOpen(false);
+    navigate(`/producto/${encodeURIComponent(key)}`);
+  };
+  const socialLinks = [
+    { label: 'Facebook', href: footerConfig.facebook, Icon: Facebook },
+    { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
+  ].filter((link) => headerMenuDestination(link.href)?.isExternal);
+  const whatsappHref = resolveWhatsAppHref(whatsappConfig);
 
-  return (
+  return createPortal(
     <>
       <header
         style={headerInlineStyle}
-        className={`theme-header px-4 rounded-b-2xl shadow-md fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
-          showHeader ? "translate-y-0" : "-translate-y-full"
-        }`}
+        data-shape={headerSurface.shape}
+        data-glass={headerSurface.glass}
+        data-tone={isDarkHeaderBackground(headerBgHex) ? 'dark' : 'light'}
+        data-visible={showHeader}
+        className="theme-header storefront-header-surface px-4 fixed z-50"
       >
         <div className="relative w-full h-[70px]">
           {/* Desktop */}
-          <div className="hidden md:flex w-full h-full items-center justify-between">
+          <div className="hidden lg:flex w-full h-full items-center justify-between gap-4">
             <NavLink to="/" className="shrink-0 z-10">
-              <img
-                src={chosenLogo || "/LOGO1.png"}
-                alt="Logo Rosa Boutique"
-                style={logoStyle}
-                className="object-contain"
-              />
+              <HeaderBrand src={chosenLogo} alternateSrc={alternateLogo} style={logoStyle} className="object-contain" />
             </NavLink>
 
             <nav
               style={navStyle}
-              className="header-menu flex justify-center space-x-6 font-bold italic drop-shadow-[0_0_3px_#FFFFFF]"
+              className="header-menu flex min-w-0 flex-1 items-center justify-center gap-3 overflow-x-auto whitespace-nowrap py-3 xl:gap-6"
+              aria-label="Navegación principal"
             >
               {menuItems.map((item, idx) => {
                 if (item.isExternal) {
@@ -440,49 +474,46 @@ function Header() {
               })}
             </nav>
 
-            <div className="header-icons flex items-center space-x-4 text-xl">
-              <div
-                onClick={() => navigate("/admin/login")}
-                className="header-icon relative cursor-pointer"
-              >
-                <User className="w-5 h-5" />
+            <div className="header-icons flex shrink-0 items-center gap-0 text-xl">
+              <div className="header-search-anchor" ref={desktopSearchAnchorRef}
+                onMouseEnter={cancelSearchClose}
+                onMouseLeave={scheduleSearchClose}
+                onBlur={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) closeSearch(false); }}>
+                <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen && searchTarget === 'desktop'}
+                  data-search-placement="desktop" onClick={openSearch} className="storefront-action-button"
+                >
+                  <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
+                </button>
+                <HeaderSearch open={searchOpen && searchTarget === 'desktop'} anchorRef={desktopSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onSelectProduct={selectSearchProduct} onPointerEnter={cancelSearchClose} />
               </div>
-
-              <div
-                onClick={() => navigate("/")}
-                className="header-icon relative cursor-pointer"
-              >
-                <Search className="w-5 h-5" />
-              </div>
-
-              <div
+              <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="header-icon relative cursor-pointer"
+                className="storefront-action-button"
               >
-                <Heart className="w-5 h-5" />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {favorites.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-[#D4AF37] text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {favorites.length}
                   </span>
                 )}
-              </div>
+              </button>
 
-              <div
+              <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="header-icon relative cursor-pointer"
+                className="storefront-action-button"
               >
-                <ShoppingCart className="w-5 h-5" />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {cart.length}
                   </span>
                 )}
-              </div>
+              </button>
             </div>
           </div>
 
           {/* Mobile */}
-          <div className="md:hidden h-full">
+          <div className="lg:hidden h-full">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20">
               <button
                 type="button"
@@ -490,6 +521,8 @@ function Header() {
                 className="flex items-center justify-center shadow-sm"
                 style={triggerStyle}
                 aria-label="Abrir menú"
+                aria-expanded={menuOpen}
+                aria-controls="storefront-mobile-menu"
               >
                 <Menu
                   className="shrink-0"
@@ -501,40 +534,46 @@ function Header() {
               </button>
             </div>
 
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2">
-              <div
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-0">
+              <div className="header-search-anchor" ref={mobileSearchAnchorRef}
+                onMouseEnter={cancelSearchClose}
+                onMouseLeave={scheduleSearchClose}
+                onBlur={(event) => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) closeSearch(false); }}>
+                <button type="button" aria-label="Buscar productos" aria-expanded={searchOpen && searchTarget === 'mobile'}
+                  data-search-placement="mobile" onClick={openSearch} className="storefront-action-button"
+                >
+                  <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
+                </button>
+                <HeaderSearch open={searchOpen && searchTarget === 'mobile'} anchorRef={mobileSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onSelectProduct={selectSearchProduct} onPointerEnter={cancelSearchClose} />
+              </div>
+              <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
-                className="relative cursor-pointer text-[#8d5c6b] bg-white shadow-sm border border-[#e7c2cf] rounded-full w-10 h-10 flex items-center justify-center"
+                className="storefront-action-button"
               >
-                <Heart className="w-5 h-5" />
+                <HeaderActionGlyph kind="favorites" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {favorites.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#D4AF37] text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {favorites.length}
                   </span>
                 )}
-              </div>
+              </button>
 
-              <div
+              <button type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
-                className="relative cursor-pointer text-[#8d5c6b] bg-white shadow-sm border border-[#e7c2cf] rounded-full w-10 h-10 flex items-center justify-center"
+                className="storefront-action-button"
               >
-                <ShoppingCart className="w-5 h-5" />
+                <HeaderActionGlyph kind="cart" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">
+                  <span className="storefront-action-badge">
                     {cart.length}
                   </span>
                 )}
-              </div>
+              </button>
             </div>
 
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <NavLink to="/" className="pointer-events-auto flex items-center justify-center">
-                <img
-                  src={chosenLogo || "/LOGO1.png"}
-                  alt="Logo Rosa Boutique"
-                  style={mobileLogoStyle}
-                  className="object-contain block"
-                />
+                <HeaderBrand src={chosenLogo} alternateSrc={alternateLogo} style={mobileLogoStyle} className="object-contain block" />
               </NavLink>
             </div>
           </div>
@@ -542,7 +581,7 @@ function Header() {
       </header>
 
       <div
-        className={`md:hidden fixed inset-0 z-[70] transition-all ${
+        className={`lg:hidden fixed inset-0 z-[70] transition-all ${
           menuOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
         style={overlayStyle}
@@ -550,20 +589,35 @@ function Header() {
       />
 
       <aside
-        className="md:hidden fixed z-[80] shadow-2xl flex flex-col transition-all"
+        id="storefront-mobile-menu"
+        className="lg:hidden fixed z-[80] shadow-2xl flex flex-col transition-all"
+        aria-label="Menú móvil"
+        aria-hidden={!menuOpen}
+        inert={!menuOpen ? '' : undefined}
         style={asideStyle}
       >
+        {isAtelierSheet ? <AtelierMobileMenu
+          items={menuItems}
+          storeName={storeName}
+          onClose={() => setMenuOpen(false)}
+          onSelect={selectAtelierItem}
+          onSearch={() => { setMenuOpen(false); setSearchTarget('mobile'); setSearchOpen(true); }}
+          onFavorites={() => closeMenuAndNavigate('/favoritos')}
+          onCart={() => { setMenuOpen(false); setCartOpen(true); }}
+          cartCount={cart.length}
+          featureImage={mobileMenuFeatureImage}
+          featureLink={headerConfig?.mobileMenuFeatureRef}
+          socialLinks={socialLinks}
+          whatsappConfig={whatsappConfig}
+          closeIconColor={headerConfig?.mobileMenuCloseIconColor}
+        /> : <>
         <div
           className="relative flex items-center justify-between pt-5 pb-4"
           style={{
             borderBottom: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}`,
           }}
         >
-          <img
-            src={chosenLogo || "/LOGO1.png"}
-            alt="Logo Rosa Boutique"
-            className="h-12 object-contain"
-          />
+          <HeaderBrand src={chosenLogo} alternateSrc={alternateLogo} className="h-12 object-contain" />
 
           <button
             type="button"
@@ -624,58 +678,21 @@ function Header() {
                 No hay opciones de menú configuradas.
               </div>
             )}
+            {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-3 py-4 text-[17px] font-semibold transition"
+              style={{ color: mobileMenuTextColor, borderBottom: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}` }}
+              aria-label="Contactar por WhatsApp">
+              <WhatsAppMenuIcon config={whatsappConfig} size={22} />
+              <span>WhatsApp</span><ChevronRight className="ml-auto w-4 h-4" style={{ color: mobileMenuMutedColor }} />
+            </a>}
           </nav>
 
-          <div className="pt-8">
-            <div
-              className="mb-4 text-[18px] font-semibold"
-              style={{ color: mobileMenuTitleColor }}
-            >
-              Mi cuenta
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => closeMenuAndNavigate("/admin/login")}
-                className="w-full font-semibold py-3 px-4 transition hover:opacity-90"
-                style={primaryButtonStyle}
-              >
-                Inicia sesión
-              </button>
-
-              <button
-                type="button"
-                onClick={() => closeMenuAndNavigate("/admin/login")}
-                className="w-full font-semibold py-3 px-4 transition"
-                style={secondaryButtonStyle}
-              >
-                Registro
-              </button>
-            </div>
-
-            <div className="pt-8 flex items-center gap-3">
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-center shadow-sm transition hover:scale-105"
-                style={socialButtonStyle}
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
-
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-center shadow-sm transition hover:scale-105"
-                style={socialButtonStyle}
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
+          {socialLinks.length > 0 && <div className="pt-8 flex items-center gap-3">
+            {socialLinks.map(({ label, href, Icon }) => <a key={label} href={href}
+              aria-label={label} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center shadow-sm transition hover:scale-105"
+              style={socialButtonStyle}><Icon className="w-5 h-5" /></a>)}
+          </div>}
         </div>
 
         <div
@@ -686,14 +703,14 @@ function Header() {
             borderTop: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}`,
           }}
         >
-          Todos los derechos reservados
-          <br />
-          © 2026, Rosa Boutique
+          {footerConfig.copyright || `© ${new Date().getFullYear()}`}
         </div>
+        </>}
       </aside>
 
       <CartSidebar isOpen={cartOpen} onClose={() => setCartOpen(false)} />
-    </>
+    </>,
+    document.body
   );
 }
 

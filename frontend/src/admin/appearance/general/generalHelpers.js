@@ -9,10 +9,12 @@ export const GLOBAL_DEFAULTS = {
     enabled: true,
     phone: "",
     message: "",
+    greeting: "¡Hola! ¿En qué podemos ayudarte?",
     position: "right", // right | left
     bottomPx: 24,
     sizePx: 56,
     bgColor: "#25D366",
+    showBackground: true,
 
     // ✅ personalización visual
     useCustomImage: false,

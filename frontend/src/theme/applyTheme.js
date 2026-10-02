@@ -1,4 +1,5 @@
 // src/theme/applyTheme.js
+import { isDarkHeaderBackground, resolveHeaderTypography } from '../components/headerPresentation';
 
 export function applyTheme(theme) {
   try {
@@ -63,27 +64,15 @@ export function applyTheme(theme) {
     const bgOpacity = clamp01(header.bgOpacity, 1);
 
     // Menú
-    const menuText = header.textColor || "#111827";
+    const menuText = header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#111827');
     const menuHover = header.linkColor || "#c2410c";
 
     // Íconos (independiente)
-    const iconColor = header.iconColor || "#111827";
+    const iconColor = header.iconColor || menuText;
     const iconHover = header.iconHoverColor || "#c2410c";
 
     // Tipografía del header (preset o custom)
-    const preset = (header.fontPreset || "").trim();
-    const presetMap = {
-      classic: '"Playfair Display", Georgia, serif',
-      modern: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
-      elegant: '"Cormorant Garamond", Georgia, serif',
-      cute: '"Baloo 2", system-ui, sans-serif',
-    };
-
-    const headerFontFamily =
-      (header.fontFamily && header.fontFamily.trim()) ||
-      (presetMap[preset] || "") ||
-      headingsFont ||
-      baseFont;
+    const headerTypography = resolveHeaderTypography(header, headingsFont || baseFont);
 
     const headerFontSizePx = Number(header.fontSizePx || 16);
 
@@ -99,7 +88,11 @@ export function applyTheme(theme) {
     set("--header-icon-color", iconColor);
     set("--header-icon-hover", iconHover);
 
-    set("--header-font-family", headerFontFamily);
+    set("--header-font-family", headerTypography.fontFamily);
+    set("--header-font-weight", headerTypography.fontWeight);
+    set("--header-font-style", headerTypography.fontStyle);
+    set("--header-letter-spacing", headerTypography.letterSpacing);
+    set("--header-text-transform", headerTypography.textTransform);
     set(
       "--header-font-size",
       String(Number.isNaN(headerFontSizePx) ? 16 : headerFontSizePx) + "px"

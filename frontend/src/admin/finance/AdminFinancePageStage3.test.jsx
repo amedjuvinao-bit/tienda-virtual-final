@@ -120,12 +120,13 @@ describe('Finanzas Nivel Plus · Etapa 3', () => {
   });
 
   it('registra una solicitud a crédito con vencimiento explícito', async () => {
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     render(<AdminFinancePage />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Nuevo gasto' }));
     fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '120000' } });
     fireEvent.change(screen.getByLabelText('Condición de pago'), { target: { value: 'credit' } });
-    fireEvent.change(screen.getByLabelText('Vencimiento'), { target: { value: '2026-09-30' } });
+    fireEvent.change(screen.getByLabelText('Vencimiento'), { target: { value: dueDate } });
     fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Inventario' } });
     fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Compra mensual a crédito' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar a aprobación' }));
@@ -133,7 +134,7 @@ describe('Finanzas Nivel Plus · Etapa 3', () => {
     await waitFor(() => expect(createFinanceExpense).toHaveBeenCalledTimes(1));
     expect(createFinanceExpense.mock.calls[0][0]).toMatchObject({
       paymentTerms: 'credit',
-      dueDate: '2026-09-30',
+      dueDate,
       amount: 120000,
     });
   });

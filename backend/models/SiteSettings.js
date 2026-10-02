@@ -286,9 +286,22 @@ const ThemeSchema = new Schema(
       bgOpacity: Number,
       textColor: String,
       linkColor: String,
+      searchBgColor: String,
+      searchTextColor: String,
+      searchAccentColor: String,
+      searchBorderColor: String,
 
       iconColor: String,
       iconHoverColor: String,
+      iconSet: { type: String, enum: ['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence', 'rose', 'noir', 'custom', 'gold', 'wine', 'satin', 'porcelain'], default: 'gold' },
+      iconImages: { account: String, search: String, favorites: String, cart: String },
+      iconOverrides: {
+        gold: { account: String, search: String, favorites: String, cart: String },
+        wine: { account: String, search: String, favorites: String, cart: String },
+        satin: { account: String, search: String, favorites: String, cart: String },
+        porcelain: { account: String, search: String, favorites: String, cart: String },
+      },
+      iconSizePx: { type: Number, min: 28, max: 40, default: 34 },
 
       menuAnimation: String,
       iconAnimation: String,
@@ -299,8 +312,13 @@ const ThemeSchema = new Schema(
 
       logoLight: String,
       logoDark: String,
+      logoMode: { type: String, enum: ["auto", "light", "dark"], default: "auto" },
 
       logoHeightPx: Number,
+      surfaceShape: { type: String, enum: ["attached", "floating"], default: "attached" },
+      cornerRadiusPx: { type: Number, min: 0, max: 48, default: 16 },
+      liquidGlassEnabled: { type: Boolean, default: false },
+      glassStrength: { type: Number, min: 0, max: 100, default: 75 },
     },
 
     home: {
@@ -394,6 +412,11 @@ const MenuItemSchema = new Schema(
     title: { type: String, required: true, trim: true },
     type: { type: String, enum: ["page", "category", "url"], default: "url" },
     ref: { type: String, default: "" },
+    icon: {
+      type: String,
+      enum: ["grid", "home", "new", "collection", "offer", "gift", "shop", "favorites", "books", "food", "technology", "services", "nature"],
+      default: "grid",
+    },
   },
   { _id: true }
 );
@@ -566,6 +589,7 @@ const SiteSettingsSchema = new Schema(
     shippingRatesRevision: { type: Number, min: 0, default: 0 },
 
     theme: ThemeSchema,
+    appearanceRevision: { type: Number, min: 0, default: 0 },
 
     admin: {
       type: AdminAppearanceSchema,

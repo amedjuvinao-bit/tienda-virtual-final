@@ -35,6 +35,10 @@
   /* Tipografía header */
   --header-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --header-font-size: 16px;
+  --header-font-weight: 700;
+  --header-font-style: italic;
+  --header-letter-spacing: normal;
+  --header-text-transform: none;
 
   /* ✅ Parámetros de animación (menú) */
   --header-menu-hover-scale: 1.12;
@@ -139,12 +143,87 @@ video {
   font-size: var(--header-font-size);
 }
 
+.theme-header.storefront-header-surface {
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: 0 0 var(--header-surface-radius, 16px) var(--header-surface-radius, 16px);
+  box-shadow: 0 8px 18px rgba(88, 35, 76, .16);
+  transition: transform 300ms ease, box-shadow 300ms ease, border-radius 300ms ease;
+}
+.theme-header.storefront-header-surface[data-shape="floating"] {
+  top: 10px;
+  left: 16px;
+  right: 16px;
+  border-radius: var(--header-surface-radius, 16px);
+}
+.theme-header.storefront-header-surface[data-visible="false"] { transform: translateY(calc(-100% - 18px)); }
+
+.storefront-header-surface[data-glass="true"] {
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, .62);
+  -webkit-backdrop-filter: blur(var(--header-glass-blur, 31px)) saturate(var(--header-glass-saturation, 1.85));
+  backdrop-filter: blur(var(--header-glass-blur, 31px)) saturate(var(--header-glass-saturation, 1.85));
+  box-shadow: inset 0 2px 1px rgba(255, 255, 255, .86), inset 0 -12px 24px rgba(120, 45, 99, .14), 0 18px 38px rgba(92, 30, 73, .26), 0 3px 9px rgba(102, 35, 80, .14);
+}
+.storefront-header-surface[data-glass="true"]::before,
+.storefront-header-surface[data-glass="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.storefront-header-surface[data-glass="true"]::before {
+  background: radial-gradient(ellipse 48% 175% at 8% -24%, rgba(255, 255, 255, .95), transparent 72%),
+    radial-gradient(ellipse 22% 180% at 86% 140%, rgba(255, 213, 239, .43), transparent 84%),
+    linear-gradient(122deg, rgba(255, 255, 255, .4) 0%, rgba(255, 255, 255, .03) 32%, rgba(255, 255, 255, .21) 64%, rgba(255, 255, 255, .07) 100%);
+  opacity: var(--header-glass-shine, .68);
+}
+.storefront-header-surface[data-glass="true"]::after {
+  inset: 2px 3px auto;
+  height: 46%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .47), rgba(255, 255, 255, 0));
+  opacity: var(--header-glass-shine, .68);
+}
+.storefront-header-surface[data-glass="true"] > * { position: relative; z-index: 1; }
+
+@media (max-width: 640px) {
+  .theme-header.storefront-header-surface[data-shape="floating"] { top: 8px; left: 8px; right: 8px; }
+}
+@media (max-width: 390px) {
+  .theme-header.storefront-header-surface { max-width: 100vw; padding-inline: 12px; }
+  .theme-header.storefront-header-surface .storefront-action-button { width: 36px; height: 40px; }
+  .theme-header.storefront-header-surface .storefront-action-glyph--image { max-width: 37px; max-height: 37px; }
+  .theme-header.storefront-header-surface button[aria-label="Abrir menú"] { max-width: 40px; max-height: 40px; }
+  .theme-header.storefront-header-surface .header-brand-text,
+  .theme-header.storefront-header-surface img[alt="Logo Rosa Boutique"] { max-width: clamp(58px, 19vw, 74px) !important; }
+}
+
 /* ✅ MENÚ: color independiente */
 .header-menu a {
   color: var(--header-menu-text);
   transition: transform 220ms ease, filter 220ms ease, opacity 220ms ease, color 220ms ease;
   display: inline-block;
 }
+.header-menu {
+  font-weight: var(--header-font-weight);
+  font-style: var(--header-font-style);
+  letter-spacing: var(--header-letter-spacing);
+  text-transform: var(--header-text-transform);
+}
+.header-brand-text {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  color: var(--header-menu-text, #713651);
+  font: 600 25px/0.9 "Cormorant Garamond", Georgia, serif;
+  white-space: nowrap;
+}
+.header-brand-text small { margin-top: 4px; font: 600 10px/1 Manrope, sans-serif; letter-spacing: .17em; text-transform: uppercase; }
 
 .header-menu a:hover {
   color: var(--header-menu-hover);

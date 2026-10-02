@@ -1,6 +1,7 @@
 // src/components/ScrollButton.jsx
 import React from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import "./storefrontLiquidGlass.css";
 import {
   DEFAULT_SECTION_IDS,
   getCurrentSectionIndex,
@@ -137,7 +138,7 @@ export default function ScrollButton({ config }) {
   const baseButtonStyle = {
     width: `${buttonSizePx}px`,
     height: `${buttonSizePx}px`,
-    background: bgColor,
+    "--liquid-tint": bgColor,
     border: `${borderWidthPx}px solid ${borderColor}`,
     borderRadius: `${borderRadiusPx}px`,
     boxShadow: getShadowValue(shadow),
@@ -183,7 +184,7 @@ export default function ScrollButton({ config }) {
         {showUp && (
           <button
             onClick={handlePrev}
-            className="flex items-center justify-center transition-transform duration-200 hover:scale-105"
+            className="storefront-liquid-icon transition-transform duration-200 hover:scale-105"
             style={{
               ...baseButtonStyle,
               animation: getButtonAnimation(upAnimation, "rbScrollMoveUp 2s ease-in-out infinite"),
@@ -216,7 +217,7 @@ export default function ScrollButton({ config }) {
         {showDown && (
           <button
             onClick={handleNext}
-            className="flex items-center justify-center transition-transform duration-200 hover:scale-105"
+            className="storefront-liquid-icon transition-transform duration-200 hover:scale-105"
             style={{
               ...baseButtonStyle,
               animation: getButtonAnimation(

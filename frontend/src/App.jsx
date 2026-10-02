@@ -47,6 +47,7 @@ const DynamicPage = lazy(() => import('./pages/DynamicPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const Carrito = lazy(() => import('./pages/Carrito'));
 const Favoritos = lazy(() => import('./pages/Favoritos'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const Login = lazy(() => import('./admin/Login'));
@@ -123,9 +124,9 @@ function GlobalFloatingButtons({ theme }) {
 
 function Home({ theme }) {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div className="flex-grow">
+      <div className="min-w-0 max-w-full flex-grow overflow-x-clip">
         <section id="banner" className="w-full"><CarouselBanner /></section>
         <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
         <section id="look" className="w-full"><LookSection theme={theme} /></section>
@@ -259,6 +260,7 @@ export default function App() {
                   <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/carrito" element={<Carrito />} />
                   <Route path="/favoritos" element={<Favoritos />} />
+                  <Route path="/buscar" element={<SearchResults theme={themeFromServer} />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
                   <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />
