@@ -124,9 +124,9 @@ function GlobalFloatingButtons({ theme }) {
 
 function Home({ theme }) {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div className="flex-grow">
+      <div className="min-w-0 max-w-full flex-grow overflow-x-clip">
         <section id="banner" className="w-full"><CarouselBanner /></section>
         <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
         <section id="look" className="w-full"><LookSection theme={theme} /></section>

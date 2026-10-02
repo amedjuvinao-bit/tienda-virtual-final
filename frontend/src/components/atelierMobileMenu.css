@@ -9,7 +9,7 @@
   flex-direction: column;
   flex: none;
   width: 100%;
-  max-height: calc(100dvh - 68px);
+  max-height: calc(100dvh - 8px);
   min-height: 0;
   overflow: hidden;
   padding: 9px clamp(15px, 4.5vw, 27px) max(10px, env(safe-area-inset-bottom));
@@ -17,13 +17,10 @@
   border-bottom: 0;
   border-radius: 39px 39px 0 0;
   color: var(--atelier-ink);
-  background-color: var(--atelier-surface);
-  background-image: linear-gradient(165deg, color-mix(in srgb, var(--atelier-surface) 28%, transparent), color-mix(in srgb, var(--atelier-surface) 40%, transparent)), url('/atelier/menu-blush.webp');
-  background-position: center, center 59%;
-  background-size: cover;
-  box-shadow: inset 0 2px 2px rgba(255, 255, 255, .94), 0 -14px 48px rgba(66, 24, 44, .27);
-  backdrop-filter: blur(25px) saturate(1.2);
-  -webkit-backdrop-filter: blur(25px) saturate(1.2);
+  background-color: color-mix(in srgb, var(--atelier-surface) 47%, transparent);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, .96), inset 0 -12px 24px rgba(165, 91, 107, .08), 0 -14px 48px rgba(66, 24, 44, .27);
+  backdrop-filter: blur(25px) saturate(1.4) brightness(1.08);
+  -webkit-backdrop-filter: blur(25px) saturate(1.4) brightness(1.08);
 }
 .atelier-menu::before {
   content: '';
@@ -31,8 +28,17 @@
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .46), transparent 29%, rgba(255, 234, 230, .2));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 15px 28px rgba(255, 255, 255, .32);
+  background: url('/atelier/menu-blush.webp') center 59% / cover no-repeat;
+  opacity: .19;
+}
+.atelier-menu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 95% 38% at 18% -8%, rgba(255,255,255,.76), transparent 75%), linear-gradient(165deg, rgba(255,255,255,.35), transparent 43%, rgba(255,224,230,.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 15px 28px rgba(255, 255, 255, .22);
 }
 .atelier-menu__handle { position: relative; z-index: 1; align-self: center; width: 43px; height: 4px; flex: none; border-radius: 8px; background: linear-gradient(90deg, #dfb89a, #a87450, #ead0ac); box-shadow: 0 1px rgba(255,255,255,.9); }
 .atelier-menu__top { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; flex: none; min-height: 56px; border-bottom: var(--atelier-separator-width, 1px) solid color-mix(in srgb, var(--atelier-line) 55%, transparent); }

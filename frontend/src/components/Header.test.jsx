@@ -185,6 +185,18 @@ describe('encabezado de la tienda', () => {
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('ancla el encabezado y el menú al viewport aunque la página contenga un panel recortado', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><div style={{ overflow: 'hidden', width: 420 }}><Header /></div></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    const drawer = document.getElementById('storefront-mobile-menu');
+    expect(screen.getByRole('banner').parentElement).toBe(document.body);
+    expect(drawer.parentElement).toBe(document.body);
+    expect(drawer).toHaveStyle({ bottom: '0px', width: '100%' });
+    expect(drawer.previousElementSibling.style.opacity).toBe('1');
+    expect(drawer.previousElementSibling.style.backdropFilter).toBe('blur(4px)');
+  });
+
   it('prueba el otro logo y muestra la marca en texto si ambos archivos fallan', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     const image = (await screen.findAllByAltText('Logo Rosa Boutique'))[0];

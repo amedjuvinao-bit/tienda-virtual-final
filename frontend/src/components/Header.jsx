@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from 'react-dom';
 import {
   Menu,
   X,
@@ -265,10 +266,12 @@ function Header() {
     mobileMenuRadiusPx > 0 ? `${mobileMenuRadiusPx}px` : "0px";
 
   const overlayStyle = {
-    backgroundColor: mobileMenuOverlayColor,
-    opacity: menuOpen ? mobileMenuOverlayOpacity : 0,
+    backgroundColor: isAtelierSheet
+      ? `color-mix(in srgb, ${mobileMenuOverlayColor} ${Math.round(Math.max(0, Math.min(1, mobileMenuOverlayOpacity)) * 100)}%, transparent)`
+      : mobileMenuOverlayColor,
+    opacity: menuOpen ? (isAtelierSheet ? 1 : mobileMenuOverlayOpacity) : 0,
     transitionDuration: `${mobileMenuAnimationDurationMs}ms`,
-    backdropFilter: isAtelierSheet && menuOpen ? 'blur(5px)' : undefined,
+    backdropFilter: isAtelierSheet && menuOpen ? 'blur(4px)' : undefined,
   };
 
   const triggerStyle = {
@@ -354,7 +357,7 @@ function Header() {
     height: "100%",
     ...(isAtelierSheet ? {
       width: '100%', maxWidth: 'none', top: 'auto', bottom: 0, left: 0, right: 0,
-      height: 'auto', maxHeight: 'calc(100dvh - 68px)',
+      height: 'auto', maxHeight: 'calc(100dvh - 8px)',
       paddingLeft: 0, paddingRight: 0, background: 'transparent', border: 0,
       boxShadow: 'none', opacity: 1,
       transform: menuOpen ? 'translateY(0)' : 'translateY(105%)',
@@ -413,7 +416,7 @@ function Header() {
     { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
   ].filter((link) => headerMenuDestination(link.href)?.isExternal);
 
-  return (
+  return createPortal(
     <>
       <header
         style={headerInlineStyle}
@@ -690,7 +693,8 @@ function Header() {
       </aside>
 
       <CartSidebar isOpen={cartOpen} onClose={() => setCartOpen(false)} />
-    </>
+    </>,
+    document.body
   );
 }
 

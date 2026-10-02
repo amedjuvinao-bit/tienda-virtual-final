@@ -192,6 +192,14 @@ video {
 @media (max-width: 640px) {
   .theme-header.storefront-header-surface[data-shape="floating"] { top: 8px; left: 8px; right: 8px; }
 }
+@media (max-width: 390px) {
+  .theme-header.storefront-header-surface { max-width: 100vw; padding-inline: 12px; }
+  .theme-header.storefront-header-surface .storefront-action-button { width: 36px; height: 40px; }
+  .theme-header.storefront-header-surface .storefront-action-glyph--image { max-width: 37px; max-height: 37px; }
+  .theme-header.storefront-header-surface button[aria-label="Abrir menú"] { max-width: 40px; max-height: 40px; }
+  .theme-header.storefront-header-surface .header-brand-text,
+  .theme-header.storefront-header-surface img[alt="Logo Rosa Boutique"] { max-width: clamp(58px, 19vw, 74px) !important; }
+}
 
 /* ✅ MENÚ: color independiente */
 .header-menu a {
