@@ -254,20 +254,21 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     }
                   />
 
-                  <Input
-                    type="number"
-                    min={36}
-                    max={120}
-                    step="1"
-                    label="Tamaño del botón (px)"
-                    value={globalConfig.whatsapp.sizePx ?? 56}
-                    onChange={(e) => setPath("global.whatsapp.sizePx", Number(e.target.value))}
-                  />
                 </PanelBlock>
               )}
 
               {whatsSubTab === "estilo" && (
                 <PanelBlock title="Apariencia y bordes">
+                  <Toggle
+                    label="Mostrar fondo de cristal"
+                    checked={globalConfig.whatsapp.showBackground !== false}
+                    onChange={(value) => {
+                      setPath("global.whatsapp.showBackground", value);
+                      if (!value && Number(globalConfig.whatsapp.sizePx) < 90) setPath("global.whatsapp.sizePx", 90);
+                    }}
+                  />
+                  {globalConfig.whatsapp.showBackground === false && <p className="self-center text-xs text-gray-600">Solo se verá la imagen transparente, sin círculo, borde ni sombra de fondo.</p>}
+                  {globalConfig.whatsapp.showBackground !== false && <>
                   <label className="block min-w-0">
                     <span className="mb-1 block text-sm font-medium text-gray-700">
                       Color de fondo
@@ -321,11 +322,21 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                       onChange={(e) => setPath("global.whatsapp.borderColor", e.target.value)}
                     />
                   </label>
+                  </>}
                 </PanelBlock>
               )}
 
               {whatsSubTab === "imagen" && (
                 <PanelBlock title="Ícono e imagen personalizada">
+                  <Input
+                    type="number"
+                    min={44}
+                    max={140}
+                    step="1"
+                    label={globalConfig.whatsapp.showBackground === false ? "Tamaño visible de la imagen (px)" : "Tamaño del botón (px)"}
+                    value={globalConfig.whatsapp.sizePx ?? 56}
+                    onChange={(e) => setPath("global.whatsapp.sizePx", Number(e.target.value))}
+                  />
                   <Toggle
                     label="Usar imagen personalizada"
                     checked={globalConfig.whatsapp.useCustomImage}
@@ -353,7 +364,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     savedRevision={savedRevision}
                   />}
 
-                  <Input
+                  {globalConfig.whatsapp.showBackground !== false && <Input
                     type="number"
                     min={20}
                     max={100}
@@ -363,7 +374,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     onChange={(e) =>
                       setPath("global.whatsapp.iconSizePercent", Number(e.target.value))
                     }
-                  />
+                  />}
                 </PanelBlock>
               )}
             </div>

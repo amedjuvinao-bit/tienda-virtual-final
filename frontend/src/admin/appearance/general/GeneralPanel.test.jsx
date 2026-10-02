@@ -123,6 +123,35 @@ describe("herramientas de Apariencia", () => {
     expect(loader.querySelector(".storefront-liquid-icon")).not.toBeInTheDocument();
   });
 
+  it("deja solo la imagen transparente de WhatsApp y permite ampliarla desde el panel", async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole("button", { name: "Estilo" }));
+    await user.click(screen.getByRole("checkbox", { name: "Mostrar fondo de cristal" }));
+    const preview = screen.getByLabelText("Vista previa de la herramienta").querySelector(".appearance-general__preview-float");
+    expect(preview).toHaveClass("appearance-general__preview-float--plain");
+    expect(preview).not.toHaveClass("storefront-liquid-icon");
+    expect(preview).toHaveStyle({ width: "90px", height: "90px" });
+    await user.click(screen.getByRole("button", { name: "Imagen y animación" }));
+    const size = screen.getByRole("spinbutton", { name: "Tamaño visible de la imagen (px)" });
+    await user.clear(size);
+    await user.type(size, "112");
+    expect(preview).toHaveStyle({ width: "112px", height: "112px" });
+    expect(screen.queryByRole("spinbutton", { name: "Tamaño del ícono interno (%)" })).not.toBeInTheDocument();
+  });
+
+  it("muestra la imagen de WhatsApp sin círculo ni borde y conserva el enlace", () => {
+    const { container } = render(<WhatsAppButton config={{ phone: "573001234567", showBackground: false, useCustomImage: true,
+      imageUrl: "https://res.cloudinary.com/demo/image/upload/boton.png", sizePx: 112, borderWidthPx: 8, shadow: "strong" }} />);
+    const button = container.querySelector('a[aria-label="WhatsApp"]');
+    expect(button).toHaveAttribute("href", "https://wa.me/573001234567");
+    expect(button).toHaveClass("whatsapp-button--plain");
+    expect(button).not.toHaveClass("storefront-liquid-icon");
+    expect(button).toHaveStyle({ width: "112px", height: "112px", boxShadow: "none" });
+    expect(button.style.border).toContain("0");
+    expect(button.querySelector("img")).toHaveStyle({ width: "112px", height: "112px" });
+  });
+
   it("mantiene visible el ícono elegido con todos los tipos de loader", () => {
     for (const type of ["spinner", "ring", "dual-ring", "dots", "bars", "pulse", "diamond", "orbit"]) {
       const { container, unmount } = render(<GlobalPageLoader config={{ type, icon: "crown" }} visible />);

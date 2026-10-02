@@ -2,6 +2,7 @@
 import React from "react";
 import WhatsAppGlyph from "./WhatsAppGlyph";
 import "./storefrontLiquidGlass.css";
+import "./whatsappButton.css";
 
 function getShadowValue(shadow) {
   if (shadow === "none") return "none";
@@ -30,9 +31,9 @@ export default function WhatsAppButton({ config }) {
     ? Number(safeConfig.bottomPx)
     : 24;
 
-  const sizePx = Number.isFinite(Number(safeConfig.sizePx))
-    ? Number(safeConfig.sizePx)
-    : 56;
+  const configuredSize = Number(safeConfig.sizePx);
+  const sizePx = Number.isFinite(configuredSize) ? Math.max(44, Math.min(140, configuredSize)) : 56;
+  const showBackground = safeConfig.showBackground !== false;
 
   const bgColor = safeConfig.bgColor || "#25D366";
 
@@ -41,8 +42,9 @@ export default function WhatsAppButton({ config }) {
   const [imageFailed, setImageFailed] = React.useState(false);
   React.useEffect(() => setImageFailed(false), [imageUrl]);
 
-  const iconSizePercent = Number.isFinite(Number(safeConfig.iconSizePercent))
-    ? Number(safeConfig.iconSizePercent)
+  const configuredIconSize = Number(safeConfig.iconSizePercent);
+  const iconSizePercent = Number.isFinite(configuredIconSize)
+    ? Math.max(20, Math.min(100, configuredIconSize))
     : 80;
 
   const borderRadiusPx = Number.isFinite(Number(safeConfig.borderRadiusPx))
@@ -60,7 +62,7 @@ export default function WhatsAppButton({ config }) {
   if (!enabled || !phone) return null;
 
   const href = `https://wa.me/${phone}${message ? `?text=${message}` : ""}`;
-  const internalIconSizePx = (sizePx * iconSizePercent) / 100;
+  const internalIconSizePx = showBackground ? (sizePx * iconSizePercent) / 100 : sizePx;
   const animationName = getAnimationName(animation);
 
   return (
@@ -87,7 +89,7 @@ export default function WhatsAppButton({ config }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="storefront-liquid-icon transition-transform hover:scale-105"
+        className={showBackground ? "storefront-liquid-icon transition-transform hover:scale-105" : "whatsapp-button--plain transition-transform hover:scale-105"}
         style={{
           position: "fixed",
           bottom: `${bottomPx}px`,
@@ -95,12 +97,12 @@ export default function WhatsAppButton({ config }) {
           height: `${sizePx}px`,
           "--liquid-tint": bgColor,
           zIndex: 9999,
-          borderRadius: `${borderRadiusPx}px`,
-          border: `${borderWidthPx}px solid ${borderColor}`,
-          boxShadow: shadow === "none" ? "none" : getShadowValue(shadow),
+          borderRadius: showBackground ? `${borderRadiusPx}px` : "0",
+          border: showBackground ? `${borderWidthPx}px solid ${borderColor}` : "0",
+          boxShadow: showBackground && shadow !== "none" ? getShadowValue(shadow) : "none",
           animation: animationName ? `${animationName} 2s ease-in-out infinite` : "none",
           [isLeft ? "left" : "right"]: "24px",
-          overflow: "hidden",
+          overflow: showBackground ? "hidden" : "visible",
         }}
         aria-label="WhatsApp"
       >

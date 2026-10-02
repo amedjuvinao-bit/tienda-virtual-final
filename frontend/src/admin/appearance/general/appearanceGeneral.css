@@ -58,6 +58,7 @@
 .appearance-general__preview-product-lines i:nth-child(2) { width: 56%; }
 .appearance-general__preview-product-lines i:nth-child(3) { width: 33%; background: #d481aa; }
 .appearance-general__preview-float { position: absolute; display: grid; place-items: center; }
+.appearance-general__preview-float--plain { overflow: visible; border: 0; box-shadow: none; background: transparent; backdrop-filter: none; }
 .appearance-general__preview-nav { position: absolute; bottom: 16px; display: flex; }
 .appearance-general__preview-nav .storefront-liquid-icon { border-radius: 50%; }
 .appearance-general__preview-nav img { width: 60%; height: 60%; object-fit: contain; }

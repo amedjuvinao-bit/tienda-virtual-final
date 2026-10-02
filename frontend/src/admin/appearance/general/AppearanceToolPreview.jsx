@@ -37,18 +37,18 @@ export default function AppearanceToolPreview({ activeTool, config }) {
           <div className="appearance-general__preview-product-lines"><i /><i /><i /></div>
         </div>
         {activeTool === "whatsapp" && whatsapp.enabled && (
-          <span className="appearance-general__preview-float storefront-liquid-icon"
+          <span className={`appearance-general__preview-float${whatsapp.showBackground === false ? " appearance-general__preview-float--plain" : " storefront-liquid-icon"}`}
             style={{
               [whatsapp.position === "left" ? "left" : "right"]: 18,
-              width: bounded(whatsapp.sizePx, 36, 90, 56),
-              height: bounded(whatsapp.sizePx, 36, 90, 56),
+              width: bounded(whatsapp.sizePx, 44, 140, 56),
+              height: bounded(whatsapp.sizePx, 44, 140, 56),
               bottom: 16,
-              borderRadius: bounded(whatsapp.borderRadiusPx, 0, 999, 999),
+              borderRadius: whatsapp.showBackground === false ? 0 : bounded(whatsapp.borderRadiusPx, 0, 999, 999),
               "--liquid-tint": whatsapp.bgColor || "#25D366",
             }}>
             <PreviewImage url={whatsapp.useCustomImage ? whatsapp.imageUrl : ""}
-              style={{ width: `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, height: `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, objectFit: "contain" }}
-              fallback={<span style={{ color: "#0e7548" }}><WhatsAppGlyph size={30} /></span>} />
+              style={{ width: whatsapp.showBackground === false ? "100%" : `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, height: whatsapp.showBackground === false ? "100%" : `${bounded(whatsapp.iconSizePercent, 20, 100, 80)}%`, objectFit: "contain" }}
+              fallback={<span style={{ color: "#0e7548" }}><WhatsAppGlyph size={whatsapp.showBackground === false ? bounded(whatsapp.sizePx, 44, 140, 56) : 30} /></span>} />
           </span>
         )}
         {activeTool === "scroll" && navigation.enabled && (

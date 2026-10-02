@@ -1,0 +1,8 @@
+.whatsapp-button--plain {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+}
+.whatsapp-button--plain > img { display: block; }
+.whatsapp-button--plain:focus-visible { outline: 2px solid #7d345e; outline-offset: 3px; }

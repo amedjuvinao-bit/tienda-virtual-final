@@ -13,6 +13,7 @@ export const GLOBAL_DEFAULTS = {
     bottomPx: 24,
     sizePx: 56,
     bgColor: "#25D366",
+    showBackground: true,
 
     // ✅ personalización visual
     useCustomImage: false,
