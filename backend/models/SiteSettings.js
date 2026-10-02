@@ -286,6 +286,10 @@ const ThemeSchema = new Schema(
       bgOpacity: Number,
       textColor: String,
       linkColor: String,
+      searchBgColor: String,
+      searchTextColor: String,
+      searchAccentColor: String,
+      searchBorderColor: String,
 
       iconColor: String,
       iconHoverColor: String,

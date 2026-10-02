@@ -68,6 +68,10 @@ function buildDefaultSettings() {
         bgOpacity: 1,
         textColor: "",
         linkColor: "",
+        searchBgColor: "",
+        searchTextColor: "",
+        searchAccentColor: "",
+        searchBorderColor: "",
         menuAnimation: "soft",
         iconColor: "",
         iconHoverColor: "",
@@ -637,6 +641,12 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       if (!['account', 'favorites', 'cart'].every((kind) => validCloudinaryImage(iconImages?.[kind]))) {
         return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_IMAGES', message: 'Carga los tres iconos en Cloudinary antes de guardar.' });
       }
+    }
+    if (theme?.header && ['searchBgColor', 'searchTextColor', 'searchAccentColor', 'searchBorderColor'].some((key) => {
+      const value = theme.header[key];
+      return value !== undefined && value !== '' && (typeof value !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value));
+    })) {
+      return res.status(400).json({ ok: false, error: 'INVALID_HEADER_SEARCH_COLORS', message: 'Los colores del buscador deben ser hexadecimales válidos.' });
     }
     if (theme?.header?.iconOverrides !== undefined) {
       const overrides = theme.header.iconOverrides;

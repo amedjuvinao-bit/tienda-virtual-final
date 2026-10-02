@@ -27,6 +27,11 @@
 .appearance-header__actions { display: flex; flex: none; gap: 0; }
 .appearance-header__store-header > button { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border: 1px solid rgba(173,96,133,.2); border-radius: 50%; }
 .appearance-header__actions .storefront-action-button { width: 42px; height: 44px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.appearance-header__search-popover { z-index: 4; }
+.appearance-header__search-popover .header-search-form > span:first-child { flex: 1; overflow: hidden; white-space: nowrap; color: var(--header-search-text); font: 500 12px/1.2 system-ui, sans-serif; }
+.appearance-header__search-arrow { display: grid; place-items: center; flex: none; width: 31px; height: 31px; border: 1px solid color-mix(in srgb, var(--header-search-border) 72%, transparent); border-radius: 50%; color: var(--header-search-accent); background: color-mix(in srgb, var(--header-search-bg) 70%, white); }
+.appearance-header__actions .header-search-anchor .storefront-action-button { width: 42px; height: 44px; }
+.appearance-header__device[data-viewport="mobile"] .appearance-header__search-popover { right: 0; }
 .appearance-header__icon-editor { display: grid; gap: 14px; padding: 10px 4px; }
 .appearance-header__icon-heading { display: grid; gap: 3px; }
 .appearance-header__icon-heading strong { color: var(--tool-ink); font-size: 15px; }

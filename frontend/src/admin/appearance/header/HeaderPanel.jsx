@@ -5,6 +5,8 @@ import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
 import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
 import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
+import { headerSearchColorVariables, resolveHeaderSearchColors } from '../../../components/headerSearchTheme';
+import '../../../components/headerSearch.css';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
 
@@ -153,6 +155,7 @@ export default function HeaderPanel({
   const [brandingSubTab, setBrandingSubTab] = useState("logo");
   const [stylesSubTab, setStylesSubTab] = useState("tipografia");
   const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
+  const searchColors = resolveHeaderSearchColors(theme.header, theme.colors);
   const iconSelection = resolveHeaderIcons(theme.header);
   const logoMode = theme.header?.logoMode || 'auto';
   const preferredLogo = logoMode === 'auto'
@@ -366,6 +369,11 @@ export default function HeaderPanel({
                 onClick={() => setStylesSubTab("menu")}
               />
               <SubTabButton
+                active={stylesSubTab === "buscador"}
+                label="Buscador"
+                onClick={() => setStylesSubTab("buscador")}
+              />
+              <SubTabButton
                 active={stylesSubTab === "iconos"}
                 label="Íconos"
                 onClick={() => setStylesSubTab("iconos")}
@@ -439,6 +447,30 @@ export default function HeaderPanel({
                       <option value="rotate">Giro suave</option>
                       <option value="pop">Pop (más fuerte)</option>
                     </Select>
+                  </div>
+                </PanelBlock>
+              )}
+
+              {stylesSubTab === "buscador" && (
+                <PanelBlock title="Colores de la barra de búsqueda">
+                  <p className="xl:col-span-2 text-xs text-gray-600">Por defecto, el buscador sigue los colores del encabezado. Cambia solo los que quieras personalizar; al pulsar «Usar colores del tema», vuelve a seguirlos.</p>
+                  {[
+                    ['searchBgColor', 'Fondo', searchColors.background],
+                    ['searchTextColor', 'Texto', searchColors.text],
+                    ['searchAccentColor', 'Flecha y enfoque', searchColors.accent],
+                    ['searchBorderColor', 'Borde', searchColors.border],
+                  ].map(([key, label, fallback]) => <label className="block min-w-0" key={key}>
+                    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+                    <ColorInput value={theme.header?.[key] || fallback} onChange={(event) => setPath(`header.${key}`, event.target.value)} />
+                  </label>)}
+                  <button type="button" className="w-fit rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 xl:col-span-2" onClick={() => {
+                    ['searchBgColor', 'searchTextColor', 'searchAccentColor', 'searchBorderColor'].forEach((key) => setPath(`header.${key}`, ''));
+                  }}>Usar colores del tema</button>
+                  <div className="relative min-h-16 rounded-xl p-3 xl:col-span-2" style={{ ...headerSearchColorVariables(theme.header, theme.colors), background: theme.header?.bgColor || '#ffe3ec' }}>
+                    <div className="header-search-form max-w-[244px]" aria-label="Vista previa de colores del buscador">
+                      <span style={{ flex: 1, color: searchColors.text, fontSize: 12 }}>Buscar productos...</span>
+                      <span className="grid h-[31px] w-[31px] place-items-center rounded-full" style={{ color: searchColors.accent, background: `color-mix(in srgb, ${searchColors.background} 70%, white)` }} aria-hidden="true">→</span>
+                    </div>
                   </div>
                 </PanelBlock>
               )}

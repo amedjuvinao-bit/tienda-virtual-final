@@ -34,6 +34,7 @@ vi.mock('./appearance/header/HeaderPanel', () => ({
       setPath('header.iconSet', 'satin');
       setPath('header.iconOverrides.satin.favorites', 'https://res.cloudinary.com/tienda/image/upload/v1/corazon.webp');
     }}>Guardar icono propio</button>
+    <button onClick={() => setPath('header.searchBgColor', '#254254')}>Cambiar fondo del buscador</button>
   </>,
 }));
 vi.mock('./appearance/banner/BannerPanel', () => ({ default: () => null }));
@@ -145,6 +146,19 @@ describe('guardado seguro de Apariencia', () => {
     expect(Object.keys(payload.theme)).toEqual(['global']);
     expect(payload.theme.global.whatsapp.phone).toBe('573001234567');
     expect(payload.menus).toBeUndefined();
+  });
+
+  it('guarda el color del buscador como parte del tema del encabezado', async () => {
+    const user = userEvent.setup();
+    permissions.allowed = ['appearance:update'];
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Encabezado Logo y menú/ }));
+    await user.click(screen.getByRole('button', { name: 'Cambiar fondo del buscador' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    expect(saveSiteSettings.mock.calls[0][0].theme.header.searchBgColor).toBe('#254254');
+    expect(saveSiteSettings.mock.calls[0][0].theme.colors).toBeUndefined();
   });
 
   it('deja consultar sin editar al perfil con permiso de lectura', async () => {

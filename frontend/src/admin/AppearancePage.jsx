@@ -295,6 +295,10 @@ function buildThemeFromServer(themeRaw) {
 
       textColor: "",
       linkColor: "",
+      searchBgColor: "",
+      searchTextColor: "",
+      searchAccentColor: "",
+      searchBorderColor: "",
       menuAnimation: "soft",
 
       iconColor: "",
@@ -769,6 +773,10 @@ export default function AppearancePage() {
         h.bgColor,
         h.textColor,
         h.linkColor,
+        h.searchBgColor,
+        h.searchTextColor,
+        h.searchAccentColor,
+        h.searchBorderColor,
         h.iconColor,
         h.iconHoverColor,
         h.mobileMenuBgColor,

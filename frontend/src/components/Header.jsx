@@ -15,6 +15,7 @@ import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolve
 import HeaderBrand from './HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
 import HeaderSearch from './HeaderSearch';
+import { headerSearchColorVariables } from './headerSearchTheme';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -38,6 +39,7 @@ function Header() {
   const [logoHeightPx, setLogoHeightPx] = useState(80);
   const [menuItems, setMenuItems] = useState([]);
   const [headerConfig, setHeaderConfig] = useState({});
+  const [themeColors, setThemeColors] = useState({});
   const iconPresentation = resolveHeaderIcons(headerConfig);
   const [footerConfig, setFooterConfig] = useState({});
 
@@ -66,6 +68,7 @@ function Header() {
         else setLogoHeightPx(80);
 
         setHeaderConfig(h);
+        setThemeColors(t?.colors || {});
         setFooterConfig(t?.footer || {});
         setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
@@ -76,6 +79,7 @@ function Header() {
         setLogoHeightPx(80);
         setMenuItems([]);
         setHeaderConfig({});
+        setThemeColors({});
         setFooterConfig({});
       }
     };
@@ -144,6 +148,7 @@ function Header() {
   const headerSurface = useMemo(() => resolveHeaderSurface(headerConfig), [headerConfig]);
   const headerInlineStyle = {
     ...headerSurface.style,
+    ...headerSearchColorVariables(headerConfig, themeColors),
     '--header-icon-color': headerConfig.iconColor || headerConfig.textColor || (isDarkHeaderBackground(headerBgHex) ? '#ffffff' : '#9d4268'),
     '--header-icon-hover': headerConfig.iconHoverColor || '#c62d6a',
     '--storefront-action-size': `${Math.max(28, Math.min(40, Number(headerConfig.iconSizePx) || 34))}px`,

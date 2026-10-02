@@ -54,6 +54,23 @@ describe('encabezado de la tienda', () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+  it('aplica al buscador los colores guardados en Apariencia y actualiza el tema', async () => {
+    fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: {
+      ...settings('Lo Nuevo').theme.header,
+      searchBgColor: '#254254', searchTextColor: '#f0f0f0', searchAccentColor: '#facc15', searchBorderColor: '#efefef',
+    } } });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const header = screen.getByRole('banner');
+    await waitFor(() => expect(header.style.getPropertyValue('--header-search-bg')).toBe('#254254'));
+    expect(header.style.getPropertyValue('--header-search-text')).toBe('#f0f0f0');
+    expect(header.style.getPropertyValue('--header-search-accent')).toBe('#facc15');
+    expect(header.style.getPropertyValue('--header-search-border')).toBe('#efefef');
+    fetchSiteSettings.mockResolvedValue(settings('Lo Nuevo'));
+    fireEvent(window, new Event('rb_site_settings_updated'));
+    await waitFor(() => expect(header.style.getPropertyValue('--header-search-bg')).toBe('#141414'));
+    expect(header.style.getPropertyValue('--header-search-text')).toBe('#ffffff');
+    expect(header.style.getPropertyValue('--header-search-accent')).toBe('#ffffff');
+  });
   it('usa el logo de contraste, conserva enlaces seguros y actualiza el menú después de guardar', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });

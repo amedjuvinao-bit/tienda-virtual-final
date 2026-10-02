@@ -3,11 +3,14 @@ import { Menu, Monitor, Smartphone, X } from 'lucide-react';
 import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, resolveHeaderTypography } from '../../../components/headerPresentation';
 import HeaderBrand from '../../../components/HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
+import { headerSearchColorVariables } from '../../../components/headerSearchTheme';
+import '../../../components/headerSearch.css';
 
 export default function HeaderPreview({ theme, menus }) {
   const [viewport, setViewport] = useState('desktop');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [failedLogo, setFailedLogo] = useState('');
+  const [searchPreviewOpen, setSearchPreviewOpen] = useState(false);
   const header = theme?.header || {};
   const links = useMemo(() => normalizeHeaderMenu(menus?.header), [menus?.header]);
   const logoLight = header.logoLight || theme?.logo?.light || '';
@@ -36,12 +39,15 @@ export default function HeaderPreview({ theme, menus }) {
     </div>
     <div className="appearance-header__scene">
       <div className="appearance-header__device" data-viewport={viewport} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-        <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', '--storefront-action-size': `${Math.max(28, Math.min(40, Number(header.iconSizePx) || 34))}px`, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
+        <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, ...headerSearchColorVariables(header, theme?.colors), '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', '--storefront-action-size': `${Math.max(28, Math.min(40, Number(header.iconSizePx) || 34))}px`, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
           {mobile && <button type="button" aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} onClick={() => setDrawerOpen(!drawerOpen)} style={{ color: header.mobileMenuTriggerIconColor || header.iconColor, backgroundColor: header.mobileMenuTriggerBgColor || '#fff' }}>{drawerOpen ? <X size={18} /> : <Menu size={18} />}</button>}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
           {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <span key={`${link.to}-${index}`}>{link.name}</span>) : <em>Tu menú aparecerá aquí</em>}</nav>}
           <div className="appearance-header__actions">
-            <button type="button" className="storefront-action-button" aria-label="Buscar (vista previa)"><HeaderActionGlyph kind="search" iconSet={icons} iconImages={header.iconImages} iconOverrides={header.iconOverrides} /></button>
+            <div className="header-search-anchor">
+              <button type="button" className="storefront-action-button" aria-label="Buscar (vista previa)" aria-expanded={searchPreviewOpen} onClick={() => setSearchPreviewOpen((open) => !open)}><HeaderActionGlyph kind="search" iconSet={icons} iconImages={header.iconImages} iconOverrides={header.iconOverrides} /></button>
+              {searchPreviewOpen && <div className="header-search-popover appearance-header__search-popover"><div className="header-search-form"><span>Buscar productos...</span><span className="appearance-header__search-arrow">→</span></div></div>}
+            </div>
             <button type="button" className="storefront-action-button" aria-label="Favoritos (vista previa)"><HeaderActionGlyph kind="favorites" iconSet={icons} iconImages={header.iconImages} iconOverrides={header.iconOverrides} /></button>
             <button type="button" className="storefront-action-button" aria-label="Carrito (vista previa)"><HeaderActionGlyph kind="cart" iconSet={icons} iconImages={header.iconImages} iconOverrides={header.iconOverrides} /></button>
           </div>
