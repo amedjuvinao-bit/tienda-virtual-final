@@ -24,8 +24,10 @@ describe('encabezado público y editor', () => {
     expect(validateHeaderMenu([{ title: 'Producto', ref: '/producto/:id' }])).toMatch(/enlace 1/);
     expect(validateHeaderMenu([{ title: '', ref: '/' }])).toMatch(/nombre/);
     expect(normalizeHeaderMenu([{ title: 'Inicio', ref: '/' }, { title: 'Admin', ref: '/admin' }])).toEqual([
-      { name: 'Inicio', to: '/', isExternal: false },
+      { name: 'Inicio', to: '/', isExternal: false, icon: 'grid' },
     ]);
+    expect(normalizeHeaderMenu([{ title: 'Libros', ref: '/pagina/libros', icon: 'books' }, { title: 'Otra categoría', ref: '/pagina/otra', icon: 'vestido' }]))
+      .toMatchObject([{ name: 'Libros', icon: 'books' }, { name: 'Otra categoría', icon: 'grid' }]);
   });
 
   it('mantiene el fondo antiguo sin vidrio y limita la opacidad al activar el efecto', () => {

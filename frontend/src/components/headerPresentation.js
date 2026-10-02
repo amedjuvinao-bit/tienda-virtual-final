@@ -1,3 +1,5 @@
+import { normalizeMobileMenuIcon } from './mobileMenuIcons';
+
 const HEX_COLOR = /^#([\da-f]{3}|[\da-f]{6})$/i;
 
 export function isDarkHeaderBackground(bgColor) {
@@ -94,7 +96,7 @@ export function normalizeHeaderMenu(items) {
   return (Array.isArray(items) ? items : []).flatMap((item) => {
     const name = String(item?.title || '').trim();
     const destination = headerMenuDestination(item?.ref);
-    return name && destination ? [{ name, ...destination }] : [];
+    return name && destination ? [{ name, ...destination, icon: normalizeMobileMenuIcon(item?.icon) }] : [];
   });
 }
 

@@ -97,7 +97,7 @@ describe('guardado seguro de Apariencia', () => {
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
     expect(saveSiteSettings.mock.calls[0][0]).toEqual({
       appearanceRevision: 3,
-      menus: { header: [{ title: 'Nuevo botón', type: 'url', ref: '/', children: [] }] },
+      menus: { header: [{ title: 'Nuevo botón', type: 'url', ref: '/', icon: 'grid', children: [] }] },
     });
   });
 

@@ -321,11 +321,12 @@ function buildThemeFromServer(themeRaw) {
       glassStrength: 75,
 
       // ✅ NUEVO: menú móvil premium
-      mobileMenuBgColor: "#fffdfd",
-      mobileMenuTextColor: "#1f1f1f",
+      mobileMenuBgColor: "#fff4f3",
+      mobileMenuTextColor: "#4e1e39",
       mobileMenuBorderColor: "#e7c2cf",
-      mobileMenuAccentColor: "#b76e79",
-      mobileMenuMutedColor: "#8a6b74",
+      mobileMenuItemBorderColor: "#d2a997",
+      mobileMenuAccentColor: "#ac7950",
+      mobileMenuMutedColor: "#815269",
       mobileMenuTitleColor: "#1f1f1f",
 
       mobileMenuButtonBg: "#d8b2bf",
@@ -336,13 +337,14 @@ function buildThemeFromServer(themeRaw) {
       mobileMenuSocialBg: "#c98ea2",
       mobileMenuSocialIconColor: "#ffffff",
 
-      mobileMenuOverlayColor: "#000000",
-      mobileMenuOverlayOpacity: 0.35,
+      mobileMenuOverlayColor: "#54233d",
+      mobileMenuOverlayOpacity: 0.22,
 
       mobileMenuFontFamily: "",
       mobileMenuAnimation: "slide-left",
       mobileMenuAnimationDurationMs: 300,
       mobileMenuWidthPercent: 88,
+      mobileMenuLayout: 'atelier-sheet',
 
       ...(t.header || {}),
       iconSet: ['gold', 'wine', 'satin', 'porcelain'].includes(t.header?.iconSet) ? t.header.iconSet : 'gold',
@@ -676,6 +678,7 @@ export default function AppearancePage() {
         title: "Nuevo botón",
         type: "url",
         ref: "/",
+        icon: "grid",
         children: [],
       });
       return draft;

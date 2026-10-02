@@ -47,7 +47,22 @@ describe('edición del encabezado', () => {
     expect(within(preview).getByText('Colección')).toBeInTheDocument();
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
-    expect(within(preview).getByText('Colección')).toBeInTheDocument();
+    expect(within(preview).getByRole('navigation', { name: 'Vista previa del menú móvil' })).toHaveTextContent('Colección');
+  });
+
+  it('permite seleccionar Atelier y elegir el ícono de cualquier enlace en la vista previa', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Comportamiento del panel móvil' }), 'atelier-sheet');
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
+    expect(preview.querySelector('.atelier-menu')).toBeInTheDocument();
+    expect(within(preview).getByRole('navigation', { name: 'Vista previa del menú móvil' })).toHaveTextContent('Inicio');
+    await user.click(screen.getByRole('button', { name: /Enlaces Destinos/ }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ícono móvil para Inicio' }), 'books');
+    expect(preview.querySelector('[data-menu-icon="books"]')).toBeInTheDocument();
   });
 
   it('sube un archivo de logo en un solo paso y lo muestra en la vista previa', async () => {

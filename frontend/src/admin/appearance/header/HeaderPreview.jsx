@@ -4,6 +4,7 @@ import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolve
 import HeaderBrand from '../../../components/HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import { headerSearchColorVariables } from '../../../components/headerSearchTheme';
+import AtelierMobileMenu from '../../../components/AtelierMobileMenu';
 import '../../../components/headerSearch.css';
 
 export default function HeaderPreview({ theme, menus }) {
@@ -22,6 +23,7 @@ export default function HeaderPreview({ theme, menus }) {
   const surface = resolveHeaderSurface(header);
   const icons = resolveHeaderIcons(header);
   const mobile = viewport === 'mobile';
+  const atelier = (header.mobileMenuLayout || 'atelier-sheet') === 'atelier-sheet';
   const background = header.bgColor || '#ffe3ec';
   const opacity = surface.opacity;
   const bannerImage = theme?.banner?.slides?.find((slide) => slide?.image)?.image || theme?.banner?.imageUrl || '';
@@ -38,7 +40,7 @@ export default function HeaderPreview({ theme, menus }) {
       </div>
     </div>
     <div className="appearance-header__scene">
-      <div className="appearance-header__device" data-viewport={viewport} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+      <div className="appearance-header__device" data-viewport={viewport} data-menu-open={mobile && drawerOpen && atelier ? 'atelier' : undefined} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
         <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, ...headerSearchColorVariables(header, theme?.colors), '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', '--storefront-action-size': `${Math.max(28, Math.min(40, Number(header.iconSizePx) || 34))}px`, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
           {mobile && <button type="button" aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} onClick={() => setDrawerOpen(!drawerOpen)} style={{ color: header.mobileMenuTriggerIconColor || header.iconColor, backgroundColor: header.mobileMenuTriggerBgColor || '#fff' }}>{drawerOpen ? <X size={18} /> : <Menu size={18} />}</button>}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
@@ -52,7 +54,13 @@ export default function HeaderPreview({ theme, menus }) {
             <button type="button" className="storefront-action-button" aria-label="Carrito (vista previa)"><HeaderActionGlyph kind="cart" iconSet={icons} iconImages={header.iconImages} iconOverrides={header.iconOverrides} /></button>
           </div>
         </div>
-        {mobile && drawerOpen && <div className="appearance-header__drawer" style={{ backgroundColor: header.mobileMenuBgColor || '#fffdfd', color: header.mobileMenuTextColor || '#1f1f1f', fontFamily: header.mobileMenuFontFamily || typography.fontFamily, fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>
+        {mobile && drawerOpen && atelier && <div className="appearance-header__atelier-preview" style={{ '--atelier-ink': header.mobileMenuTextColor || '#4e1e39', '--atelier-muted': header.mobileMenuMutedColor || '#815269', '--atelier-accent': header.mobileMenuAccentColor || '#ac7950', '--atelier-line': header.mobileMenuItemBorderColor || '#d2a997', '--atelier-surface': header.mobileMenuBgColor || '#fff4f3', '--atelier-font': header.mobileMenuFontFamily || 'Georgia, serif', '--atelier-separator-width': `${Math.max(0, Math.min(6, Number(header.mobileMenuItemBorderWidthPx ?? 1)))}px` }}>
+          <AtelierMobileMenu items={links} logo={logo} alternateLogo={alternateLogo} featureImage={bannerImage} preview
+            onClose={() => setDrawerOpen(false)} onSelect={() => setDrawerOpen(false)}
+            onSearch={() => { setDrawerOpen(false); setSearchPreviewOpen(true); }}
+            onFavorites={() => setDrawerOpen(false)} onCart={() => setDrawerOpen(false)} />
+        </div>}
+        {mobile && drawerOpen && !atelier && <div className="appearance-header__drawer" style={{ backgroundColor: header.mobileMenuBgColor || '#fffdfd', color: header.mobileMenuTextColor || '#1f1f1f', fontFamily: header.mobileMenuFontFamily || typography.fontFamily, fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>
           {links.length ? links.map((link, index) => <div key={`${link.to}-${index}`}>{link.name}</div>) : <p>Añade enlaces en la pestaña Menú.</p>}
         </div>}
         <div className="appearance-header__hero"><div className="appearance-header__hero-label">Tu tienda</div><span>El encabezado se verá aquí</span></div>

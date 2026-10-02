@@ -16,6 +16,7 @@ import HeaderBrand from './HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
 import HeaderSearch from './HeaderSearch';
 import { headerSearchColorVariables } from './headerSearchTheme';
+import AtelierMobileMenu from './AtelierMobileMenu';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -42,6 +43,7 @@ function Header() {
   const [themeColors, setThemeColors] = useState({});
   const iconPresentation = resolveHeaderIcons(headerConfig);
   const [footerConfig, setFooterConfig] = useState({});
+  const [mobileMenuFeatureImage, setMobileMenuFeatureImage] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +72,7 @@ function Header() {
         setHeaderConfig(h);
         setThemeColors(t?.colors || {});
         setFooterConfig(t?.footer || {});
+        setMobileMenuFeatureImage(t?.banner?.slides?.find((slide) => slide?.image)?.image || t?.banner?.imageUrl || '');
         setMenuItems(normalizeHeaderMenu(s?.menus?.header));
       } catch {
         if (cancelled || requestId !== sequence) return;
@@ -81,6 +84,7 @@ function Header() {
         setHeaderConfig({});
         setThemeColors({});
         setFooterConfig({});
+        setMobileMenuFeatureImage('');
       }
     };
     refresh();
@@ -175,11 +179,13 @@ function Header() {
     [logoHeightPx]
   );
 
-  const mobileMenuBgColor = headerConfig?.mobileMenuBgColor || "#fffdfd";
-  const mobileMenuTextColor = headerConfig?.mobileMenuTextColor || "#1f1f1f";
+  const mobileMenuLayout = headerConfig?.mobileMenuLayout || 'atelier-sheet';
+  const isAtelierSheet = mobileMenuLayout === 'atelier-sheet';
+  const mobileMenuBgColor = headerConfig?.mobileMenuBgColor || (isAtelierSheet ? '#fff4f3' : '#fffdfd');
+  const mobileMenuTextColor = headerConfig?.mobileMenuTextColor || (isAtelierSheet ? '#4e1e39' : '#1f1f1f');
   const mobileMenuBorderColor = headerConfig?.mobileMenuBorderColor || "#e7c2cf";
-  const mobileMenuAccentColor = headerConfig?.mobileMenuAccentColor || "#b76e79";
-  const mobileMenuMutedColor = headerConfig?.mobileMenuMutedColor || "#8a6b74";
+  const mobileMenuAccentColor = headerConfig?.mobileMenuAccentColor || (isAtelierSheet ? '#ac7950' : '#b76e79');
+  const mobileMenuMutedColor = headerConfig?.mobileMenuMutedColor || (isAtelierSheet ? '#815269' : '#8a6b74');
   const mobileMenuSocialBg = headerConfig?.mobileMenuSocialBg || "#c98ea2";
   const mobileMenuSocialIconColor =
     headerConfig?.mobileMenuSocialIconColor || "#ffffff";
@@ -191,9 +197,9 @@ function Header() {
   );
 
   const mobileMenuOverlayColor =
-    headerConfig?.mobileMenuOverlayColor || "#000000";
+    headerConfig?.mobileMenuOverlayColor || (isAtelierSheet ? '#54233d' : '#000000');
   const mobileMenuOverlayOpacity = Number(
-    headerConfig?.mobileMenuOverlayOpacity ?? 0.35
+    headerConfig?.mobileMenuOverlayOpacity ?? (isAtelierSheet ? 0.22 : 0.35)
   );
 
   const mobileMenuFontFamily = headerConfig?.mobileMenuFontFamily || "";
@@ -241,13 +247,12 @@ function Header() {
     headerConfig?.mobileMenuBorderWidthPx ?? 0
   );
   const mobileMenuItemBorderColor =
-    headerConfig?.mobileMenuItemBorderColor || "#e7c2cf";
+    headerConfig?.mobileMenuItemBorderColor || (isAtelierSheet ? '#d2a997' : '#e7c2cf');
   const mobileMenuItemBorderWidthPx = Number(
     headerConfig?.mobileMenuItemBorderWidthPx ?? 1
   );
   const mobileMenuRadiusPx = Number(headerConfig?.mobileMenuRadiusPx ?? 0);
   const mobileMenuPaddingPx = Number(headerConfig?.mobileMenuPaddingPx ?? 20);
-  const mobileMenuLayout = headerConfig?.mobileMenuLayout || "drawer-left";
 
   const mobileMenuTriggerRadius =
     mobileMenuTriggerRadiusPx === 999 ? "999px" : `${mobileMenuTriggerRadiusPx}px`;
@@ -260,6 +265,7 @@ function Header() {
     backgroundColor: mobileMenuOverlayColor,
     opacity: menuOpen ? mobileMenuOverlayOpacity : 0,
     transitionDuration: `${mobileMenuAnimationDurationMs}ms`,
+    backdropFilter: isAtelierSheet && menuOpen ? 'blur(5px)' : undefined,
   };
 
   const triggerStyle = {
@@ -343,11 +349,30 @@ function Header() {
     right: isRightLayout ? "0" : "auto",
     top: "0",
     height: "100%",
+    ...(isAtelierSheet ? {
+      width: '100%', maxWidth: 'none', top: 'auto', bottom: 0, left: 0, right: 0,
+      height: 'min(78dvh, 760px)', maxHeight: 'calc(100dvh - 72px)',
+      paddingLeft: 0, paddingRight: 0, background: 'transparent', border: 0,
+      boxShadow: 'none', opacity: 1,
+      transform: menuOpen ? 'translateY(0)' : 'translateY(105%)',
+      '--atelier-ink': mobileMenuTextColor,
+      '--atelier-muted': mobileMenuMutedColor,
+      '--atelier-accent': mobileMenuAccentColor,
+      '--atelier-line': mobileMenuItemBorderColor,
+      '--atelier-surface': mobileMenuBgColor,
+      '--atelier-font': mobileMenuFontFamily || 'Georgia, serif',
+      '--atelier-separator-width': `${Math.max(0, Math.min(6, mobileMenuItemBorderWidthPx))}px`,
+    } : {}),
   };
 
   const closeMenuAndNavigate = (to) => {
     setMenuOpen(false);
     navigate(to);
+  };
+  const selectAtelierItem = (item) => {
+    setMenuOpen(false);
+    if (item.isExternal) window.open(item.to, '_blank', 'noopener,noreferrer');
+    else navigate(item.to);
   };
   const openSearch = (event) => {
     if (searchCloseTimerRef.current) window.clearTimeout(searchCloseTimerRef.current);
@@ -558,6 +583,19 @@ function Header() {
         inert={!menuOpen ? '' : undefined}
         style={asideStyle}
       >
+        {isAtelierSheet ? <AtelierMobileMenu
+          items={menuItems}
+          logo={chosenLogo}
+          alternateLogo={alternateLogo}
+          onClose={() => setMenuOpen(false)}
+          onSelect={selectAtelierItem}
+          onSearch={() => { setMenuOpen(false); setSearchTarget('mobile'); setSearchOpen(true); }}
+          onFavorites={() => closeMenuAndNavigate('/favoritos')}
+          onCart={() => { setMenuOpen(false); setCartOpen(true); }}
+          cartCount={cart.length}
+          featureImage={mobileMenuFeatureImage}
+          socialLinks={socialLinks}
+        /> : <>
         <div
           className="relative flex items-center justify-between pt-5 pb-4"
           style={{
@@ -645,6 +683,7 @@ function Header() {
         >
           {footerConfig.copyright || `© ${new Date().getFullYear()}`}
         </div>
+        </>}
       </aside>
 
       <CartSidebar isOpen={cartOpen} onClose={() => setCartOpen(false)} />

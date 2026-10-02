@@ -6,6 +6,7 @@ import HeaderPreview from './HeaderPreview';
 import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
 import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import { headerSearchColorVariables, resolveHeaderSearchColors } from '../../../components/headerSearchTheme';
+import { MOBILE_MENU_ICON_OPTIONS, MobileMenuLinkIcon, normalizeMobileMenuIcon } from '../../../components/mobileMenuIcons';
 import '../../../components/headerSearch.css';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
@@ -163,6 +164,7 @@ export default function HeaderPanel({
     : (logoMode === 'light' ? 'claro' : 'oscuro');
   const lightLogo = theme.header?.logoLight || theme.logo?.light || '';
   const darkLogo = theme.header?.logoDark || theme.logo?.dark || '';
+  const isAtelierLayout = (theme.header?.mobileMenuLayout || 'atelier-sheet') === 'atelier-sheet';
 
   return (
     <div className="appearance-header min-w-0">
@@ -612,52 +614,45 @@ export default function HeaderPanel({
                   </PanelBlock>
 
                   <PanelBlock title="Panel móvil">
-                    <Input
-                      label="Ancho del menú móvil (%)"
-                      type="number"
-                      min={60}
-                      max={100}
-                      step="1"
-                      value={theme.header?.mobileMenuWidthPercent ?? 88}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuWidthPercent", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Radio general del panel (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuRadiusPx ?? 0}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuRadiusPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Separación interna del panel (px)"
-                      type="number"
-                      min={8}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuPaddingPx ?? 20}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuPaddingPx", Number(e.target.value))
-                      }
-                    />
-
                     <Select
                       label="Comportamiento del panel móvil"
-                      value={theme.header?.mobileMenuLayout || "drawer-left"}
-                      onChange={(e) => setPath("header.mobileMenuLayout", e.target.value)}
+                      value={theme.header?.mobileMenuLayout || 'atelier-sheet'}
+                      onChange={(e) => {
+                        setPath("header.mobileMenuLayout", e.target.value);
+                        if (e.target.value === 'atelier-sheet') {
+                          setPath('header.mobileMenuBgColor', '#fff4f3');
+                          setPath('header.mobileMenuTextColor', '#4e1e39');
+                          setPath('header.mobileMenuMutedColor', '#815269');
+                          setPath('header.mobileMenuAccentColor', '#ac7950');
+                          setPath('header.mobileMenuItemBorderColor', '#d2a997');
+                          setPath('header.mobileMenuOverlayColor', '#54233d');
+                          setPath('header.mobileMenuOverlayOpacity', 0.22);
+                        }
+                      }}
                     >
                       <option value="drawer-left">Drawer desde la izquierda</option>
                       <option value="drawer-right">Drawer desde la derecha</option>
                       <option value="center-panel">Panel centrado</option>
                       <option value="full-screen">Pantalla completa</option>
+                      <option value="atelier-sheet">Atelier · cristal inferior</option>
                     </Select>
+                    {isAtelierLayout ? <p className="self-center text-sm text-gray-700">Panel inferior de cristal con los enlaces reales de tu tienda. Elige los íconos en <strong>Enlaces</strong> y revisa la vista <strong>Móvil</strong> arriba.</p> : <>
+                      <Input
+                        label="Ancho del menú móvil (%)" type="number" min={60} max={100} step="1"
+                        value={theme.header?.mobileMenuWidthPercent ?? 88}
+                        onChange={(e) => setPath("header.mobileMenuWidthPercent", Number(e.target.value))}
+                      />
+                      <Input
+                        label="Radio general del panel (px)" type="number" min={0} max={40} step="1"
+                        value={theme.header?.mobileMenuRadiusPx ?? 0}
+                        onChange={(e) => setPath("header.mobileMenuRadiusPx", Number(e.target.value))}
+                      />
+                      <Input
+                        label="Separación interna del panel (px)" type="number" min={8} max={40} step="1"
+                        value={theme.header?.mobileMenuPaddingPx ?? 20}
+                        onChange={(e) => setPath("header.mobileMenuPaddingPx", Number(e.target.value))}
+                      />
+                    </>}
                   </PanelBlock>
                 </>
               )}
@@ -1148,6 +1143,19 @@ export default function HeaderPanel({
                           </button>
                         </div>
                       </div>
+
+                      <label className="mt-3 flex max-w-sm items-center gap-3 text-sm text-gray-700">
+                        <span className="shrink-0 text-pink-700"><MobileMenuLinkIcon name={item?.icon} size={20} /></span>
+                        <span className="shrink-0">Ícono en menú móvil</span>
+                        <select
+                          className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800"
+                          value={normalizeMobileMenuIcon(item?.icon)}
+                          onChange={(e) => setHeaderMenuItem(idx, { icon: e.target.value })}
+                          aria-label={`Ícono móvil para ${item?.title || `enlace ${idx + 1}`}`}
+                        >
+                          {MOBILE_MENU_ICON_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </select>
+                      </label>
 
                       <div className="mt-2 text-xs text-gray-500">
                         Para un producto específico, pega su ruta real, por ejemplo <span className="font-mono">/producto/123</span>. Las rutas con <span className="font-mono">:id</span> no sirven como enlace público.

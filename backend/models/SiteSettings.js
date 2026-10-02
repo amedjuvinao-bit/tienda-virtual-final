@@ -412,6 +412,11 @@ const MenuItemSchema = new Schema(
     title: { type: String, required: true, trim: true },
     type: { type: String, enum: ["page", "category", "url"], default: "url" },
     ref: { type: String, default: "" },
+    icon: {
+      type: String,
+      enum: ["grid", "home", "new", "collection", "offer", "gift", "shop", "favorites", "books", "food", "technology", "services", "nature"],
+      default: "grid",
+    },
   },
   { _id: true }
 );

@@ -152,6 +152,33 @@ describe('encabezado de la tienda', () => {
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('muestra el cristal inferior con las categorías e íconos configurados, sin asumir que vende ropa', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      ...settings('Lo Nuevo'),
+      theme: { header: { mobileMenuLayout: 'atelier-sheet', logoLight: '/claro.png' }, banner: { slides: [{ image: '/campana.webp' }] } },
+      menus: { header: [
+        { title: 'Libros', ref: '/pagina/libros', icon: 'books' },
+        { title: 'Café', ref: '/pagina/cafe', icon: 'food' },
+        { title: 'Otra categoría', ref: '/pagina/otra' },
+      ] },
+    });
+    const user = userEvent.setup();
+    function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    const drawer = document.getElementById('storefront-mobile-menu');
+    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+    expect(drawer).toHaveStyle({ bottom: '0px', width: '100%' });
+    expect(within(drawer).getByRole('navigation', { name: 'Navegación móvil' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: 'Libros' }).querySelector('[data-menu-icon]')).toHaveAttribute('data-menu-icon', 'books');
+    expect(within(drawer).getByRole('button', { name: 'Café' }).querySelector('[data-menu-icon]')).toHaveAttribute('data-menu-icon', 'food');
+    expect(within(drawer).getByRole('button', { name: 'Otra categoría' }).querySelector('[data-menu-icon]')).toHaveAttribute('data-menu-icon', 'grid');
+    expect(drawer.querySelector('.atelier-menu__feature').style.backgroundImage).toContain('/campana.webp');
+    await user.click(within(drawer).getByRole('button', { name: 'Café' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/pagina/cafe');
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('prueba el otro logo y muestra la marca en texto si ambos archivos fallan', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
     const image = (await screen.findAllByAltText('Logo Rosa Boutique'))[0];
