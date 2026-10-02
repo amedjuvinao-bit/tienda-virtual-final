@@ -609,6 +609,7 @@ function Header() {
           featureLink={headerConfig?.mobileMenuFeatureRef}
           socialLinks={socialLinks}
           whatsappConfig={whatsappConfig}
+          closeIconColor={headerConfig?.mobileMenuCloseIconColor}
         /> : <>
         <div
           className="relative flex items-center justify-between pt-5 pb-4"

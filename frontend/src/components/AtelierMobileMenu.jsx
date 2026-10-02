@@ -6,7 +6,7 @@ import './atelierMobileMenu.css';
 
 export default function AtelierMobileMenu({
   items = [], storeName = 'Rosa Boutique', onClose, onSelect, onSearch, onFavorites, onCart,
-  cartCount = 0, featureImage = '', featureLink = '', socialLinks = [], whatsappConfig = null, preview = false,
+  cartCount = 0, featureImage = '', featureLink = '', socialLinks = [], whatsappConfig = null, closeIconColor = '', preview = false,
 }) {
   const featured = items.find((item) => item.to === featureLink && !item.isExternal)
     || items.find((item) => item.to !== '/' && !item.isExternal) || items[0];
@@ -16,7 +16,8 @@ export default function AtelierMobileMenu({
     <span className="atelier-menu__handle" aria-hidden="true" />
     <div className="atelier-menu__top">
       <span className="atelier-menu__brand">{storeName}</span>
-      <button type="button" className="atelier-menu__close" onClick={onClose} aria-label="Cerrar menú"><X size={21} strokeWidth={1.4} /></button>
+      <button type="button" className="atelier-menu__close" style={closeIconColor ? { color: closeIconColor } : undefined}
+        onClick={onClose} aria-label="Cerrar menú"><X size={21} strokeWidth={1.4} /></button>
     </div>
 
     <nav className="atelier-menu__links" aria-label={preview ? 'Vista previa del menú móvil' : 'Navegación móvil'}>

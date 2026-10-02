@@ -75,10 +75,64 @@ describe('edición del encabezado', () => {
     await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
     const feature = preview.querySelector('.atelier-menu__feature');
     expect(feature.style.backgroundImage).toBe('');
+    await user.click(screen.getByRole('button', { name: /Tarjeta Destacado/ }));
     await user.upload(screen.getByLabelText('Seleccionar imagen para Imagen de tarjeta destacada del menú móvil'),
       new File(['imagen'], 'tarjeta.webp', { type: 'image/webp' }));
     expect(upload).toHaveBeenCalled();
     expect(feature.style.backgroundImage).toContain('/tarjeta.webp');
+  });
+
+  it('agrupa la edición por objeto y muestra solo los bordes que el diseño realmente usa', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    expect(screen.getByRole('region', { name: 'Editar Panel' })).toBeInTheDocument();
+    expect(screen.queryByText('Color del borde')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Abrir menú Botón hamburguesa/ }));
+    expect(within(screen.getByRole('region', { name: 'Editar Abrir menú' })).getByText('Grosor del borde (px)')).toBeInTheDocument();
+    expect(screen.queryByText('Tarjeta destacada')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Panel Forma y fondo/ }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Comportamiento del panel móvil' }), 'drawer-left');
+    expect(screen.queryByRole('button', { name: /Tarjeta Destacado/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Redes y pie Parte inferior/ })).toBeInTheDocument();
+    expect(screen.queryByText('Color del borde')).not.toBeInTheDocument();
+    await user.clear(screen.getByRole('spinbutton', { name: /Grosor del borde \(px\)/ }));
+    await user.type(screen.getByRole('spinbutton', { name: /Grosor del borde \(px\)/ }), '2');
+    expect(screen.getByText('Color del borde')).toBeInTheDocument();
+  });
+
+  it('previsualiza por separado el botón para abrir y el icono para cerrar Atelier', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.click(screen.getByRole('button', { name: /Abrir menú Botón hamburguesa/ }));
+    await user.clear(screen.getByRole('spinbutton', { name: 'Tamaño del botón (px)' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Tamaño del botón (px)' }), '52');
+    expect(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' })).toHaveStyle({ width: '52px' });
+    await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
+    await user.click(screen.getByRole('button', { name: /Cerrar menú Botón de cierre/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Color de la X: código de color' }), { target: { value: '#754153' } });
+    expect(within(preview).getByRole('button', { name: 'Cerrar menú' })).toHaveStyle({ color: '#754153' });
+  });
+
+  it('conserva los colores propios al cambiar de modelo y aplica la paleta Atelier solo si se elige', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    await user.click(screen.getByRole('button', { name: /Enlaces Texto y divisiones/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Texto principal: código de color' }), { target: { value: '#345678' } });
+    await user.click(screen.getByRole('button', { name: /Panel Forma y fondo/ }));
+    const layout = screen.getByRole('combobox', { name: 'Comportamiento del panel móvil' });
+    await user.selectOptions(layout, 'drawer-left');
+    await user.selectOptions(layout, 'atelier-sheet');
+    await user.click(screen.getByRole('button', { name: /Enlaces Texto y divisiones/ }));
+    expect(screen.getByRole('textbox', { name: 'Texto principal: código de color' })).toHaveValue('#345678');
+    await user.click(screen.getByRole('button', { name: /Panel Forma y fondo/ }));
+    await user.click(screen.getByRole('button', { name: /Aplicar paleta equilibrada de Atelier/ }));
+    await user.click(screen.getByRole('button', { name: /Enlaces Texto y divisiones/ }));
+    expect(screen.getByRole('textbox', { name: 'Texto principal: código de color' })).toHaveValue('#4e1e39');
   });
 
   it('sube un archivo de logo en un solo paso y lo muestra en la vista previa', async () => {
