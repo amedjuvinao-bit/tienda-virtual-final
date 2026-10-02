@@ -30,7 +30,7 @@ it('de la lupa a un producto del catálogo tras buscar y volver a buscar', async
     <Route path="/buscar" element={<SearchResults />} />
   </Routes></MemoryRouter>);
   await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
-  await user.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), 'vestido rosa');
+  await user.type(screen.getByRole('combobox', { name: 'Buscar productos' }), 'vestido rosa');
   await user.click(screen.getByRole('button', { name: 'Ver resultados' }));
   expect(await screen.findByText('Vestido Rosa')).toBeInTheDocument();
   expect(global.fetch.mock.calls[0][0]).toContain('/api/products?q=vestido+rosa&page=1&limit=24');

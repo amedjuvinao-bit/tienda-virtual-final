@@ -374,6 +374,12 @@ function Header() {
     setSearchOpen(false);
     navigate(`/buscar?q=${encodeURIComponent(term)}`);
   };
+  const selectSearchProduct = (product) => {
+    const key = product?.slug || product?._id;
+    if (!key) return;
+    setSearchOpen(false);
+    navigate(`/producto/${encodeURIComponent(key)}`);
+  };
   const socialLinks = [
     { label: 'Facebook', href: footerConfig.facebook, Icon: Facebook },
     { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
@@ -440,7 +446,7 @@ function Header() {
                 >
                   <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 </button>
-                <HeaderSearch open={searchOpen && searchTarget === 'desktop'} anchorRef={desktopSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onPointerEnter={cancelSearchClose} />
+                <HeaderSearch open={searchOpen && searchTarget === 'desktop'} anchorRef={desktopSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onSelectProduct={selectSearchProduct} onPointerEnter={cancelSearchClose} />
               </div>
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}
@@ -500,7 +506,7 @@ function Header() {
                 >
                   <HeaderActionGlyph kind="search" iconSet={iconPresentation} iconImages={headerConfig.iconImages} iconOverrides={headerConfig.iconOverrides} />
                 </button>
-                <HeaderSearch open={searchOpen && searchTarget === 'mobile'} anchorRef={mobileSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onPointerEnter={cancelSearchClose} />
+                <HeaderSearch open={searchOpen && searchTarget === 'mobile'} anchorRef={mobileSearchAnchorRef} onClose={closeSearch} onSearch={submitSearch} onSelectProduct={selectSearchProduct} onPointerEnter={cancelSearchClose} />
               </div>
               <button type="button" aria-label="Favoritos"
                 onClick={() => navigate("/favoritos")}

@@ -17,7 +17,7 @@ const settings = (name) => ({
 });
 
 beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(settings('Lo Nuevo')); });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
   it('abre la búsqueda desde la lupa, permite cerrarla y envía la consulta a resultados', async () => {
@@ -31,14 +31,14 @@ describe('encabezado de la tienda', () => {
     await user.click(buttons[0]);
     expect(within(buttons[0].closest('.header-search-anchor')).getByRole('dialog', { name: 'Buscar productos' })).toBeInTheDocument();
     expect(document.querySelector('.header-search-backdrop')).not.toBeInTheDocument();
-    expect(screen.getByRole('searchbox', { name: 'Buscar productos' })).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: 'Buscar productos' })).toHaveFocus();
     fireEvent.mouseLeave(buttons[0].closest('.header-search-anchor'));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await user.click(buttons[0]);
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.click(buttons[1]);
-    const input = screen.getByRole('searchbox', { name: 'Buscar productos' });
+    const input = screen.getByRole('combobox', { name: 'Buscar productos' });
     await user.type(input, 'vestido rosa');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(input).toHaveValue('vestido rosa');
@@ -53,6 +53,56 @@ describe('encabezado de la tienda', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it('muestra productos del catálogo al escribir y abre el producto seleccionado', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      products: [{ _id: 'p1', slug: 'vestido-rosa', title: 'Vestido Rosa', image: '/vestido.webp', price: 125000 }],
+      pagination: { totalProducts: 1 },
+    }) }));
+    const user = userEvent.setup();
+    function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
+    await user.type(screen.getByRole('combobox', { name: 'Buscar productos' }), 'vest');
+    const option = await screen.findByRole('option', { name: /Vestido Rosa/ });
+    expect(global.fetch.mock.calls[0][0]).toContain('/api/products?q=vest&page=1&limit=5');
+    expect(option.querySelector('img')).toHaveAttribute('src', '/vestido.webp');
+    expect(option).toHaveTextContent('125.000');
+    await user.click(option);
+    expect(screen.getByTestId('location')).toHaveTextContent('/producto/vestido-rosa');
+    expect(screen.queryByRole('dialog', { name: 'Buscar productos' })).not.toBeInTheDocument();
+  });
+  it('permite elegir una sugerencia con flechas y Enter y cambiar la consulta', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url) => ({ ok: true, json: async () => ({
+      products: String(url).includes('q=bol')
+        ? [{ _id: 'b2', title: 'Bolso Azul', price: 50000 }]
+        : [{ _id: 'p1', title: 'Vestido Rosa', price: 125000 }],
+      pagination: { totalProducts: 1 },
+    }) })));
+    const user = userEvent.setup();
+    function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[1]);
+    const input = screen.getByRole('combobox', { name: 'Buscar productos' });
+    await user.type(input, 'ves');
+    expect(await screen.findByRole('option', { name: /Vestido Rosa/ })).toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, 'bol');
+    expect(await screen.findByRole('option', { name: /Bolso Azul/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Vestido Rosa/ })).not.toBeInTheDocument();
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(screen.getByTestId('location')).toHaveTextContent('/producto/b2');
+  });
+  it('indica cuando no hay coincidencias y permite ver la búsqueda completa', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ products: [], pagination: { totalProducts: 0 } }) }));
+    const user = userEvent.setup();
+    function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
+    await user.type(screen.getByRole('combobox', { name: 'Buscar productos' }), 'inexistente');
+    expect(await screen.findByText('No encontramos productos para “inexistente”.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Ver todos los resultados/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/buscar?q=inexistente');
   });
   it('aplica al buscador los colores guardados en Apariencia y actualiza el tema', async () => {
     fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: {
