@@ -38,8 +38,8 @@ export default function HeaderSearch({ open, anchorRef, onClose, onSearch, onPoi
   return <div className="header-search-popover" role="dialog" aria-label="Buscar productos" onMouseEnter={onPointerEnter}>
     <form className="header-search-form" role="search" onSubmit={submit}>
       <input ref={inputRef} aria-label="Buscar productos" type="search" maxLength={160}
-        placeholder="Busca nombre, categoría o referencia" value={query} onChange={(event) => setQuery(event.target.value)} />
-      <button type="submit" disabled={!query.trim()}>Buscar</button>
+        placeholder="Buscar productos..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      <button type="submit" aria-label="Ver resultados" disabled={!query.trim()}><span aria-hidden="true">→</span></button>
     </form>
   </div>;
 }
