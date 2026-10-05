@@ -345,6 +345,8 @@ function buildThemeFromServer(themeRaw) {
       mobileMenuAnimationDurationMs: 300,
       mobileMenuTriggerIcon: 'classic',
       mobileMenuTriggerAnimation: 'glide',
+      mobileMenuTriggerBgOpacity: 30,
+      mobileMenuTriggerMotionDurationMs: 440,
       mobileMenuWidthPercent: 88,
       mobileMenuLayout: 'atelier-sheet',
 

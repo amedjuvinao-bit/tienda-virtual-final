@@ -9,10 +9,10 @@ export const MOBILE_TRIGGER_ICONS = [
 
 export const MOBILE_TRIGGER_MOTIONS = [
   { value: 'none', label: 'Quieto', detail: 'Sin movimiento' },
-  { value: 'glide', label: 'Trazo fluido', detail: 'Los trazos se deslizan al pasar' },
-  { value: 'glass', label: 'Destello de cristal', detail: 'Un reflejo cruza el botón' },
-  { value: 'halo', label: 'Halo suave', detail: 'Un aro aparece alrededor' },
-  { value: 'morph', label: 'Apertura fluida', detail: 'El símbolo se transforma al abrir' },
+  { value: 'glide', label: 'Cintas', detail: 'Los trazos se cruzan y se recogen' },
+  { value: 'glass', label: 'Prisma', detail: 'Un barrido de luz revela el cierre' },
+  { value: 'halo', label: 'Órbita', detail: 'El símbolo se abre con un eco circular' },
+  { value: 'morph', label: 'Metamorfosis', detail: 'Los trazos giran y forman el cierre' },
 ];
 
 export function resolveMobileTriggerIcon(value) {
@@ -37,17 +37,20 @@ export default function MobileMenuTrigger({ config = {}, expanded = false, onCli
   const iconSize = between(config.mobileMenuTriggerIconSizePx, 14, 36, 20);
   const borderWidth = between(config.mobileMenuTriggerBorderWidthPx, 0, 8, 1);
   const radius = between(config.mobileMenuTriggerRadiusPx, 0, 999, 999);
+  const backgroundOpacity = between(config.mobileMenuTriggerBgOpacity, 0, 100, 30);
+  const duration = between(config.mobileMenuTriggerMotionDurationMs, 180, 700, 440);
   const Element = decorative ? 'span' : 'button';
   const elementProps = decorative ? { 'aria-hidden': true } : { type: 'button', onClick, 'aria-expanded': expanded, ...props };
 
   return <Element {...elementProps} className={`storefront-mobile-trigger ${className}`.trim()}
-    data-icon={icon} data-motion={motion} data-expanded={expanded ? 'true' : 'false'}
+    data-icon={icon} data-motion={motion} data-expanded={expanded ? 'true' : 'false'} data-transparent={backgroundOpacity === 0 ? 'true' : undefined}
     style={{
       width: size, height: size, borderRadius: radius,
       borderWidth, borderColor: config.mobileMenuTriggerBorderColor || '#d3a7b7',
-      backgroundColor: config.mobileMenuTriggerBgColor || '#ffffff',
+      backgroundColor: `color-mix(in srgb, ${config.mobileMenuTriggerBgColor || '#ffffff'} ${backgroundOpacity}%, transparent)`,
       color: config.mobileMenuTriggerIconColor || '#8d5c6b',
       '--mobile-trigger-icon-size': `${iconSize}px`,
+      '--mobile-trigger-duration': `${duration}ms`,
     }}>
     <span className="storefront-mobile-trigger__glyph" aria-hidden="true">
       {Array.from({ length: icon === 'dots' ? 6 : 3 }, (_, index) => <i key={index} />)}

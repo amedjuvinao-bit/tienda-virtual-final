@@ -89,6 +89,7 @@ describe('edición del encabezado', () => {
     expect(screen.getByRole('region', { name: 'Editar Panel' })).toBeInTheDocument();
     expect(screen.queryByText('Color del borde')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Abrir menú Botón hamburguesa/ }));
+    await user.click(screen.getByRole('tab', { name: /Acabado/ }));
     expect(within(screen.getByRole('region', { name: 'Editar Abrir menú' })).getByText('Grosor del borde (px)')).toBeInTheDocument();
     expect(screen.queryByText('Tarjeta destacada')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Panel Forma y fondo/ }));
@@ -108,6 +109,7 @@ describe('edición del encabezado', () => {
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     await user.click(screen.getByRole('button', { name: /Abrir menú Botón hamburguesa/ }));
+    await user.click(screen.getByRole('tab', { name: /Acabado/ }));
     await user.clear(screen.getByRole('spinbutton', { name: 'Tamaño del botón (px)' }));
     await user.type(screen.getByRole('spinbutton', { name: 'Tamaño del botón (px)' }), '52');
     expect(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' })).toHaveStyle({ width: '52px' });
@@ -126,15 +128,34 @@ describe('edición del encabezado', () => {
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     await user.click(within(region).getByRole('button', { name: /Constelación/ }));
-    await user.click(within(region).getByRole('button', { name: /Apertura fluida/ }));
     expect(within(region).getByRole('button', { name: /Constelación/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(region).getByRole('button', { name: /Apertura fluida/ })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(region).getByRole('tab', { name: /Movimiento/ }));
+    await user.click(within(region).getByRole('button', { name: /Metamorfosis/ }));
+    expect(within(region).getByRole('button', { name: /Metamorfosis/ })).toHaveAttribute('aria-pressed', 'true');
+    const demo = within(region).getByRole('button', { name: 'Probar apertura del símbolo' });
+    expect(demo).toHaveAttribute('data-expanded', 'false');
+    await user.click(demo);
+    expect(within(region).getByRole('button', { name: 'Probar cierre del símbolo' })).toHaveAttribute('data-expanded', 'true');
+    await user.click(within(region).getByRole('button', { name: 'Probar cierre del símbolo' }));
+    expect(within(region).getByRole('button', { name: 'Probar apertura del símbolo' })).toHaveAttribute('data-expanded', 'false');
     const trigger = within(preview).getByRole('button', { name: 'Abrir menú de vista previa' });
     expect(trigger).toHaveAttribute('data-icon', 'dots');
     expect(trigger).toHaveAttribute('data-motion', 'morph');
     expect(trigger.querySelectorAll('.storefront-mobile-trigger__glyph i')).toHaveLength(6);
     await user.click(trigger);
     expect(within(preview).getByRole('button', { name: 'Cerrar menú de vista previa' })).toHaveAttribute('data-expanded', 'true');
+  });
+
+  it('permite dejar transparente el botón sin perder el icono en la vista previa', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    await user.click(screen.getByRole('button', { name: /Abrir menú Botón hamburguesa/ }));
+    await user.click(screen.getByRole('tab', { name: /Acabado/ }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Opacidad del fondo del botón' }), { target: { value: '0' } });
+    const demo = screen.getByRole('button', { name: 'Probar apertura del símbolo' });
+    expect(demo.style.backgroundColor).toContain('0%, transparent');
+    expect(demo.querySelector('.storefront-mobile-trigger__glyph')).toBeInTheDocument();
   });
 
   it('conserva los colores propios al cambiar de modelo y aplica la paleta Atelier solo si se elige', async () => {

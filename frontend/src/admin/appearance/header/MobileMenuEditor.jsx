@@ -64,6 +64,8 @@ export default function MobileMenuEditor({ theme, setPath, menus, uploading, set
   const header = theme.header || {};
   const atelier = (header.mobileMenuLayout || 'atelier-sheet') === 'atelier-sheet';
   const [selected, setSelected] = useState('panel');
+  const [triggerSection, setTriggerSection] = useState('model');
+  const [demoExpanded, setDemoExpanded] = useState(false);
   const objects = OBJECTS.filter(({ atelierOnly, drawerOnly }) => (!atelierOnly || atelier) && (!drawerOnly || !atelier));
   const active = objects.find(({ id }) => id === selected) || objects[0];
   const change = (path) => (event) => setPath(`header.${path}`, event.target.value);
@@ -144,38 +146,65 @@ export default function MobileMenuEditor({ theme, setPath, menus, uploading, set
       </Group>}
 
       {active.id === 'trigger' && <>
-        <Group title="Modelo del símbolo" description="Escoge la figura que verán los clientes para abrir el menú.">
-          <div className="appearance-header__trigger-gallery">
-            {MOBILE_TRIGGER_ICONS.map(({ value, label, detail }) => <button type="button" key={value}
-              className="appearance-header__trigger-option" aria-pressed={resolveMobileTriggerIcon(header.mobileMenuTriggerIcon) === value}
-              onClick={() => setPath('header.mobileMenuTriggerIcon', value)}>
-              <MobileMenuTrigger decorative config={{ ...header, mobileMenuTriggerIcon: value, mobileMenuTriggerAnimation: 'none', mobileMenuTriggerSizePx: 52, mobileMenuTriggerIconSizePx: 25 }} />
-              <strong>{label}</strong><small>{detail}</small>
-            </button>)}
-          </div>
-        </Group>
-        <Group title="Animación del botón" description="Pasa el cursor sobre cada opción para probarla. El movimiento ocurre al interactuar con el botón.">
-          <div className="appearance-header__trigger-gallery">
-            {MOBILE_TRIGGER_MOTIONS.map(({ value, label, detail }) => <button type="button" key={value}
-              className="appearance-header__trigger-option" aria-pressed={resolveMobileTriggerMotion(header.mobileMenuTriggerAnimation || 'glide') === value}
-              onClick={() => setPath('header.mobileMenuTriggerAnimation', value)}>
-              <MobileMenuTrigger decorative config={{ ...header, mobileMenuTriggerAnimation: value, mobileMenuTriggerSizePx: 52, mobileMenuTriggerIconSizePx: 25 }} />
-              <strong>{label}</strong><small>{detail}</small>
-            </button>)}
-          </div>
-          <p className="appearance-header__mobile-help">Para ver la apertura fluida, abre y cierra el menú en la vista previa Móvil.</p>
-        </Group>
-        <Group title="Tamaño y forma" description="Este botón abre el menú desde el encabezado.">
-          {number('Tamaño del botón (px)', 'mobileMenuTriggerSizePx', 40, 32, 80)}
-          {number('Tamaño del ícono (px)', 'mobileMenuTriggerIconSizePx', 20, 14, 36)}
-          {number('Redondeo (px)', 'mobileMenuTriggerRadiusPx', 999, 0, 999, '999 = completamente redondo.')}
-        </Group>
-        <Group title="Colores y borde" description="Solo afectan al botón que abre el menú.">
-          {color('Fondo del botón', 'mobileMenuTriggerBgColor', '#ffffff')}
-          {color('Ícono del botón', 'mobileMenuTriggerIconColor', '#8d5c6b')}
-          {number('Grosor del borde (px)', 'mobileMenuTriggerBorderWidthPx', 1, 0, 8)}
-          {Number(header.mobileMenuTriggerBorderWidthPx ?? 1) > 0 && color('Color del borde', 'mobileMenuTriggerBorderColor', '#d3a7b7')}
-        </Group>
+        <section className="appearance-header__trigger-studio" aria-label="Prueba del botón móvil">
+          <div><strong>Prueba tu botón</strong><p>Tócalo para ver cómo entra y sale el símbolo. Los cambios se aplican también en la vista previa Móvil.</p></div>
+          <MobileMenuTrigger config={{ ...header, mobileMenuTriggerSizePx: Math.max(48, Number(header.mobileMenuTriggerSizePx) || 40) }}
+            expanded={demoExpanded} onClick={() => setDemoExpanded((open) => !open)}
+            aria-label={demoExpanded ? 'Probar cierre del símbolo' : 'Probar apertura del símbolo'} />
+          <span aria-live="polite">{demoExpanded ? 'Abierto · pulsa para cerrar' : 'Cerrado · pulsa para abrir'}</span>
+        </section>
+        <div className="appearance-header__trigger-tabs" role="tablist" aria-label="Personalizar botón móvil">
+          {[['model', '1 · Símbolo'], ['motion', '2 · Movimiento'], ['finish', '3 · Acabado']].map(([id, label]) =>
+            <button key={id} type="button" role="tab" aria-selected={triggerSection === id} aria-controls="mobile-trigger-options"
+              onClick={() => setTriggerSection(id)}>{label}</button>)}
+        </div>
+        <div id="mobile-trigger-options" role="tabpanel" className="appearance-header__trigger-content">
+          {triggerSection === 'model' && <>
+            <p>Elige una figura. Se adapta a los colores y al acabado del botón.</p>
+            <div className="appearance-header__trigger-gallery">
+              {MOBILE_TRIGGER_ICONS.map(({ value, label }) => <button type="button" key={value}
+                className="appearance-header__trigger-option" aria-pressed={resolveMobileTriggerIcon(header.mobileMenuTriggerIcon) === value}
+                onClick={() => { setPath('header.mobileMenuTriggerIcon', value); setDemoExpanded(false); }}>
+                <MobileMenuTrigger decorative config={{ ...header, mobileMenuTriggerIcon: value, mobileMenuTriggerAnimation: 'none', mobileMenuTriggerSizePx: 39, mobileMenuTriggerIconSizePx: 21 }} />
+                <strong>{label}</strong>
+              </button>)}
+            </div>
+          </>}
+          {triggerSection === 'motion' && <>
+            <p>Selecciona el movimiento y pulsa la muestra de arriba para comprobar la apertura y el cierre.</p>
+            <div className="appearance-header__trigger-gallery">
+              {MOBILE_TRIGGER_MOTIONS.map(({ value, label }) => <button type="button" key={value}
+                className="appearance-header__trigger-option" aria-pressed={resolveMobileTriggerMotion(header.mobileMenuTriggerAnimation || 'glide') === value}
+                onClick={() => { setPath('header.mobileMenuTriggerAnimation', value); setDemoExpanded(false); }}>
+                <MobileMenuTrigger decorative config={{ ...header, mobileMenuTriggerAnimation: value, mobileMenuTriggerSizePx: 39, mobileMenuTriggerIconSizePx: 21 }} />
+                <strong>{label}</strong>
+              </button>)}
+            </div>
+            <p>{MOBILE_TRIGGER_MOTIONS.find(({ value }) => value === resolveMobileTriggerMotion(header.mobileMenuTriggerAnimation || 'glide'))?.detail}</p>
+            {number('Duración del movimiento (ms)', 'mobileMenuTriggerMotionDurationMs', 440, 180, 700)}
+          </>}
+          {triggerSection === 'finish' && <>
+            <Group title="Proporciones" description="Ajusta la forma sin alterar el diseño del menú.">
+              {number('Tamaño del botón (px)', 'mobileMenuTriggerSizePx', 40, 32, 80)}
+              {number('Tamaño del ícono (px)', 'mobileMenuTriggerIconSizePx', 20, 14, 36)}
+              {number('Redondeo (px)', 'mobileMenuTriggerRadiusPx', 999, 0, 999, '999 = completamente redondo.')}
+            </Group>
+            <Group title="Cristal y color" description="Con 0% de fondo, queda solo el símbolo y su borde.">
+              {color('Fondo del botón', 'mobileMenuTriggerBgColor', '#ffffff')}
+              {color('Ícono del botón', 'mobileMenuTriggerIconColor', '#8d5c6b')}
+              <Field label="Opacidad del fondo (0% = transparente)" wide>
+                <span className="appearance-header__mobile-range">
+                  <input type="range" min="0" max="100" step="5" aria-label="Opacidad del fondo del botón"
+                    value={header.mobileMenuTriggerBgOpacity ?? 30}
+                    onChange={(event) => setPath('header.mobileMenuTriggerBgOpacity', Number(event.target.value))} />
+                  <output>{header.mobileMenuTriggerBgOpacity ?? 30}%</output>
+                </span>
+              </Field>
+              {number('Grosor del borde (px)', 'mobileMenuTriggerBorderWidthPx', 1, 0, 8)}
+              {Number(header.mobileMenuTriggerBorderWidthPx ?? 1) > 0 && color('Color del borde', 'mobileMenuTriggerBorderColor', '#d3a7b7')}
+            </Group>
+          </>}
+        </div>
       </>}
 
       {active.id === 'close' && <Group title="Botón de cierre" description="La X para cerrar el menú está dentro del panel.">
