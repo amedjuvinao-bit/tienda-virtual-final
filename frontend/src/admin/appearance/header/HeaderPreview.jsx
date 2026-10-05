@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Facebook, Instagram, Menu, Monitor, Smartphone, X } from 'lucide-react';
+import { Facebook, Instagram, Monitor, Smartphone, X } from 'lucide-react';
 import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, resolveHeaderTypography } from '../../../components/headerPresentation';
 import HeaderBrand from '../../../components/HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import { headerSearchColorVariables } from '../../../components/headerSearchTheme';
 import AtelierMobileMenu from '../../../components/AtelierMobileMenu';
+import MobileMenuTrigger from '../../../components/MobileMenuTrigger';
 import '../../../components/headerSearch.css';
 
 export default function HeaderPreview({ theme, menus }) {
@@ -47,13 +48,8 @@ export default function HeaderPreview({ theme, menus }) {
     <div className="appearance-header__scene">
       <div className="appearance-header__device" data-viewport={viewport} data-menu-open={mobile && drawerOpen ? (atelier ? 'atelier' : 'drawer') : undefined} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
         <div className="appearance-header__store-header storefront-header-surface" data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, ...headerSearchColorVariables(header, theme?.colors), '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', '--storefront-action-size': `${Math.max(28, Math.min(40, Number(header.iconSizePx) || 34))}px`, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
-          {mobile && <button type="button" aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} onClick={() => setDrawerOpen(!drawerOpen)}
-            style={{ color: header.mobileMenuTriggerIconColor || header.iconColor, backgroundColor: header.mobileMenuTriggerBgColor || '#fff',
-              width: `${header.mobileMenuTriggerSizePx ?? 40}px`, height: `${header.mobileMenuTriggerSizePx ?? 40}px`,
-              border: `${header.mobileMenuTriggerBorderWidthPx ?? 1}px solid ${header.mobileMenuTriggerBorderColor || '#d3a7b7'}`,
-              borderRadius: `${header.mobileMenuTriggerRadiusPx ?? 999}px` }}>
-            {drawerOpen ? <X size={header.mobileMenuTriggerIconSizePx ?? 20} /> : <Menu size={header.mobileMenuTriggerIconSizePx ?? 20} />}
-          </button>}
+          {mobile && <MobileMenuTrigger config={header} expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}
+            aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} />}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
           {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <span key={`${link.to}-${index}`}>{link.name}</span>) : <em>Tu menú aparecerá aquí</em>}</nav>}
           <div className="appearance-header__actions">

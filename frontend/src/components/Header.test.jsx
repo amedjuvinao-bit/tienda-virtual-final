@@ -20,6 +20,21 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
+  it('usa el símbolo y la animación guardados y conserva la apertura del menú', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      ...settings('Lo Nuevo'),
+      theme: { header: { mobileMenuLayout: 'atelier-sheet', mobileMenuTriggerIcon: 'editorial', mobileMenuTriggerAnimation: 'glass' } },
+    });
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const trigger = screen.getByRole('button', { name: 'Abrir menú' });
+    await waitFor(() => expect(trigger).toHaveAttribute('data-icon', 'editorial'));
+    expect(trigger).toHaveAttribute('data-motion', 'glass');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById('storefront-mobile-menu')).toHaveAttribute('aria-hidden', 'false');
+  });
   it('abre la búsqueda desde la lupa, permite cerrarla y envía la consulta a resultados', async () => {
     const user = userEvent.setup();
     function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }

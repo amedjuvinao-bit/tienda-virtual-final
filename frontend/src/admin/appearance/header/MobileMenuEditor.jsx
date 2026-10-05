@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LayoutPanelTop, Link2, Menu, Move, Share2, Sparkles, X } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import { headerMenuDestination } from '../../../components/headerPresentation';
+import MobileMenuTrigger, { MOBILE_TRIGGER_ICONS, MOBILE_TRIGGER_MOTIONS, resolveMobileTriggerIcon, resolveMobileTriggerMotion } from '../../../components/MobileMenuTrigger';
 
 const OBJECTS = [
   { id: 'panel', label: 'Panel', detail: 'Forma y fondo', Icon: LayoutPanelTop },
@@ -143,6 +144,27 @@ export default function MobileMenuEditor({ theme, setPath, menus, uploading, set
       </Group>}
 
       {active.id === 'trigger' && <>
+        <Group title="Modelo del símbolo" description="Escoge la figura que verán los clientes para abrir el menú.">
+          <div className="appearance-header__trigger-gallery">
+            {MOBILE_TRIGGER_ICONS.map(({ value, label, detail }) => <button type="button" key={value}
+              className="appearance-header__trigger-option" aria-pressed={resolveMobileTriggerIcon(header.mobileMenuTriggerIcon) === value}
+              onClick={() => setPath('header.mobileMenuTriggerIcon', value)}>
+              <MobileMenuTrigger decorative config={{ ...header, mobileMenuTriggerIcon: value, mobileMenuTriggerAnimation: 'none', mobileMenuTriggerSizePx: 52, mobileMenuTriggerIconSizePx: 25 }} />
+              <strong>{label}</strong><small>{detail}</small>
+            </button>)}
+          </div>
+        </Group>
+        <Group title="Animación del botón" description="Pasa el cursor sobre cada opción para probarla. El movimiento ocurre al interactuar con el botón.">
+          <div className="appearance-header__trigger-gallery">
+            {MOBILE_TRIGGER_MOTIONS.map(({ value, label, detail }) => <button type="button" key={value}
+              className="appearance-header__trigger-option" aria-pressed={resolveMobileTriggerMotion(header.mobileMenuTriggerAnimation || 'glide') === value}
+              onClick={() => setPath('header.mobileMenuTriggerAnimation', value)}>
+              <MobileMenuTrigger decorative config={{ ...header, mobileMenuTriggerAnimation: value, mobileMenuTriggerSizePx: 52, mobileMenuTriggerIconSizePx: 25 }} />
+              <strong>{label}</strong><small>{detail}</small>
+            </button>)}
+          </div>
+          <p className="appearance-header__mobile-help">Para ver la apertura fluida, abre y cierra el menú en la vista previa Móvil.</p>
+        </Group>
         <Group title="Tamaño y forma" description="Este botón abre el menú desde el encabezado.">
           {number('Tamaño del botón (px)', 'mobileMenuTriggerSizePx', 40, 32, 80)}
           {number('Tamaño del ícono (px)', 'mobileMenuTriggerIconSizePx', 20, 14, 36)}

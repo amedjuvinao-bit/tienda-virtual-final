@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from 'react-dom';
 import {
-  Menu,
   X,
   ChevronRight,
   Facebook,
@@ -20,6 +19,7 @@ import { headerSearchColorVariables } from './headerSearchTheme';
 import AtelierMobileMenu from './AtelierMobileMenu';
 import WhatsAppMenuIcon from './WhatsAppMenuIcon';
 import { resolveWhatsAppHref } from './whatsappLink';
+import MobileMenuTrigger from './MobileMenuTrigger';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -220,25 +220,6 @@ function Header() {
     headerConfig?.mobileMenuWidthPercent ?? 88
   );
 
-  const mobileMenuTriggerSizePx = Number(
-    headerConfig?.mobileMenuTriggerSizePx ?? 40
-  );
-  const mobileMenuTriggerIconSizePx = Number(
-    headerConfig?.mobileMenuTriggerIconSizePx ?? 20
-  );
-  const mobileMenuTriggerBgColor =
-    headerConfig?.mobileMenuTriggerBgColor || "#ffffff";
-  const mobileMenuTriggerIconColor =
-    headerConfig?.mobileMenuTriggerIconColor || "#8d5c6b";
-  const mobileMenuTriggerBorderColor =
-    headerConfig?.mobileMenuTriggerBorderColor || "#d3a7b7";
-  const mobileMenuTriggerBorderWidthPx = Number(
-    headerConfig?.mobileMenuTriggerBorderWidthPx ?? 1
-  );
-  const mobileMenuTriggerRadiusPx = Number(
-    headerConfig?.mobileMenuTriggerRadiusPx ?? 999
-  );
-
   const mobileMenuCloseBgColor =
     headerConfig?.mobileMenuCloseBgColor || "#ffffff";
   const mobileMenuCloseIconColor =
@@ -263,8 +244,6 @@ function Header() {
   const mobileMenuRadiusPx = Number(headerConfig?.mobileMenuRadiusPx ?? 0);
   const mobileMenuPaddingPx = Number(headerConfig?.mobileMenuPaddingPx ?? 20);
 
-  const mobileMenuTriggerRadius =
-    mobileMenuTriggerRadiusPx === 999 ? "999px" : `${mobileMenuTriggerRadiusPx}px`;
   const mobileMenuCloseRadius =
     mobileMenuCloseRadiusPx === 999 ? "999px" : `${mobileMenuCloseRadiusPx}px`;
   const drawerBorderRadius =
@@ -277,16 +256,6 @@ function Header() {
     opacity: menuOpen ? (isAtelierSheet ? 1 : mobileMenuOverlayOpacity) : 0,
     transitionDuration: `${mobileMenuAnimationDurationMs}ms`,
     backdropFilter: isAtelierSheet && menuOpen ? 'blur(4px)' : undefined,
-  };
-
-  const triggerStyle = {
-    width: `${mobileMenuTriggerSizePx}px`,
-    height: `${mobileMenuTriggerSizePx}px`,
-    backgroundColor: mobileMenuTriggerBgColor,
-    color: mobileMenuTriggerIconColor,
-    borderColor: mobileMenuTriggerBorderColor,
-    borderWidth: `${mobileMenuTriggerBorderWidthPx}px`,
-    borderRadius: mobileMenuTriggerRadius,
   };
 
   const closeButtonStyle = {
@@ -515,23 +484,9 @@ function Header() {
           {/* Mobile */}
           <div className="lg:hidden h-full">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20">
-              <button
-                type="button"
-                onClick={() => setMenuOpen(true)}
-                className="flex items-center justify-center shadow-sm"
-                style={triggerStyle}
-                aria-label="Abrir menú"
-                aria-expanded={menuOpen}
-                aria-controls="storefront-mobile-menu"
-              >
-                <Menu
-                  className="shrink-0"
-                  style={{
-                    width: `${mobileMenuTriggerIconSizePx}px`,
-                    height: `${mobileMenuTriggerIconSizePx}px`,
-                  }}
-                />
-              </button>
+              <MobileMenuTrigger config={headerConfig} expanded={menuOpen}
+                onClick={() => setMenuOpen(true)} aria-label="Abrir menú"
+                aria-controls="storefront-mobile-menu" />
             </div>
 
             <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-0">

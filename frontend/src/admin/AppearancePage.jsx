@@ -343,6 +343,8 @@ function buildThemeFromServer(themeRaw) {
       mobileMenuFontFamily: "",
       mobileMenuAnimation: "slide-left",
       mobileMenuAnimationDurationMs: 300,
+      mobileMenuTriggerIcon: 'classic',
+      mobileMenuTriggerAnimation: 'glide',
       mobileMenuWidthPercent: 88,
       mobileMenuLayout: 'atelier-sheet',
 

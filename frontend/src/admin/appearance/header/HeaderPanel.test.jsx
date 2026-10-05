@@ -117,6 +117,26 @@ describe('edición del encabezado', () => {
     expect(within(preview).getByRole('button', { name: 'Cerrar menú' })).toHaveStyle({ color: '#754153' });
   });
 
+  it('aplica el modelo y la animación elegidos al mismo botón de la vista previa', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Menú móvil Panel/ }));
+    await user.click(screen.getByRole('button', { name: /Abrir menú Botón hamburguesa/ }));
+    const region = screen.getByRole('region', { name: 'Editar Abrir menú' });
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.click(within(region).getByRole('button', { name: /Constelación/ }));
+    await user.click(within(region).getByRole('button', { name: /Apertura fluida/ }));
+    expect(within(region).getByRole('button', { name: /Constelación/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(region).getByRole('button', { name: /Apertura fluida/ })).toHaveAttribute('aria-pressed', 'true');
+    const trigger = within(preview).getByRole('button', { name: 'Abrir menú de vista previa' });
+    expect(trigger).toHaveAttribute('data-icon', 'dots');
+    expect(trigger).toHaveAttribute('data-motion', 'morph');
+    expect(trigger.querySelectorAll('.storefront-mobile-trigger__glyph i')).toHaveLength(6);
+    await user.click(trigger);
+    expect(within(preview).getByRole('button', { name: 'Cerrar menú de vista previa' })).toHaveAttribute('data-expanded', 'true');
+  });
+
   it('conserva los colores propios al cambiar de modelo y aplica la paleta Atelier solo si se elige', async () => {
     const user = userEvent.setup();
     render(<Editor />);

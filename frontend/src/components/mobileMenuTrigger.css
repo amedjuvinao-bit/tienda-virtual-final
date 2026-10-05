@@ -1,0 +1,122 @@
+.storefront-mobile-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border-style: solid;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 5px 13px rgba(70,24,50,.12);
+  cursor: pointer;
+  transition: transform .34s cubic-bezier(.2,.8,.2,1), box-shadow .34s, border-color .34s;
+}
+.storefront-mobile-trigger__glyph,
+.storefront-mobile-trigger__close {
+  grid-area: 1 / 1;
+  width: var(--mobile-trigger-icon-size);
+  height: var(--mobile-trigger-icon-size);
+  pointer-events: none;
+}
+.storefront-mobile-trigger__glyph {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: max(3px, calc(var(--mobile-trigger-icon-size) * .17));
+  transition: opacity .32s, transform .42s cubic-bezier(.2,.8,.2,1);
+}
+.storefront-mobile-trigger__glyph i {
+  display: block;
+  flex: none;
+  width: 88%;
+  height: max(1.5px, calc(var(--mobile-trigger-icon-size) * .09));
+  border-radius: 99px;
+  background: currentColor;
+  transition: width .38s cubic-bezier(.2,.8,.2,1), transform .38s;
+}
+.storefront-mobile-trigger[data-icon="classic"] .storefront-mobile-trigger__glyph i:nth-child(2) { width: 66%; }
+.storefront-mobile-trigger[data-icon="editorial"] .storefront-mobile-trigger__glyph { align-items: flex-start; gap: max(5px, calc(var(--mobile-trigger-icon-size) * .28)); }
+.storefront-mobile-trigger[data-icon="editorial"] .storefront-mobile-trigger__glyph i:first-child { width: 94%; }
+.storefront-mobile-trigger[data-icon="editorial"] .storefront-mobile-trigger__glyph i:nth-child(2) { width: 58%; margin-left: auto; }
+.storefront-mobile-trigger[data-icon="editorial"] .storefront-mobile-trigger__glyph i:nth-child(3) { display: none; }
+.storefront-mobile-trigger[data-icon="cascade"] .storefront-mobile-trigger__glyph { align-items: flex-start; }
+.storefront-mobile-trigger[data-icon="cascade"] .storefront-mobile-trigger__glyph i:first-child { width: 43%; }
+.storefront-mobile-trigger[data-icon="cascade"] .storefront-mobile-trigger__glyph i:nth-child(2) { width: 66%; }
+.storefront-mobile-trigger[data-icon="cascade"] .storefront-mobile-trigger__glyph i:nth-child(3) { width: 94%; }
+.storefront-mobile-trigger[data-icon="dots"] .storefront-mobile-trigger__glyph {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  justify-items: center;
+  align-items: center;
+  gap: 1px;
+}
+.storefront-mobile-trigger[data-icon="dots"] .storefront-mobile-trigger__glyph i {
+  width: clamp(3px, calc(var(--mobile-trigger-icon-size) * .19), 5px);
+  height: clamp(3px, calc(var(--mobile-trigger-icon-size) * .19), 5px);
+  border-radius: 50%;
+}
+.storefront-mobile-trigger__close {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  transform: rotate(-55deg) scale(.65);
+  transition: opacity .32s, transform .42s cubic-bezier(.2,.8,.2,1);
+}
+.storefront-mobile-trigger__close i {
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 7%;
+  width: 86%;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.storefront-mobile-trigger__close i:nth-child(2) { transform: rotate(-45deg); }
+.storefront-mobile-trigger[data-motion="morph"][data-expanded="true"] .storefront-mobile-trigger__glyph { opacity: 0; transform: rotate(50deg) scale(.7); }
+.storefront-mobile-trigger[data-motion="morph"][data-expanded="true"] .storefront-mobile-trigger__close { opacity: 1; transform: rotate(0) scale(1); }
+.storefront-mobile-trigger[data-motion="glide"]:is(:hover, :focus-visible),
+.appearance-header__trigger-option:hover .storefront-mobile-trigger[data-motion="glide"] { transform: translateY(-2px); }
+.storefront-mobile-trigger[data-motion="glide"]:is(:hover, :focus-visible) .storefront-mobile-trigger__glyph i:first-child,
+.appearance-header__trigger-option:hover .storefront-mobile-trigger[data-motion="glide"] .storefront-mobile-trigger__glyph i:first-child { transform: translateX(3px); }
+.storefront-mobile-trigger[data-motion="glide"]:is(:hover, :focus-visible) .storefront-mobile-trigger__glyph i:last-child,
+.appearance-header__trigger-option:hover .storefront-mobile-trigger[data-motion="glide"] .storefront-mobile-trigger__glyph i:last-child { transform: translateX(-3px); }
+.storefront-mobile-trigger[data-motion="glass"]::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -25% auto -25% -60%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.67), transparent);
+  transform: skewX(-24deg);
+  transition: left .65s cubic-bezier(.2,.7,.2,1);
+  pointer-events: none;
+}
+.storefront-mobile-trigger[data-motion="glass"]:is(:hover, :focus-visible)::after,
+.appearance-header__trigger-option:hover .storefront-mobile-trigger[data-motion="glass"]::after { left: 125%; }
+.storefront-mobile-trigger[data-motion="halo"]::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid currentColor;
+  border-radius: inherit;
+  opacity: 0;
+  transform: scale(.72);
+  transition: opacity .38s, transform .38s;
+  pointer-events: none;
+}
+.storefront-mobile-trigger[data-motion="halo"]:is(:hover, :focus-visible)::before,
+.appearance-header__trigger-option:hover .storefront-mobile-trigger[data-motion="halo"]::before { opacity: .42; transform: scale(1); }
+.storefront-mobile-trigger[data-motion="morph"]:is(:hover, :focus-visible) .storefront-mobile-trigger__glyph,
+.appearance-header__trigger-option:hover .storefront-mobile-trigger[data-motion="morph"] .storefront-mobile-trigger__glyph { transform: rotate(-7deg); }
+.storefront-mobile-trigger[data-motion="morph"][data-expanded="true"]:is(:hover, :focus-visible) .storefront-mobile-trigger__glyph { transform: rotate(50deg) scale(.7); }
+.storefront-mobile-trigger:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .storefront-mobile-trigger, .storefront-mobile-trigger::before, .storefront-mobile-trigger::after,
+  .storefront-mobile-trigger__glyph, .storefront-mobile-trigger__glyph i, .storefront-mobile-trigger__close { transition: none; animation: none; }
+  .storefront-mobile-trigger[data-motion="glide"]:is(:hover, :focus-visible) { transform: none; }
+}
