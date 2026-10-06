@@ -56,7 +56,7 @@ describe('carga inicial de Apariencia', () => {
       expect(fetchAppearanceSettings).toHaveBeenCalledTimes(2);
       expect(screen.getByRole('heading', { name: 'Apariencia de la tienda' })).toBeInTheDocument();
       expect(screen.queryByText('Área seleccionada')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     } finally {
       consoleError.mockRestore();
     }

@@ -130,7 +130,6 @@
   transition: transform .18s ease;
 }
 
-.appearance-action--primary .admin-premium-nav-icon__glass { border-color: color-mix(in srgb, var(--admin-primary) 44%, white); background: color-mix(in srgb, var(--admin-primary) 17%, var(--admin-card-bg)); }
 .appearance-action:hover:not(:disabled) { transform: translateX(-2px); }
 .appearance-action:hover:not(:disabled) .admin-premium-nav-icon__glass,
 .appearance-action:focus-visible .admin-premium-nav-icon__glass { border-color: var(--admin-primary); box-shadow: inset 1px 1px rgba(255,255,255,.9), 0 4px 12px color-mix(in srgb, var(--admin-primary) 25%, transparent); }
@@ -158,7 +157,7 @@
   transition: opacity .15s ease, transform .15s ease;
 }
 .appearance-action:hover::after, .appearance-action:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
-.appearance-action:disabled { cursor: not-allowed; opacity: .52; }
+.appearance-action:disabled { cursor: not-allowed; }
 .appearance-navigation__item:focus-visible,
 .appearance-action:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 2px; }
 

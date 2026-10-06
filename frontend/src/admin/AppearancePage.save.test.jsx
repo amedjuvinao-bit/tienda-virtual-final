@@ -201,7 +201,14 @@ describe('guardado seguro de Apariencia', () => {
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
     expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(screen.getByText('No hay cambios por guardar.')).toBeInTheDocument();
+    expect(saveSiteSettings).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+    expect(screen.getByText('No hay cambios por descartar.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Aplicar aquí' }));
+    expect(screen.getByText('La vista previa ya muestra la configuración guardada.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
     expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
@@ -218,7 +225,7 @@ describe('guardado seguro de Apariencia', () => {
 
     await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
     expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     expect(saveSiteSettings).not.toHaveBeenCalled();
   });
 
@@ -230,7 +237,7 @@ describe('guardado seguro de Apariencia', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
     expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
   });
 
   it('impide dos solicitudes de guardado simultáneas', async () => {
@@ -244,7 +251,7 @@ describe('guardado seguro de Apariencia', () => {
     expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled();
     expect(saveSiteSettings).toHaveBeenCalledTimes(1);
     complete({ theme: initial.theme, menus: initial.menus, appearanceRevision: 4 });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled());
   });
 
   it('presenta el conflicto sin sobrescribir y ofrece recargar explícitamente', async () => {

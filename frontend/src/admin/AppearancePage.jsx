@@ -526,7 +526,7 @@ export default function AppearancePage() {
   }, [theme, serverSnapshot, menus, menusSnapshot]);
 
   useEffect(() => {
-    if (changedAreas.length && saveMessage?.type === 'success') setSaveMessage(null);
+    if (changedAreas.length && ['success', 'info'].includes(saveMessage?.type)) setSaveMessage(null);
   }, [changedAreas.length, saveMessage]);
 
   useEffect(() => {
@@ -649,10 +649,17 @@ export default function AppearancePage() {
     });
   }, []);
 
-  const onPreview = () => applyTheme(theme);
+  const onPreview = () => {
+    applyTheme(theme);
+    if (!changedAreas.length) setSaveMessage({ type: 'info', text: 'La vista previa ya muestra la configuración guardada.' });
+  };
 
   const onReset = () => {
     if (savingRef.current || saveConflict) return;
+    if (!changedAreas.length) {
+      setSaveMessage({ type: 'info', text: 'No hay cambios por descartar.' });
+      return;
+    }
     if (serverSnapshot) {
       const merged = buildThemeFromServer(serverSnapshot);
       setTheme(merged);
@@ -1023,9 +1030,9 @@ export default function AppearancePage() {
       </div>
       {createPortal(
         <div className="appearance-action-dock" role="group" aria-label="Acciones de apariencia">
-          <button onClick={onPreview} disabled={saving || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><PremiumAdminNavIcon icon={Eye} compact /></button>
-          <button onClick={onReset} disabled={saving || saveConflict || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios"><PremiumAdminNavIcon icon={RotateCcw} compact /></button>
-          <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'}><PremiumAdminNavIcon icon={Save} compact /></button>
+          <button onClick={onPreview} disabled={saving} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><PremiumAdminNavIcon icon={Eye} compact /></button>
+          <button onClick={onReset} disabled={saving || saveConflict} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios"><PremiumAdminNavIcon icon={RotateCcw} compact /></button>
+          <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'}><PremiumAdminNavIcon icon={Save} compact /></button>
         </div>, document.body
       )}
 
