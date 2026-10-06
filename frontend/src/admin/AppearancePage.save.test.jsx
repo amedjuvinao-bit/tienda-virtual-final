@@ -74,6 +74,8 @@ describe('guardado seguro de Apariencia', () => {
     expect(dock).toHaveClass('appearance-action-dock');
     expect(dock.textContent).toBe('');
     expect(dock.querySelectorAll('.admin-premium-nav-icon--compact')).toHaveLength(3);
+    expect(screen.getByRole('navigation', { name: 'Áreas de apariencia' }).parentElement).toHaveClass('appearance-workspace__header');
+    expect(screen.queryByText('Todo está guardado')).not.toBeInTheDocument();
     expect(within(dock).getByRole('button', { name: 'Aplicar aquí' })).toHaveAttribute('data-tooltip', 'Aplicar aquí');
     expect(within(dock).getByRole('button', { name: 'Descartar cambios' })).toHaveAttribute('data-tooltip', 'Descartar cambios');
     expect(within(dock).getByRole('button', { name: 'Guardar cambios' })).toHaveAttribute('data-tooltip', 'Guardar cambios');
@@ -200,10 +202,13 @@ describe('guardado seguro de Apariencia', () => {
     const user = userEvent.setup();
     render(<AppearancePage />);
     await screen.findByText('Cambiar WhatsApp');
-    expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
+    expect(screen.queryByText('Todo está guardado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     expect(screen.getByText('No hay cambios por guardar.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveClass('appearance-feedback');
+    expect(screen.getByRole('status').parentElement).toBe(document.body);
     expect(saveSiteSettings).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
     expect(screen.getByText('No hay cambios por descartar.')).toBeInTheDocument();
@@ -212,7 +217,7 @@ describe('guardado seguro de Apariencia', () => {
 
     await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
     expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
-    expect(screen.getByText('Pendiente: General.')).toBeInTheDocument();
+    expect(screen.getByTitle('Pendiente: General.')).toBeInTheDocument();
     const unloadEvent = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(unloadEvent);
     expect(unloadEvent.defaultPrevented).toBe(true);
@@ -220,11 +225,11 @@ describe('guardado seguro de Apariencia', () => {
     await user.click(screen.getByRole('button', { name: /Secciones Página de inicio/ }));
     await user.click(screen.getByRole('button', { name: 'Cambiar sección' }));
     expect(screen.getByText('2 áreas pendientes por guardar')).toBeInTheDocument();
-    expect(screen.getByText('Pendiente: General, Secciones.')).toBeInTheDocument();
+    expect(screen.getByTitle('Pendiente: General, Secciones.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
-    expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
+    expect(screen.queryByText('1 área pendiente por guardar')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     expect(saveSiteSettings).not.toHaveBeenCalled();
   });
@@ -236,7 +241,8 @@ describe('guardado seguro de Apariencia', () => {
     await user.click(screen.getByRole('button', { name: 'Cambiar WhatsApp' }));
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
-    expect(screen.getByText('Todo está guardado')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveClass('appearance-feedback');
+    expect(screen.queryByText('1 área pendiente por guardar')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
   });
 

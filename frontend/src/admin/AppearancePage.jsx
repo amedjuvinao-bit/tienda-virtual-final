@@ -530,6 +530,12 @@ export default function AppearancePage() {
   }, [changedAreas.length, saveMessage]);
 
   useEffect(() => {
+    if (!saveMessage || saveMessage.type === 'error') return undefined;
+    const timeout = window.setTimeout(() => setSaveMessage((current) => current === saveMessage ? null : current), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [saveMessage]);
+
+  useEffect(() => {
     if (!changedAreas.length) return undefined;
     const warn = (event) => {
       event.preventDefault();
@@ -989,11 +995,13 @@ export default function AppearancePage() {
         </div>
       )}
       <header className="appearance-workspace__header">
-        <div>
+        <div className="appearance-workspace__intro">
           <h1>Apariencia de la tienda</h1>
-          <p>{currentTab.help}</p>
+          <p>
+            {changedAreas.length > 0 && <span className="appearance-workspace__pending" title={`Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.`}>{changedAreas.length} {changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar</span>}
+            <span className="appearance-workspace__help">{canEditCurrentArea ? currentTab.help : 'Solo lectura para tu perfil.'}</span>
+          </p>
         </div>
-      </header>
         <nav className="appearance-navigation" aria-label="Áreas de apariencia">
           {tabs.map((tab) => {
             const TabIcon = tab.icon;
@@ -1005,6 +1013,8 @@ export default function AppearancePage() {
                 className="appearance-navigation__item"
                 data-active={selected}
                 aria-pressed={selected}
+                aria-label={`${tab.label} ${tab.detail}`}
+                title={`${tab.label}: ${tab.detail}`}
                 type="button"
               >
                 <TabIcon size={18} aria-hidden="true" />
@@ -1017,17 +1027,14 @@ export default function AppearancePage() {
             );
           })}
         </nav>
-      <div className="appearance-action-bar">
-        <div className="appearance-action-bar__inner">
-          <div className="appearance-action-bar__status" data-feedback={saveMessage?.type || ''} role="status" aria-live="polite">
-            <span className="appearance-action-bar__marker" data-dirty={changedAreas.length > 0} />
-            <div>
-              <strong>{saving ? 'Guardando…' : changedAreas.length ? `${changedAreas.length} ${changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar` : 'Todo está guardado'}</strong>
-              <small>{saveMessage ? saveMessage.text : !canEditCurrentArea ? 'Esta área es de solo lectura para tu perfil.' : changedAreas.length ? `Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.` : 'Los cambios se publican al guardar.'}</small>
-            </div>
-          </div>
-        </div>
-      </div>
+      </header>
+      {saveMessage && createPortal(
+        <div className="appearance-feedback" data-feedback={saveMessage.type} role={saveMessage.type === 'error' ? 'alert' : 'status'} aria-live={saveMessage.type === 'error' ? 'assertive' : 'polite'}>
+          <span className="appearance-feedback__indicator" aria-hidden="true" />
+          <div><strong>{saveMessage.type === 'success' ? 'Cambios guardados' : saveMessage.type === 'error' ? 'Revisa los cambios' : 'Estado de Apariencia'}</strong><p>{saveMessage.text}</p></div>
+          <button type="button" onClick={() => setSaveMessage(null)} aria-label="Cerrar aviso" title="Cerrar aviso">×</button>
+        </div>, document.body
+      )}
       {createPortal(
         <div className="appearance-action-dock" role="group" aria-label="Acciones de apariencia">
           <button onClick={onPreview} disabled={saving} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><PremiumAdminNavIcon icon={Eye} compact /></button>
