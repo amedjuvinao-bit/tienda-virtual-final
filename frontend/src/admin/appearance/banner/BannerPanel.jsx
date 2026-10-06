@@ -1,5 +1,7 @@
 // src/admin/appearance/banner/BannerPanel.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import BannerDevicePreview, { BANNER_DEVICES } from './BannerDevicePreview';
+import './bannerPanel.css';
 
 /* =======================
    UI Helpers
@@ -25,21 +27,6 @@ const Select = ({ label, children, ...rest }) => (
     </select>
   </label>
 );
-
-const Badge = ({ children, tone = "gray" }) => {
-  const map = {
-    gray: "bg-gray-100 text-gray-700 border-gray-200",
-    pink: "bg-pink-50 text-pink-700 border-pink-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    green: "bg-green-50 text-green-700 border-green-200",
-    gold: "bg-yellow-50 text-yellow-800 border-yellow-200",
-  };
-  return (
-    <span className={"inline-flex items-center px-2 py-0.5 text-xs rounded-full border " + (map[tone] || map.gray)}>
-      {children}
-    </span>
-  );
-};
 
 const clamp01 = (n) => Math.max(0, Math.min(100, n));
 const clampNum = (n, min, max, fallback) => {
@@ -111,7 +98,7 @@ const BannerDragPreview = ({ src, fit = "cover", posX = 50, posY = 50, height = 
             className="h-full w-full"
             style={{
               objectFit: fit === "contain" ? "contain" : "cover",
-              objectPosition: `${Number(posX) || 50}% ${Number(posY) || 50}%`,
+              objectPosition: `${clampNum(posX, 0, 100, 50)}% ${clampNum(posY, 0, 100, 50)}%`,
             }}
             draggable={false}
           />
@@ -239,9 +226,6 @@ const BannerButtonEditor = ({ title = "Botón", value, onChange, uploading, onUp
           </div>
         </div>
 
-        <div className="mt-2 text-[11px] text-gray-500">
-          Nota: el estilo final lo define el front (<span className="font-mono">CarouselBanner.jsx</span>).
-        </div>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3 mt-3">
@@ -290,6 +274,8 @@ const BannerButtonEditor = ({ title = "Botón", value, onChange, uploading, onUp
                 try {
                   const url = await onUploadImage(f);
                   set({ imageUrl: url });
+                } catch (_) {
+                  // El editor principal muestra el error; conserva la imagen anterior.
                 } finally {
                   e.target.value = "";
                 }
@@ -324,15 +310,21 @@ const BannerButtonEditor = ({ title = "Botón", value, onChange, uploading, onUp
    Modal
 ======================= */
 const Modal = ({ open, title, onClose, children }) => {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[9999]">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-white/25 backdrop-blur-md" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-4xl rounded-2xl bg-white shadow-xl border overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-white">
-            <div className="font-semibold text-gray-900">{title}</div>
-            <button onClick={onClose} className="px-3 py-1.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm" type="button">
+        <div className="banner-editor-dialog w-full max-w-4xl rounded-2xl bg-white shadow-xl border overflow-hidden" role="dialog" aria-modal="true" aria-label={title}>
+          <div className="banner-editor-dialog__head flex items-center justify-between gap-3 px-4 py-3 border-b">
+            <div className="font-semibold">{title}</div>
+            <button onClick={onClose} className="banner-btn" type="button">
               Cerrar
             </button>
           </div>
@@ -346,7 +338,7 @@ const Modal = ({ open, title, onClose, children }) => {
 /* =======================
    MAIN BannerPanel
 ======================= */
-export default function BannerPanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend, onPreview }) {
+export default function BannerPanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend }) {
   const b = theme?.banner || {};
   const slides = useMemo(() => (Array.isArray(b.slides) ? b.slides : []), [b.slides]);
 
@@ -358,7 +350,10 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   // UI states
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [editIdx, setEditIdx] = useState(null);
-  const [showJson, setShowJson] = useState(false);
+  const [activeButtonIdx, setActiveButtonIdx] = useState(0);
+  const [activePanel, setActivePanel] = useState('content');
+  const [previewDevice, setPreviewDevice] = useState('desktop');
+  const [uploadStatus, setUploadStatus] = useState(null);
 
   const ensureSlides = () => {
     if (!Array.isArray(b.slides)) setPath("banner.slides", []);
@@ -386,17 +381,15 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     next.splice(idx, 1);
     setSlides(next);
 
-    setBannerSlideFiles((prev) => {
-      const copy = { ...prev };
-      delete copy[idx];
-      return copy;
-    });
+    setBannerSlideFiles((prev) => Object.fromEntries(Object.entries(prev)
+      .filter(([key]) => Number(key) !== idx)
+      .map(([key, file]) => [Number(key) > idx ? Number(key) - 1 : Number(key), file])));
 
     setSelectedIdx((p) => {
-      const n = Math.max(0, Math.min((next.length || 1) - 1, p));
+      const n = Math.max(0, Math.min((next.length || 1) - 1, p > idx ? p - 1 : p));
       return n;
     });
-    if (editIdx === idx) setEditIdx(null);
+    setEditIdx((current) => typeof current === 'number' ? current === idx ? null : current > idx ? current - 1 : current : current);
   };
 
   const setSlide = (idx, patch) => {
@@ -406,13 +399,50 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     setSlides(next);
   };
 
+  const moveSlide = (idx, direction) => {
+    const target = idx + direction;
+    if (target < 0 || target >= slides.length) return;
+    const next = [...slides];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setSlides(next);
+    setBannerSlideFiles((previous) => {
+      const files = { ...previous };
+      const current = files[idx];
+      const other = files[target];
+      if (other) files[idx] = other; else delete files[idx];
+      if (current) files[target] = current; else delete files[target];
+      return files;
+    });
+    setSelectedIdx(target);
+  };
+
   const setSlideButton = (idx, nextBtn) => {
     const next = [...slides];
     if (!next[idx]) return;
     const cur = next[idx] || {};
-    const curBtn = cur.button || buildDefaultButton();
-    next[idx] = { ...cur, button: { ...buildDefaultButton(), ...curBtn, ...(nextBtn || {}) } };
+    if (Array.isArray(cur.buttons) && cur.buttons.length) {
+      const buttons = [...cur.buttons];
+      buttons[activeButtonIdx] = { ...buttons[activeButtonIdx], ...(nextBtn || {}) };
+      next[idx] = { ...cur, buttons };
+    } else {
+      const curBtn = cur.button || buildDefaultButton();
+      next[idx] = { ...cur, button: { ...buildDefaultButton(), ...curBtn, ...(nextBtn || {}) } };
+    }
     setSlides(next);
+  };
+
+  const buttonFor = (item, manyKey, oneKey) => {
+    const many = item?.[manyKey];
+    return Array.isArray(many) && many.length ? many[activeButtonIdx] || many[0] : item?.[oneKey] || buildDefaultButton();
+  };
+
+  const setSingleOrMultipleButton = (manyKey, oneKey, nextBtn) => {
+    const many = b[manyKey];
+    if (Array.isArray(many) && many.length) {
+      const next = [...many];
+      next[activeButtonIdx] = { ...next[activeButtonIdx], ...nextBtn };
+      setPath(`banner.${manyKey}`, next);
+    } else setPath(`banner.${oneKey}`, nextBtn);
   };
 
   const uploadButtonImage = async (file) => {
@@ -420,11 +450,11 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     setUploading(true);
     try {
       const url = await uploadToCloudinaryViaBackend(file, "image");
-      alert("Imagen del botón subida ✅ (ahora dale Guardar para dejarlo fijo)");
+      setUploadStatus({ type: 'success', text: 'Imagen del botón subida. Guarda los cambios para publicarla.' });
       return url;
     } catch (e) {
       console.error(e);
-      alert(e?.message || "Error subiendo imagen del botón");
+      setUploadStatus({ type: 'error', text: e?.message || 'No se pudo subir la imagen del botón.' });
       throw e;
     } finally {
       setUploading(false);
@@ -433,15 +463,15 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
 
   const onUploadBannerImage = async () => {
     try {
-      if (!bannerImageFile) return alert("Selecciona una imagen primero.");
+      if (!bannerImageFile) return setUploadStatus({ type: 'error', text: 'Selecciona una imagen primero.' });
       setUploading(true);
       const url = await uploadToCloudinaryViaBackend(bannerImageFile, "image");
       setPath("banner.imageUrl", url);
       setBannerImageFile(null);
-      alert("Imagen del banner subida ✅ (ahora dale Guardar para dejarlo fijo)");
+      setUploadStatus({ type: 'success', text: 'Imagen subida. Guarda los cambios para publicarla.' });
     } catch (e) {
       console.error(e);
-      alert(e?.message || "Error subiendo imagen del banner");
+      setUploadStatus({ type: 'error', text: e?.message || 'No se pudo subir la imagen.' });
     } finally {
       setUploading(false);
     }
@@ -450,15 +480,15 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const onUploadBannerSlideImage = async (idx) => {
     try {
       const file = bannerSlideFiles?.[idx] || null;
-      if (!file) return alert("Selecciona una imagen primero.");
+      if (!file) return setUploadStatus({ type: 'error', text: 'Selecciona una imagen primero.' });
       setUploading(true);
       const url = await uploadToCloudinaryViaBackend(file, "image");
       setSlide(idx, { image: url });
       setBannerSlideFiles((prev) => ({ ...prev, [idx]: null }));
-      alert("Slide subido ✅ (ahora dale Guardar para dejarlo fijo)");
+      setUploadStatus({ type: 'success', text: 'Slide subido. Guarda los cambios para publicarlo.' });
     } catch (e) {
       console.error(e);
-      alert(e?.message || "Error subiendo slide");
+      setUploadStatus({ type: 'error', text: e?.message || 'No se pudo subir el slide.' });
     } finally {
       setUploading(false);
     }
@@ -466,15 +496,15 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
 
   const onUploadBannerVideo = async () => {
     try {
-      if (!bannerVideoFile) return alert("Selecciona un video primero.");
+      if (!bannerVideoFile) return setUploadStatus({ type: 'error', text: 'Selecciona un video primero.' });
       setUploading(true);
       const url = await uploadToCloudinaryViaBackend(bannerVideoFile, "video");
       setPath("banner.videoUrl", url);
       setBannerVideoFile(null);
-      alert("Video subido ✅ (ahora dale Guardar para dejarlo fijo)");
+      setUploadStatus({ type: 'success', text: 'Video subido. Guarda los cambios para publicarlo.' });
     } catch (e) {
       console.error(e);
-      alert(e?.message || "Error subiendo video (si tu backend no soporta video, pega la URL manualmente).");
+      setUploadStatus({ type: 'error', text: e?.message || 'No se pudo subir el video.' });
     } finally {
       setUploading(false);
     }
@@ -488,7 +518,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     const type = String(b.type || "slider");
 
     if (type === "slider") {
-      if (!slides.length) out.push({ tone: "red", text: "No tienes slides. Agrega al menos 1." });
+      if (!slides.length) out.push({ tone: "red", text: "Sin slides la tienda mostrará imágenes de ejemplo. Agrega al menos uno." });
       slides.forEach((s, i) => {
         if (!s?.image) out.push({ tone: "red", text: `Slide #${i + 1}: falta imagen.` });
       });
@@ -499,396 +529,116 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     }
 
     if (type === "video") {
-      if (!b.videoUrl) out.push({ tone: "red", text: "Video: falta videoUrl." });
+      if (!b.videoUrl) out.push({ tone: "red", text: "Agrega el video de portada." });
+      if (b.videoAutoplay && !b.videoMuted) out.push({ tone: "red", text: "La reproducción automática con sonido puede ser bloqueada por el navegador. Activa Silenciar." });
     }
 
     return out;
-  }, [b.type, b.imageUrl, b.videoUrl, slides]);
+  }, [b.type, b.imageUrl, b.videoUrl, b.videoAutoplay, b.videoMuted, slides]);
 
-  const selectedSlide = slides?.[selectedIdx] || null;
-  const previewSrc =
-    String(b.type || "slider") === "slider"
-      ? selectedSlide?.image || ""
-      : String(b.type || "slider") === "image"
-      ? b.imageUrl || ""
-      : "";
+  const bannerType = String(b.type || "slider");
+  const effectiveInterval = b.sliderIntervalMs ?? b.autoplayMs ?? 3500;
+  const activeSlideIdx = Math.min(selectedIdx, Math.max(0, slides.length - 1));
+  const editCurrent = (buttonIndex = 0) => {
+    setActiveButtonIdx(Number.isInteger(buttonIndex) ? buttonIndex : 0);
+    setEditIdx(bannerType === "slider" ? activeSlideIdx : bannerType);
+  };
+  const chooseSlide = (step) => setSelectedIdx((current) => (current + step + slides.length) % slides.length);
 
-  /* =======================
-     Layout
-  ======================= */
   return (
-    <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-6 min-w-0">
-      {/* =======================
-          LEFT: Simple controls + compact list
-      ======================= */}
-      <section className="rounded-2xl border p-4 bg-white min-w-0">
-        <div className="flex items-center justify-between gap-3 mb-3">
+    <div className="banner-workspace">
+      <section className="banner-panel banner-panel--editor" aria-label="Configurar portada">
+        <div className="banner-panel__head">
           <div>
-            <h2 className="font-semibold text-gray-900">Banner</h2>
-            <div className="text-xs text-gray-500">Lo básico aquí. “Editar” abre el editor completo (modal).</div>
+            <h2>Portada de la tienda</h2>
+            <p>Elige el contenido y mira cómo queda antes de guardar.</p>
           </div>
-
-          <button
-            type="button"
-            onClick={onPreview}
-            className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm"
-            title="Aplica cambios en vista previa"
-          >
-            Ver cambios
-          </button>
-        </div>
-
-        <div className="rounded-2xl border bg-gradient-to-br from-pink-50 via-white to-amber-50 p-3 mb-3">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <Badge tone="pink">Responsive automático</Badge>
-            <Badge tone="gray">Móvil</Badge>
-            <Badge tone="gray">Tablet</Badge>
-            <Badge tone="gray">Desktop</Badge>
-          </div>
-          <div className="text-sm font-semibold text-gray-800 mb-1">Comportamiento responsive prediseñado</div>
-          <div className="text-xs text-gray-600 leading-5">
-            El sistema adapta automáticamente la altura visual, el tamaño del botón y la posición de los controles según el tamaño de pantalla.
-            Aquí sigues configurando la base del banner, pero el ajuste fino para móvil y tablet lo resuelve el frontend para mantener un diseño más limpio y profesional.
+          <div className="banner-panel-tabs" role="group" aria-label="Edición de portada">
+            <button type="button" onClick={() => setActivePanel('content')} aria-pressed={activePanel === 'content'}>Contenido</button>
+            <button type="button" onClick={() => setActivePanel('behavior')} aria-pressed={activePanel === 'behavior'}>Comportamiento</button>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          <Select label="Tipo de Banner" value={b.type || "slider"} onChange={(e) => setPath("banner.type", e.target.value)}>
-            <option value="slider">Slider</option>
+        {uploadStatus && <div className="banner-upload-status" data-tone={uploadStatus.type} role={uploadStatus.type === 'error' ? 'alert' : 'status'}>{uploadStatus.text}<button type="button" onClick={() => setUploadStatus(null)} aria-label="Cerrar aviso de subida">×</button></div>}
+
+        <div className="banner-core-controls">
+          <Select label="Contenido de la portada" value={bannerType} onChange={(e) => { setPath('banner.type', e.target.value); setActivePanel('content'); }}>
+            <option value="slider">Galería de imágenes</option>
             <option value="image">Imagen única</option>
             <option value="video">Video</option>
           </Select>
-
-          <Select label="Altura" value={b.heightMode || "auto"} onChange={(e) => setPath("banner.heightMode", e.target.value)}>
-            <option value="auto">Auto</option>
-            <option value="fullscreen">Fullscreen (automático por dispositivo)</option>
+          <Select label="Altura en escritorio" value={b.heightMode || 'auto'} onChange={(e) => setPath('banner.heightMode', e.target.value)}>
+            <option value="auto">Altura personalizada</option>
+            <option value="fullscreen">Pantalla completa</option>
           </Select>
         </div>
 
-        {String(b.heightMode || "auto") === "auto" && (
-          <div className="rounded-2xl border bg-gray-50 p-3 mb-3">
-            <div className="font-semibold text-sm text-gray-800 mb-2">Altura base (px)</div>
-            <div className="grid grid-cols-[1fr_96px] gap-3 items-center min-w-0">
-              <input
-                type="range"
-                min="240"
-                max="1200"
-                step="1"
-                value={b.heightPx ?? 520}
-                onChange={(e) => setPath("banner.heightPx", Number(e.target.value))}
-                className="w-full min-w-0"
-              />
-              <input
-                type="number"
-                min="240"
-                max="1200"
-                step="1"
-                value={b.heightPx ?? 520}
-                onChange={(e) => setPath("banner.heightPx", Number(e.target.value))}
-                className="w-24 rounded-lg border border-gray-300 px-3 py-2"
-              />
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              Recomendado: 360–700 px. En móvil y tablet el sistema ajusta esta altura automáticamente para que no se vea exagerada.
-            </div>
-          </div>
-        )}
-
-        {/* Slider options */}
-        {String(b.type || "slider") === "slider" && (
-          <div className="rounded-2xl border bg-gray-50 p-3 mb-3">
-            <div className="font-semibold text-sm text-gray-800 mb-2">Slider (básico)</div>
-
-            <div className="grid md:grid-cols-2 gap-3">
-              <Input
-                type="number"
-                min={1000}
-                max={15000}
-                step="100"
-                label="Duración por slide (ms)"
-                value={b.sliderIntervalMs ?? 3500}
-                onChange={(e) => setPath("banner.sliderIntervalMs", Number(e.target.value))}
-              />
-              <label className="flex items-center gap-2 text-sm mt-6">
-                <input
-                  type="checkbox"
-                  checked={b.sliderShowProgress !== false}
-                  onChange={(e) => setPath("banner.sliderShowProgress", e.target.checked)}
-                />
-                Mostrar anillo de progreso
-              </label>
-            </div>
-          </div>
-        )}
-
-        {/* Compact editor by type */}
-        {String(b.type || "slider") === "slider" && (
-          <div className="rounded-2xl border bg-white p-3">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div className="font-semibold text-gray-900">Slides</div>
-                <div className="text-xs text-gray-500">Lista compacta. Edita completo con “Editar”.</div>
+        {activePanel === 'content' && bannerType === 'slider' && (
+          <div className="banner-content-card">
+            <div className="banner-content-card__head"><strong>Imágenes de la galería <span>{slides.length}</span></strong><button type="button" className="banner-btn banner-btn--primary" onClick={addSlide}>+ Agregar</button></div>
+            {slides.length ? <>
+              <div className="banner-slide-picker">
+                <button type="button" onClick={() => chooseSlide(-1)} disabled={slides.length < 2} aria-label="Slide anterior">‹</button>
+                <select aria-label="Slide para editar" value={activeSlideIdx} onChange={(e) => setSelectedIdx(Number(e.target.value))}>
+                  {slides.map((slide, index) => <option key={index} value={index}>Slide {index + 1} de {slides.length}{slide?.image ? '' : ' · Falta imagen'}</option>)}
+                </select>
+                <button type="button" onClick={() => chooseSlide(1)} disabled={slides.length < 2} aria-label="Slide siguiente">›</button>
               </div>
-
-              <button type="button" onClick={addSlide} className="px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700 text-sm">
-                + Agregar
-              </button>
-            </div>
-
-            {slides.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-4 text-gray-500 bg-gray-50">Aún no hay slides.</div>
-            ) : (
-              <div className="space-y-2">
-                {slides.map((s, idx) => {
-                  const ok = !!s?.image;
-                  const isSel = idx === selectedIdx;
-                  return (
-                    <div
-                      key={idx}
-                      className={
-                        "rounded-2xl border p-3 flex items-center gap-3 " +
-                        (isSel ? "border-pink-300 bg-pink-50/40" : "bg-white")
-                      }
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setSelectedIdx(idx)}
-                        className="h-14 w-14 rounded-xl border bg-white overflow-hidden shrink-0"
-                        title="Seleccionar para previsualizar"
-                      >
-                        {s?.image ? <img src={s.image} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full grid place-items-center text-[10px] text-gray-400">Sin</div>}
-                      </button>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="font-semibold text-sm text-gray-900">Slide #{idx + 1}</div>
-                          {ok ? <Badge tone="green">OK</Badge> : <Badge tone="red">Falta imagen</Badge>}
-                          <Badge tone="gray">{(s?.fit || "cover") === "contain" ? "contain" : "cover"}</Badge>
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {s?.link ? `Link: ${s.link}` : "Sin link"}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditIdx(idx)}
-                          className="px-3 py-1.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeSlide(idx)}
-                          className="px-3 py-1.5 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 text-sm"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="banner-slide-current">
+                <div className="banner-slide-current__image">{slides[activeSlideIdx]?.image ? <img src={slides[activeSlideIdx].image} alt={`Miniatura del slide ${activeSlideIdx + 1}`} /> : <span>Sin imagen</span>}</div>
+                <div className="banner-slide-current__details"><strong>Slide {activeSlideIdx + 1}</strong><small>{slides[activeSlideIdx]?.image ? 'Imagen lista' : 'Sube una imagen para mostrarlo en la tienda'}</small></div>
+                <button type="button" className="banner-btn" onClick={() => moveSlide(activeSlideIdx, -1)} disabled={activeSlideIdx === 0} aria-label="Mover slide antes" title="Mover antes">↑</button>
+                <button type="button" className="banner-btn" onClick={() => moveSlide(activeSlideIdx, 1)} disabled={activeSlideIdx === slides.length - 1} aria-label="Mover slide después" title="Mover después">↓</button>
+                <button type="button" className="banner-btn" onClick={() => editCurrent()}>Editar</button>
+                <button type="button" className="banner-btn banner-btn--danger" onClick={() => removeSlide(activeSlideIdx)} aria-label={`Eliminar slide ${activeSlideIdx + 1}`}>Eliminar</button>
               </div>
-            )}
+              <label className="banner-upload-field"><span>Imagen del slide</span><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Elegir imagen del slide" onChange={(e) => setBannerSlideFiles((prev) => ({ ...prev, [activeSlideIdx]: e.target.files?.[0] || null }))} /></label>
+              {bannerSlideFiles[activeSlideIdx] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerSlideImage(activeSlideIdx)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
+            </> : <p className="banner-empty">Agrega un slide y sube su imagen para reemplazar las imágenes de ejemplo.</p>}
           </div>
         )}
 
-        {String(b.type || "slider") === "image" && (
-          <div className="rounded-2xl border bg-white p-3">
-            <div className="font-semibold text-gray-900 mb-2">Imagen única (simple)</div>
-
-            <Input label="Imagen URL" value={b.imageUrl || ""} onChange={(e) => setPath("banner.imageUrl", e.target.value)} placeholder="https://.../banner.png" />
-            <Input label="Link (opcional)" value={b.imageLink || ""} onChange={(e) => setPath("banner.imageLink", e.target.value)} placeholder="/lo-nuevo ó https://..." />
-
-            <div className="rounded-2xl border bg-gray-50 p-3">
-              <div className="text-sm font-medium mb-2">Subir imagen</div>
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setBannerImageFile(e.target.files?.[0] || null)} className="block w-full text-sm" />
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={onUploadBannerImage}
-                className="mt-2 w-full px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700 text-sm disabled:opacity-60"
-              >
-                {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-              </button>
-            </div>
-
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => setEditIdx("image")}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-              >
-                Editar encuadre + botón (avanzado)
-              </button>
-            </div>
+        {activePanel === 'content' && bannerType === 'image' && (
+          <div className="banner-content-card">
+            <div className="banner-content-card__head"><strong>Imagen principal</strong><button type="button" className="banner-btn" onClick={() => editCurrent()}>Ajustar encuadre y botón</button></div>
+            <label className="banner-upload-field"><span>Subir imagen</span><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Elegir imagen principal" onChange={(e) => setBannerImageFile(e.target.files?.[0] || null)} /></label>
+            {bannerImageFile && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={onUploadBannerImage}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
+            <details className="banner-inline-details"><summary>Usar una imagen ya alojada</summary><Input label="URL de la imagen" value={b.imageUrl || ''} onChange={(e) => setPath('banner.imageUrl', e.target.value)} placeholder="https://..." /></details>
+            <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/coleccion o https://..." />
           </div>
         )}
 
-        {String(b.type || "slider") === "video" && (
-          <div className="rounded-2xl border bg-white p-3">
-            <div className="font-semibold text-gray-900 mb-2">Video (simple)</div>
-
-            <Input label="Video URL" value={b.videoUrl || ""} onChange={(e) => setPath("banner.videoUrl", e.target.value)} placeholder="https://.../video.mp4" />
-
-            <div className="grid sm:grid-cols-3 gap-3 mb-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={!!b.videoAutoplay} onChange={(e) => setPath("banner.videoAutoplay", e.target.checked)} />
-                Autoplay
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={!!b.videoMuted} onChange={(e) => setPath("banner.videoMuted", e.target.checked)} />
-                Muted
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={!!b.videoLoop} onChange={(e) => setPath("banner.videoLoop", e.target.checked)} />
-                Loop
-              </label>
-            </div>
-
-            <div className="rounded-2xl border bg-gray-50 p-3">
-              <div className="text-sm font-medium mb-2">Subir video</div>
-              <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={(e) => setBannerVideoFile(e.target.files?.[0] || null)} className="block w-full text-sm" />
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={onUploadBannerVideo}
-                className="mt-2 w-full px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700 text-sm disabled:opacity-60"
-              >
-                {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-              </button>
-              <div className="text-xs text-gray-500 mt-2">Si falla el upload, pega la URL manualmente.</div>
-            </div>
-
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => setEditIdx("video")}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-              >
-                Editar botón del video (avanzado)
-              </button>
-            </div>
+        {activePanel === 'content' && bannerType === 'video' && (
+          <div className="banner-content-card">
+            <div className="banner-content-card__head"><strong>Video principal</strong><button type="button" className="banner-btn" onClick={() => editCurrent()}>Editar botón</button></div>
+            <label className="banner-upload-field"><span>Subir video</span><input type="file" accept="video/mp4,video/webm,video/ogg" aria-label="Elegir video de portada" onChange={(e) => setBannerVideoFile(e.target.files?.[0] || null)} /></label>
+            {bannerVideoFile && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={onUploadBannerVideo}>{uploading ? 'Subiendo…' : 'Subir video'}</button>}
+            <details className="banner-inline-details"><summary>Usar un video ya alojado</summary><Input label="URL del video" value={b.videoUrl || ''} onChange={(e) => setPath('banner.videoUrl', e.target.value)} placeholder="https://.../video.mp4" /></details>
           </div>
         )}
+
+        {activePanel === 'behavior' && <div className="banner-content-card banner-behavior">
+          <div><strong>Altura y adaptación</strong><p>En móvil y tableta la portada ocupa el alto de pantalla. En escritorio puedes ajustar su altura.</p></div>
+          {(b.heightMode || 'auto') === 'auto' && <Input type="number" min="240" max="1200" label="Altura de escritorio (px)" value={b.heightPx ?? 520} onChange={(e) => setPath('banner.heightPx', Number(e.target.value))} />}
+          {bannerType === 'slider' && <>
+            <Input type="number" min="1.2" max="15" step="0.1" label="Segundos por imagen" value={Number(effectiveInterval) / 1000} onChange={(e) => setPath('banner.sliderIntervalMs', Math.round(Number(e.target.value) * 1000))} />
+            <label className="banner-check"><input type="checkbox" checked={b.sliderShowProgress !== false} onChange={(e) => setPath('banner.sliderShowProgress', e.target.checked)} /> Mostrar progreso entre imágenes</label>
+          </>}
+          {bannerType === 'video' && <div className="banner-checks">
+            <label className="banner-check"><input type="checkbox" checked={!!b.videoAutoplay} onChange={(e) => setPath('banner.videoAutoplay', e.target.checked)} /> Reproducir automáticamente</label>
+            <label className="banner-check"><input type="checkbox" checked={!!b.videoMuted} onChange={(e) => setPath('banner.videoMuted', e.target.checked)} /> Silenciar</label>
+            <label className="banner-check"><input type="checkbox" checked={!!b.videoLoop} onChange={(e) => setPath('banner.videoLoop', e.target.checked)} /> Repetir</label>
+          </div>}
+        </div>}
       </section>
 
-      {/* =======================
-          RIGHT: Real preview + checklist + actions
-      ======================= */}
-      <section className="rounded-2xl border p-4 bg-white min-w-0">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="font-semibold text-gray-900">Vista previa</div>
-            <div className="text-xs text-gray-500">Esto es lo que el usuario “entiende”.</div>
-          </div>
-
-          <button type="button" onClick={() => setShowJson((v) => !v)} className="px-3 py-1.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm">
-            {showJson ? "Ocultar JSON" : "Ver JSON"}
-          </button>
-        </div>
-
-        {/* Preview box */}
-        <div className="mt-3 rounded-2xl border bg-gray-50 p-3">
-          {String(b.type || "slider") === "video" ? (
-            <div className="rounded-xl border bg-white overflow-hidden">
-              <div className="h-44 flex items-center justify-center text-sm text-gray-500">
-                {b.videoUrl ? (
-                  <div className="text-center px-4">
-                    <div className="font-semibold text-gray-700">Video</div>
-                    <div className="text-xs text-gray-500 break-words mt-1">{b.videoUrl}</div>
-                  </div>
-                ) : (
-                  "Sin video"
-                )}
-              </div>
-            </div>
-          ) : (
-            <BannerDragPreview
-              src={previewSrc}
-              fit={
-                String(b.type || "slider") === "slider"
-                  ? (selectedSlide?.fit || "cover")
-                  : (b.imageFit || "cover")
-              }
-              posX={
-                String(b.type || "slider") === "slider"
-                  ? (Number.isFinite(Number(selectedSlide?.posX)) ? Number(selectedSlide?.posX) : 50)
-                  : (Number.isFinite(Number(b.imagePosX)) ? Number(b.imagePosX) : 50)
-              }
-              posY={
-                String(b.type || "slider") === "slider"
-                  ? (Number.isFinite(Number(selectedSlide?.posY)) ? Number(selectedSlide?.posY) : 50)
-                  : (Number.isFinite(Number(b.imagePosY)) ? Number(b.imagePosY) : 50)
-              }
-              height={220}
-              onChange={null}
-            />
-          )}
-
-          {String(b.type || "slider") === "slider" && slides.length > 0 && (
-            <div className="mt-3">
-              <div className="text-xs text-gray-500 mb-1">Previsualizando:</div>
-              <select
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-pink-400 text-sm"
-                value={selectedIdx}
-                onChange={(e) => setSelectedIdx(Number(e.target.value))}
-              >
-                {slides.map((_, i) => (
-                  <option key={i} value={i}>
-                    Slide #{i + 1} {slides[i]?.image ? "" : "(falta imagen)"}
-                  </option>
-                ))}
-              </select>
-
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditIdx(selectedIdx)}
-                  className="px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700 text-sm"
-                >
-                  Editar este slide
-                </button>
-                <button
-                  type="button"
-                  onClick={addSlide}
-                  className="px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-                >
-                  + Agregar slide
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Checklist */}
-        <div className="mt-3 rounded-2xl border bg-white p-3">
-          <div className="font-semibold text-gray-900 mb-2">Checklist</div>
-
-          {issues.length === 0 ? (
-            <div className="flex items-center justify-between gap-2">
-              <Badge tone="green">Todo OK</Badge>
-              <div className="text-xs text-gray-500">Solo recuerda presionar Guardar.</div>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {issues.map((it, k) => (
-                <li key={k} className="flex items-start gap-2">
-                  <Badge tone={it.tone}>{it.tone === "red" ? "Error" : "Info"}</Badge>
-                  <div className="text-sm text-gray-700">{it.text}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* JSON */}
-        {showJson && (
-          <div className="mt-3 rounded-2xl border bg-gray-50 p-3 text-xs overflow-auto">
-            <pre className="whitespace-pre-wrap break-words">{JSON.stringify(theme.banner || {}, null, 2)}</pre>
-          </div>
-        )}
+      <section className="banner-panel banner-panel--preview" aria-label="Vista previa de portada">
+        <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>Selecciona un tamaño para comprobar el encuadre.</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
+        <BannerDevicePreview banner={b} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} />
+        {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
+        <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => editCurrent()} disabled={bannerType === 'slider' && !slides.length}>Editar {bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
+        {issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
+        <details className="banner-inline-details banner-json"><summary>Datos técnicos</summary><pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>
       </section>
 
       {/* =======================
@@ -954,8 +704,8 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
 
             <div>
               <BannerButtonEditor
-                title="Botón del slide"
-                value={slides[editIdx]?.button || buildDefaultButton()}
+                title={`Botón ${activeButtonIdx + 1} del slide`}
+                value={buttonFor(slides[editIdx], 'buttons', 'button')}
                 uploading={uploading}
                 onUploadImage={uploadButtonImage}
                 onChange={(nextBtn) => setSlideButton(editIdx, nextBtn)}
@@ -1010,10 +760,10 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
           <div>
             <BannerButtonEditor
               title="Botón de Imagen única"
-              value={b.imageButton || buildDefaultButton()}
+              value={buttonFor(b, 'imageButtons', 'imageButton')}
               uploading={uploading}
               onUploadImage={uploadButtonImage}
-              onChange={(nextBtn) => setPath("banner.imageButton", nextBtn)}
+              onChange={(nextBtn) => setSingleOrMultipleButton('imageButtons', 'imageButton', nextBtn)}
             />
           </div>
         </div>
@@ -1022,10 +772,10 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
       <Modal open={editIdx === "video"} title="Editar Video (botón avanzado)" onClose={() => setEditIdx(null)}>
         <BannerButtonEditor
           title="Botón del video"
-          value={b.videoButton || buildDefaultButton()}
+          value={buttonFor(b, 'videoButtons', 'videoButton')}
           uploading={uploading}
           onUploadImage={uploadButtonImage}
-          onChange={(nextBtn) => setPath("banner.videoButton", nextBtn)}
+          onChange={(nextBtn) => setSingleOrMultipleButton('videoButtons', 'videoButton', nextBtn)}
         />
       </Modal>
     </div>

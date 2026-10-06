@@ -1045,7 +1045,7 @@ export default function CarouselBanner() {
                   style={{
                     width: `${ringSize}px`,
                     height: `${ringSize}px`,
-                    backgroundImage: active
+                    backgroundImage: active && banner?.sliderShowProgress !== false
                       ? `conic-gradient(rgba(212,175,55,.95) ${deg}deg, rgba(255,255,255,.15) 0deg)`
                       : "none",
                   }}

@@ -107,6 +107,7 @@ function buildDefaultSettings() {
 
       banner: {
         type: "slider",
+        sliderShowProgress: true,
         slides: [],
         imageUrl: "",
         imageLink: "",

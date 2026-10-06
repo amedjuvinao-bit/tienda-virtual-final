@@ -38,7 +38,10 @@ vi.mock('./appearance/header/HeaderPanel', () => ({
     <button onClick={() => setPath('header.searchBgColor', '#254254')}>Cambiar fondo del buscador</button>
   </>,
 }));
-vi.mock('./appearance/banner/BannerPanel', () => ({ default: () => null }));
+vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }) => <button onClick={() => {
+  setPath('banner.sliderIntervalMs', 6200);
+  setPath('banner.sliderShowProgress', false);
+}}>Ajustar slider ({theme.banner.sliderIntervalMs} ms)</button> }));
 vi.mock('./appearance/sections/SectionsPanel', () => ({
   default: ({ theme, setPath }) => <button onClick={() => setPath('sections', theme.sections.map((section) =>
     section.id === 'look' ? { ...section, title: 'Nuevos looks' } : section
@@ -115,6 +118,21 @@ describe('guardado seguro de Apariencia', () => {
       appearanceRevision: 3,
       menus: { header: [{ title: 'Nuevo botón', type: 'url', ref: '/', icon: 'grid', children: [] }] },
     });
+  });
+
+  it('usa el intervalo que tenía la tienda y guarda la visibilidad del progreso', async () => {
+    const user = userEvent.setup();
+    fetchAppearanceSettings.mockResolvedValueOnce({ ...initial, theme: { banner: { autoplayMs: 4500, sliderShowProgress: true, slides: [{ image: '/portada.jpg' }] } } });
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+    expect(screen.getByRole('button', { name: 'Ajustar slider (4500 ms)' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ajustar slider (4500 ms)' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.autoplayMs).toBe(6200);
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.sliderShowProgress).toBe(false);
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.sliderIntervalMs).toBeUndefined();
   });
 
   it('persiste el icono de moda y su color como datos del enlace', async () => {

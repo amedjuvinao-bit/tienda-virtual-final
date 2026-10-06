@@ -391,7 +391,9 @@ function buildThemeFromServer(themeRaw) {
 
       sliderIntervalMs: Number.isFinite(Number(bannerRaw?.sliderIntervalMs))
         ? Number(bannerRaw.sliderIntervalMs)
-        : bannerDefaults.sliderIntervalMs,
+        : Number.isFinite(Number(bannerRaw?.autoplayMs))
+          ? Number(bannerRaw.autoplayMs)
+          : bannerDefaults.sliderIntervalMs,
       sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
     },
   };
@@ -446,7 +448,6 @@ function normalizeThemeForSave(theme) {
 
   // No mandes campos solo-UI al backend (evita inconsistencias)
   delete b.sliderIntervalMs;
-  delete b.sliderShowProgress;
 
   // Asegura imageUrl si el tipo es imagen (por si algún panel guardó en otro nombre)
   if (type === "image") {
@@ -1083,7 +1084,6 @@ export default function AppearancePage() {
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
-              onPreview={onPreview}
             />
             </fieldset>
           )}

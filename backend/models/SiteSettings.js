@@ -82,6 +82,7 @@ const BannerSchema = new Schema(
     slides: { type: [BannerSlideSchema], default: [] },
 
     autoplayMs: { type: Number, default: 4500 },
+    sliderShowProgress: { type: Boolean, default: true },
 
     imageUrl: { type: String, default: "" },
     imageLink: { type: String, default: "" },
