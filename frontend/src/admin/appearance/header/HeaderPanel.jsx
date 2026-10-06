@@ -1,6 +1,6 @@
 // frontend/src/admin/appearance/header/HeaderPanel.jsx
 import React, { useMemo, useState } from "react";
-import { Image, Link2, Palette, Smartphone } from 'lucide-react';
+import { ChevronDown, Image, Link2, Palette, Smartphone } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
 import MobileMenuEditor from './MobileMenuEditor';
@@ -161,6 +161,26 @@ export default function HeaderPanel({
   const [activeMainTab, setActiveMainTab] = useState("branding");
   const [brandingSubTab, setBrandingSubTab] = useState("logo");
   const [stylesSubTab, setStylesSubTab] = useState("tipografia");
+  const [editingHeaderMenuIndex, setEditingHeaderMenuIndex] = useState(0);
+  const [customDestinationIndex, setCustomDestinationIndex] = useState(-1);
+  const headerMenuItems = menus?.header || [];
+  const activeHeaderMenuIndex = Math.min(editingHeaderMenuIndex, headerMenuItems.length - 1);
+  const addAndEditHeaderMenuItem = () => {
+    addHeaderMenuItem();
+    setEditingHeaderMenuIndex(headerMenuItems.length);
+    setCustomDestinationIndex(-1);
+  };
+  const moveAndKeepHeaderMenuItem = (from, to) => {
+    if (to < 0 || to >= headerMenuItems.length) return;
+    moveHeaderMenuItem(from, to);
+    setEditingHeaderMenuIndex((active) => active === from ? to : active === to ? from : active);
+    setCustomDestinationIndex((active) => active === from ? to : active === to ? from : active);
+  };
+  const removeAndSelectHeaderMenuItem = (index) => {
+    removeHeaderMenuItem(index);
+    setEditingHeaderMenuIndex((active) => active === index ? Math.max(0, index - 1) : active > index ? active - 1 : active);
+    setCustomDestinationIndex((active) => active === index ? -1 : active > index ? active - 1 : active);
+  };
   const searchColors = resolveHeaderSearchColors(theme.header, theme.colors);
   const iconSelection = resolveHeaderIcons(theme.header);
   const logoMode = theme.header?.logoMode || 'auto';
@@ -558,25 +578,42 @@ export default function HeaderPanel({
 
                 <button
                   type="button"
-                  onClick={addHeaderMenuItem}
+                  onClick={addAndEditHeaderMenuItem}
                   className="inline-flex shrink-0 items-center justify-center rounded-xl bg-pink-600 px-4 py-2 text-sm text-white transition hover:bg-pink-700"
                 >
                   + Agregar
                 </button>
               </div>
 
-              {!menus?.header || menus.header.length === 0 ? (
+              {headerMenuItems.length === 0 ? (
                 <div className="rounded-2xl border border-dashed bg-white p-4 text-gray-500">
                   No hay botones en el menú. Presiona{" "}
                   <span className="font-medium">“+ Agregar”</span>.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {menus.header.map((item, idx) => (
-                    <div key={item?._id || idx} className="rounded-2xl border bg-white p-4 min-w-0">
-                      <div className="grid min-w-0 gap-4 xl:grid-cols-[1fr_1.2fr_auto] xl:items-end">
+                <div className="appearance-header__menu-list">
+                  {headerMenuItems.map((item, idx) => (
+                    <div key={item?._id || idx} className="appearance-header__menu-entry" data-active={activeHeaderMenuIndex === idx}>
+                      <div className="appearance-header__menu-row">
+                        <button type="button" className="appearance-header__menu-summary"
+                          aria-expanded={activeHeaderMenuIndex === idx}
+                          aria-controls={`header-menu-editor-${idx}`}
+                          onClick={() => { setEditingHeaderMenuIndex(idx); setCustomDestinationIndex(-1); }}>
+                          <span className="appearance-header__menu-number">{idx + 1}</span>
+                          <span className="appearance-header__menu-icon-sample"><MobileMenuLinkIcon name={item?.icon} color={item?.iconColor || theme?.header?.mobileMenuAccentColor || '#ac7950'} size={25} /></span>
+                          <span className="appearance-header__menu-summary-copy"><strong>{item?.title || `Enlace ${idx + 1}`}</strong><small>{item?.ref || 'Sin destino'}</small></span>
+                          <ChevronDown className="appearance-header__menu-chevron" size={18} aria-hidden="true" />
+                        </button>
+                        <div className="appearance-header__menu-actions">
+                          <button type="button" onClick={() => moveAndKeepHeaderMenuItem(idx, idx - 1)} disabled={idx === 0} aria-label={`Subir ${item?.title || `enlace ${idx + 1}`}`} title="Subir">↑</button>
+                          <button type="button" onClick={() => moveAndKeepHeaderMenuItem(idx, idx + 1)} disabled={idx === headerMenuItems.length - 1} aria-label={`Bajar ${item?.title || `enlace ${idx + 1}`}`} title="Bajar">↓</button>
+                          <button type="button" onClick={() => removeAndSelectHeaderMenuItem(idx)} aria-label={`Eliminar ${item?.title || `enlace ${idx + 1}`}`} title="Eliminar">Eliminar</button>
+                        </div>
+                      </div>
+                      {activeHeaderMenuIndex === idx && <div id={`header-menu-editor-${idx}`} className="appearance-header__menu-details">
+                        <div className="grid min-w-0 gap-3 md:grid-cols-2">
                         <Input
-                          label={`Texto del botón #${idx + 1}`}
+                          label="Texto del botón"
                           value={item?.title || ""}
                           onChange={(e) => setHeaderMenuItem(idx, { title: e.target.value })}
                           placeholder="Ej: Lo Nuevo"
@@ -584,17 +621,16 @@ export default function HeaderPanel({
 
                         <div className="min-w-0">
                           <label className="block min-w-0">
-                            <span className="mb-1 block text-sm font-medium text-gray-700">
-                              Página o destino
-                            </span>
-
+                            <span className="mb-1 block text-sm font-medium text-gray-700">Página o destino</span>
                             <select
-                              className="mb-2 w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-                              value={item?.ref || ""}
-                              onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
+                              className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
+                              value={customDestinationIndex === idx || (item?.ref && !routeOptions.public.some((route) => route.value === item.ref)) ? '__custom__' : item?.ref || ''}
+                              onChange={(e) => {
+                                if (e.target.value === '__custom__') setCustomDestinationIndex(idx);
+                                else { setCustomDestinationIndex(-1); setHeaderMenuItem(idx, { ref: e.target.value }); }
+                              }}
                             >
                               <option value="">Selecciona una página</option>
-                              {item?.ref && !routeOptions.public.some((route) => route.value === item.ref) && <option value={item.ref}>Enlace personalizado: {item.ref}</option>}
                               <optgroup label="Páginas públicas">
                                 {routeOptions.public.map((r) => (
                                   <option key={r.value} value={r.value}>
@@ -602,42 +638,13 @@ export default function HeaderPanel({
                                   </option>
                                 ))}
                               </optgroup>
+                              <option value="__custom__">Escribir enlace personalizado…</option>
                             </select>
-
-                            <input
-                              className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-                              value={item?.ref || ""}
-                              onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
-                              placeholder="/lo-nuevo, #tendencia o https://sitio.com"
-                            />
                           </label>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 xl:justify-end">
-                          <button
-                            type="button"
-                            onClick={() => moveHeaderMenuItem(idx, idx - 1)}
-                            className="rounded-xl border border-gray-300 px-3 py-2 text-sm transition hover:bg-gray-50"
-                            title="Subir"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveHeaderMenuItem(idx, idx + 1)}
-                            className="rounded-xl border border-gray-300 px-3 py-2 text-sm transition hover:bg-gray-50"
-                            title="Bajar"
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeHeaderMenuItem(idx)}
-                            className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700 transition hover:bg-red-50"
-                            title="Eliminar"
-                          >
-                            Eliminar
-                          </button>
+                          {(customDestinationIndex === idx || (item?.ref && !routeOptions.public.some((route) => route.value === item.ref))) &&
+                            <Input label="Ruta o URL" value={item?.ref || ''}
+                              onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
+                              placeholder="/producto/123 o https://sitio.com" />}
                         </div>
                       </div>
 
@@ -669,11 +676,10 @@ export default function HeaderPanel({
                           onClick={() => setHeaderMenuItem(idx, { iconColor: '' })}>Usar color general</button>}
                       </div>
 
-                      <div className="mt-2 text-xs text-gray-500">
-                        Para un producto específico, pega su ruta real, por ejemplo <span className="font-mono">/producto/123</span>. Las rutas con <span className="font-mono">:id</span> no sirven como enlace público.
-                      </div>
+                      </div>}
                     </div>
                   ))}
+                  <p className="appearance-header__menu-hint">Para enlazar un producto, usa su ruta real (por ejemplo, /producto/123).</p>
                 </div>
               )}
             </div>

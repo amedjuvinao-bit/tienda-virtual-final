@@ -6,9 +6,9 @@ import HeaderPanel from './HeaderPanel';
 
 afterEach(cleanup);
 
-function Editor({ upload = vi.fn() }) {
+function Editor({ upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' }] }) {
   const [theme, setTheme] = useState({ header: { bgColor: '#18181b', logoLight: '/claro.png', logoDark: '/oscuro.png', logoHeightPx: 80 } });
-  const [menus, setMenus] = useState({ header: [{ title: 'Inicio', ref: '/' }] });
+  const [menus, setMenus] = useState({ header: initialLinks });
   const setPath = (path, value) => setTheme((previous) => {
     const next = structuredClone(previous);
     const parts = path.split('.');
@@ -21,11 +21,37 @@ function Editor({ upload = vi.fn() }) {
     routeOptions={{ public: [{ label: 'Inicio', value: '/' }, { label: 'Lo Nuevo', value: '/lo-nuevo' }] }}
     uploading={false} setUploading={() => {}} savedRevision={1} uploadToCloudinaryViaBackend={upload}
     addHeaderMenuItem={() => setMenus((previous) => ({ header: [...previous.header, { title: 'Nuevo', ref: '/lo-nuevo' }] }))}
-    removeHeaderMenuItem={() => {}} moveHeaderMenuItem={() => {}}
+    removeHeaderMenuItem={(index) => setMenus((previous) => ({ header: previous.header.filter((_, i) => i !== index) }))}
+    moveHeaderMenuItem={(from, to) => setMenus((previous) => {
+      const header = [...previous.header];
+      header.splice(to, 0, header.splice(from, 1)[0]);
+      return { header };
+    })}
     setHeaderMenuItem={(index, patch) => setMenus((previous) => ({ header: previous.header.map((item, i) => i === index ? { ...item, ...patch } : item) }))} />;
 }
 
 describe('edición del encabezado', () => {
+  it('resume los enlaces y mantiene abierto solo el editor elegido al añadir y reordenar', async () => {
+    const user = userEvent.setup();
+    render(<Editor initialLinks={[
+      { title: 'Inicio', ref: '/' }, { title: 'Colección', ref: '/lo-nuevo' }, { title: 'Especial', ref: '/ofertas' },
+    ]} />);
+    await user.click(screen.getByRole('button', { name: /Enlaces Destinos/ }));
+    expect(screen.getAllByPlaceholderText('Ej: Lo Nuevo')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: /Colección \/lo-nuevo/ }));
+    expect(screen.getAllByPlaceholderText('Ej: Lo Nuevo')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Colección \/lo-nuevo/ })).toHaveAttribute('aria-expanded', 'true');
+    await user.click(screen.getByRole('button', { name: 'Bajar Colección' }));
+    expect(screen.getByRole('button', { name: /Colección \/lo-nuevo/ })).toHaveAttribute('aria-expanded', 'true');
+    await user.click(screen.getByRole('button', { name: '+ Agregar' }));
+    expect(screen.getByRole('button', { name: /Nuevo \/lo-nuevo/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByPlaceholderText('Ej: Lo Nuevo')).toHaveLength(1);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Página o destino' }), '__custom__');
+    await user.clear(screen.getByPlaceholderText('/producto/123 o https://sitio.com'));
+    await user.type(screen.getByPlaceholderText('/producto/123 o https://sitio.com'), '/producto/123');
+    expect(screen.getByRole('button', { name: /Nuevo \/producto\/123/ })).toBeInTheDocument();
+  });
+
   it('muestra el logo correcto, la navegación editada y el menú móvil antes de guardar', async () => {
     const user = userEvent.setup();
     render(<Editor />);
