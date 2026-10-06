@@ -65,6 +65,22 @@ describe('edición del encabezado', () => {
     expect(preview.querySelector('[data-menu-icon="books"]')).toBeInTheDocument();
   });
 
+  it('permite escoger prendas y color por enlace y lo muestra en el menú móvil', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.click(screen.getByRole('button', { name: /Enlaces Destinos/ }));
+    const selector = screen.getByRole('combobox', { name: 'Ícono móvil para Inicio' });
+    expect(within(selector).getByRole('group', { name: 'Moda y accesorios' })).toBeInTheDocument();
+    await user.selectOptions(selector, 'gown');
+    fireEvent.change(screen.getByLabelText('Color del ícono móvil para Inicio'), { target: { value: '#754153' } });
+    await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
+    expect(preview.querySelector('[data-menu-icon="gown"]')).toHaveStyle({ color: '#754153' });
+    await user.click(screen.getByRole('button', { name: 'Usar color general' }));
+    expect(preview.querySelector('[data-menu-icon="gown"]')).not.toHaveStyle({ color: '#754153' });
+  });
+
   it('permite cargar una imagen propia para la tarjeta Atelier y verla antes de guardar', async () => {
     const user = userEvent.setup();
     const upload = vi.fn().mockResolvedValue('https://res.cloudinary.com/tienda/image/upload/v1/tarjeta.webp');

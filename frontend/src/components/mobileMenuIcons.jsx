@@ -1,4 +1,5 @@
 import { BookOpen, Coffee, Gift, Grid2X2, Heart, House, Leaf, Package, ShoppingBag, Smartphone, Sparkles, Tag, Wrench } from 'lucide-react';
+import { FASHION_MENU_ICON_OPTIONS, FashionMenuIcon, isFashionMenuIcon } from './fashionMenuIcons';
 
 const ICONS = {
   grid: Grid2X2,
@@ -30,13 +31,21 @@ export const MOBILE_MENU_ICON_OPTIONS = [
   { value: 'technology', label: 'Tecnología' },
   { value: 'services', label: 'Servicios' },
   { value: 'nature', label: 'Naturaleza' },
+  ...FASHION_MENU_ICON_OPTIONS.map((option) => ({ ...option, group: 'fashion' })),
 ];
 
 export function normalizeMobileMenuIcon(value) {
-  return Object.hasOwn(ICONS, value) ? value : 'grid';
+  return Object.hasOwn(ICONS, value) || isFashionMenuIcon(value) ? value : 'grid';
 }
 
-export function MobileMenuLinkIcon({ name, size = 22 }) {
-  const Icon = ICONS[normalizeMobileMenuIcon(name)];
-  return <Icon size={size} strokeWidth={1.45} aria-hidden="true" data-menu-icon={normalizeMobileMenuIcon(name)} />;
+export function normalizeMobileMenuIconColor(value) {
+  return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value || '') ? value : '';
+}
+
+export function MobileMenuLinkIcon({ name, size = 22, color = '' }) {
+  const normalized = normalizeMobileMenuIcon(name);
+  const style = normalizeMobileMenuIconColor(color) ? { color } : undefined;
+  if (isFashionMenuIcon(normalized)) return <FashionMenuIcon name={normalized} size={size} style={style} />;
+  const Icon = ICONS[normalized];
+  return <Icon className="mobile-menu-link-icon" size={size} strokeWidth={1.45} style={style} aria-hidden="true" data-menu-icon={normalized} />;
 }

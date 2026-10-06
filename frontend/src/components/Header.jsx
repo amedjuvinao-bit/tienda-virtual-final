@@ -20,6 +20,7 @@ import AtelierMobileMenu from './AtelierMobileMenu';
 import WhatsAppMenuIcon from './WhatsAppMenuIcon';
 import { resolveWhatsAppHref } from './whatsappLink';
 import MobileMenuTrigger from './MobileMenuTrigger';
+import { MobileMenuLinkIcon } from './mobileMenuIcons';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -609,7 +610,7 @@ function Header() {
                       className="flex items-center justify-between py-4 text-[17px] font-semibold transition"
                       style={itemStyle}
                     >
-                      <span>{item.name}</span>
+                      <span className="flex min-w-0 items-center gap-2"><MobileMenuLinkIcon name={item.icon} color={item.iconColor || mobileMenuAccentColor} /><span>{item.name}</span></span>
                       <ChevronRight className="w-4 h-4" style={chevronStyle} />
                     </a>
                   );
@@ -623,7 +624,7 @@ function Header() {
                     className="flex items-center justify-between py-4 text-[17px] font-semibold transition text-left"
                     style={itemStyle}
                   >
-                    <span>{item.name}</span>
+                    <span className="flex min-w-0 items-center gap-2"><MobileMenuLinkIcon name={item.icon} color={item.iconColor || mobileMenuAccentColor} /><span>{item.name}</span></span>
                     <ChevronRight className="w-4 h-4" style={chevronStyle} />
                   </button>
                 );

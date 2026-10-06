@@ -22,7 +22,7 @@ export default function AtelierMobileMenu({
 
     <nav className="atelier-menu__links" aria-label={preview ? 'Vista previa del menú móvil' : 'Navegación móvil'}>
       {items.length ? items.map((item, index) => {
-        const content = <><MobileMenuLinkIcon name={item.icon} /><span>{item.name}</span><ChevronRight className="atelier-menu__chevron" size={16} strokeWidth={1.5} aria-hidden="true" /></>;
+        const content = <><MobileMenuLinkIcon name={item.icon} color={item.iconColor} /><span>{item.name}</span><ChevronRight className="atelier-menu__chevron" size={16} strokeWidth={1.5} aria-hidden="true" /></>;
         return item.isExternal
           ? <a key={`${item.to}-${index}`} className="atelier-menu__link" href={preview ? undefined : item.to} target={preview ? undefined : '_blank'} rel={preview ? undefined : 'noopener noreferrer'} onClick={preview ? (event) => event.preventDefault() : onClose}>{content}</a>
           : <button key={`${item.to}-${index}`} type="button" className="atelier-menu__link" onClick={() => onSelect?.(item)}>{content}</button>;

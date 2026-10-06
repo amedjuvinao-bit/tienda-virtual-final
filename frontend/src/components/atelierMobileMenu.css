@@ -50,6 +50,7 @@
 .atelier-menu__link:last-child, .atelier-menu__link:nth-last-child(2):nth-child(odd) { border-bottom-color: transparent; }
 .atelier-menu__link:hover { color: var(--atelier-accent); background: rgba(255,255,255,.14); }
 .atelier-menu__link > svg:first-child { flex: none; color: var(--atelier-accent); }
+.mobile-menu-link-icon { flex: none; }
 .atelier-menu__link > span { min-width: 0; overflow-wrap: anywhere; }
 .atelier-menu__chevron { flex: none; margin-left: auto; color: var(--atelier-muted); }
 .atelier-menu__empty { grid-column: 1 / -1; padding: 20px 0; color: var(--atelier-muted); font-size: 14px; }

@@ -676,6 +676,10 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     )) {
       return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_MENUS', message: 'Los menús deben ser listas.' });
     }
+    if (menus?.header?.some((item) => item?.iconColor !== undefined && item.iconColor !== '' &&
+      (typeof item.iconColor !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(item.iconColor)))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_MOBILE_MENU_ICON_COLOR', message: 'El color de cada ícono debe ser hexadecimal.' });
+    }
     if (isInvalidSettingsSection(admin)) {
       return res.status(400).json({ error: "admin debe ser un objeto" });
     }

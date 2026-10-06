@@ -6,6 +6,7 @@ import { HeaderActionGlyph, resolveHeaderIcons } from '../../../components/Heade
 import { headerSearchColorVariables } from '../../../components/headerSearchTheme';
 import AtelierMobileMenu from '../../../components/AtelierMobileMenu';
 import MobileMenuTrigger from '../../../components/MobileMenuTrigger';
+import { MobileMenuLinkIcon } from '../../../components/mobileMenuIcons';
 import '../../../components/headerSearch.css';
 
 export default function HeaderPreview({ theme, menus }) {
@@ -74,7 +75,7 @@ export default function HeaderPreview({ theme, menus }) {
             <button type="button" aria-label="Cerrar menú del panel de vista previa" onClick={() => setDrawerOpen(false)}
               style={{ color: header.mobileMenuCloseIconColor || '#8d5c6b', backgroundColor: header.mobileMenuCloseBgColor || '#fff', border: `${header.mobileMenuCloseBorderWidthPx ?? 1}px solid ${header.mobileMenuCloseBorderColor || '#e7c2cf'}`, borderRadius: `${header.mobileMenuCloseRadiusPx ?? 999}px` }}><X size={19} /></button>
           </div>
-          <div className="appearance-header__drawer-links">{links.length ? links.map((link, index) => <div key={`${link.to}-${index}`} style={{ borderBottom: `${header.mobileMenuItemBorderWidthPx ?? 1}px solid ${header.mobileMenuItemBorderColor || '#e7c2cf'}` }}>{link.name}</div>) : <p>Añade enlaces en la pestaña Enlaces.</p>}</div>
+          <div className="appearance-header__drawer-links">{links.length ? links.map((link, index) => <div key={`${link.to}-${index}`} style={{ borderBottom: `${header.mobileMenuItemBorderWidthPx ?? 1}px solid ${header.mobileMenuItemBorderColor || '#e7c2cf'}` }}><MobileMenuLinkIcon name={link.icon} color={link.iconColor || header.mobileMenuAccentColor || '#ac7950'} size={19} />{link.name}</div>) : <p>Añade enlaces en la pestaña Enlaces.</p>}</div>
           {socialLinks.length > 0 && <div className="appearance-header__drawer-social">{socialLinks.map(({ label, Icon }) => <span key={label} aria-label={label} style={{ width: `${header.mobileMenuSocialSizePx ?? 44}px`, height: `${header.mobileMenuSocialSizePx ?? 44}px`, backgroundColor: header.mobileMenuSocialBg || '#c98ea2', color: header.mobileMenuSocialIconColor || '#fff' }}><Icon size={18} /></span>)}</div>}
           <p className="appearance-header__drawer-footer" style={{ color: header.mobileMenuMutedColor || '#8a6b74', fontSize: `${header.mobileMenuFooterTextSizePx ?? 13}px` }}>{theme?.footer?.copyright || `© ${new Date().getFullYear()}`}</p>
         </div>}

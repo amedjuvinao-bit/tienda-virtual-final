@@ -21,8 +21,9 @@ vi.mock('./appearance/general/GeneralPanel', () => ({
   default: ({ setPath }) => <button onClick={() => setPath('global.whatsapp.phone', '573001234567')}>Cambiar WhatsApp</button>,
 }));
 vi.mock('./appearance/header/HeaderPanel', () => ({
-  default: ({ addHeaderMenuItem, setPath }) => <>
+  default: ({ addHeaderMenuItem, setHeaderMenuItem, setPath }) => <>
     <button onClick={addHeaderMenuItem}>Añadir enlace</button>
+    <button onClick={() => setHeaderMenuItem(0, { icon: 'gown', iconColor: '#754153' })}>Personalizar categoría</button>
     <button onClick={() => {
       setPath('header.surfaceShape', 'floating');
       setPath('header.cornerRadiusPx', 32);
@@ -99,6 +100,19 @@ describe('guardado seguro de Apariencia', () => {
       appearanceRevision: 3,
       menus: { header: [{ title: 'Nuevo botón', type: 'url', ref: '/', icon: 'grid', children: [] }] },
     });
+  });
+
+  it('persiste el icono de moda y su color como datos del enlace', async () => {
+    const user = userEvent.setup();
+    permissions.allowed = ['appearance:menus'];
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Encabezado Logo y menú/ }));
+    await user.click(screen.getByRole('button', { name: 'Añadir enlace' }));
+    await user.click(screen.getByRole('button', { name: 'Personalizar categoría' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    expect(saveSiteSettings.mock.calls[0][0].menus.header[0]).toMatchObject({ icon: 'gown', iconColor: '#754153' });
   });
 
   it('guarda la forma y el vidrio junto con el encabezado', async () => {

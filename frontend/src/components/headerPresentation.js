@@ -1,4 +1,4 @@
-import { normalizeMobileMenuIcon } from './mobileMenuIcons';
+import { normalizeMobileMenuIcon, normalizeMobileMenuIconColor } from './mobileMenuIcons';
 
 const HEX_COLOR = /^#([\da-f]{3}|[\da-f]{6})$/i;
 
@@ -96,7 +96,7 @@ export function normalizeHeaderMenu(items) {
   return (Array.isArray(items) ? items : []).flatMap((item) => {
     const name = String(item?.title || '').trim();
     const destination = headerMenuDestination(item?.ref);
-    return name && destination ? [{ name, ...destination, icon: normalizeMobileMenuIcon(item?.icon) }] : [];
+    return name && destination ? [{ name, ...destination, icon: normalizeMobileMenuIcon(item?.icon), iconColor: normalizeMobileMenuIconColor(item?.iconColor) }] : [];
   });
 }
 

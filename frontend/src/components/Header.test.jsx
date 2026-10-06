@@ -20,6 +20,19 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
+  it('muestra el icono de moda y el color guardados en el menú móvil público', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      theme: { header: { mobileMenuLayout: 'atelier-sheet' }, footer: {} },
+      menus: { header: [{ title: 'Vestidos elegantes', ref: '/pagina/gala', icon: 'gown', iconColor: '#754153' }] },
+    });
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    const drawer = document.getElementById('storefront-mobile-menu');
+    const icon = within(drawer).getByRole('navigation', { name: 'Navegación móvil' }).querySelector('[data-menu-icon="gown"]');
+    expect(icon).toHaveStyle({ color: '#754153' });
+    expect(icon.tagName).toBe('svg');
+  });
   it('usa el símbolo y la animación guardados y conserva la apertura del menú', async () => {
     fetchSiteSettings.mockResolvedValue({
       ...settings('Lo Nuevo'),

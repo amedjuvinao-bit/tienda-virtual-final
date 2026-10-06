@@ -24,10 +24,13 @@ describe('encabezado público y editor', () => {
     expect(validateHeaderMenu([{ title: 'Producto', ref: '/producto/:id' }])).toMatch(/enlace 1/);
     expect(validateHeaderMenu([{ title: '', ref: '/' }])).toMatch(/nombre/);
     expect(normalizeHeaderMenu([{ title: 'Inicio', ref: '/' }, { title: 'Admin', ref: '/admin' }])).toEqual([
-      { name: 'Inicio', to: '/', isExternal: false, icon: 'grid' },
+      { name: 'Inicio', to: '/', isExternal: false, icon: 'grid', iconColor: '' },
     ]);
     expect(normalizeHeaderMenu([{ title: 'Libros', ref: '/pagina/libros', icon: 'books' }, { title: 'Otra categoría', ref: '/pagina/otra', icon: 'vestido' }]))
       .toMatchObject([{ name: 'Libros', icon: 'books' }, { name: 'Otra categoría', icon: 'grid' }]);
+    expect(normalizeHeaderMenu([{ title: 'Gala', ref: '/pagina/gala', icon: 'gown', iconColor: '#804060' }])[0])
+      .toMatchObject({ icon: 'gown', iconColor: '#804060' });
+    expect(normalizeHeaderMenu([{ title: 'Otro', ref: '/pagina/otro', iconColor: 'url(evil)' }])[0].iconColor).toBe('');
   });
 
   it('mantiene el fondo antiguo sin vidrio y limita la opacidad al activar el efecto', () => {

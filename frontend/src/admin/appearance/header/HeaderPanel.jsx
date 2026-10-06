@@ -7,7 +7,7 @@ import MobileMenuEditor from './MobileMenuEditor';
 import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
 import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import { headerSearchColorVariables, resolveHeaderSearchColors } from '../../../components/headerSearchTheme';
-import { MOBILE_MENU_ICON_OPTIONS, MobileMenuLinkIcon, normalizeMobileMenuIcon } from '../../../components/mobileMenuIcons';
+import { MOBILE_MENU_ICON_OPTIONS, MobileMenuLinkIcon, normalizeMobileMenuIcon, normalizeMobileMenuIconColor } from '../../../components/mobileMenuIcons';
 import '../../../components/headerSearch.css';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
@@ -56,6 +56,11 @@ const ColorInput = ({ value, onChange }) => {
       />
     </div>
   );
+};
+
+const pickerColor = (value) => {
+  const hex = normalizeMobileMenuIconColor(value) || '#ac7950';
+  return hex.length === 4 ? `#${[...hex.slice(1)].map((digit) => digit + digit).join('')}` : hex;
 };
 
 const SectionHeader = ({ title, description }) => (
@@ -636,18 +641,33 @@ export default function HeaderPanel({
                         </div>
                       </div>
 
-                      <label className="mt-3 flex max-w-sm items-center gap-3 text-sm text-gray-700">
-                        <span className="shrink-0 text-pink-700"><MobileMenuLinkIcon name={item?.icon} size={20} /></span>
-                        <span className="shrink-0">Ícono en menú móvil</span>
-                        <select
-                          className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800"
-                          value={normalizeMobileMenuIcon(item?.icon)}
-                          onChange={(e) => setHeaderMenuItem(idx, { icon: e.target.value })}
-                          aria-label={`Ícono móvil para ${item?.title || `enlace ${idx + 1}`}`}
-                        >
-                          {MOBILE_MENU_ICON_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                        </select>
-                      </label>
+                      <div className="appearance-header__menu-icon-editor">
+                        <span className="appearance-header__menu-icon-sample"><MobileMenuLinkIcon name={item?.icon} color={item?.iconColor || theme?.header?.mobileMenuAccentColor || '#ac7950'} size={25} /></span>
+                        <label className="appearance-header__menu-icon-select">
+                          <span>Ícono en menú móvil</span>
+                          <select value={normalizeMobileMenuIcon(item?.icon)}
+                            onChange={(e) => setHeaderMenuItem(idx, { icon: e.target.value })}
+                            aria-label={`Ícono móvil para ${item?.title || `enlace ${idx + 1}`}`}>
+                            <optgroup label="Moda y accesorios">
+                              {MOBILE_MENU_ICON_OPTIONS.filter((option) => option.group === 'fashion')
+                                .map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </optgroup>
+                            <optgroup label="Otras categorías">
+                              {MOBILE_MENU_ICON_OPTIONS.filter((option) => option.group !== 'fashion')
+                                .map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </optgroup>
+                          </select>
+                        </label>
+                        <label className="appearance-header__menu-icon-color">
+                          <span>Color del ícono</span>
+                          <span><input type="color" aria-label={`Color del ícono móvil para ${item?.title || `enlace ${idx + 1}`}`}
+                            value={pickerColor(item?.iconColor || theme?.header?.mobileMenuAccentColor)}
+                            onChange={(e) => setHeaderMenuItem(idx, { iconColor: e.target.value })} />
+                            <small>{normalizeMobileMenuIconColor(item?.iconColor) || 'Color general'}</small></span>
+                        </label>
+                        {item?.iconColor && <button type="button" className="appearance-header__menu-icon-reset"
+                          onClick={() => setHeaderMenuItem(idx, { iconColor: '' })}>Usar color general</button>}
+                      </div>
 
                       <div className="mt-2 text-xs text-gray-500">
                         Para un producto específico, pega su ruta real, por ejemplo <span className="font-mono">/producto/123</span>. Las rutas con <span className="font-mono">:id</span> no sirven como enlace público.
