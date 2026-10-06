@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -65,6 +65,18 @@ describe('guardado seguro de Apariencia', () => {
     }));
   });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it('mantiene la botonera de iconos en el borde de la pantalla y accesible por nombre', async () => {
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    const dock = screen.getByRole('group', { name: 'Acciones de apariencia' });
+    expect(dock.parentElement).toBe(document.body);
+    expect(dock).toHaveClass('appearance-action-dock');
+    expect(dock.textContent).toBe('');
+    expect(within(dock).getByRole('button', { name: 'Aplicar aquí' })).toHaveAttribute('data-tooltip', 'Aplicar aquí');
+    expect(within(dock).getByRole('button', { name: 'Descartar cambios' })).toHaveAttribute('data-tooltip', 'Descartar cambios');
+    expect(within(dock).getByRole('button', { name: 'Guardar cambios' })).toHaveAttribute('data-tooltip', 'Guardar cambios');
+  });
 
   it('guarda solo secciones y no exige permisos de menús o tema general', async () => {
     const user = userEvent.setup();
