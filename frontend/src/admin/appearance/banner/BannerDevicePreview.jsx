@@ -24,22 +24,27 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   const buttons = Array.isArray(many) && many.length ? many : one ? [one] : [];
   const requestedHeight = Number(banner?.heightPx);
   const height = Number.isFinite(requestedHeight) ? Math.max(240, Math.min(1200, requestedHeight)) : 520;
-  // La portada pública usa 100dvh en móvil y tableta incluso en modo auto.
-  const fill = device !== 'desktop' || banner?.heightMode === 'fullscreen';
+  // La tienda usa 100dvh en móvil/tableta. El marco de escritorio abarca
+  // hasta 1200 px para enseñar también la porción situada bajo el pliegue.
+  const desktop = device === 'desktop';
+  const frameHeight = desktop ? 1200 : viewport.height;
+  const heroHeight = desktop ? (banner?.heightMode === 'fullscreen' ? viewport.height : height) : viewport.height;
   return {
     viewport,
     type,
     mediaUrl: String(mediaUrl || '').trim(),
     fit: fit === 'contain' ? 'contain' : 'cover',
     objectPosition: `${percent(x)}% ${percent(y)}%`,
-    heightPercent: fill ? 100 : Math.min(100, (height / viewport.height) * 100),
+    heroHeight,
+    heightPercent: (heroHeight / frameHeight) * 100,
+    foldPercent: desktop ? (viewport.height / frameHeight) * 100 : null,
     buttons: buttons.filter((button) => button && button.enabled !== false),
   };
 }
 
 export default function BannerDevicePreview({ banner, slides, selectedIdx, device, onEdit }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
-  const { viewport, type, mediaUrl, fit, objectPosition, heightPercent, buttons } = model;
+  const { viewport, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent, buttons } = model;
   const noMediaText = type === 'video' ? 'Agrega un video para verlo aquí' : 'Agrega una imagen para verla aquí';
 
   return (
@@ -67,9 +72,10 @@ export default function BannerDevicePreview({ banner, slides, selectedIdx, devic
           })}
           {type === 'slider' && slides.length > 1 && <div className="banner-preview-dots" aria-hidden="true">{slides.map((_, index) => <i key={index} data-active={index === selectedIdx} />)}</div>}
         </div>
+        {foldPercent !== null && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>900 px visibles</span></div>}
         {heightPercent < 100 && <div className="banner-preview-below" style={{ top: `${heightPercent}%` }}>Contenido debajo de la portada</div>}
       </div>
-      <p className="banner-preview-caption">{viewport.label} · {viewport.width} × {viewport.height} px · {heightPercent === 100 ? 'alto de pantalla' : `${Math.round(heightPercent)} % del alto visible`}</p>
+      <p className="banner-preview-caption">{viewport.label} · {viewport.width} × {viewport.height} px · portada {heroHeight} px</p>
     </div>
   );
 }

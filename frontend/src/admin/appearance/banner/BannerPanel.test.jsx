@@ -26,7 +26,7 @@ describe('editor de Portada', () => {
     const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
     const frame = preview.querySelector('.banner-preview-viewport');
     expect(frame).toHaveAttribute('data-device', 'desktop');
-    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(520 / 900) * 100}%` });
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(520 / 1200) * 100}%` });
     expect(within(preview).getByAltText('Slide 1')).toHaveStyle({ objectPosition: '0% 35%' });
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     expect(frame).toHaveAttribute('data-device', 'mobile');
@@ -82,8 +82,27 @@ describe('editor de Portada', () => {
 
   it('ajusta la altura de escritorio y conserva 100dvh para móvil y tableta', () => {
     const banner = { type: 'image', imageUrl: '/hero.jpg', imagePosX: 0, imagePosY: 100, heightMode: 'auto', heightPx: 450 };
-    expect(getBannerPreviewModel(banner, [], 0, 'desktop').heightPercent).toBe(50);
+    expect(getBannerPreviewModel(banner, [], 0, 'desktop').heightPercent).toBe(37.5);
+    expect(getBannerPreviewModel({ ...banner, heightPx: 1100 }, [], 0, 'desktop').heightPercent).toBeCloseTo(91.67, 1);
+    expect(getBannerPreviewModel({ ...banner, heightMode: 'fullscreen' }, [], 0, 'desktop').heightPercent).toBe(75);
     expect(getBannerPreviewModel(banner, [], 0, 'mobile').heightPercent).toBe(100);
     expect(getBannerPreviewModel(banner, [], 0, 'tablet').objectPosition).toBe('0% 100%');
+  });
+
+  it('muestra el cambio de altura aunque el usuario estuviera mirando la vista móvil', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    const frame = preview.querySelector('.banner-preview-viewport');
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Altura en escritorio' }), 'fullscreen');
+    expect(frame).toHaveAttribute('data-device', 'desktop');
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: '75%' });
+    expect(preview.querySelector('.banner-preview-fold')).toHaveStyle({ top: '75%' });
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Altura en escritorio' }), 'auto');
+    fireEvent.change(screen.getByRole('slider', { name: /Altura de escritorio/ }), { target: { value: '1100' } });
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(1100 / 1200) * 100}%` });
+    expect(within(preview).getByText(/portada 1100 px/)).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('banner-values').textContent).heightPx).toBe(1100);
   });
 });

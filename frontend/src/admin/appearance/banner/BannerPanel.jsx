@@ -567,7 +567,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
             <option value="image">Imagen única</option>
             <option value="video">Video</option>
           </Select>
-          <Select label="Altura en escritorio" value={b.heightMode || 'auto'} onChange={(e) => setPath('banner.heightMode', e.target.value)}>
+          <Select label="Altura en escritorio" value={b.heightMode || 'auto'} onChange={(e) => { setPath('banner.heightMode', e.target.value); setPreviewDevice('desktop'); setActivePanel('behavior'); }}>
             <option value="auto">Altura personalizada</option>
             <option value="fullscreen">Pantalla completa</option>
           </Select>
@@ -619,7 +619,11 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
 
         {activePanel === 'behavior' && <div className="banner-content-card banner-behavior">
           <div><strong>Altura y adaptación</strong><p>En móvil y tableta la portada ocupa el alto de pantalla. En escritorio puedes ajustar su altura.</p></div>
-          {(b.heightMode || 'auto') === 'auto' && <Input type="number" min="240" max="1200" label="Altura de escritorio (px)" value={b.heightPx ?? 520} onChange={(e) => setPath('banner.heightPx', Number(e.target.value))} />}
+          {(b.heightMode || 'auto') === 'auto' ? <div className="banner-height-control">
+            <label htmlFor="banner-height-range">Altura de escritorio: <strong>{b.heightPx ?? 520} px</strong></label>
+            <input id="banner-height-range" type="range" min="240" max="1200" step="10" value={b.heightPx ?? 520} onChange={(e) => { setPath('banner.heightPx', Number(e.target.value)); setPreviewDevice('desktop'); }} />
+            <Input type="number" min="240" max="1200" label="Altura exacta (px)" value={b.heightPx ?? 520} onChange={(e) => { setPath('banner.heightPx', Number(e.target.value)); setPreviewDevice('desktop'); }} />
+          </div> : <p>En esta vista de escritorio, pantalla completa equivale a 900 px. Para cambiar el alto, selecciona Altura personalizada.</p>}
           {bannerType === 'slider' && <>
             <Input type="number" min="1.2" max="15" step="0.1" label="Segundos por imagen" value={Number(effectiveInterval) / 1000} onChange={(e) => setPath('banner.sliderIntervalMs', Math.round(Number(e.target.value) * 1000))} />
             <label className="banner-check"><input type="checkbox" checked={b.sliderShowProgress !== false} onChange={(e) => setPath('banner.sliderShowProgress', e.target.checked)} /> Mostrar progreso entre imágenes</label>
