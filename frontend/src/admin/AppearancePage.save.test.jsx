@@ -73,6 +73,7 @@ describe('guardado seguro de Apariencia', () => {
     expect(dock.parentElement).toBe(document.body);
     expect(dock).toHaveClass('appearance-action-dock');
     expect(dock.textContent).toBe('');
+    expect(dock.querySelectorAll('.admin-premium-nav-icon--compact')).toHaveLength(3);
     expect(within(dock).getByRole('button', { name: 'Aplicar aquí' })).toHaveAttribute('data-tooltip', 'Aplicar aquí');
     expect(within(dock).getByRole('button', { name: 'Descartar cambios' })).toHaveAttribute('data-tooltip', 'Descartar cambios');
     expect(within(dock).getByRole('button', { name: 'Guardar cambios' })).toHaveAttribute('data-tooltip', 'Guardar cambios');

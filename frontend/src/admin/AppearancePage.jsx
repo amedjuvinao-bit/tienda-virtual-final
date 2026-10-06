@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
 import { fetchAppearanceSettings, saveSiteSettings } from "../lib/siteSettingsApi";
 import { applyTheme } from "../theme/applyTheme";
+import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
 import { validateHeaderMenu } from '../components/headerPresentation';
@@ -1022,9 +1023,9 @@ export default function AppearancePage() {
       </div>
       {createPortal(
         <div className="appearance-action-dock" role="group" aria-label="Acciones de apariencia">
-          <button onClick={onPreview} disabled={saving || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><Eye size={20} aria-hidden="true" /></button>
-          <button onClick={onReset} disabled={saving || saveConflict || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios"><RotateCcw size={20} aria-hidden="true" /></button>
-          <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'}><Save size={20} aria-hidden="true" /></button>
+          <button onClick={onPreview} disabled={saving || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><PremiumAdminNavIcon icon={Eye} compact /></button>
+          <button onClick={onReset} disabled={saving || saveConflict || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios"><PremiumAdminNavIcon icon={RotateCcw} compact /></button>
+          <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'}><PremiumAdminNavIcon icon={Save} compact /></button>
         </div>, document.body
       )}
 
