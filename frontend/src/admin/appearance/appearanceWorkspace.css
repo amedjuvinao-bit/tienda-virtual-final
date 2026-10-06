@@ -68,8 +68,9 @@
 
 .appearance-action-bar {
   position: sticky;
-  top: calc(var(--admin-padding, 16px) + 72px);
-  z-index: 40;
+  top: calc(var(--admin-padding, 16px) + var(--admin-header-height, 72px) + 8px);
+  align-self: start;
+  z-index: 60;
   border: 1px solid var(--admin-card-border);
   border-radius: 16px;
   background: var(--admin-widget-surface-strong-bg, var(--admin-card-bg));
@@ -106,24 +107,50 @@
 .appearance-action-bar__status small { display: block; margin-top: 2px; color: var(--admin-card-muted-text); font-size: 11px; line-height: 1.3; }
 .appearance-action-bar__status[data-feedback="error"] small { color: #a52542; font-weight: 800; }
 .appearance-action-bar__status[data-feedback="success"] small { color: #126f54; font-weight: 800; }
-.appearance-action-bar__buttons { display: flex; flex: none; flex-wrap: wrap; gap: 6px; }
+.appearance-action-bar__buttons { display: flex; flex: none; align-items: center; gap: 8px; }
 
 .appearance-action {
+  position: relative;
   display: inline-flex;
-  min-height: 39px;
+  width: 43px;
+  height: 43px;
+  flex: none;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 10px;
   border: 1px solid var(--admin-card-border);
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .56), 0 4px 12px color-mix(in srgb, var(--admin-primary) 11%, transparent);
+  transition: transform .18s ease, box-shadow .18s ease;
 }
 
 .appearance-action--secondary { background: var(--admin-card-bg); color: var(--admin-card-text); }
 .appearance-action--primary { border-color: var(--admin-button-bg); background: var(--admin-button-bg); color: var(--admin-button-text); }
-.appearance-action:hover:not(:disabled) { filter: brightness(.96); }
+.appearance-action:hover:not(:disabled) { transform: translateY(-2px); box-shadow: inset 0 1px rgba(255, 255, 255, .6), 0 7px 16px color-mix(in srgb, var(--admin-primary) 20%, transparent); }
+.appearance-action::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  width: max-content;
+  max-width: min(220px, 70vw);
+  padding: 7px 10px;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 9px;
+  background: var(--admin-widget-surface-strong-bg, var(--admin-card-bg));
+  color: var(--admin-card-text);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--admin-primary) 15%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.appearance-action:hover::after, .appearance-action:focus-visible::after { opacity: 1; transform: translateY(0); }
 .appearance-action:disabled { cursor: not-allowed; opacity: .52; }
 .appearance-navigation__item:focus-visible,
 .appearance-action:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 2px; }
@@ -171,8 +198,7 @@
 
 @media (max-width: 980px) {
   .appearance-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .appearance-action-bar__inner { align-items: flex-start; flex-direction: column; }
-  .appearance-action-bar__buttons { width: 100%; }
+  .appearance-action-bar__status small { max-width: 340px; }
 }
 
 @media (max-width: 640px) {
@@ -183,9 +209,12 @@
   .appearance-navigation__item { min-height: 51px; padding: 8px; }
   .appearance-navigation__item:last-child { grid-column: 1 / -1; }
   .appearance-navigation__item small { display: none; }
-  .appearance-action-bar { top: 68px; }
+  .appearance-action-bar { top: calc(var(--admin-padding, 10px) + 58px); }
   .appearance-action-bar__inner { padding: 8px; }
-  .appearance-action-bar__buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .appearance-action--primary { grid-column: 1 / -1; grid-row: 1; }
+  .appearance-action-bar__status { gap: 6px; }
+  .appearance-action-bar__status small { display: none; }
+  .appearance-action-bar__buttons { gap: 4px; }
+  .appearance-action { width: 37px; height: 37px; border-radius: 11px; }
+  .appearance-action svg { width: 18px; height: 18px; }
   .appearance-panel-main-tab small { display: none; }
 }

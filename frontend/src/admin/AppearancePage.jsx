@@ -1017,10 +1017,10 @@ export default function AppearancePage() {
               <small>{saveMessage ? saveMessage.text : !canEditCurrentArea ? 'Esta área es de solo lectura para tu perfil.' : changedAreas.length ? `Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.` : 'Los cambios se publican al guardar.'}</small>
             </div>
           </div>
-          <div className="appearance-action-bar__buttons">
-            <button onClick={onPreview} disabled={saving || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" title="Aplica el diseño en esta pantalla sin guardarlo"><Eye size={17} /> Aplicar aquí</button>
-            <button onClick={onReset} disabled={saving || saveConflict || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button"><RotateCcw size={17} /> Descartar cambios</button>
-            <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length} className="appearance-action appearance-action--primary" type="button"><Save size={17} /> {saving ? 'Guardando…' : 'Guardar cambios'}</button>
+          <div className="appearance-action-bar__buttons" role="group" aria-label="Acciones de apariencia">
+            <button onClick={onPreview} disabled={saving || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí" title="Aplicar el diseño en esta pantalla"><Eye size={20} aria-hidden="true" /></button>
+            <button onClick={onReset} disabled={saving || saveConflict || !changedAreas.length} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios" title="Descartar cambios"><RotateCcw size={20} aria-hidden="true" /></button>
+            <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny || !changedAreas.length} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'} title={saving ? 'Guardando…' : 'Guardar cambios'}><Save size={20} aria-hidden="true" /></button>
           </div>
         </div>
       </div>
