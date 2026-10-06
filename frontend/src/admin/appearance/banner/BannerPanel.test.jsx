@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import BannerPanel from './BannerPanel';
 import { getBannerPreviewModel } from './BannerDevicePreview';
+import { getBannerHeightStyle } from '../../../lib/bannerHeight';
 
 afterEach(cleanup);
 
@@ -30,7 +31,7 @@ describe('editor de Portada', () => {
     expect(within(preview).getByAltText('Slide 1')).toHaveStyle({ objectPosition: '0% 35%' });
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     expect(frame).toHaveAttribute('data-device', 'mobile');
-    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: '100%' });
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(844 / 1200) * 100}%` });
     await user.click(within(preview).getByRole('button', { name: 'Tableta' }));
     expect(frame).toHaveAttribute('data-device', 'tablet');
     await user.click(within(preview).getByRole('button', { name: 'Siguiente ›' }));
@@ -85,24 +86,40 @@ describe('editor de Portada', () => {
     expect(getBannerPreviewModel(banner, [], 0, 'desktop').heightPercent).toBe(37.5);
     expect(getBannerPreviewModel({ ...banner, heightPx: 1100 }, [], 0, 'desktop').heightPercent).toBeCloseTo(91.67, 1);
     expect(getBannerPreviewModel({ ...banner, heightMode: 'fullscreen' }, [], 0, 'desktop').heightPercent).toBe(75);
-    expect(getBannerPreviewModel(banner, [], 0, 'mobile').heightPercent).toBe(100);
+    expect(getBannerPreviewModel(banner, [], 0, 'mobile').heightPercent).toBeCloseTo((844 / 1200) * 100);
     expect(getBannerPreviewModel(banner, [], 0, 'tablet').objectPosition).toBe('0% 100%');
+    expect(getBannerHeightStyle(banner, 'mobile')).toEqual({ height: '100dvh' });
+    expect(getBannerHeightStyle(banner, 'tablet')).toEqual({ height: '100dvh' });
+    expect(getBannerHeightStyle(banner, 'desktop')).toEqual({ height: '450px' });
   });
 
-  it('muestra el cambio de altura aunque el usuario estuviera mirando la vista móvil', async () => {
+  it('ajusta la altura del dispositivo seleccionado sin cambiar la vista y conserva las otras alturas', async () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
     const frame = preview.querySelector('.banner-preview-viewport');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Altura en escritorio' }), 'fullscreen');
-    expect(frame).toHaveAttribute('data-device', 'desktop');
+    await user.click(screen.getByRole('button', { name: 'Comportamiento' }));
+    fireEvent.change(screen.getByRole('slider', { name: /Altura de móvil/ }), { target: { value: '650' } });
+    expect(frame).toHaveAttribute('data-device', 'mobile');
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(650 / 1200) * 100}%` });
+    expect(getBannerHeightStyle(JSON.parse(screen.getByTestId('banner-values').textContent), 'mobile')).toEqual({ height: '650px' });
+    await user.click(within(preview).getByRole('button', { name: 'Tableta' }));
+    expect(screen.getByRole('slider', { name: /Altura de tableta/ })).toHaveValue('1180');
+    fireEvent.change(screen.getByRole('slider', { name: /Altura de tableta/ }), { target: { value: '900' } });
+    expect(frame).toHaveAttribute('data-device', 'tablet');
     expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: '75%' });
-    expect(preview.querySelector('.banner-preview-fold')).toHaveStyle({ top: '75%' });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Altura en escritorio' }), 'auto');
+    await user.click(within(preview).getByRole('button', { name: 'Escritorio' }));
+    expect(screen.getByRole('slider', { name: /Altura de escritorio/ })).toHaveValue('520');
     fireEvent.change(screen.getByRole('slider', { name: /Altura de escritorio/ }), { target: { value: '1100' } });
     expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(1100 / 1200) * 100}%` });
     expect(within(preview).getByText(/portada 1100 px/)).toBeInTheDocument();
-    expect(JSON.parse(screen.getByTestId('banner-values').textContent).heightPx).toBe(1100);
+    const values = JSON.parse(screen.getByTestId('banner-values').textContent);
+    expect(values).toMatchObject({ heightPx: 1100, mobileHeightPx: 650, mobileHeightMode: 'auto', tabletHeightPx: 900, tabletHeightMode: 'auto' });
+    expect(getBannerHeightStyle(values, 'tablet')).toEqual({ height: '900px' });
+    await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Altura en móvil' }), 'fullscreen');
+    expect(frame).toHaveAttribute('data-device', 'mobile');
+    expect(getBannerHeightStyle(JSON.parse(screen.getByTestId('banner-values').textContent), 'mobile')).toEqual({ height: '100dvh' });
   });
 });

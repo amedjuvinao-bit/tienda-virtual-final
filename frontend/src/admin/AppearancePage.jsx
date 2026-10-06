@@ -245,6 +245,10 @@ function buildThemeFromServer(themeRaw) {
     videoLoop: true,
     heightMode: "auto", // auto | fullscreen
     heightPx: 520,
+    tabletHeightMode: "fullscreen",
+    tabletHeightPx: 1180,
+    mobileHeightMode: "fullscreen",
+    mobileHeightPx: 844,
 
     imagePosX: 50,
     imagePosY: 50,
@@ -906,6 +910,18 @@ export default function AppearancePage() {
         const hp = Number(b.heightPx);
         if (Number.isNaN(hp) || hp < 240 || hp > 1200) {
           showValidation("La altura del banner debe estar entre 240 y 1200 px.");
+          return;
+        }
+      }
+      for (const [label, modeKey, heightKey] of [
+        ["tableta", "tabletHeightMode", "tabletHeightPx"],
+        ["móvil", "mobileHeightMode", "mobileHeightPx"],
+      ]) {
+        if (!changedTheme.banner) break;
+        const mode = b[modeKey] || "fullscreen";
+        const height = Number(b[heightKey]);
+        if (!["auto", "fullscreen"].includes(mode) || (mode === "auto" && (!Number.isFinite(height) || height < 240 || height > 1200))) {
+          showValidation(`La altura de ${label} debe estar entre 240 y 1200 px o usar pantalla completa.`);
           return;
         }
       }

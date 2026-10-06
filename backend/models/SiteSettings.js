@@ -109,6 +109,10 @@ const BannerSchema = new Schema(
     },
 
     heightPx: { type: Number, default: 520 },
+    tabletHeightMode: { type: String, enum: ["auto", "fullscreen"], default: "fullscreen" },
+    tabletHeightPx: { type: Number, min: 240, max: 1200, default: 1180 },
+    mobileHeightMode: { type: String, enum: ["auto", "fullscreen"], default: "fullscreen" },
+    mobileHeightPx: { type: Number, min: 240, max: 1200, default: 844 },
   },
   { _id: false }
 );

@@ -4,6 +4,7 @@ import { useKeenSlider } from "keen-slider/react"
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { X } from "lucide-react"
 import { fetchSiteSettings } from "../lib/siteSettingsApi" // ✅ MISMA RUTA QUE APPEARANCEPAGE
+import { getBannerHeightStyle } from "../lib/bannerHeight"
 
 export default function CarouselBanner() {
   const [loaded, setLoaded] = useState(false)
@@ -221,8 +222,6 @@ export default function CarouselBanner() {
   }, [loadBannerSettings])
 
   const bannerType = bannerLoading ? "loading" : String(banner?.type || "slider")
-  const heightMode = banner?.heightMode || "auto"
-
   const isMobile = viewportWidth < 640
   const isTablet = viewportWidth >= 640 && viewportWidth < 1024
   const isDesktop = viewportWidth >= 1024
@@ -238,21 +237,7 @@ export default function CarouselBanner() {
     ? Math.max(1200, Math.min(20000, autoplayMsRaw))
     : 3500
 
-  const heightPxRaw = Number(banner?.heightPx)
-  const heightPx = Number.isFinite(heightPxRaw) ? heightPxRaw : 520
-  const clampedHeightPx = Math.max(240, Math.min(1200, heightPx))
-
-  // ✅ en móvil y tablet el banner cubre toda la pantalla
-  const responsiveHeightPx = useMemo(() => {
-    if (isMobile) return Math.max(520, Math.min(860, clampedHeightPx))
-    if (isTablet) return Math.max(560, Math.min(920, clampedHeightPx))
-    return clampedHeightPx
-  }, [isMobile, isTablet, clampedHeightPx])
-
-  const responsiveFullscreenHeight = useMemo(() => {
-    if (isMobile || isTablet) return "100dvh"
-    return "100vh"
-  }, [isMobile, isTablet])
+  const heightDevice = isMobile ? "mobile" : isTablet ? "tablet" : "desktop"
 
   // ✅ SIN fondo / SIN espacio artificial debajo del header
   const heroWrapStyle = useMemo(() => ({}), [])
@@ -262,12 +247,7 @@ export default function CarouselBanner() {
 
   const heroContainerClass = "w-full relative"
 
-  const heroContainerStyle =
-    heightMode === "fullscreen"
-      ? { height: responsiveFullscreenHeight }
-      : isMobile || isTablet
-      ? { height: "100dvh" }
-      : { height: `${responsiveHeightPx}px` }
+  const heroContainerStyle = getBannerHeightStyle(banner, heightDevice)
 
   const heroFullscreenClass = ""
 

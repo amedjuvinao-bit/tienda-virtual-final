@@ -120,6 +120,10 @@ function buildDefaultSettings() {
         videoLoop: true,
         heightMode: "auto",
         heightPx: 520,
+        tabletHeightMode: "fullscreen",
+        tabletHeightPx: 1180,
+        mobileHeightMode: "fullscreen",
+        mobileHeightPx: 844,
         imageButton: {
           enabled: true,
           kind: "image",

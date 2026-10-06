@@ -1,4 +1,5 @@
 import React from 'react';
+import { getBannerHeightSettings } from '../../../lib/bannerHeight';
 
 export const BANNER_DEVICES = Object.freeze({
   mobile: { label: 'Móvil', width: 390, height: 844 },
@@ -22,13 +23,11 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   const many = type === 'slider' ? slide?.buttons : type === 'image' ? banner?.imageButtons : banner?.videoButtons;
   const one = type === 'slider' ? slide?.button : type === 'image' ? banner?.imageButton : banner?.videoButton;
   const buttons = Array.isArray(many) && many.length ? many : one ? [one] : [];
-  const requestedHeight = Number(banner?.heightPx);
-  const height = Number.isFinite(requestedHeight) ? Math.max(240, Math.min(1200, requestedHeight)) : 520;
-  // La tienda usa 100dvh en móvil/tableta. El marco de escritorio abarca
-  // hasta 1200 px para enseñar también la porción situada bajo el pliegue.
-  const desktop = device === 'desktop';
-  const frameHeight = desktop ? 1200 : viewport.height;
-  const heroHeight = desktop ? (banner?.heightMode === 'fullscreen' ? viewport.height : height) : viewport.height;
+  // Un marco de 1200 px deja ver alturas personalizadas y el contenido posterior
+  // aunque la portada se extienda más allá del alto visible del dispositivo.
+  const frameHeight = 1200;
+  const heightSettings = getBannerHeightSettings(banner, device);
+  const heroHeight = heightSettings.mode === 'fullscreen' ? viewport.height : heightSettings.heightPx;
   return {
     viewport,
     type,
@@ -37,7 +36,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
     objectPosition: `${percent(x)}% ${percent(y)}%`,
     heroHeight,
     heightPercent: (heroHeight / frameHeight) * 100,
-    foldPercent: desktop ? (viewport.height / frameHeight) * 100 : null,
+    foldPercent: (viewport.height / frameHeight) * 100,
     buttons: buttons.filter((button) => button && button.enabled !== false),
   };
 }
@@ -72,7 +71,7 @@ export default function BannerDevicePreview({ banner, slides, selectedIdx, devic
           })}
           {type === 'slider' && slides.length > 1 && <div className="banner-preview-dots" aria-hidden="true">{slides.map((_, index) => <i key={index} data-active={index === selectedIdx} />)}</div>}
         </div>
-        {foldPercent !== null && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>900 px visibles</span></div>}
+        {foldPercent < 100 && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>{viewport.height} px visibles</span></div>}
         {heightPercent < 100 && <div className="banner-preview-below" style={{ top: `${heightPercent}%` }}>Contenido debajo de la portada</div>}
       </div>
       <p className="banner-preview-caption">{viewport.label} · {viewport.width} × {viewport.height} px · portada {heroHeight} px</p>
