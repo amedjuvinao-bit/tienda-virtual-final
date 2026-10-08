@@ -7,12 +7,11 @@ function GlassContour() {
   return <svg className="rb-glass-contour" aria-hidden="true" focusable="false" preserveAspectRatio="none">
     <defs><linearGradient id={gradientId} gradientUnits="userSpaceOnUse">
       <stop offset="0" stopColor="#7be9e2" stopOpacity="0" />
-      <stop offset=".22" stopColor="#7be9e2" stopOpacity=".8" />
-      <stop offset=".5" stopColor="#b6a4ed" stopOpacity=".9" />
-      <stop offset=".76" stopColor="#f9c5bf" stopOpacity=".8" />
+      <stop offset=".22" stopColor="#7be9e2" stopOpacity=".75" />
+      <stop offset=".5" stopColor="#b6a4ed" stopOpacity=".82" />
+      <stop offset=".76" stopColor="#f9c5bf" stopOpacity=".75" />
       <stop offset="1" stopColor="#f9c5bf" stopOpacity="0" />
     </linearGradient></defs>
-    <path className="rb-glass-contour__base" data-contour-base="" />
     <path className="rb-glass-contour__spectrum" data-contour-spectrum="" stroke={`url(#${gradientId})`} />
   </svg>;
 }
@@ -84,21 +83,19 @@ const moveGlassLens = (event) => {
   const points = contourPoints(rect.width, rect.height, radius);
   const curved = points.map((point) => {
     const distance = Math.hypot(point.x - x, point.y - y);
-    const shift = 5.5 * Math.exp(-distance * distance / (2 * 39 * 39));
+    const shift = 1.2 * Math.exp(-distance * distance / (2 * 25 * 25));
     return { x: point.x - point.nx * shift, y: point.y - point.ny * shift };
   });
   const contour = `M ${curved.map(formatPoint).join(' L ')} Z`;
-  const base = target.querySelector('[data-contour-base]');
   const spectrum = target.querySelector('[data-contour-spectrum]');
   const svg = target.querySelector('.rb-glass-contour');
-  if (!base || !spectrum || !svg) return;
+  if (!spectrum || !svg) return;
   svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-  base.setAttribute('d', contour);
   let nearest = 0;
   for (let i = 1; i < points.length; i++) {
     if (Math.hypot(points[i].x - x, points[i].y - y) < Math.hypot(points[nearest].x - x, points[nearest].y - y)) nearest = i;
   }
-  const segment = Array.from({ length: Math.min(25, points.length) }, (_, offset) => curved[(nearest - 12 + offset + points.length) % points.length]);
+  const segment = Array.from({ length: Math.min(9, points.length) }, (_, offset) => curved[(nearest - 4 + offset + points.length) % points.length]);
   spectrum.setAttribute('d', `M ${segment.map(formatPoint).join(' L ')}`);
   const gradient = svg.querySelector('linearGradient');
   gradient?.setAttribute('x1', segment[0].x);

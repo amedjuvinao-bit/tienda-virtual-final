@@ -99,11 +99,13 @@ describe('plantillas sobre contenido existente', () => {
     expect(card).toHaveAttribute('data-refracting', 'true');
     const surface = card.querySelector('.rb-glass-surface');
     expect(surface.style.clipPath).toMatch(/^path\('M /);
-    const firstContour = card.querySelector('[data-contour-base]').getAttribute('d');
+    const firstContour = surface.style.clipPath;
     const firstSpectrum = card.querySelector('[data-contour-spectrum]').getAttribute('d');
+    expect(card.querySelector('[data-contour-base]')).toBeNull();
+    expect(firstSpectrum.match(/ L /g)).toHaveLength(8);
     const firstGradient = card.querySelector('linearGradient').getAttribute('x1');
     move(230);
-    expect(card.querySelector('[data-contour-base]').getAttribute('d')).not.toBe(firstContour);
+    expect(surface.style.clipPath).not.toBe(firstContour);
     expect(card.querySelector('[data-contour-spectrum]').getAttribute('d')).not.toBe(firstSpectrum);
     expect(card.querySelector('linearGradient').getAttribute('x1')).not.toBe(firstGradient);
     expect(copy).not.toHaveAttribute('data-zoom-part');
@@ -111,5 +113,19 @@ describe('plantillas sobre contenido existente', () => {
     fireEvent.pointerLeave(card);
     expect(card).not.toHaveAttribute('data-refracting');
     expect(surface.style.clipPath).toBe('');
+  });
+
+  it('mantiene el contorno original del botón y concentra el destello en un tramo corto', () => {
+    const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories} />);
+    const button = container.querySelector('.rb-liquid-button--secondary');
+    button.getBoundingClientRect = () => ({ left: 10, top: 15, width: 120, height: 48 });
+    const event = new Event('pointermove', { bubbles: true });
+    Object.defineProperties(event, { clientX: { value: 70 }, clientY: { value: 34 }, pointerType: { value: 'mouse' } });
+    fireEvent(button, event);
+    expect(button).toHaveAttribute('data-refracting', 'true');
+    expect(button.querySelector('[data-contour-spectrum]').getAttribute('d').match(/ L /g)).toHaveLength(8);
+    expect(button.querySelector('[data-contour-base]')).toBeNull();
+    fireEvent.pointerLeave(button);
+    expect(button).not.toHaveAttribute('data-refracting');
   });
 });
