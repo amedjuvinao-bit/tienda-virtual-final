@@ -85,7 +85,20 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
 
-  it('deforma el contorno junto al puntero y desplaza el tramo iridiscente sin ampliar el contenido', () => {
+  it('desplaza la refracción de la superficie con el puntero sin ampliar el contenido', () => {
+    const frames = [];
+    const imageData = [];
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { frames.push(callback); return frames.length; });
+    const cancelSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const contextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
+      createImageData: (width, height) => {
+        const image = { data: new Uint8ClampedArray(width * height * 4) };
+        imageData.push(image);
+        return image;
+      },
+      putImageData: () => {},
+    }));
+    const dataSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,YQ==');
     const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     const card = container.querySelector('.rb-template__spot-card');
     const copy = card.querySelector('.rb-template__spot-copy');
@@ -98,24 +111,32 @@ describe('plantillas sobre contenido existente', () => {
     move(80);
     expect(card).toHaveAttribute('data-refracting', 'true');
     const surface = card.querySelector('.rb-glass-surface');
-    expect(surface.style.clipPath).toMatch(/^path\('M /);
-    const firstContour = surface.style.clipPath;
-    const firstSpectrum = card.querySelector('[data-contour-spectrum]').getAttribute('d');
-    expect(card.querySelector('[data-contour-base]')).toBeNull();
-    expect(firstSpectrum.match(/ L /g)).toHaveLength(8);
-    const firstGradient = card.querySelector('linearGradient').getAttribute('x1');
+    expect(card).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '25px' });
+    expect(card.querySelector('.rb-glass-lens')).toHaveAttribute('aria-hidden', 'true');
+    expect(card.querySelector('.rb-glass-rim')).toHaveAttribute('aria-hidden', 'true');
+    frames.shift()(0);
+    expect(card.querySelector('[data-glass-map]')).toHaveAttribute('href', 'data:image/png;base64,YQ==');
+    expect(surface.style.filter).toMatch(/^url\(#rb-liquid-/);
+    const firstMap = imageData[0].data;
+    expect(firstMap[(25 * 250 + 80) * 4]).not.toBe(128);
+    expect(firstMap[(65 * 250 + 200) * 4]).toBe(128);
     move(230);
-    expect(surface.style.clipPath).not.toBe(firstContour);
-    expect(card.querySelector('[data-contour-spectrum]').getAttribute('d')).not.toBe(firstSpectrum);
-    expect(card.querySelector('linearGradient').getAttribute('x1')).not.toBe(firstGradient);
+    expect(card).toHaveStyle({ '--rb-pointer-x': '210px' });
+    frames.shift()(0);
+    expect(imageData[1].data[(25 * 250 + 80) * 4]).toBe(128);
+    expect(imageData[1].data[(25 * 250 + 230) * 4]).not.toBe(128);
     expect(copy).not.toHaveAttribute('data-zoom-part');
     expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
     fireEvent.pointerLeave(card);
     expect(card).not.toHaveAttribute('data-refracting');
-    expect(surface.style.clipPath).toBe('');
+    expect(surface.style.filter).toBe('');
+    frameSpy.mockRestore();
+    cancelSpy.mockRestore();
+    contextSpy.mockRestore();
+    dataSpy.mockRestore();
   });
 
-  it('mantiene el contorno original del botón y concentra el destello en un tramo corto', () => {
+  it('mantiene el contorno original del botón mientras sigue el puntero', () => {
     const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories} />);
     const button = container.querySelector('.rb-liquid-button--secondary');
     button.getBoundingClientRect = () => ({ left: 10, top: 15, width: 120, height: 48 });
@@ -123,8 +144,9 @@ describe('plantillas sobre contenido existente', () => {
     Object.defineProperties(event, { clientX: { value: 70 }, clientY: { value: 34 }, pointerType: { value: 'mouse' } });
     fireEvent(button, event);
     expect(button).toHaveAttribute('data-refracting', 'true');
-    expect(button.querySelector('[data-contour-spectrum]').getAttribute('d').match(/ L /g)).toHaveLength(8);
-    expect(button.querySelector('[data-contour-base]')).toBeNull();
+    expect(button).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '19px' });
+    expect(button.querySelector('.rb-glass-rim')).toBeInTheDocument();
+    expect(button.style.transform).toBe('');
     fireEvent.pointerLeave(button);
     expect(button).not.toHaveAttribute('data-refracting');
   });
