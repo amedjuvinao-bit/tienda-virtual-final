@@ -1,5 +1,5 @@
 const maps = new WeakMap();
-const DISPLACEMENT_SCALE = 14;
+const DISPLACEMENT_SCALE = 28;
 
 function paintDisplacement(canvas, width, height, pointerX, pointerY) {
   canvas.width = width;
@@ -13,7 +13,7 @@ function paintDisplacement(canvas, width, height, pointerX, pointerY) {
     pixels[index + 1] = 128;
     pixels[index + 3] = 255;
   }
-  const radius = Math.min(58, Math.max(38, height * .95));
+  const radius = Math.min(72, Math.max(43, height * 1.05));
   const left = Math.max(0, Math.floor(pointerX - radius));
   const right = Math.min(width, Math.ceil(pointerX + radius));
   const top = Math.max(0, Math.floor(pointerY - radius));
@@ -26,8 +26,8 @@ function paintDisplacement(canvas, width, height, pointerX, pointerY) {
       if (distance >= 1) continue;
       const falloff = (1 - distance) ** 2;
       const index = (y * width + x) * 4;
-      const pull = -.26 * falloff;
-      const swirl = .035 * falloff;
+      const pull = -.92 * falloff;
+      const swirl = .08 * falloff;
       pixels[index] = Math.max(0, Math.min(255, Math.round(128 + (dx * pull - dy * swirl) * 255 / DISPLACEMENT_SCALE)));
       pixels[index + 1] = Math.max(0, Math.min(255, Math.round(128 + (dy * pull + dx * swirl) * 255 / DISPLACEMENT_SCALE)));
     }
@@ -66,10 +66,14 @@ export function moveLiquidGlass(event) {
       const map = paintDisplacement(state.canvas, point.width, point.height, point.x, point.y);
       if (!map) return;
       image.setAttribute('href', map);
-      lens.style.filter = `url(#${lens.dataset.glassFilter})`;
+      // El filtro debe actuar sobre el fondo visto A TRAVÉS del vidrio.
+      // filter: url(...) solo deforma los píxeles de la capa transparente.
+      lens.style.backdropFilter = `url(#${lens.dataset.glassFilter}) saturate(145%)`;
+      lens.style.webkitBackdropFilter = lens.style.backdropFilter;
     } catch {
       // La apertura local sigue visible si Canvas/SVG no está disponible.
-      lens.style.removeProperty('filter');
+      lens.style.backdropFilter = '';
+      lens.style.webkitBackdropFilter = '';
     }
   });
 }
@@ -80,5 +84,9 @@ export function clearLiquidGlass(event) {
   const state = maps.get(target);
   if (state?.frame !== null && state?.frame !== undefined) window.cancelAnimationFrame(state.frame);
   if (state) state.frame = null;
-  target.querySelector('.rb-glass-lens')?.style.removeProperty('filter');
+  const lens = target.querySelector('.rb-glass-lens');
+  if (lens) {
+    lens.style.backdropFilter = '';
+    lens.style.webkitBackdropFilter = '';
+  }
 }

@@ -9,9 +9,9 @@ function GlassSurface() {
     <span className="rb-glass-lens" data-glass-filter={filterId} aria-hidden="true" />
     <span className="rb-glass-surface" aria-hidden="true" />
     <svg className="rb-glass-filter" width="0" height="0" aria-hidden="true" focusable="false">
-      <defs><filter id={filterId} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+      <defs><filter id={filterId} x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
         <feImage data-glass-map="" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="glass-map" />
-        <feDisplacementMap in="SourceGraphic" in2="glass-map" scale="14" xChannelSelector="R" yChannelSelector="G" />
+        <feDisplacementMap in="SourceGraphic" in2="glass-map" scale="28" xChannelSelector="R" yChannelSelector="G" />
       </filter></defs>
     </svg>
     <span className="rb-glass-rim" aria-hidden="true" />

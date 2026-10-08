@@ -117,9 +117,9 @@ describe('plantillas sobre contenido existente', () => {
     expect(card.querySelector('.rb-glass-rim')).toHaveAttribute('aria-hidden', 'true');
     frames.shift()(0);
     expect(card.querySelector('[data-glass-map]')).toHaveAttribute('href', 'data:image/png;base64,YQ==');
-    expect(lens.style.filter).toMatch(/^url\(#rb-liquid-/);
+    expect(lens.style.backdropFilter).toMatch(/^url\(#rb-liquid-/);
     const firstMap = imageData[0].data;
-    expect(firstMap[(25 * 250 + 80) * 4]).not.toBe(128);
+    expect(Math.abs(firstMap[(25 * 250 + 80) * 4] - 128)).toBeGreaterThan(10);
     expect(firstMap[(65 * 250 + 200) * 4]).toBe(128);
     move(230);
     expect(card).toHaveStyle({ '--rb-pointer-x': '210px' });
@@ -130,7 +130,7 @@ describe('plantillas sobre contenido existente', () => {
     expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
     fireEvent.pointerLeave(card);
     expect(card).not.toHaveAttribute('data-refracting');
-    expect(lens.style.filter).toBe('');
+    expect(lens.style.backdropFilter).toBe('');
     frameSpy.mockRestore();
     cancelSpy.mockRestore();
     contextSpy.mockRestore();
