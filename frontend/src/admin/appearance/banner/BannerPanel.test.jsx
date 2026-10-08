@@ -6,7 +6,7 @@ import BannerPanel from './BannerPanel';
 import { getBannerPreviewModel } from './BannerDevicePreview';
 import { getBannerHeightStyle } from '../../../lib/bannerHeight';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 const slides = [
   { image: '/first.jpg', fit: 'cover', posX: 0, posY: 35, button: { enabled: true, kind: 'text', text: 'Ver colección', posX: 50, posY: 85 } },
@@ -137,6 +137,17 @@ describe('editor de Portada', () => {
     await user.click(screen.getByRole('button', { name: 'Comportamiento' }));
     await user.click(screen.getByRole('checkbox', { name: 'Silenciar' }));
     expect(screen.queryByText(/reproducción automática con sonido puede ser bloqueada/)).not.toBeInTheDocument();
+  });
+
+  it('mantiene la vista previa en el bloque fijo y recoge los avisos en pantallas estrechas', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    render(<Editor initial={{ type: 'video', videoUrl: '/hero.mp4', videoAutoplay: true, videoMuted: false }} />);
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    const fixed = preview.querySelector('.banner-preview-pin');
+    expect(fixed).toContainElement(preview.querySelector('.banner-preview-viewport'));
+    expect(fixed).toContainElement(screen.getByText('1 aviso antes de publicar'));
+    expect(screen.getAllByText(/reproducción automática con sonido puede ser bloqueada/)).toHaveLength(1);
+    expect(preview.querySelector('.banner-issues')).not.toBeInTheDocument();
   });
 
   it('edita el botón elegido en la vista previa cuando el slide tiene varios', async () => {

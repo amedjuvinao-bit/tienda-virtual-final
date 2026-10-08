@@ -359,6 +359,15 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const [uploadStatus, setUploadStatus] = useState(null);
   const [templateSelection, setTemplateSelection] = useState('copy:title');
   const [placingCard, setPlacingCard] = useState(null);
+  const [compactPreview, setCompactPreview] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 1050px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 1050px)');
+    if (!media) return;
+    const update = () => setCompactPreview(media.matches);
+    media.addEventListener('change', update);
+    update();
+    return () => media.removeEventListener('change', update);
+  }, []);
   const heightSettings = getBannerHeightSettings(b, previewDevice);
   const displayedHeight = heightSettings.mode === 'fullscreen' ? BANNER_DEVICES[previewDevice].height : heightSettings.heightPx;
   const updateDeviceHeight = (value) => {
@@ -685,12 +694,15 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
       </section>
 
       <section className="banner-panel banner-panel--preview" aria-label="Vista previa de portada">
-        <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un texto, botón o categoría para editarlo.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-        <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} />
-        {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
-        <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
-        {issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
-        <details className="banner-inline-details banner-json"><summary>Datos técnicos</summary><pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>
+        <div className="banner-preview-pin">
+          <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un texto, botón o categoría para editarlo.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
+          <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} />
+          {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
+          <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
+          {compactPreview && <details className="banner-preview-compact-meta"><summary>{issues.length ? `${issues.length} ${issues.length === 1 ? 'aviso' : 'avisos'} antes de publicar` : 'Datos técnicos'}</summary>{issues.length > 0 && <ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul>}<pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
+        </div>
+        {!compactPreview && issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
+        {!compactPreview && <details className="banner-inline-details banner-json"><summary>Datos técnicos</summary><pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
       </section>
 
       {/* =======================
