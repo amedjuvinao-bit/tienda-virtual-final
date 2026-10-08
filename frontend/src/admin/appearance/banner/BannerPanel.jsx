@@ -1,5 +1,6 @@
 // src/admin/appearance/banner/BannerPanel.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from 'react-dom';
 import BannerDevicePreview, { BANNER_DEVICES } from './BannerDevicePreview';
 import BannerTemplatePanel from './BannerTemplatePanel';
 import { BANNER_TEMPLATE_IDS, BANNER_TEMPLATE_META, getBannerTemplate, safeBannerLink } from '../../../lib/bannerTemplates';
@@ -341,7 +342,7 @@ const Modal = ({ open, title, onClose, children }) => {
 /* =======================
    MAIN BannerPanel
 ======================= */
-export default function BannerPanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend }) {
+export default function BannerPanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend, disabled = false }) {
   const b = theme?.banner || {};
   const slides = useMemo(() => (Array.isArray(b.slides) ? b.slides : []), [b.slides]);
 
@@ -360,6 +361,11 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const [templateSelection, setTemplateSelection] = useState('copy:title');
   const [placingCard, setPlacingCard] = useState(null);
   const [compactPreview, setCompactPreview] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 1050px)').matches);
+  const workspaceRef = useRef(null);
+  const previewAnchorRef = useRef(null);
+  const previewCardRef = useRef(null);
+  const [floatingPreview, setFloatingPreview] = useState(null);
+  const [previewHeight, setPreviewHeight] = useState(0);
   useEffect(() => {
     const media = window.matchMedia?.('(max-width: 1050px)');
     if (!media) return;
@@ -368,6 +374,39 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     update();
     return () => media.removeEventListener('change', update);
   }, []);
+  useLayoutEffect(() => {
+    const workspace = workspaceRef.current;
+    const anchor = previewAnchorRef.current;
+    const card = previewCardRef.current;
+    const portalTarget = workspace?.closest('.admin-area');
+    if (!workspace || !anchor || !card || !portalTarget) return;
+
+    const updatePosition = () => {
+      const header = [...portalTarget.querySelectorAll('.admin-header-panel, .admin-mobile-header-panel')]
+        .find((element) => element.getBoundingClientRect().height > 0);
+      const top = Math.max(12, (header?.getBoundingClientRect().bottom || 0) + 8);
+      const anchorBox = anchor.getBoundingClientRect();
+      const workspaceBox = workspace.getBoundingClientRect();
+      const height = card.getBoundingClientRect().height;
+      if (height > 0) setPreviewHeight((previous) => Math.abs(previous - height) > 1 ? height : previous);
+      const visibleHeight = Math.min(height, Math.max(0, window.innerHeight - top - 8));
+      const shouldFloat = anchorBox.top < top && workspaceBox.bottom > top + visibleHeight && anchorBox.width > 0;
+      const next = shouldFloat ? { top, left: anchorBox.left, width: anchorBox.width } : null;
+      setFloatingPreview((previous) => previous?.top === next?.top && previous?.left === next?.left && previous?.width === next?.width ? previous : next);
+    };
+
+    updatePosition();
+    document.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updatePosition) : null;
+    observer?.observe(workspace);
+    observer?.observe(card);
+    return () => {
+      document.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+      observer?.disconnect();
+    };
+  }, [!!floatingPreview, compactPreview, previewDevice, activePanel]);
   const heightSettings = getBannerHeightSettings(b, previewDevice);
   const displayedHeight = heightSettings.mode === 'fullscreen' ? BANNER_DEVICES[previewDevice].height : heightSettings.heightPx;
   const updateDeviceHeight = (value) => {
@@ -587,8 +626,18 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     setPlacingCard(null);
   };
 
+  const previewCard = (
+    <div className="banner-preview-pin" ref={previewCardRef}>
+      <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un texto, botón o categoría para editarlo.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
+      <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} />
+      {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
+      <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
+      {compactPreview && <details className="banner-preview-compact-meta"><summary>{issues.length ? `${issues.length} ${issues.length === 1 ? 'aviso' : 'avisos'} antes de publicar` : 'Datos técnicos'}</summary>{issues.length > 0 && <ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul>}<pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
+    </div>
+  );
+
   return (
-    <div className="banner-workspace">
+    <div className="banner-workspace" ref={workspaceRef}>
       <section className="banner-panel banner-panel--editor" aria-label="Configurar portada">
         <div className="banner-panel__head">
           <div>
@@ -693,17 +742,18 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
         </div>}
       </section>
 
-      <section className="banner-panel banner-panel--preview" aria-label="Vista previa de portada">
-        <div className="banner-preview-pin">
-          <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un texto, botón o categoría para editarlo.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-          <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} />
-          {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
-          <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
-          {compactPreview && <details className="banner-preview-compact-meta"><summary>{issues.length ? `${issues.length} ${issues.length === 1 ? 'aviso' : 'avisos'} antes de publicar` : 'Datos técnicos'}</summary>{issues.length > 0 && <ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul>}<pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
+      <section className="banner-panel banner-panel--preview" aria-label={floatingPreview ? undefined : 'Vista previa de portada'}>
+        <div className="banner-preview-anchor" ref={previewAnchorRef} style={floatingPreview && previewHeight ? { minHeight: previewHeight } : undefined}>
+          {!floatingPreview && previewCard}
         </div>
         {!compactPreview && issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
         {!compactPreview && <details className="banner-inline-details banner-json"><summary>Datos técnicos</summary><pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
       </section>
+      {floatingPreview && workspaceRef.current?.closest('.admin-area') && createPortal(
+        <fieldset disabled={disabled} className="banner-panel banner-panel--preview banner-preview-floating" role="region" aria-label="Vista previa de portada" style={{ ...floatingPreview, maxHeight: `calc(100dvh - ${floatingPreview.top + 8}px)` }}>
+          {previewCard}
+        </fieldset>, workspaceRef.current.closest('.admin-area')
+      )}
 
       {/* =======================
           MODALS (Editor completo)

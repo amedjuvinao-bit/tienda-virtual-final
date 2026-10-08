@@ -6,7 +6,7 @@ import BannerPanel from './BannerPanel';
 import { getBannerPreviewModel } from './BannerDevicePreview';
 import { getBannerHeightStyle } from '../../../lib/bannerHeight';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const slides = [
   { image: '/first.jpg', fit: 'cover', posX: 0, posY: 35, button: { enabled: true, kind: 'text', text: 'Ver colección', posX: 50, posY: 85 } },
@@ -148,6 +148,32 @@ describe('editor de Portada', () => {
     expect(fixed).toContainElement(screen.getByText('1 aviso antes de publicar'));
     expect(screen.getAllByText(/reproducción automática con sonido puede ser bloqueada/)).toHaveLength(1);
     expect(preview.querySelector('.banner-issues')).not.toBeInTheDocument();
+  });
+
+  it('ancla la vista previa al desplazarse, conserva los controles y la libera al salir del editor', async () => {
+    const user = userEvent.setup();
+    let anchorTop = 170;
+    let workspaceBottom = 1600;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.classList.contains('admin-header-panel')) return { top: 16, bottom: 80, height: 64 };
+      if (this.classList.contains('banner-preview-anchor')) return { top: anchorTop, left: 780, width: 320, height: 400 };
+      if (this.classList.contains('banner-workspace')) return { top: -200, bottom: workspaceBottom, height: 1800 };
+      if (this.classList.contains('banner-preview-pin')) return { top: 0, bottom: 400, height: 400 };
+      return { top: 0, bottom: 0, height: 0, width: 0 };
+    });
+    render(<div className="admin-area"><div className="admin-header-panel" /><Editor /></div>);
+    expect(document.querySelector('.banner-preview-floating')).not.toBeInTheDocument();
+    anchorTop = 40;
+    fireEvent.scroll(document);
+    const floating = document.querySelector('.admin-area > .banner-preview-floating');
+    expect(floating).toHaveStyle({ top: '88px', left: '780px', width: '320px' });
+    expect(document.querySelector('.banner-preview-anchor')).toHaveStyle({ minHeight: '400px' });
+    await user.click(within(floating).getByRole('button', { name: 'Móvil' }));
+    expect(within(floating).getByRole('button', { name: 'Móvil' })).toHaveAttribute('aria-pressed', 'true');
+    workspaceBottom = 60;
+    fireEvent.scroll(document);
+    expect(document.querySelector('.banner-preview-floating')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Vista previa de portada' }).querySelector('.banner-preview-pin')).toBeInTheDocument();
   });
 
   it('edita el botón elegido en la vista previa cuando el slide tiene varios', async () => {

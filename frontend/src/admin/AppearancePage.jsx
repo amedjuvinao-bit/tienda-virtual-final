@@ -1097,6 +1097,7 @@ export default function AppearancePage() {
             <BannerPanel
               theme={theme}
               setPath={setPath}
+              disabled={saving || !canEditAppearance}
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
