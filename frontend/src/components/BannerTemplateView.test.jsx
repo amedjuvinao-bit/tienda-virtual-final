@@ -84,4 +84,26 @@ describe('plantillas sobre contenido existente', () => {
     rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { atelier: { ...banner.templateConfigs.atelier, cards: [{ categoryId: 'actual-a', lineColor: '#18ad7c' }] } } }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
+
+  it('amplía solo el contenido cercano al puntero sin cambiar la tarjeta', () => {
+    const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
+    const card = container.querySelector('.rb-template__spot-card');
+    const copy = card.querySelector('.rb-template__spot-copy');
+    const arrow = card.querySelector('.rb-template__spot-arrow');
+    copy.getBoundingClientRect = () => ({ left: 20, right: 170, top: 10, bottom: 60, width: 150, height: 50 });
+    arrow.getBoundingClientRect = () => ({ left: 215, right: 245, top: 20, bottom: 50, width: 30, height: 30 });
+    const move = (x) => {
+      const event = new Event('pointermove', { bubbles: true });
+      Object.defineProperties(event, { clientX: { value: x }, clientY: { value: 35 }, pointerType: { value: 'mouse' } });
+      fireEvent(card, event);
+    };
+    move(80);
+    expect(copy).toHaveStyle({ '--rb-local-zoom': '1.090' });
+    expect(arrow).toHaveStyle({ '--rb-local-zoom': '1.000' });
+    move(230);
+    expect(copy).toHaveStyle({ '--rb-local-zoom': '1.000' });
+    expect(arrow).toHaveStyle({ '--rb-local-zoom': '1.090' });
+    fireEvent.pointerLeave(card);
+    expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
+  });
 });

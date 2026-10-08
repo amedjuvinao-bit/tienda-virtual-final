@@ -11,9 +11,11 @@ function GlassLink({ action, secondary = false, preview = false, onSelect, selec
     className,
     'data-selected': preview && selected ? 'true' : undefined,
     onPointerDown: () => { setPressed(true); window.setTimeout(() => setPressed(false), 440); },
+    onPointerMove: zoomNearPointer,
+    onPointerLeave: clearPointerZoom,
     onClick: preview ? (event) => { event.preventDefault(); onSelect?.(); } : undefined,
   };
-  const contents = <><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
+  const contents = <><span className="rb-liquid-button__label" data-zoom-part>{action.text}</span><span data-zoom-part aria-hidden="true">↗</span></>;
   return href ? <a {...props} href={href}>{contents}</a>
     : <span {...props} title={preview ? 'Editar este botón' : 'Configura un enlace en el panel'} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(); } } : undefined} aria-disabled={preview ? undefined : 'true'}>{contents}</span>;
 }
@@ -26,6 +28,21 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 }
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
+const zoomNearPointer = (event) => {
+  if (event.pointerType && event.pointerType !== 'mouse') return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  for (const part of event.currentTarget.querySelectorAll('[data-zoom-part]')) {
+    const rect = part.getBoundingClientRect();
+    if (!rect.width || !rect.height) continue;
+    const dx = Math.max(rect.left - event.clientX, 0, event.clientX - rect.right);
+    const dy = Math.max(rect.top - event.clientY, 0, event.clientY - rect.bottom);
+    const proximity = Math.max(0, 1 - Math.hypot(dx, dy) / 48);
+    part.style.setProperty('--rb-local-zoom', (1 + .09 * proximity).toFixed(3));
+  }
+};
+const clearPointerZoom = (event) => {
+  for (const part of event.currentTarget.querySelectorAll('[data-zoom-part]')) part.style.removeProperty('--rb-local-zoom');
+};
 
 export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
@@ -64,10 +81,10 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
             <polyline points={`${x},${y} 73,${y} 73,${cardY} 76,${cardY}`} stroke={lineColor} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
-          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
-            {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
-            <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
-            <span className="rb-template__spot-arrow" aria-hidden="true">→</span>
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={zoomNearPointer} onPointerLeave={clearPointerZoom} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
+            {item.image && <img src={item.image} alt="" data-zoom-part onError={(event) => { event.currentTarget.hidden = true; }} />}
+            <span className="rb-template__spot-copy" data-zoom-part><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
+            <span className="rb-template__spot-arrow" data-zoom-part aria-hidden="true">→</span>
           </CardTag>
         </div>;
       })}
