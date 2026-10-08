@@ -85,25 +85,25 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
 
-  it('amplía solo el contenido cercano al puntero sin cambiar la tarjeta', () => {
+  it('desplaza el vidrio localizado con el puntero y lo apaga al salir sin ampliar el contenido', () => {
     const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     const card = container.querySelector('.rb-template__spot-card');
     const copy = card.querySelector('.rb-template__spot-copy');
-    const arrow = card.querySelector('.rb-template__spot-arrow');
-    copy.getBoundingClientRect = () => ({ left: 20, right: 170, top: 10, bottom: 60, width: 150, height: 50 });
-    arrow.getBoundingClientRect = () => ({ left: 215, right: 245, top: 20, bottom: 50, width: 30, height: 30 });
+    card.getBoundingClientRect = () => ({ left: 20, top: 10, width: 250, height: 70 });
     const move = (x) => {
       const event = new Event('pointermove', { bubbles: true });
       Object.defineProperties(event, { clientX: { value: x }, clientY: { value: 35 }, pointerType: { value: 'mouse' } });
       fireEvent(card, event);
     };
     move(80);
-    expect(copy).toHaveStyle({ '--rb-local-zoom': '1.090' });
-    expect(arrow).toHaveStyle({ '--rb-local-zoom': '1.000' });
+    expect(card).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '25px' });
+    expect(card).toHaveAttribute('data-refracting', 'true');
+    expect(card.querySelector('.rb-glass-lens')).toHaveAttribute('aria-hidden', 'true');
     move(230);
-    expect(copy).toHaveStyle({ '--rb-local-zoom': '1.000' });
-    expect(arrow).toHaveStyle({ '--rb-local-zoom': '1.090' });
-    fireEvent.pointerLeave(card);
+    expect(card).toHaveStyle({ '--rb-pointer-x': '210px' });
+    expect(copy).not.toHaveAttribute('data-zoom-part');
     expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
+    fireEvent.pointerLeave(card);
+    expect(card).not.toHaveAttribute('data-refracting');
   });
 });
