@@ -49,6 +49,7 @@
 .rb-template__spot-card:hover,.rb-template__spot-card[data-open='true'] { transform: translateY(-50%) scale(1.025); background: color-mix(in srgb,var(--rb-template-glass) 90%,transparent); box-shadow: inset 0 2px 3px rgba(255,255,255,.8),0 12px 27px rgba(63,20,28,.23); }
 .rb-template__spot-card:active { transform: translateY(-50%) scale(.98); }
 .rb-template__spot-card img { width: 52px; height: 52px; flex: none; object-fit: cover; border-radius: 10px; }
+.rb-template__spot-card img[hidden] { display: none; }
 .rb-template__spot-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
 .rb-template__spot-card strong { overflow: hidden; color: inherit; font: 600 clamp(11px,1.05cqw,15px)/1.2 Georgia,serif; text-overflow: ellipsis; white-space: nowrap; }
 .rb-template__spot-card small { display: -webkit-box; overflow: hidden; color: #694d4b; font: 400 clamp(8px,.7cqw,11px)/1.2 system-ui,sans-serif; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
