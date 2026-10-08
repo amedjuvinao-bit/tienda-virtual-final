@@ -48,9 +48,9 @@ export function moveLiquidGlass(event) {
   target.style.setProperty('--rb-pointer-y', `${y}px`);
   target.dataset.refracting = 'true';
 
-  const surface = target.querySelector('.rb-glass-surface');
+  const lens = target.querySelector('.rb-glass-lens');
   const image = target.querySelector('[data-glass-map]');
-  if (!surface || !image) return;
+  if (!lens || !image) return;
   let state = maps.get(target);
   if (!state) {
     state = { canvas: document.createElement('canvas'), frame: null, point: null };
@@ -66,10 +66,10 @@ export function moveLiquidGlass(event) {
       const map = paintDisplacement(state.canvas, point.width, point.height, point.x, point.y);
       if (!map) return;
       image.setAttribute('href', map);
-      surface.style.filter = `url(#${surface.dataset.glassFilter})`;
+      lens.style.filter = `url(#${lens.dataset.glassFilter})`;
     } catch {
-      // El borde conserva su interacción si el navegador no permite Canvas/SVG.
-      surface.style.removeProperty('filter');
+      // La apertura local sigue visible si Canvas/SVG no está disponible.
+      lens.style.removeProperty('filter');
     }
   });
 }
@@ -80,5 +80,5 @@ export function clearLiquidGlass(event) {
   const state = maps.get(target);
   if (state?.frame !== null && state?.frame !== undefined) window.cancelAnimationFrame(state.frame);
   if (state) state.frame = null;
-  target.querySelector('.rb-glass-surface')?.style.removeProperty('filter');
+  target.querySelector('.rb-glass-lens')?.style.removeProperty('filter');
 }

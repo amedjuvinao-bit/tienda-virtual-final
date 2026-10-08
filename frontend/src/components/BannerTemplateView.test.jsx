@@ -110,13 +110,14 @@ describe('plantillas sobre contenido existente', () => {
     };
     move(80);
     expect(card).toHaveAttribute('data-refracting', 'true');
-    const surface = card.querySelector('.rb-glass-surface');
+    const lens = card.querySelector('.rb-glass-lens');
+    expect(lens.compareDocumentPosition(card.querySelector('.rb-glass-surface')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(card).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '25px' });
-    expect(card.querySelector('.rb-glass-lens')).toHaveAttribute('aria-hidden', 'true');
+    expect(lens).toHaveAttribute('aria-hidden', 'true');
     expect(card.querySelector('.rb-glass-rim')).toHaveAttribute('aria-hidden', 'true');
     frames.shift()(0);
     expect(card.querySelector('[data-glass-map]')).toHaveAttribute('href', 'data:image/png;base64,YQ==');
-    expect(surface.style.filter).toMatch(/^url\(#rb-liquid-/);
+    expect(lens.style.filter).toMatch(/^url\(#rb-liquid-/);
     const firstMap = imageData[0].data;
     expect(firstMap[(25 * 250 + 80) * 4]).not.toBe(128);
     expect(firstMap[(65 * 250 + 200) * 4]).toBe(128);
@@ -129,7 +130,7 @@ describe('plantillas sobre contenido existente', () => {
     expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
     fireEvent.pointerLeave(card);
     expect(card).not.toHaveAttribute('data-refracting');
-    expect(surface.style.filter).toBe('');
+    expect(lens.style.filter).toBe('');
     frameSpy.mockRestore();
     cancelSpy.mockRestore();
     contextSpy.mockRestore();
