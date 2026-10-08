@@ -1,19 +1,12 @@
-import React, { useId, useState } from 'react';
+import React, { useState } from 'react';
 import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import { moveLiquidGlass, clearLiquidGlass } from './liquidGlassRefraction';
 import './bannerTemplateView.css';
 
 function GlassSurface() {
-  const filterId = `rb-liquid-${useId().replace(/:/g, '')}`;
   return <>
-    <span className="rb-glass-lens" data-glass-filter={filterId} aria-hidden="true" />
+    <canvas className="rb-glass-lens" aria-hidden="true" />
     <span className="rb-glass-surface" aria-hidden="true" />
-    <svg className="rb-glass-filter" width="0" height="0" aria-hidden="true" focusable="false">
-      <defs><filter id={filterId} x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
-        <feImage data-glass-map="" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="glass-map" />
-        <feDisplacementMap in="SourceGraphic" in2="glass-map" scale="28" xChannelSelector="R" yChannelSelector="G" />
-      </filter></defs>
-    </svg>
     <span className="rb-glass-rim" aria-hidden="true" />
   </>;
 }

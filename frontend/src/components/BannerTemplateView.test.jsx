@@ -87,21 +87,20 @@ describe('plantillas sobre contenido existente', () => {
 
   it('desplaza la refracción de la superficie con el puntero sin ampliar el contenido', () => {
     const frames = [];
-    const imageData = [];
+    const draws = [];
     const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { frames.push(callback); return frames.length; });
     const cancelSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
     const contextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
-      createImageData: (width, height) => {
-        const image = { data: new Uint8ClampedArray(width * height * 4) };
-        imageData.push(image);
-        return image;
-      },
-      putImageData: () => {},
+      setTransform: () => {},
+      clearRect: () => { draws.length = 0; },
+      drawImage: (...args) => { draws.push(args); },
     }));
-    const dataSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,YQ==');
     const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     const card = container.querySelector('.rb-template__spot-card');
     const copy = card.querySelector('.rb-template__spot-copy');
+    const media = container.querySelector('.rb-template__picture img');
+    Object.defineProperties(media, { complete: { value: true }, naturalWidth: { value: 800 }, naturalHeight: { value: 400 } });
+    media.getBoundingClientRect = () => ({ left: 0, top: 0, right: 400, bottom: 200, width: 400, height: 200 });
     card.getBoundingClientRect = () => ({ left: 20, top: 10, width: 250, height: 70 });
     const move = (x) => {
       const event = new Event('pointermove', { bubbles: true });
@@ -109,32 +108,27 @@ describe('plantillas sobre contenido existente', () => {
       fireEvent(card, event);
     };
     move(80);
-    expect(card).toHaveAttribute('data-refracting', 'true');
+    expect(card).not.toHaveAttribute('data-refracting');
     const lens = card.querySelector('.rb-glass-lens');
     expect(lens.compareDocumentPosition(card.querySelector('.rb-glass-surface')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(card).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '25px' });
     expect(lens).toHaveAttribute('aria-hidden', 'true');
     expect(card.querySelector('.rb-glass-rim')).toHaveAttribute('aria-hidden', 'true');
     frames.shift()(0);
-    expect(card.querySelector('[data-glass-map]')).toHaveAttribute('href', 'data:image/png;base64,YQ==');
-    expect(lens.style.backdropFilter).toMatch(/^url\(#rb-liquid-/);
-    const firstMap = imageData[0].data;
-    expect(Math.abs(firstMap[(25 * 250 + 80) * 4] - 128)).toBeGreaterThan(10);
-    expect(firstMap[(65 * 250 + 200) * 4]).toBe(128);
+    expect(card).toHaveAttribute('data-refracting', 'true');
+    expect(draws.length).toBeGreaterThan(100);
+    expect(draws.some(([source, sx, , , , dx]) => source === media && Math.abs(sx - (20 + dx) * 2) > 10)).toBe(true);
     move(230);
     expect(card).toHaveStyle({ '--rb-pointer-x': '210px' });
     frames.shift()(0);
-    expect(imageData[1].data[(25 * 250 + 80) * 4]).toBe(128);
-    expect(imageData[1].data[(25 * 250 + 230) * 4]).not.toBe(128);
+    expect(draws.some(([, sx, , , , dx]) => dx > 170 && Math.abs(sx - (20 + dx) * 2) > 10)).toBe(true);
     expect(copy).not.toHaveAttribute('data-zoom-part');
     expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
     fireEvent.pointerLeave(card);
     expect(card).not.toHaveAttribute('data-refracting');
-    expect(lens.style.backdropFilter).toBe('');
     frameSpy.mockRestore();
     cancelSpy.mockRestore();
     contextSpy.mockRestore();
-    dataSpy.mockRestore();
   });
 
   it('mantiene el contorno original del botón mientras sigue el puntero', () => {
@@ -144,11 +138,43 @@ describe('plantillas sobre contenido existente', () => {
     const event = new Event('pointermove', { bubbles: true });
     Object.defineProperties(event, { clientX: { value: 70 }, clientY: { value: 34 }, pointerType: { value: 'mouse' } });
     fireEvent(button, event);
-    expect(button).toHaveAttribute('data-refracting', 'true');
     expect(button).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '19px' });
     expect(button.querySelector('.rb-glass-rim')).toBeInTheDocument();
     expect(button.style.transform).toBe('');
     fireEvent.pointerLeave(button);
     expect(button).not.toHaveAttribute('data-refracting');
+  });
+
+  it('actualiza la refracción del video mientras el puntero permanece sobre la tarjeta', () => {
+    const frames = [];
+    const drawImage = vi.fn();
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { frames.push(callback); return frames.length; });
+    const cancelSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const contextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
+      setTransform: () => {}, clearRect: () => {}, drawImage,
+    }));
+    const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><video src="/portada.mp4" /></BannerTemplateView>);
+    const video = container.querySelector('.rb-template__picture video');
+    Object.defineProperties(video, {
+      readyState: { value: 2 }, videoWidth: { value: 1200 }, videoHeight: { value: 600 }, paused: { value: false },
+    });
+    video.getBoundingClientRect = () => ({ left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300 });
+    const card = container.querySelector('.rb-template__spot-card');
+    card.getBoundingClientRect = () => ({ left: 20, top: 10, width: 250, height: 70 });
+    const event = new Event('pointermove', { bubbles: true });
+    Object.defineProperties(event, { clientX: { value: 120 }, clientY: { value: 45 }, pointerType: { value: 'mouse' } });
+    fireEvent(card, event);
+    frames.shift()(40);
+    expect(drawImage).toHaveBeenCalledWith(video, expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number));
+    const firstFrameDraws = drawImage.mock.calls.length;
+    expect(frames.length).toBe(1);
+    frames.shift()(80);
+    expect(drawImage.mock.calls.length).toBeGreaterThan(firstFrameDraws);
+    fireEvent.pointerLeave(card);
+    expect(card).not.toHaveAttribute('data-refracting');
+    expect(cancelSpy).toHaveBeenCalled();
+    frameSpy.mockRestore();
+    cancelSpy.mockRestore();
+    contextSpy.mockRestore();
   });
 });
