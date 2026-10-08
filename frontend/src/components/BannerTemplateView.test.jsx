@@ -85,7 +85,7 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
 
-  it('desplaza el vidrio localizado con el puntero y lo apaga al salir sin ampliar el contenido', () => {
+  it('deforma el contorno junto al puntero y desplaza el tramo iridiscente sin ampliar el contenido', () => {
     const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     const card = container.querySelector('.rb-template__spot-card');
     const copy = card.querySelector('.rb-template__spot-copy');
@@ -96,14 +96,20 @@ describe('plantillas sobre contenido existente', () => {
       fireEvent(card, event);
     };
     move(80);
-    expect(card).toHaveStyle({ '--rb-pointer-x': '60px', '--rb-pointer-y': '25px' });
     expect(card).toHaveAttribute('data-refracting', 'true');
-    expect(card.querySelector('.rb-glass-lens')).toHaveAttribute('aria-hidden', 'true');
+    const surface = card.querySelector('.rb-glass-surface');
+    expect(surface.style.clipPath).toMatch(/^path\('M /);
+    const firstContour = card.querySelector('[data-contour-base]').getAttribute('d');
+    const firstSpectrum = card.querySelector('[data-contour-spectrum]').getAttribute('d');
+    const firstGradient = card.querySelector('linearGradient').getAttribute('x1');
     move(230);
-    expect(card).toHaveStyle({ '--rb-pointer-x': '210px' });
+    expect(card.querySelector('[data-contour-base]').getAttribute('d')).not.toBe(firstContour);
+    expect(card.querySelector('[data-contour-spectrum]').getAttribute('d')).not.toBe(firstSpectrum);
+    expect(card.querySelector('linearGradient').getAttribute('x1')).not.toBe(firstGradient);
     expect(copy).not.toHaveAttribute('data-zoom-part');
     expect(copy.style.getPropertyValue('--rb-local-zoom')).toBe('');
     fireEvent.pointerLeave(card);
     expect(card).not.toHaveAttribute('data-refracting');
+    expect(surface.style.clipPath).toBe('');
   });
 });
