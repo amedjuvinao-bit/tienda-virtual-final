@@ -115,7 +115,7 @@ const BannerSchema = new Schema(
     },
 
     slides: { type: [BannerSlideSchema], default: [] },
-    templateId: { type: String, enum: ["classic", "discovery", "editorial", "atelier"], default: "classic" },
+    templateId: { type: String, enum: ["plain", "classic", "discovery", "editorial", "atelier"], default: "classic" },
     templateConfigs: {
       discovery: { type: BannerTemplateConfigSchema, default: undefined },
       editorial: { type: BannerTemplateConfigSchema, default: undefined },

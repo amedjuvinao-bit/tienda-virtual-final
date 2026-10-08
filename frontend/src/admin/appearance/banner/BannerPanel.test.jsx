@@ -27,6 +27,39 @@ function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520,
 }
 
 describe('editor de Portada', () => {
+  it('conserva la galería al alternar entre solo imágenes y un diseño común', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    await user.click(screen.getByRole('button', { name: 'Solo archivo' }));
+    expect(preview.querySelector('.rb-template')).not.toBeInTheDocument();
+    expect(preview.querySelector('.banner-preview-cta')).not.toBeInTheDocument();
+    await user.click(within(preview).getByRole('button', { name: 'Siguiente ›' }));
+    expect(within(preview).getByAltText('Slide 2')).toHaveAttribute('src', '/second.jpg');
+    await user.click(screen.getByRole('button', { name: 'Descubrimiento' }));
+    expect(preview.querySelector('.rb-template')).toBeInTheDocument();
+    expect(within(preview).getByAltText('Slide 2')).toHaveAttribute('src', '/second.jpg');
+    await user.click(within(preview).getByRole('button', { name: '‹ Anterior' }));
+    expect(within(preview).getByAltText('Slide 1')).toHaveAttribute('src', '/first.jpg');
+    expect(preview.querySelector('.rb-template__title')).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('banner-values').textContent).slides).toHaveLength(2);
+  });
+
+  it('conserva el video al activar y desactivar el diseño', async () => {
+    const user = userEvent.setup();
+    render(<Editor initial={{ type: 'video', videoUrl: '/portada.mp4', videoButton: { enabled: true, kind: 'text', text: 'Antiguo' } }} />);
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    await user.click(screen.getByRole('button', { name: 'Solo archivo' }));
+    expect(preview.querySelector('video')).toHaveAttribute('src', '/portada.mp4');
+    expect(preview.querySelector('.banner-preview-cta')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Editorial' }));
+    expect(preview.querySelector('video')).toHaveAttribute('src', '/portada.mp4');
+    expect(preview.querySelector('.rb-template')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Solo archivo' }));
+    expect(preview.querySelector('video')).toHaveAttribute('src', '/portada.mp4');
+    expect(JSON.parse(screen.getByTestId('banner-values').textContent).videoUrl).toBe('/portada.mp4');
+  });
+
   it('elige la parte en la vista previa y muestra solo sus controles', async () => {
     const user = userEvent.setup();
     render(<Editor initial={{ type: 'image', imageUrl: '/hero.jpg' }} />);

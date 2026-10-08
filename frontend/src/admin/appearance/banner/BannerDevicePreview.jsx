@@ -44,7 +44,8 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
 
 export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
-  const { viewport, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent, buttons } = model;
+  const { viewport, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
+  const buttons = banner?.templateId === 'plain' ? [] : model.buttons;
   const noMediaText = type === 'video' ? 'Agrega un video para verlo aquí' : 'Agrega una imagen para verla aquí';
   const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId);
   const media = mediaUrl ? type === 'video' ? (

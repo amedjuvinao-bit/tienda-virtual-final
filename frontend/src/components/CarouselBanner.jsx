@@ -233,6 +233,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
   const bannerType = bannerLoading ? "loading" : String(banner?.type || "slider")
   const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId)
+  const plainMedia = banner?.templateId === 'plain'
   const isMobile = viewportWidth < 640
   const isTablet = viewportWidth >= 640 && viewportWidth < 1024
   const isDesktop = viewportWidth >= 1024
@@ -636,7 +637,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       })
       .filter((s) => !!s.image)
 
-    if (normalized.length > 0 || useTemplate) return normalized.map((s) => ({ ...s, text: "" }))
+    if (normalized.length > 0 || useTemplate || plainMedia) return normalized.map((s) => ({ ...s, text: "" }))
 
     return fallbackSlides.map((s) => ({
       image: s.image,
@@ -648,7 +649,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       buttons: null,
       text: s.text || "",
     }))
-  }, [bannerType, banner?.slides, fallbackSlides, useTemplate])
+  }, [bannerType, banner?.slides, fallbackSlides, useTemplate, plainMedia])
 
   const sliderMountKey = useMemo(() => {
     if (bannerType !== "slider") return "noslider"
@@ -879,7 +880,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
   if (bannerType === "video") {
     const videoUrl = String(banner?.videoUrl || "").trim()
-    const videoBtnPayload = pickButtons(banner?.videoButtons, banner?.videoButton)
+    const videoBtnPayload = plainMedia ? [] : pickButtons(banner?.videoButtons, banner?.videoButton)
 
     return (
       <div className={heroWrapClass} style={heroWrapStyle}>
@@ -913,14 +914,14 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
   if (bannerType === "image") {
     const imageUrl = String(banner?.imageUrl || "").trim()
-    const imageLink = String(banner?.imageLink || "").trim()
+    const imageLink = plainMedia ? "" : String(banner?.imageLink || "").trim()
 
     const imageFit = normalizeFit(banner?.imageFit)
     const imagePosX = clamp0_100(banner?.imagePosX, 50)
     const imagePosY = clamp0_100(banner?.imagePosY, 50)
     const imageObjectPosition = `${imagePosX}% ${imagePosY}%`
 
-    const imageBtnPayload = pickButtons(banner?.imageButtons, banner?.imageButton)
+    const imageBtnPayload = plainMedia ? [] : pickButtons(banner?.imageButtons, banner?.imageButton)
 
     const Img = (
       <img
@@ -1021,7 +1022,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
             const posY = clamp0_100(slide?.posY, 50)
             const objectPosition = `${posX}% ${posY}%`
 
-            const slideButtons = pickButtons(slide?.buttons, slide?.button)
+            const slideButtons = plainMedia ? [] : pickButtons(slide?.buttons, slide?.button)
             const isActive = idx === currentSlide
 
             return (
