@@ -1,6 +1,7 @@
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/BlockConfigPanel.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { fetchSiteSettings } from '../../lib/siteSettingsApi';
 import LookSectionUI from "../appearance/sections/look/LookSectionUI";
 import BannerPanel from "../appearance/banner/BannerPanel";
 import CategoriasSectionUI from "../appearance/sections/categorias/CategoriasSectionUI";
@@ -412,6 +413,8 @@ function normalizeBannerConfig(raw) {
 
   return {
     type: source.type || "slider",
+    templateId: source.templateId || "classic",
+    templateConfigs: source.templateConfigs && typeof source.templateConfigs === 'object' ? source.templateConfigs : {},
     slides: Array.isArray(source.slides)
       ? source.slides.map((slide) => {
           const safeSlide = slide || {};
@@ -714,11 +717,21 @@ function InfoBlockEditor({ block, onChange }) {
 
 function BannerBlockEditor({ block, onChange }) {
   const [uploading, setUploading] = useState(false);
+  const [storeSections, setStoreSections] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchSiteSettings().then((settings) => {
+      if (mounted) setStoreSections(settings?.theme?.sections || []);
+    }).catch(() => { if (mounted) setStoreSections([]); });
+    return () => { mounted = false; };
+  }, []);
 
   const safeBanner = normalizeBannerConfig(block?.config);
 
   const theme = {
     banner: safeBanner,
+    sections: storeSections || [],
   };
 
   const setPath = (path, value) => {

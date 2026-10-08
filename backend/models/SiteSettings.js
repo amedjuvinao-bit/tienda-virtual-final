@@ -71,6 +71,41 @@ const BannerSlideSchema = new Schema(
   { _id: false }
 );
 
+const BannerTemplateActionSchema = new Schema({
+  enabled: { type: Boolean, default: true },
+  text: { type: String, default: "" },
+  link: { type: String, default: "" },
+}, { _id: false });
+
+const BannerTemplateCardSchema = new Schema({
+  enabled: { type: Boolean, default: true },
+  categoryId: { type: String, default: "" },
+  label: { type: String, default: "" },
+  text: { type: String, default: "" },
+  image: { type: String, default: "" },
+  link: { type: String, default: "" },
+  x: { type: Number, min: 0, max: 100, default: 70 },
+  y: { type: Number, min: 0, max: 100, default: 55 },
+}, { _id: false });
+
+const BannerTemplateConfigSchema = new Schema({
+  eyebrow: String,
+  eyebrowLink: String,
+  title: String,
+  titleLink: String,
+  description: String,
+  descriptionLink: String,
+  footerText: String,
+  footerTextLink: String,
+  primary: { type: BannerTemplateActionSchema, default: undefined },
+  secondary: { type: BannerTemplateActionSchema, default: undefined },
+  cards: { type: [BannerTemplateCardSchema], default: [] },
+  textColor: String,
+  accentColor: String,
+  glassColor: String,
+  overlayOpacity: { type: Number, min: 0, max: 70 },
+}, { _id: false });
+
 const BannerSchema = new Schema(
   {
     type: {
@@ -80,6 +115,12 @@ const BannerSchema = new Schema(
     },
 
     slides: { type: [BannerSlideSchema], default: [] },
+    templateId: { type: String, enum: ["classic", "discovery", "editorial", "atelier"], default: "classic" },
+    templateConfigs: {
+      discovery: { type: BannerTemplateConfigSchema, default: undefined },
+      editorial: { type: BannerTemplateConfigSchema, default: undefined },
+      atelier: { type: BannerTemplateConfigSchema, default: undefined },
+    },
 
     autoplayMs: { type: Number, default: 4500 },
     sliderShowProgress: { type: Boolean, default: true },

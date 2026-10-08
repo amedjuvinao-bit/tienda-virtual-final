@@ -1,6 +1,8 @@
 // src/admin/appearance/banner/BannerPanel.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import BannerDevicePreview, { BANNER_DEVICES } from './BannerDevicePreview';
+import BannerTemplatePanel from './BannerTemplatePanel';
+import { getBannerTemplate, safeBannerLink } from '../../../lib/bannerTemplates';
 import { getBannerHeightSettings } from '../../../lib/bannerHeight';
 import './bannerPanel.css';
 
@@ -525,7 +527,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     const type = String(b.type || "slider");
 
     if (type === "slider") {
-      if (!slides.length) out.push({ tone: "red", text: "Sin slides la tienda mostrará imágenes de ejemplo. Agrega al menos uno." });
+      if (!slides.length) out.push({ tone: "red", text: ['discovery', 'editorial', 'atelier'].includes(b.templateId) ? "Agrega al menos una imagen para esta portada." : "Sin slides la tienda mostrará imágenes de ejemplo. Agrega al menos uno." });
       slides.forEach((s, i) => {
         if (!s?.image) out.push({ tone: "red", text: `Slide #${i + 1}: falta imagen.` });
       });
@@ -540,8 +542,17 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
       if (b.videoAutoplay && !b.videoMuted) out.push({ tone: "red", text: "La reproducción automática con sonido puede ser bloqueada por el navegador. Activa Silenciar." });
     }
 
+    if (['discovery', 'editorial', 'atelier'].includes(b.templateId)) {
+      const selected = getBannerTemplate(b, theme?.sections).config;
+      for (const key of ['primary', 'secondary']) {
+        if (selected[key].enabled !== false && selected[key].text && !safeBannerLink(selected[key].link)) {
+          out.push({ tone: 'red', text: `Configura un enlace válido para el botón ${key === 'primary' ? 'principal' : 'secundario'}.` });
+        }
+      }
+    }
+
     return out;
-  }, [b.type, b.imageUrl, b.videoUrl, b.videoAutoplay, b.videoMuted, slides]);
+  }, [b, theme?.sections, slides]);
 
   const bannerType = String(b.type || "slider");
   const effectiveInterval = b.sliderIntervalMs ?? b.autoplayMs ?? 3500;
@@ -579,6 +590,18 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
             <option value="fullscreen">Pantalla completa</option>
           </Select>
         </div>
+
+        {activePanel === 'content' && <div className="banner-template-mode">
+          <label className="banner-template-field"><span>Diseño sobre tus imágenes o video</span>
+            <select value={b.templateId || 'classic'} onChange={(event) => setPath('banner.templateId', event.target.value)}>
+              <option value="classic">Diseño actual</option>
+              <option value="discovery">Descubrimiento</option>
+              <option value="editorial">Editorial</option>
+              <option value="atelier">Vitrina de cristal</option>
+            </select>
+          </label>
+          {b.templateId && b.templateId !== 'classic' && <BannerTemplatePanel theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} />}
+        </div>}
 
         {activePanel === 'content' && bannerType === 'slider' && (
           <div className="banner-content-card">
@@ -645,9 +668,9 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
 
       <section className="banner-panel banner-panel--preview" aria-label="Vista previa de portada">
         <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>Selecciona un tamaño para comprobar el encuadre.</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-        <BannerDevicePreview banner={b} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} />
+        <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} />
         {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
-        <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => editCurrent()} disabled={bannerType === 'slider' && !slides.length}>Editar {bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
+        <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (!b.templateId || b.templateId === 'classic') editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && (!b.templateId || b.templateId === 'classic')}>Editar {b.templateId && b.templateId !== 'classic' ? 'diseño' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
         {issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
         <details className="banner-inline-details banner-json"><summary>Datos técnicos</summary><pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>
       </section>

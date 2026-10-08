@@ -1,5 +1,6 @@
 import React from 'react';
 import { getBannerHeightSettings } from '../../../lib/bannerHeight';
+import BannerTemplateView from '../../../components/BannerTemplateView';
 
 export const BANNER_DEVICES = Object.freeze({
   mobile: { label: 'Móvil', width: 390, height: 844 },
@@ -41,22 +42,23 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   };
 }
 
-export default function BannerDevicePreview({ banner, slides, selectedIdx, device, onEdit }) {
+export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
   const { viewport, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent, buttons } = model;
   const noMediaText = type === 'video' ? 'Agrega un video para verlo aquí' : 'Agrega una imagen para verla aquí';
+  const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId);
+  const media = mediaUrl ? type === 'video' ? (
+    <video src={mediaUrl} muted playsInline controls preload="metadata" className="banner-preview-media" />
+  ) : <img src={mediaUrl} alt={type === 'slider' ? `Slide ${selectedIdx + 1}` : 'Imagen de portada'} className="banner-preview-media" style={{ objectFit: fit, objectPosition }} />
+    : <span className="banner-preview-empty">{noMediaText}</span>;
 
   return (
     <div className="banner-preview-shell" data-device={device}>
       <div className="banner-preview-viewport" data-device={device} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
         <div className="banner-preview-mini-header"><span>ROSA BOUTIQUE</span><span>⌕ · ≡</span></div>
         <div className="banner-preview-hero" style={{ height: `${heightPercent}%` }}>
-          {mediaUrl ? type === 'video' ? (
-            <video src={mediaUrl} muted playsInline controls preload="metadata" className="banner-preview-media" />
-          ) : (
-            <img src={mediaUrl} alt={type === 'slider' ? `Slide ${selectedIdx + 1}` : 'Imagen de portada'} className="banner-preview-media" style={{ objectFit: fit, objectPosition }} />
-          ) : <span className="banner-preview-empty">{noMediaText}</span>}
-          {buttons.map((button, index) => {
+          {useTemplate ? <BannerTemplateView banner={banner} sections={sections} preview device={device}>{media}</BannerTemplateView> : media}
+          {!useTemplate && buttons.map((button, index) => {
             const requestedWidth = Number(button.widthPx);
             const width = Number.isFinite(requestedWidth) ? Math.max(80, Math.min(520, requestedWidth)) : 200;
             const responsiveWidth = device === 'mobile' ? Math.min(220, viewport.width * .5, width) : device === 'tablet' ? Math.min(320, viewport.width * .4, width) : width;
