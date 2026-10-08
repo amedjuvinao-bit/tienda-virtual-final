@@ -71,7 +71,7 @@ describe('plantillas sobre contenido existente', () => {
     expect(onPlaceCard).toHaveBeenCalledWith(0, 50, 75);
   });
 
-  it('usa el color guardado en la tarjeta y mueve el brillo con el puntero', () => {
+  it('usa el color guardado en la tarjeta y en su conexión', () => {
     const banner = { templateId: 'atelier', templateConfigs: { atelier: {
       glassColor: '#75cfff', cards: [{ categoryId: 'actual-a', lineColor: '#c32d72' }],
     } } };
@@ -81,11 +81,6 @@ describe('plantillas sobre contenido existente', () => {
     expect(template).toHaveStyle({ '--rb-template-glass': '#75cfff' });
     expect(card).toHaveAttribute('href', '/categoria/hogar');
     expect(card.closest('.rb-template__spot')).toHaveStyle({ '--rb-spot-color': '#c32d72' });
-    card.getBoundingClientRect = () => ({ left: 20, top: 40, width: 200, height: 100 });
-    const pointer = new Event('pointermove', { bubbles: true });
-    Object.defineProperties(pointer, { clientX: { value: 70 }, clientY: { value: 65 } });
-    fireEvent(card, pointer);
-    expect(card).toHaveStyle({ '--rb-glass-x': '25%', '--rb-glass-y': '25%' });
     rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { atelier: { ...banner.templateConfigs.atelier, cards: [{ categoryId: 'actual-a', lineColor: '#18ad7c' }] } } }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });

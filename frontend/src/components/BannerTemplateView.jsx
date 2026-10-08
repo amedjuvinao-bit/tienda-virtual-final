@@ -11,8 +11,6 @@ function GlassLink({ action, secondary = false, preview = false, onSelect, selec
     className,
     'data-selected': preview && selected ? 'true' : undefined,
     onPointerDown: () => { setPressed(true); window.setTimeout(() => setPressed(false), 440); },
-    onPointerMove: moveGlassLight,
-    onPointerLeave: (event) => { event.currentTarget.style.removeProperty('--rb-glass-x'); event.currentTarget.style.removeProperty('--rb-glass-y'); },
     onClick: preview ? (event) => { event.preventDefault(); onSelect?.(); } : undefined,
   };
   const contents = <><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
@@ -28,12 +26,6 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 }
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
-const moveGlassLight = (event) => {
-  const rect = event.currentTarget.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-  event.currentTarget.style.setProperty('--rb-glass-x', `${percent((event.clientX - rect.left) / rect.width * 100, 50)}%`);
-  event.currentTarget.style.setProperty('--rb-glass-y', `${percent((event.clientY - rect.top) / rect.height * 100, 50)}%`);
-};
 
 export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
@@ -72,7 +64,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
             <polyline points={`${x},${y} 73,${y} 73,${cardY} 76,${cardY}`} stroke={lineColor} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
-          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={moveGlassLight} onPointerLeave={(event) => { event.currentTarget.style.removeProperty('--rb-glass-x'); event.currentTarget.style.removeProperty('--rb-glass-y'); }} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
             {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
             <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
             <span className="rb-template__spot-arrow" aria-hidden="true">→</span>
