@@ -16,7 +16,7 @@ function Editor() {
     cursor[keys.at(-1)] = value;
     return draft;
   });
-  return <><output data-testid="state">{JSON.stringify(theme.banner)}</output><BannerTemplatePanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={vi.fn()} /></>;
+  return <><output data-testid="state">{JSON.stringify(theme.banner)}</output><button onClick={() => setPath('banner.templateId', 'editorial')}>Editorial</button><button onClick={() => setPath('banner.templateId', 'discovery')}>Descubrimiento</button><BannerTemplatePanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={vi.fn()} /></>;
 }
 
 describe('editor de plantillas', () => {
@@ -27,10 +27,17 @@ describe('editor de plantillas', () => {
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi editorial' } });
     fireEvent.click(screen.getByRole('button', { name: /Descubrimiento/ }));
     expect(screen.getByLabelText('Título').value).toBe('Mi portada');
-    fireEvent.click(screen.getByRole('button', { name: 'Categorías' }));
-    const select = screen.getAllByLabelText('Categoría existente')[0];
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    const select = screen.getByLabelText('Usar esta categoría');
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['Hogar', 'Regalos']);
+    expect(screen.getAllByLabelText('Usar esta categoría')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /Acceso 2/ }));
+    fireEvent.change(screen.getByLabelText('Texto visible'), { target: { value: 'Un regalo' } });
+    fireEvent.click(screen.getByRole('button', { name: '② Botones' }));
+    fireEvent.change(screen.getByLabelText('Texto del botón'), { target: { value: 'Comprar' } });
     const saved = JSON.parse(screen.getByTestId('state').textContent);
     expect(saved.templateConfigs.editorial.title).toBe('Mi editorial');
+    expect(saved.templateConfigs.discovery.cards[1].text).toBe('Un regalo');
+    expect(saved.templateConfigs.discovery.primary.text).toBe('Comprar');
   });
 });

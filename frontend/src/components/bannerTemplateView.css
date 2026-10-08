@@ -103,4 +103,7 @@
 .rb-template[data-preview-device="mobile"] .rb-template__card small { font-size: 1.5cqw; }
 .rb-template[data-preview-device="mobile"] .rb-template__card strong { font-size: 2cqw; }
 .rb-template[data-preview-device="mobile"] .rb-template__card > span:last-child { font-size: 2.5cqw; }
+.rb-template[data-preview-device] .rb-template__editable,.rb-template[data-preview-device] .rb-template__card,.rb-template[data-preview-device] .rb-template__spot-trigger { cursor: pointer; }
+.rb-template[data-preview-device] [data-selected="true"] { outline: 2px solid var(--rb-template-accent); outline-offset: 2px; }
+.rb-template[data-preview-device] .rb-template__editable:hover,.rb-template[data-preview-device] .rb-template__card:hover { outline: 1px solid var(--rb-template-accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-liquid-button::after { transition: none; } }

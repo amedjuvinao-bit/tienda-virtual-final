@@ -15,11 +15,32 @@ const slides = [
 
 function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520, sliderIntervalMs: 4500, sliderShowProgress: true, slides }, upload = vi.fn() }) {
   const [theme, setTheme] = useState({ banner: initial });
-  const setPath = (path, value) => setTheme((previous) => ({ banner: { ...previous.banner, [path.split('.')[1]]: value } }));
+  const setPath = (path, value) => setTheme((previous) => {
+    const next = structuredClone(previous);
+    const keys = path.split('.');
+    let cursor = next;
+    for (const key of keys.slice(0, -1)) cursor = cursor[key] ||= {};
+    cursor[keys.at(-1)] = value;
+    return next;
+  });
   return <><output data-testid="banner-values">{JSON.stringify(theme.banner)}</output><BannerPanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={upload} onPreview={() => {}} /></>;
 }
 
 describe('editor de Portada', () => {
+  it('elige la parte en la vista previa y muestra solo sus controles', async () => {
+    const user = userEvent.setup();
+    render(<Editor initial={{ type: 'image', imageUrl: '/hero.jpg' }} />);
+    await user.click(screen.getByRole('button', { name: /Descubrimiento/ }));
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    const title = preview.querySelector('.rb-template__title .rb-template__editable');
+    await user.click(title);
+    expect(screen.getByLabelText('Título')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '② Botones' }));
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Texto del botón'), { target: { value: 'Explorar ahora' } });
+    expect(preview).toHaveTextContent('Explorar ahora');
+    expect(JSON.parse(screen.getByTestId('banner-values').textContent).templateConfigs.discovery.primary.text).toBe('Explorar ahora');
+  });
   it('mantiene los controles compactos y cambia el encuadre entre móvil, tableta y escritorio', async () => {
     const user = userEvent.setup();
     render(<Editor />);

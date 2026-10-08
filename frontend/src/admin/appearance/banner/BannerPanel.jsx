@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BannerDevicePreview, { BANNER_DEVICES } from './BannerDevicePreview';
 import BannerTemplatePanel from './BannerTemplatePanel';
-import { getBannerTemplate, safeBannerLink } from '../../../lib/bannerTemplates';
+import { BANNER_TEMPLATE_IDS, BANNER_TEMPLATE_META, getBannerTemplate, safeBannerLink } from '../../../lib/bannerTemplates';
 import { getBannerHeightSettings } from '../../../lib/bannerHeight';
 import './bannerPanel.css';
 
@@ -357,6 +357,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const [activePanel, setActivePanel] = useState('content');
   const [previewDevice, setPreviewDevice] = useState('desktop');
   const [uploadStatus, setUploadStatus] = useState(null);
+  const [templateSelection, setTemplateSelection] = useState('copy:title');
   const heightSettings = getBannerHeightSettings(b, previewDevice);
   const displayedHeight = heightSettings.mode === 'fullscreen' ? BANNER_DEVICES[previewDevice].height : heightSettings.heightPx;
   const updateDeviceHeight = (value) => {
@@ -555,6 +556,9 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   }, [b, theme?.sections, slides]);
 
   const bannerType = String(b.type || "slider");
+  const templateActive = BANNER_TEMPLATE_IDS.includes(b.templateId);
+  const hasMedia = bannerType === 'slider' ? slides.some((slide) => !!slide?.image) : bannerType === 'image' ? !!b.imageUrl : !!b.videoUrl;
+  const MediaShell = templateActive ? 'details' : 'div';
   const effectiveInterval = b.sliderIntervalMs ?? b.autoplayMs ?? 3500;
   const activeSlideIdx = Math.min(selectedIdx, Math.max(0, slides.length - 1));
   const editCurrent = (buttonIndex = 0) => {
@@ -580,30 +584,27 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
         {uploadStatus && <div className="banner-upload-status" data-tone={uploadStatus.type} role={uploadStatus.type === 'error' ? 'alert' : 'status'}>{uploadStatus.text}<button type="button" onClick={() => setUploadStatus(null)} aria-label="Cerrar aviso de subida">×</button></div>}
 
         <div className="banner-core-controls">
-          <Select label="Contenido de la portada" value={bannerType} onChange={(e) => { setPath('banner.type', e.target.value); setActivePanel('content'); }}>
+          <Select label="1. ¿Qué mostrarás?" value={bannerType} onChange={(e) => { setPath('banner.type', e.target.value); setActivePanel('content'); }}>
             <option value="slider">Galería de imágenes</option>
             <option value="image">Imagen única</option>
             <option value="video">Video</option>
           </Select>
-          <Select label={`Altura en ${heightSettings.label.toLowerCase()}`} value={heightSettings.mode} onChange={(e) => { setPath(`banner.${heightSettings.modeKey}`, e.target.value); setActivePanel('behavior'); }}>
-            <option value="auto">Altura personalizada</option>
-            <option value="fullscreen">Pantalla completa</option>
-          </Select>
         </div>
 
         {activePanel === 'content' && <div className="banner-template-mode">
-          <label className="banner-template-field"><span>Diseño sobre tus imágenes o video</span>
-            <select value={b.templateId || 'classic'} onChange={(event) => setPath('banner.templateId', event.target.value)}>
-              <option value="classic">Diseño actual</option>
-              <option value="discovery">Descubrimiento</option>
-              <option value="editorial">Editorial</option>
-              <option value="atelier">Vitrina de cristal</option>
-            </select>
-          </label>
-          {b.templateId && b.templateId !== 'classic' && <BannerTemplatePanel theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} />}
+          <strong className="banner-template-mode__title">2. Elige cómo se verá</strong>
+          <div className="banner-template-choices" role="group" aria-label="Diseño de la portada">
+            {['classic', ...BANNER_TEMPLATE_IDS].map((key) => <button key={key} type="button" aria-pressed={(b.templateId || 'classic') === key} onClick={() => { setPath('banner.templateId', key); setTemplateSelection('copy:title'); }}>
+              <span className={`banner-template-choices__art banner-template-choices__art--${key}`} aria-hidden="true"><i /><i /><i /></span>
+              <strong>{key === 'classic' ? 'Actual' : BANNER_TEMPLATE_META[key].name}</strong>
+            </button>)}
+          </div>
+          {templateActive && <BannerTemplatePanel theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} selection={templateSelection} onSelectionChange={setTemplateSelection} />}
         </div>}
 
-        {activePanel === 'content' && bannerType === 'slider' && (
+        {activePanel === 'content' && <MediaShell className={templateActive ? 'banner-template-media' : undefined} {...(templateActive ? { open: !hasMedia } : {})} key={`${bannerType}-${b.templateId || 'classic'}`}>
+          {templateActive && <summary>{hasMedia ? `Archivo de portada · ${bannerType === 'slider' ? `${slides.length} imágenes` : bannerType === 'image' ? 'Imagen cargada' : 'Video cargado'}` : 'Falta el archivo de portada · abrir para cargar'}</summary>}
+        {bannerType === 'slider' && (
           <div className="banner-content-card">
             <div className="banner-content-card__head"><strong>Imágenes de la galería <span>{slides.length}</span></strong><button type="button" className="banner-btn banner-btn--primary" onClick={addSlide}>+ Agregar</button></div>
             {slides.length ? <>
@@ -619,36 +620,40 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
                 <div className="banner-slide-current__details"><strong>Slide {activeSlideIdx + 1}</strong><small>{slides[activeSlideIdx]?.image ? 'Imagen lista' : 'Sube una imagen para mostrarlo en la tienda'}</small></div>
                 <button type="button" className="banner-btn" onClick={() => moveSlide(activeSlideIdx, -1)} disabled={activeSlideIdx === 0} aria-label="Mover slide antes" title="Mover antes">↑</button>
                 <button type="button" className="banner-btn" onClick={() => moveSlide(activeSlideIdx, 1)} disabled={activeSlideIdx === slides.length - 1} aria-label="Mover slide después" title="Mover después">↓</button>
-                <button type="button" className="banner-btn" onClick={() => editCurrent()}>Editar</button>
+                <button type="button" className="banner-btn" onClick={() => editCurrent()}>{templateActive ? 'Encuadre' : 'Editar'}</button>
                 <button type="button" className="banner-btn banner-btn--danger" onClick={() => removeSlide(activeSlideIdx)} aria-label={`Eliminar slide ${activeSlideIdx + 1}`}>Eliminar</button>
               </div>
               <label className="banner-upload-field"><span>Imagen del slide</span><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Elegir imagen del slide" onChange={(e) => setBannerSlideFiles((prev) => ({ ...prev, [activeSlideIdx]: e.target.files?.[0] || null }))} /></label>
               {bannerSlideFiles[activeSlideIdx] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerSlideImage(activeSlideIdx)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
-            </> : <p className="banner-empty">Agrega un slide y sube su imagen para reemplazar las imágenes de ejemplo.</p>}
+            </> : <p className="banner-empty">Agrega una imagen para empezar.</p>}
           </div>
         )}
 
-        {activePanel === 'content' && bannerType === 'image' && (
+        {bannerType === 'image' && (
           <div className="banner-content-card">
-            <div className="banner-content-card__head"><strong>Imagen principal</strong><button type="button" className="banner-btn" onClick={() => editCurrent()}>Ajustar encuadre y botón</button></div>
+            <div className="banner-content-card__head"><strong>Imagen principal</strong><button type="button" className="banner-btn" onClick={() => editCurrent()}>{templateActive ? 'Ajustar encuadre' : 'Ajustar encuadre y botón'}</button></div>
             <label className="banner-upload-field"><span>Subir imagen</span><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Elegir imagen principal" onChange={(e) => setBannerImageFile(e.target.files?.[0] || null)} /></label>
             {bannerImageFile && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={onUploadBannerImage}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
             <details className="banner-inline-details"><summary>Usar una imagen ya alojada</summary><Input label="URL de la imagen" value={b.imageUrl || ''} onChange={(e) => setPath('banner.imageUrl', e.target.value)} placeholder="https://..." /></details>
-            <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/coleccion o https://..." />
+            {!templateActive && <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/coleccion o https://..." />}
           </div>
         )}
 
-        {activePanel === 'content' && bannerType === 'video' && (
+        {bannerType === 'video' && (
           <div className="banner-content-card">
-            <div className="banner-content-card__head"><strong>Video principal</strong><button type="button" className="banner-btn" onClick={() => editCurrent()}>Editar botón</button></div>
+            <div className="banner-content-card__head"><strong>Video principal</strong>{!templateActive && <button type="button" className="banner-btn" onClick={() => editCurrent()}>Editar botón</button>}</div>
             <label className="banner-upload-field"><span>Subir video</span><input type="file" accept="video/mp4,video/webm,video/ogg" aria-label="Elegir video de portada" onChange={(e) => setBannerVideoFile(e.target.files?.[0] || null)} /></label>
             {bannerVideoFile && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={onUploadBannerVideo}>{uploading ? 'Subiendo…' : 'Subir video'}</button>}
             <details className="banner-inline-details"><summary>Usar un video ya alojado</summary><Input label="URL del video" value={b.videoUrl || ''} onChange={(e) => setPath('banner.videoUrl', e.target.value)} placeholder="https://.../video.mp4" /></details>
           </div>
         )}
+        </MediaShell>}
 
         {activePanel === 'behavior' && <div className="banner-content-card banner-behavior">
           <div><strong>Altura y adaptación</strong><p>Selecciona Escritorio, Tableta o Móvil en la vista previa. La altura se guarda por separado para cada tamaño.</p></div>
+          <Select label={`Altura en ${heightSettings.label.toLowerCase()}`} value={heightSettings.mode} onChange={(e) => setPath(`banner.${heightSettings.modeKey}`, e.target.value)}>
+            <option value="auto">Altura personalizada</option><option value="fullscreen">Pantalla completa</option>
+          </Select>
           <div className="banner-height-control">
             <label htmlFor="banner-height-range">Altura de {heightSettings.label.toLowerCase()}: <strong>{displayedHeight} px{heightSettings.mode === 'fullscreen' ? ' · pantalla completa en esta vista' : ''}</strong></label>
             <input id="banner-height-range" type="range" min="240" max="1200" step="1" value={displayedHeight} onChange={(e) => updateDeviceHeight(e.target.value)} />
@@ -667,8 +672,8 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
       </section>
 
       <section className="banner-panel banner-panel--preview" aria-label="Vista previa de portada">
-        <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>Selecciona un tamaño para comprobar el encuadre.</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-        <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} />
+        <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un texto, botón o categoría para editarlo.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
+        <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} />
         {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
         <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (!b.templateId || b.templateId === 'classic') editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && (!b.templateId || b.templateId === 'classic')}>Editar {b.templateId && b.templateId !== 'classic' ? 'diseño' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
         {issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
@@ -715,7 +720,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
               </div>
 
               <Input label="Imagen (URL)" value={slides[editIdx]?.image || ""} onChange={(e) => setSlide(editIdx, { image: e.target.value })} placeholder="https://.../slide.png" />
-              <Input label="Link (opcional)" value={slides[editIdx]?.link || ""} onChange={(e) => setSlide(editIdx, { link: e.target.value })} placeholder="/lo-nuevo ó https://..." />
+              {!templateActive && <Input label="Link (opcional)" value={slides[editIdx]?.link || ""} onChange={(e) => setSlide(editIdx, { link: e.target.value })} placeholder="/lo-nuevo ó https://..." />}
 
               <div className="rounded-2xl border bg-gray-50 p-3">
                 <div className="text-sm font-medium mb-2">Subir imagen del slide</div>
@@ -736,7 +741,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
               </div>
             </div>
 
-            <div>
+            {!templateActive && <div>
               <BannerButtonEditor
                 title={`Botón ${activeButtonIdx + 1} del slide`}
                 value={buttonFor(slides[editIdx], 'buttons', 'button')}
@@ -744,7 +749,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
                 onUploadImage={uploadButtonImage}
                 onChange={(nextBtn) => setSlideButton(editIdx, nextBtn)}
               />
-            </div>
+            </div>}
           </div>
         )}
       </Modal>
@@ -791,7 +796,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
             </div>
           </div>
 
-          <div>
+          {!templateActive && <div>
             <BannerButtonEditor
               title="Botón de Imagen única"
               value={buttonFor(b, 'imageButtons', 'imageButton')}
@@ -799,7 +804,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
               onUploadImage={uploadButtonImage}
               onChange={(nextBtn) => setSingleOrMultipleButton('imageButtons', 'imageButton', nextBtn)}
             />
-          </div>
+          </div>}
         </div>
       </Modal>
 
