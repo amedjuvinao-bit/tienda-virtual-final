@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getBannerTemplate } from '../../../lib/bannerTemplates';
+import { getBannerTemplate, safeHotspotColor } from '../../../lib/bannerTemplates';
 
 const Field = ({ label, ...props }) => <label className="banner-template-field"><span>{label}</span><input {...props} /></label>;
 
@@ -10,7 +10,7 @@ const COPY_PARTS = [
   { key: 'footerText', name: 'Texto de categorías', link: 'footerTextLink' },
 ];
 
-export default function BannerTemplatePanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend, selection, onSelectionChange }) {
+export default function BannerTemplatePanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend, selection, onSelectionChange, placingCard = null, onStartPlacing }) {
   const banner = theme?.banner || {};
   const { id, config, categories } = getBannerTemplate(banner, theme?.sections);
   const [localSelection, setLocalSelection] = useState('copy:title');
@@ -101,17 +101,22 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
         </div>
         {card && <div className="banner-template-inspector__fields">
           <strong>Acceso {index + 1}</strong>
-          {id === 'atelier' && <p className="banner-template-help">El anillo señala esta categoría sobre la imagen y se conecta con su tarjeta.</p>}
+          {id === 'atelier' && <p className="banner-template-help">La línea une el punto señalado en la foto con esta tarjeta. Elige el lugar y el color para cada acceso.</p>}
           <label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Mostrar en la portada</label>
           <label className="banner-template-field"><span>Usar esta categoría</span><select value={card.categoryId} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', link: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
           <Field label="Texto visible" placeholder={category?.title || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <Field label="Al hacer clic, ir a" placeholder={category?.link || '/categoria/...'} value={card.link || ''} onChange={(event) => updateCard(index, { link: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto o el enlace vacío, se usa el de la categoría elegida.</p>
-          <details className="banner-template-more" open={!!card.image || !!card.label}><summary>Imagen, etiqueta y posición <span>opcional</span></summary>
+          {id === 'atelier' && <div className="banner-template-point-control">
+            <button type="button" className="banner-btn banner-btn--primary" aria-pressed={placingCard === index} onClick={() => onStartPlacing?.(placingCard === index ? null : index)}>{placingCard === index ? 'Cancelar ubicación' : 'Señalar lugar en la imagen'}</button>
+            {placingCard === index && <p className="banner-template-help" role="status">Ahora haz clic en el objeto que quieres señalar dentro de la vista previa.</p>}
+            <div className="banner-template-position"><Field type="number" min="0" max="100" label="Punto horizontal %" value={card.x ?? 45 + index * 29} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Punto vertical %" value={card.y ?? 28 + index * 24} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>
+            <Field type="color" label="Color de línea y punto" value={safeHotspotColor(card.lineColor)} onChange={(event) => updateCard(index, { lineColor: event.target.value })} />
+          </div>}
+          <details className="banner-template-more" open={!!card.image || !!card.label}><summary>Imagen y etiqueta <span>opcional</span></summary>
             <Field label="Etiqueta pequeña" placeholder={category?.title || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
             {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen de la categoría</button>}
-            {id === 'atelier' && <div className="banner-template-position"><Field type="number" min="0" max="100" label="Horizontal %" value={card.x ?? 70} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Vertical %" value={card.y ?? 55} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>}
           </details>
           {error && <p role="alert">{error}</p>}
         </div>}

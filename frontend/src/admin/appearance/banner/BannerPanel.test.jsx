@@ -13,8 +13,8 @@ const slides = [
   { image: '/second.jpg', fit: 'contain', posX: 70, posY: 50, button: { enabled: false } },
 ];
 
-function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520, sliderIntervalMs: 4500, sliderShowProgress: true, slides }, upload = vi.fn() }) {
-  const [theme, setTheme] = useState({ banner: initial });
+function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520, sliderIntervalMs: 4500, sliderShowProgress: true, slides }, upload = vi.fn(), sections = [] }) {
+  const [theme, setTheme] = useState({ banner: initial, sections });
   const setPath = (path, value) => setTheme((previous) => {
     const next = structuredClone(previous);
     const keys = path.split('.');
@@ -73,6 +73,26 @@ describe('editor de Portada', () => {
     fireEvent.change(screen.getByLabelText('Texto del botón'), { target: { value: 'Explorar ahora' } });
     expect(preview).toHaveTextContent('Explorar ahora');
     expect(JSON.parse(screen.getByTestId('banner-values').textContent).templateConfigs.discovery.primary.text).toBe('Explorar ahora');
+  });
+
+  it('ubica el punto sobre la imagen y conserva el color del acceso al guardar', async () => {
+    const user = userEvent.setup();
+    const sections = [{ id: 'categorias', config: { slides: [
+      { id: 'hogar', title: 'Hogar', href: '/categoria/hogar', enabled: true },
+      { id: 'regalos', title: 'Regalos', href: '/categoria/regalos', enabled: true },
+    ] } }];
+    render(<Editor initial={{ type: 'image', imageUrl: '/hero.jpg', templateId: 'atelier' }} sections={sections} />);
+    await user.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.change(screen.getByLabelText('Color de línea y punto'), { target: { value: '#ca2379' } });
+    await user.click(screen.getByRole('button', { name: 'Señalar lugar en la imagen' }));
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    const target = within(preview).getByRole('button', { name: 'Señalar en la imagen el acceso 1' });
+    target.getBoundingClientRect = () => ({ left: 10, top: 30, width: 400, height: 200 });
+    fireEvent.click(target, { clientX: 150, clientY: 180 });
+    const saved = JSON.parse(screen.getByTestId('banner-values').textContent);
+    expect(saved.templateConfigs.atelier.cards[0]).toEqual(expect.objectContaining({ categoryId: 'hogar', x: 35, y: 75, lineColor: '#ca2379' }));
+    expect(preview.querySelector('.rb-template__spot').style.getPropertyValue('--rb-spot-x')).toBe('35%');
+    expect(within(preview).queryByRole('button', { name: 'Señalar en la imagen el acceso 1' })).not.toBeInTheDocument();
   });
   it('mantiene los controles compactos y cambia el encuadre entre móvil, tableta y escritorio', async () => {
     const user = userEvent.setup();

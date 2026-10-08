@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import BannerTemplateView from './BannerTemplateView';
 import BannerDevicePreview from '../admin/appearance/banner/BannerDevicePreview';
 import { getBannerTemplate } from '../lib/bannerTemplates';
@@ -50,5 +50,22 @@ describe('plantillas sobre contenido existente', () => {
     expect(hotspot).not.toHaveTextContent('+');
     expect(container.querySelector('.rb-template__spot-connector polyline')).toBeInTheDocument();
     expect(container.querySelector('.rb-template__spot-card[data-open="true"]')?.getAttribute('href')).toBe('/categoria/hogar');
+  });
+
+  it('permite señalar un punto desde la vista previa y colorea cada conexión', () => {
+    const onPlaceCard = vi.fn();
+    const banner = { templateId: 'atelier', templateConfigs: { atelier: { cards: [
+      { categoryId: 'actual-a', x: 26, y: 63, lineColor: '#ef357c' },
+      { categoryId: 'actual-b', x: 78, y: 48, lineColor: 'url(evil)' },
+    ] } } };
+    const { container } = render(<BannerTemplateView banner={banner} sections={categories} preview device="desktop" placingCard={0} onPlaceCard={onPlaceCard}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
+    const spots = container.querySelectorAll('.rb-template__spot');
+    expect(spots[0].style.getPropertyValue('--rb-spot-color')).toBe('#ef357c');
+    expect(spots[1].style.getPropertyValue('--rb-spot-color')).toBe('#ffffff');
+    expect(spots[0].querySelector('polyline').getAttribute('points')).toBe('26,63 68,63 68,20 71.7,20');
+    const target = screen.getByRole('button', { name: 'Señalar en la imagen el acceso 1' });
+    target.getBoundingClientRect = () => ({ left: 20, top: 10, width: 200, height: 100 });
+    fireEvent.click(target, { clientX: 120, clientY: 85 });
+    expect(onPlaceCard).toHaveBeenCalledWith(0, 50, 75);
   });
 });

@@ -57,6 +57,8 @@
 .banner-template-more summary span { color: var(--admin-card-muted-text); font-weight: 500; }
 .banner-template-more[open] { display: grid; gap: 8px; }
 .banner-template-position,.banner-template-color-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.banner-template-point-control { display: grid; gap: 7px; padding: 9px; border: 1px solid var(--admin-card-border); border-radius: 9px; }
+.banner-template-point-control > .banner-btn { justify-self: start; }
 .banner-template-color-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
 @media (max-width: 600px) { .banner-template-choices { grid-template-columns: repeat(2,minmax(0,1fr)); } .banner-template-inspector { grid-template-columns: 1fr; } .banner-template-parts { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 .banner-content-card { display: grid; gap: 10px; min-width: 0; margin-top: 13px; padding: 12px; border: 1px solid var(--admin-card-border); border-radius: 14px; background: color-mix(in srgb, var(--admin-card-bg) 80%, var(--admin-primary-soft-bg) 20%); }

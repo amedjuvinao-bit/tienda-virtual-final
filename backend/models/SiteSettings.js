@@ -86,6 +86,7 @@ const BannerTemplateCardSchema = new Schema({
   link: { type: String, default: "" },
   x: { type: Number, min: 0, max: 100, default: 70 },
   y: { type: Number, min: 0, max: 100, default: 55 },
+  lineColor: { type: String, match: /^#[0-9a-f]{6}$/i, default: "#ffffff" },
 }, { _id: false });
 
 const BannerTemplateConfigSchema = new Schema({

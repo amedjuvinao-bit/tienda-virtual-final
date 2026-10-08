@@ -358,6 +358,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const [previewDevice, setPreviewDevice] = useState('desktop');
   const [uploadStatus, setUploadStatus] = useState(null);
   const [templateSelection, setTemplateSelection] = useState('copy:title');
+  const [placingCard, setPlacingCard] = useState(null);
   const heightSettings = getBannerHeightSettings(b, previewDevice);
   const displayedHeight = heightSettings.mode === 'fullscreen' ? BANNER_DEVICES[previewDevice].height : heightSettings.heightPx;
   const updateDeviceHeight = (value) => {
@@ -568,6 +569,14 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     setEditIdx(bannerType === "slider" ? activeSlideIdx : bannerType);
   };
   const chooseSlide = (step) => setSelectedIdx((current) => (current + step + slides.length) % slides.length);
+  const placeCard = (index, x, y) => {
+    const current = b.templateConfigs?.atelier || {};
+    const refs = Array.isArray(current.cards) && current.cards.length ? current.cards
+      : getBannerTemplate(b, theme?.sections).categories.slice(0, 2).map((entry, i) => ({ categoryId: entry.id, enabled: true, x: 45 + i * 29, y: 28 + i * 24 }));
+    if (!refs[index]) return;
+    setPath('banner.templateConfigs.atelier', { ...current, cards: refs.map((card, i) => i === index ? { ...card, x, y } : card) });
+    setPlacingCard(null);
+  };
 
   return (
     <div className="banner-workspace">
@@ -644,13 +653,13 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
           <strong className="banner-template-mode__title">3. Diseño opcional</strong>
           <p>{bannerType === 'slider' ? `El diseño elegido se muestra sobre todas las imágenes de la galería (${slides.length}).` : bannerType === 'video' ? 'El diseño elegido se muestra encima del video, sin reemplazarlo.' : 'El diseño elegido se muestra encima de tu imagen, sin reemplazarla.'}</p>
           <div className="banner-template-choices" role="group" aria-label="Diseño de la portada">
-            {['plain', 'classic', ...BANNER_TEMPLATE_IDS].map((key) => <button key={key} type="button" aria-pressed={(b.templateId || 'classic') === key} onClick={() => { setPath('banner.templateId', key); setTemplateSelection('copy:title'); }}>
+            {['plain', 'classic', ...BANNER_TEMPLATE_IDS].map((key) => <button key={key} type="button" aria-pressed={(b.templateId || 'classic') === key} onClick={() => { setPath('banner.templateId', key); setTemplateSelection('copy:title'); setPlacingCard(null); }}>
               <span className={`banner-template-choices__art banner-template-choices__art--${key}`} aria-hidden="true"><i /><i /><i /></span>
               <strong>{key === 'plain' ? 'Solo archivo' : key === 'classic' ? 'Diseño anterior' : BANNER_TEMPLATE_META[key].name}</strong>
             </button>)}
           </div>
           <p className="banner-template-mode__hint">{plainMedia ? 'Sin textos ni botones encima. Las imágenes o el video se conservan.' : templateActive ? 'Puedes volver a «Solo archivo» sin perder la configuración de este diseño.' : 'Conserva los botones antiguos de cada imagen o video.'}</p>
-          {templateActive && <BannerTemplatePanel theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} selection={templateSelection} onSelectionChange={setTemplateSelection} />}
+          {templateActive && <BannerTemplatePanel theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} selection={templateSelection} onSelectionChange={setTemplateSelection} placingCard={placingCard} onStartPlacing={setPlacingCard} />}
         </div>}
 
         {activePanel === 'behavior' && <div className="banner-content-card banner-behavior">
@@ -677,7 +686,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
 
       <section className="banner-panel banner-panel--preview" aria-label="Vista previa de portada">
         <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un texto, botón o categoría para editarlo.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-        <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} />
+        <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} />
         {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
         <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
         {issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}

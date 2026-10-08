@@ -29,6 +29,8 @@ export const BANNER_TEMPLATE_DEFAULTS = {
   },
 };
 
+export const safeHotspotColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : '#ffffff';
+
 export function getExistingBannerCategories(sections) {
   const source = (Array.isArray(sections) ? sections : []).find((section) =>
     [section?.id, section?.type].some((value) => String(value || '').toLowerCase() === 'categorias'));

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getBannerTemplate, safeBannerLink } from '../lib/bannerTemplates';
+import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
 
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {
@@ -27,7 +27,7 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
 
-export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, children }) {
+export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
   const [activeCard, setActiveCard] = useState(null);
   const css = {
@@ -58,18 +58,23 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
         const cardY = 20 + index * 28;
         const cardSelected = activeCard === index || (preview && selectedPart === `card:${item.sourceIndex}`);
         const CardTag = href && !preview ? 'a' : 'div';
-        return <div key={item.sourceIndex} className="rb-template__spot" data-active={cardSelected ? 'true' : undefined} style={{ '--rb-spot-x': `${x}%`, '--rb-spot-y': `${y}%`, '--rb-card-y': `${cardY}%`, '--rb-card-mobile-y': `${58 + index * 20}%` }}>
+        return <div key={item.sourceIndex} className="rb-template__spot" data-active={cardSelected ? 'true' : undefined} style={{ '--rb-spot-x': `${x}%`, '--rb-spot-y': `${y}%`, '--rb-card-y': `${cardY}%`, '--rb-card-mobile-y': `${58 + index * 20}%`, '--rb-spot-color': safeHotspotColor(item.lineColor) }}>
           <svg className="rb-template__spot-connector" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <polyline points={`${x},${y} ${x + (73 - x) * .35},${y} ${x + (73 - x) * .65},${cardY} 73,${cardY}`} />
+            <polyline points={`${x},${y} 68,${y} 68,${cardY} 71.7,${cardY}`} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
           <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
-            {item.image && <img src={item.image} alt="" />}
+            {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
             <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
             <span className="rb-template__spot-arrow" aria-hidden="true">→</span>
           </CardTag>
         </div>;
       })}
+      {preview && placingCard !== null && <button type="button" className="rb-template__place-point" aria-label={`Señalar en la imagen el acceso ${placingCard + 1}`} title="Haz clic sobre el lugar que quieres señalar" onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        onPlaceCard?.(placingCard, Math.round(percent((event.clientX - rect.left) / rect.width * 100, 50)), Math.round(percent((event.clientY - rect.top) / rect.height * 100, 50)));
+      }}><span>Haz clic sobre el lugar que quieres señalar</span></button>}
     </div> : <div className="rb-template__rail">
       {c.footerText && <span className="rb-template__rail-heading"><CopyLink href={c.footerTextLink} preview={preview} selected={selectedPart === 'copy:footerText'} onSelect={() => onSelect?.('copy:footerText')}>{c.footerText}</CopyLink></span>}
       <div className="rb-template__cards">
