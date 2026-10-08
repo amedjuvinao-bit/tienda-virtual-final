@@ -45,6 +45,10 @@ describe('plantillas sobre contenido existente', () => {
     expect(screen.getByText('Comprar').closest('a')).toBeNull();
     expect(container.querySelector('.rb-liquid-button--secondary')?.getAttribute('href')).toBe('/catalogo');
     fireEvent.click(screen.getByRole('button', { name: 'Hogar' }));
-    expect(container.querySelector('.rb-template__spot-card[data-open="true"] a')?.getAttribute('href')).toBe('/categoria/hogar');
+    const hotspot = screen.getByRole('button', { name: 'Hogar' });
+    expect(hotspot).toBePressed();
+    expect(hotspot).not.toHaveTextContent('+');
+    expect(container.querySelector('.rb-template__spot-connector polyline')).toBeInTheDocument();
+    expect(container.querySelector('.rb-template__spot-card[data-open="true"]')?.getAttribute('href')).toBe('/categoria/hogar');
   });
 });

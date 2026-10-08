@@ -24,7 +24,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const maxCards = id === 'atelier' ? 2 : 3;
   const refs = Array.isArray(current.cards) && current.cards.length
     ? current.cards
-    : categories.slice(0, maxCards).map((category, index) => ({ categoryId: category.id, enabled: true, x: 68 + index * 13, y: 42 + index * 26 }));
+    : categories.slice(0, maxCards).map((category, index) => ({ categoryId: category.id, enabled: true, x: id === 'atelier' ? 45 + index * 29 : 68 + index * 13, y: id === 'atelier' ? 28 + index * 24 : 42 + index * 26 }));
   const updateCard = (index, patch) => update({ cards: refs.map((card, i) => i === index ? { ...card, ...patch } : card) });
   const uploadCardImage = async (index, file) => {
     if (!file) return;
@@ -101,6 +101,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
         </div>
         {card && <div className="banner-template-inspector__fields">
           <strong>Acceso {index + 1}</strong>
+          {id === 'atelier' && <p className="banner-template-help">El anillo señala esta categoría sobre la imagen y se conecta con su tarjeta.</p>}
           <label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Mostrar en la portada</label>
           <label className="banner-template-field"><span>Usar esta categoría</span><select value={card.categoryId} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', link: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
           <Field label="Texto visible" placeholder={category?.title || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />

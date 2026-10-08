@@ -44,7 +44,7 @@ export function getBannerTemplate(banner, sections) {
   const defaults = BANNER_TEMPLATE_DEFAULTS[id];
   const existing = getExistingBannerCategories(sections);
   const saved = Array.isArray(raw.cards) && raw.cards.length ? raw.cards : existing.slice(0, id === 'atelier' ? 2 : 3).map((entry, index) => ({
-    categoryId: entry.id, x: 68 + index * 13, y: 42 + index * 26,
+    categoryId: entry.id, x: id === 'atelier' ? 45 + index * 29 : 68 + index * 13, y: id === 'atelier' ? 28 + index * 24 : 42 + index * 26,
   }));
   return {
     id,

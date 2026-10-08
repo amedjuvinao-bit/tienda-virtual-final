@@ -53,12 +53,21 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
     {id === 'atelier' ? <div className="rb-template__hotspots">
       {cards.map((item, index) => {
         const href = safeBannerLink(item.link);
-        return <div key={index} className="rb-template__spot" style={{ left: `${percent(item.x, 70)}%`, top: `${percent(item.y, 55)}%` }}>
-          <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} aria-expanded={activeCard === index} onClick={() => { setActiveCard(activeCard === index ? null : index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}>+</button>
-          <div className="rb-template__spot-card" data-open={activeCard === index}>
+        const x = percent(item.x, 70);
+        const y = percent(item.y, 55);
+        const cardY = 20 + index * 28;
+        const cardSelected = activeCard === index || (preview && selectedPart === `card:${item.sourceIndex}`);
+        const CardTag = href && !preview ? 'a' : 'div';
+        return <div key={item.sourceIndex} className="rb-template__spot" data-active={cardSelected ? 'true' : undefined} style={{ '--rb-spot-x': `${x}%`, '--rb-spot-y': `${y}%`, '--rb-card-y': `${cardY}%`, '--rb-card-mobile-y': `${58 + index * 20}%` }}>
+          <svg className="rb-template__spot-connector" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points={`${x},${y} ${x + (73 - x) * .35},${y} ${x + (73 - x) * .65},${cardY} 73,${cardY}`} />
+          </svg>
+          <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
             {item.image && <img src={item.image} alt="" />}
-            <span><small>{item.label}</small><strong>{item.text}</strong>{href && (preview ? <span className="rb-template__spot-link">Explorar ↗</span> : <a href={href}>Explorar ↗</a>)}</span>
-          </div>
+            <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
+            <span className="rb-template__spot-arrow" aria-hidden="true">→</span>
+          </CardTag>
         </div>;
       })}
     </div> : <div className="rb-template__rail">
