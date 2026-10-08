@@ -62,10 +62,31 @@ describe('plantillas sobre contenido existente', () => {
     const spots = container.querySelectorAll('.rb-template__spot');
     expect(spots[0].style.getPropertyValue('--rb-spot-color')).toBe('#ef357c');
     expect(spots[1].style.getPropertyValue('--rb-spot-color')).toBe('#ffffff');
-    expect(spots[0].querySelector('polyline').getAttribute('points')).toBe('26,63 68,63 68,20 71.7,20');
+    expect(spots[0].querySelector('polyline')).toHaveAttribute('points', '26,63 73,63 73,20 76,20');
+    expect(spots[0].querySelector('polyline')).toHaveAttribute('stroke', '#ef357c');
+    expect(spots[1].querySelector('polyline')).toHaveAttribute('stroke', '#ffffff');
     const target = screen.getByRole('button', { name: 'Señalar en la imagen el acceso 1' });
     target.getBoundingClientRect = () => ({ left: 20, top: 10, width: 200, height: 100 });
     fireEvent.click(target, { clientX: 120, clientY: 85 });
     expect(onPlaceCard).toHaveBeenCalledWith(0, 50, 75);
+  });
+
+  it('usa el color guardado en la tarjeta y mueve el brillo con el puntero', () => {
+    const banner = { templateId: 'atelier', templateConfigs: { atelier: {
+      glassColor: '#75cfff', cards: [{ categoryId: 'actual-a', lineColor: '#c32d72' }],
+    } } };
+    const { container, rerender } = render(<BannerTemplateView banner={banner} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
+    const template = container.querySelector('.rb-template');
+    const card = container.querySelector('.rb-template__spot-card');
+    expect(template).toHaveStyle({ '--rb-template-glass': '#75cfff' });
+    expect(card).toHaveAttribute('href', '/categoria/hogar');
+    expect(card.closest('.rb-template__spot')).toHaveStyle({ '--rb-spot-color': '#c32d72' });
+    card.getBoundingClientRect = () => ({ left: 20, top: 40, width: 200, height: 100 });
+    const pointer = new Event('pointermove', { bubbles: true });
+    Object.defineProperties(pointer, { clientX: { value: 70 }, clientY: { value: 65 } });
+    fireEvent(card, pointer);
+    expect(card).toHaveStyle({ '--rb-glass-x': '25%', '--rb-glass-y': '25%' });
+    rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { atelier: { ...banner.templateConfigs.atelier, cards: [{ categoryId: 'actual-a', lineColor: '#18ad7c' }] } } }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
+    expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
 });
