@@ -1,27 +1,35 @@
+/* Replay on each section visit; normal layout remains visible before JavaScript runs. */
 @media (prefers-reduced-motion: no-preference) {
-  .storefront-sections > section[data-section-motion="entered"] > * {
-    animation: storefront-section-enter 680ms cubic-bezier(.18,.72,.2,1) both;
+  .storefront-sections > section[data-section-motion="entering"] {
+    animation: storefront-section-enter 820ms cubic-bezier(.16,1,.3,1) both;
   }
-  .storefront-sections > section[data-section-motion="leaving"] > * {
-    animation: storefront-section-leave 190ms ease-in both;
+  .storefront-sections > section[data-section-motion="leaving"] {
+    animation: storefront-section-leave 240ms ease-in both;
   }
-  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__content,
-  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__actions,
-  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__rail {
-    animation: storefront-banner-detail 570ms ease-out both;
+  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__content {
+    animation: storefront-banner-content 720ms cubic-bezier(.16,1,.3,1) 100ms both;
   }
-  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__actions { animation-delay: 190ms; }
-  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__rail { animation-delay: 250ms; }
+  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__rail,
+  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__hotspots {
+    animation: storefront-banner-content 700ms cubic-bezier(.16,1,.3,1) 230ms both;
+  }
+  .storefront-sections > #banner .keen-slider__slide[data-active="true"] > img {
+    animation: storefront-slide-image 780ms cubic-bezier(.2,.7,.2,1) both;
+  }
 }
 @keyframes storefront-section-enter {
-  from { opacity: .65; transform: translate3d(0,18px,0); }
-  to { opacity: 1; transform: translate3d(0,0,0); }
+  from { opacity: .18; transform: translate3d(0,46px,0) scale(.977); }
+  to { opacity: 1; transform: translate3d(0,0,0) scale(1); }
 }
 @keyframes storefront-section-leave {
-  from { opacity: 1; transform: translate3d(0,0,0); }
-  to { opacity: .55; transform: translate3d(0,-12px,0); }
+  from { opacity: 1; transform: translate3d(0,0,0) scale(1); }
+  to { opacity: .45; transform: translate3d(0,-20px,0) scale(.99); }
 }
-@keyframes storefront-banner-detail {
-  from { opacity: .35; }
-  to { opacity: 1; }
+@keyframes storefront-banner-content {
+  from { opacity: 0; transform: translate3d(0,25px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+@keyframes storefront-slide-image {
+  from { opacity: .45; transform: scale(1.035); }
+  to { opacity: 1; transform: scale(1); }
 }

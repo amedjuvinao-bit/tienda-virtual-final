@@ -76,6 +76,24 @@ describe('plantillas sobre contenido existente', () => {
     }
   });
 
+  it('vuelve a animar el texto y los accesos al cambiar la imagen activa', () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    const original = Element.prototype.animate;
+    Element.prototype.animate = animate;
+    try {
+      const banner = { templateId: 'atelier' };
+      const { rerender, unmount } = render(<BannerTemplateView banner={banner} sections={categories} motionKey={0}><img src="/primera.jpg" alt="" /></BannerTemplateView>);
+      const firstCount = animate.mock.calls.length;
+      expect(firstCount).toBeGreaterThan(3);
+      rerender(<BannerTemplateView banner={banner} sections={categories} motionKey={1}><img src="/segunda.jpg" alt="" /></BannerTemplateView>);
+      expect(animate.mock.calls.length).toBe(firstCount * 2);
+      unmount();
+    } finally {
+      if (original) Element.prototype.animate = original;
+      else delete Element.prototype.animate;
+    }
+  });
+
   it('muestra botones y enlaces seguros; los puntos de la vitrina abren la categoría existente', () => {
     const banner = { templateId: 'atelier', templateConfigs: { atelier: {
       primary: { text: 'Comprar', link: 'javascript:alert(1)' },

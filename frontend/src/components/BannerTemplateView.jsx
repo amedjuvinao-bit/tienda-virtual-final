@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getBannerTemplate, moveBannerButtonLight, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
 
@@ -28,13 +28,24 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
 
-export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, onMoveCard, children }) {
+export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, onMoveCard, motionKey, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
   const [activeCard, setActiveCard] = useState(null);
   const [dragged, setDragged] = useState(null);
   const dragRef = useRef(null);
   const suppressClick = useRef(false);
   const rootRef = useRef(null);
+  useEffect(() => {
+    if (preview || motionKey == null || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const root = rootRef.current;
+    if (!root || !Element.prototype.animate) return undefined;
+    const elements = root.querySelectorAll('.rb-template__eyebrow, .rb-template__title, .rb-template__description, .rb-template__actions, .rb-template__card, .rb-template__spot-card');
+    const animations = Array.from(elements, (element, index) => element.animate(
+      [{ opacity: 0, translate: '0 24px' }, { opacity: 1, translate: '0 0' }],
+      { duration: 650, delay: 90 + Math.min(index, 6) * 95, easing: 'cubic-bezier(.16,1,.3,1)' }
+    ));
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [motionKey, preview, id]);
   const dragMove = (event) => {
     const drag = dragRef.current;
     if (!drag || event.pointerId !== drag.pointerId) return;

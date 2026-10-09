@@ -845,9 +845,9 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       onMouseEnter={() => { isPaused.current = true }}
       onMouseLeave={() => { startTsRef.current = performance.now() - progress * autoplayMs; isPaused.current = false }}>
       <div className={heroContainerClass} style={heroContainerStyle}>
-        <BannerTemplateView banner={banner} sections={bannerSections}>
+        <BannerTemplateView banner={banner} sections={bannerSections} motionKey={currentSlide}>
           <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
-            {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full">
+            {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
               <img src={slide.image} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: `${clamp0_100(slide.posX)}% ${clamp0_100(slide.posY)}%` }} />
             </div>)}
           </div>
@@ -1029,6 +1029,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
               <div
                 key={idx}
                 className="keen-slider__slide relative h-full w-full"
+                data-active={isActive}
                 onClick={(e) => {
                   if (isClickFromButton(e)) return
                   setSelectedImage(slide.image)
