@@ -62,7 +62,7 @@ describe('plantillas sobre contenido existente', () => {
       fireEvent(action, new MouseEvent('pointermove', { bubbles: true, clientX: 90, clientY: 52 }));
       expect(action.style.getPropertyValue('--rb-lens-x')).toBe('80px');
       expect(action.style.getPropertyValue('--rb-lens-y')).toBe('32px');
-      expect(action.style.getPropertyValue('--rb-lens-size')).toBe('96px');
+      expect(action.style.getPropertyValue('--rb-lens-size')).toBe('68px');
       fireEvent(action, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
       expect(Number.parseFloat(action.style.getPropertyValue('--rb-lens-x'))).toBeGreaterThan(0);
       expect(Number.parseFloat(action.style.getPropertyValue('--rb-lens-y'))).toBeGreaterThan(0);

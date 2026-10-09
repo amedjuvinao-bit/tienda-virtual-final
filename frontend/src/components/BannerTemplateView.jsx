@@ -7,7 +7,7 @@ function moveGlassLens(event) {
   const element = event.currentTarget;
   const bounds = element.getBoundingClientRect();
   if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
-  const size = Math.max(26, Math.min(96, bounds.height * 1.6));
+  const size = Math.max(22, Math.min(68, bounds.height * 1.08));
   const inset = Math.min(bounds.width / 2, bounds.height / 2, size * .38);
   element.style.setProperty('--rb-lens-size', `${size}px`);
   element.style.setProperty('--rb-lens-x', `${Math.max(inset, Math.min(bounds.width - inset, event.clientX - bounds.left))}px`);
