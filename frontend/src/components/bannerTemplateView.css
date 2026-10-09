@@ -136,8 +136,8 @@
 .rb-template__spot-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
 .rb-template__spot-card strong { overflow: hidden; color: inherit; font: 600 clamp(11px,1.05cqw,15px)/1.2 Georgia,serif; text-overflow: ellipsis; white-space: nowrap; }
 .rb-template__spot-card small { display: -webkit-box; overflow: hidden; color: inherit; opacity: .8; font: 400 clamp(8px,.7cqw,11px)/1.2 system-ui,sans-serif; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.rb-template__spot-arrow { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border: 1px solid color-mix(in srgb,var(--rb-spot-color) 65%,transparent); border-radius: 50%; background: color-mix(in srgb,var(--rb-template-glass) 18%,transparent); color: var(--rb-template-text); font: 500 18px/1 system-ui,sans-serif; transition: transform .3s ease,background .3s ease; }
-.rb-template__spot-card:hover .rb-template__spot-arrow,.rb-template__spot-card:focus-visible .rb-template__spot-arrow { transform: translateX(2px); background: color-mix(in srgb,var(--rb-spot-color) 34%,transparent); }
+.rb-template__spot-arrow { display: inline-block; flex: none; color: var(--rb-template-text); font: 500 22px/1 system-ui,sans-serif; transition: transform .3s ease,color .3s ease; }
+.rb-template__spot-card:hover .rb-template__spot-arrow,.rb-template__spot-card:focus-visible .rb-template__spot-arrow { transform: translateX(3px); color: var(--rb-spot-color); }
 @container (max-width: 680px) {
   .rb-template__content,.rb-template--editorial .rb-template__content,.rb-template--atelier .rb-template__content { top: 8%; left: 6%; width: 85%; }
   .rb-template__title,.rb-template--editorial .rb-template__title,.rb-template--atelier .rb-template__title { font-size: clamp(18px,7.8cqw,48px); max-width: 13ch; }
@@ -160,7 +160,7 @@
   .rb-template__spot-card img { width: clamp(18px,5cqw,37px); height: clamp(18px,5cqw,37px); border-radius: 5px; }
   .rb-template__spot-card strong { font-size: clamp(6px,1.7cqw,10px); }
   .rb-template__spot-card small { font-size: clamp(5px,1.25cqw,8px); }
-  .rb-template__spot-arrow { width: clamp(12px,3cqw,20px); height: clamp(12px,3cqw,20px); font-size: clamp(9px,2cqw,13px); }
+  .rb-template__spot-arrow { font-size: clamp(10px,3cqw,18px); }
 }
 .rb-template[data-preview-device] .rb-template__eyebrow { font-size: 1.05cqw; }
 .rb-template[data-preview-device] .rb-template__description { font-size: 1.28cqw; }
@@ -203,7 +203,7 @@
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card img { width: 4cqw; height: 4cqw; border-radius: .6cqw; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card strong { font-size: 1.05cqw; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card small { font-size: .7cqw; }
-.rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-arrow { width: 2cqw; height: 2cqw; font-size: 1.4cqw; }
+.rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-arrow { font-size: 1.7cqw; }
 .rb-template[data-preview-device] .rb-template__editable,.rb-template[data-preview-device] .rb-template__card,.rb-template[data-preview-device] .rb-template__spot-trigger { cursor: pointer; }
 .rb-template[data-preview-device] [data-selected="true"] { outline: 2px solid var(--rb-template-accent); outline-offset: 2px; }
 .rb-template[data-preview-device] .rb-template__editable:hover,.rb-template[data-preview-device] .rb-template__card:hover { outline: 1px solid var(--rb-template-accent); outline-offset: 2px; }
