@@ -11,8 +11,8 @@ function moveGlassSurface(event) {
   const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
   element.style.setProperty('--rb-light-x', `${Math.round(x * 100)}%`);
   element.style.setProperty('--rb-light-y', `${Math.round(y * 100)}%`);
-  element.style.setProperty('--rb-turn-x', `${((.5 - y) * 2.4).toFixed(2)}deg`);
-  element.style.setProperty('--rb-turn-y', `${((x - .5) * 2.4).toFixed(2)}deg`);
+  element.style.setProperty('--rb-turn-x', `${((.5 - y) * 5).toFixed(2)}deg`);
+  element.style.setProperty('--rb-turn-y', `${((x - .5) * 5).toFixed(2)}deg`);
 }
 
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {

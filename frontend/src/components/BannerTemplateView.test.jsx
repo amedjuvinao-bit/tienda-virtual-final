@@ -67,8 +67,8 @@ describe('plantillas sobre contenido existente', () => {
       fireEvent(action, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
       expect(action.style.getPropertyValue('--rb-light-x')).toBe('0%');
       expect(action.style.getPropertyValue('--rb-light-y')).toBe('0%');
-      expect(action.style.getPropertyValue('--rb-turn-x')).toBe('1.20deg');
-      expect(action.style.getPropertyValue('--rb-turn-y')).toBe('-1.20deg');
+      expect(action.style.getPropertyValue('--rb-turn-x')).toBe('2.50deg');
+      expect(action.style.getPropertyValue('--rb-turn-y')).toBe('-2.50deg');
     });
     expect(container.querySelector('.rb-template__spot-card[href="/categoria/hogar"]')).toBeInTheDocument();
   });
