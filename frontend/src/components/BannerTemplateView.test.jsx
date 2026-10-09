@@ -73,7 +73,15 @@ describe('plantillas sobre contenido existente', () => {
     button.getBoundingClientRect = () => ({ left: 20, top: 30, width: 190, height: 48 });
     fireEvent(button, new MouseEvent('pointermove', { bubbles: true, clientX: 170, clientY: 52 }));
     expect(button.style.getPropertyValue('--rb-ripple-x')).toBe('150px');
-    expect(button.style.getPropertyValue('--rb-ripple-y')).toBe('22px');
+    expect(button.style.getPropertyValue('--rb-ripple-y')).toBe('23px');
+    fireEvent(button, new MouseEvent('pointermove', { bubbles: true, clientX: 209, clientY: 31 }));
+    expect(button.style.getPropertyValue('--rb-ripple-x')).toBe('167px');
+    expect(button.style.getPropertyValue('--rb-ripple-y')).toBe('23px');
+    const card = surfaces[2];
+    card.getBoundingClientRect = () => ({ left: 300, top: 50, width: 280, height: 66 });
+    fireEvent(card, new MouseEvent('pointermove', { bubbles: true, clientX: 301, clientY: 51 }));
+    expect(card.style.getPropertyValue('--rb-ripple-x')).toBe('25px');
+    expect(card.style.getPropertyValue('--rb-ripple-y')).toBe('25px');
     expect(button.querySelector('.rb-glass-ripple').parentElement).toBe(button);
   });
 

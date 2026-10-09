@@ -6,8 +6,12 @@ import './bannerTemplateView.css';
 function trackGlassRipple(event) {
   if (event.pointerType === 'touch' || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
   const rect = event.currentTarget.getBoundingClientRect();
-  event.currentTarget.style.setProperty('--rb-ripple-x', `${event.clientX - rect.left}px`);
-  event.currentTarget.style.setProperty('--rb-ripple-y', `${event.clientY - rect.top}px`);
+  // Keep the refracted pixels away from the clipped pill edge.
+  const inset = Math.min(25, Math.max(0, Math.min(rect.width, rect.height) / 2 - 1));
+  const x = Math.min(rect.width - inset, Math.max(inset, event.clientX - rect.left));
+  const y = Math.min(rect.height - inset, Math.max(inset, event.clientY - rect.top));
+  event.currentTarget.style.setProperty('--rb-ripple-x', `${x}px`);
+  event.currentTarget.style.setProperty('--rb-ripple-y', `${y}px`);
 }
 
 function GlassRipple() {
@@ -16,7 +20,7 @@ function GlassRipple() {
     <svg className="rb-glass-filter" aria-hidden="true" focusable="false">
       <filter id={id} x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
         <feImage href={rippleDisplacement} x="0" y="0" width="96" height="96" preserveAspectRatio="none" result="ripples" />
-        <feDisplacementMap in="SourceGraphic" in2="ripples" scale="34" xChannelSelector="R" yChannelSelector="G" />
+        <feDisplacementMap in="SourceGraphic" in2="ripples" scale="18" xChannelSelector="R" yChannelSelector="G" />
       </filter>
     </svg>
     <span className="rb-glass-ripple" style={{ '--rb-ripple-filter': `url(#${id})` }} aria-hidden="true" />
