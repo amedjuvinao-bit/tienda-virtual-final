@@ -39,11 +39,23 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
     if (preview || motionKey == null || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
     const root = rootRef.current;
     if (!root || !Element.prototype.animate) return undefined;
-    const elements = root.querySelectorAll('.rb-template__eyebrow, .rb-template__title, .rb-template__description, .rb-template__actions, .rb-template__card, .rb-template__spot-card');
-    const animations = Array.from(elements, (element, index) => element.animate(
-      [{ opacity: 0, translate: '0 24px' }, { opacity: 1, translate: '0 0' }],
-      { duration: 650, delay: 90 + Math.min(index, 6) * 95, easing: 'cubic-bezier(.16,1,.3,1)' }
-    ));
+    const animations = [];
+    const animate = (selector, delay, from, duration = 780) => {
+      root.querySelectorAll(selector).forEach((element, index) => {
+        animations.push(element.animate([from, { opacity: 1, translate: '0 0', scale: 1, filter: 'blur(0)', clipPath: 'inset(0 0 0 0)' }],
+          { duration, delay: delay + index * 105, easing: 'cubic-bezier(.16,1,.3,1)' }));
+      });
+    };
+    animate('.rb-template__eyebrow', 90, { opacity: 0, translate: '0 22px' }, 620);
+    animate('.rb-template__title', 160, { opacity: 0, translate: '0 40px', filter: 'blur(8px)', clipPath: 'inset(100% 0 0 0)' }, 920);
+    animate('.rb-template__description', 360, { opacity: 0, translate: '0 28px' });
+    animate('.rb-liquid-button', 480, { opacity: 0, translate: '0 32px', scale: .86 }, 840);
+    animate('.rb-template__rail-heading', 390, { opacity: 0, translate: '0 18px' }, 650);
+    animate('.rb-template__card, .rb-template__spot-card', 580, { opacity: 0, translate: '0 36px', scale: .9 }, 860);
+    root.querySelectorAll('.rb-template__spot-connector polyline').forEach((line, index) => {
+      animations.push(line.animate([{ strokeDashoffset: 210, opacity: .2 }, { strokeDashoffset: 0, opacity: 1 }],
+        { duration: 880, delay: 420 + index * 120, easing: 'cubic-bezier(.16,1,.3,1)' }));
+    });
     return () => animations.forEach((animation) => animation.cancel());
   }, [motionKey, preview, id]);
   const dragMove = (event) => {

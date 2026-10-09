@@ -12,7 +12,12 @@ export function mountStorefrontSectionMotion(container) {
       || [...sections].reverse().find((section) => section.offsetTop <= anchor)
       || sections[0];
     if (next === active) return;
-    if (active) active.dataset.sectionMotion = 'leaving';
+    const direction = active && sections.indexOf(next) < sections.indexOf(active) ? 'up' : 'down';
+    if (active) {
+      active.dataset.sectionDirection = direction;
+      active.dataset.sectionMotion = 'leaving';
+    }
+    next.dataset.sectionDirection = direction;
     next.dataset.sectionMotion = 'entering';
     active = next;
   };

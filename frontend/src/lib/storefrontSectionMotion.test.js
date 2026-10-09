@@ -34,11 +34,13 @@ describe('transiciones de secciones de la tienda', () => {
     scheduled();
     expect(sections[0].dataset.sectionMotion).toBe('leaving');
     expect(sections[1].dataset.sectionMotion).toBe('entering');
+    expect(sections[1].dataset.sectionDirection).toBe('down');
     scrollY = 0;
     window.dispatchEvent(new Event('scroll'));
     scheduled();
     expect(sections[1].dataset.sectionMotion).toBe('leaving');
     expect(sections[0].dataset.sectionMotion).toBe('entering');
+    expect(sections[0].dataset.sectionDirection).toBe('up');
     unmount();
   });
 });
