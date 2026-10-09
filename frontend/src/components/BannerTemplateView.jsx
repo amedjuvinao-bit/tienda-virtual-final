@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { getBannerTemplate, moveBannerButtonLight, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
 
@@ -28,9 +28,39 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
 
-export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, children }) {
+export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, onMoveCard, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
   const [activeCard, setActiveCard] = useState(null);
+  const [dragged, setDragged] = useState(null);
+  const dragRef = useRef(null);
+  const suppressClick = useRef(false);
+  const rootRef = useRef(null);
+  const dragMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const root = rootRef.current?.getBoundingClientRect();
+    if (!root?.width || !root?.height) return;
+    if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 4) return;
+    drag.moved = true;
+    const x = Math.round(percent((event.clientX - root.left - drag.offsetX) / root.width * 100, drag.x));
+    const y = Math.round(percent((event.clientY - root.top - drag.offsetY) / root.height * 100, drag.y));
+    const cardWidth = drag.device === 'mobile' ? 58 : 22;
+    const cardHeight = drag.cardHeight / root.height * 100;
+    const position = { x: Math.max(cardWidth / 2, Math.min(100 - cardWidth / 2, x)), y: Math.max(cardHeight / 2, Math.min(100 - cardHeight / 2, y)) };
+    drag.position = position;
+    setDragged({ index: drag.index, device: drag.device, ...position });
+  };
+  const dragEnd = (event) => {
+    const drag = dragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    dragRef.current = null;
+    setDragged(null);
+    if (drag.moved) {
+      suppressClick.current = true;
+      if (event.type === 'pointerup') onMoveCard?.(drag.index, drag.device, drag.position.x, drag.position.y);
+      window.setTimeout(() => { suppressClick.current = false; }, 0);
+    }
+  };
   const css = {
     '--rb-template-text': c.textColor,
     '--rb-template-accent': c.accentColor,
@@ -39,7 +69,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   };
   const cards = c.cards.map((item, index) => ({ ...item, sourceIndex: index })).filter((item) => item.enabled !== false);
 
-  return <div className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-button-animation={c.buttonAnimation} data-preview-device={preview ? device : undefined}>
+  return <div ref={rootRef} className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-button-animation={c.buttonAnimation} data-preview-device={preview ? device : undefined}>
     <div className="rb-template__picture">{children}</div>
     <div className="rb-template__wash" aria-hidden="true" />
     <div className="rb-template__content">
@@ -56,16 +86,36 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
         const href = safeBannerLink(item.link);
         const x = percent(item.x, 70);
         const y = percent(item.y, 55);
-        const cardY = 20 + index * 28;
+        const defaults = { desktop: { x: 87, y: 20 + index * 28 }, tablet: { x: 87, y: 20 + index * 28 }, mobile: { x: 68, y: 58 + index * 20 } };
+        const positions = Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => {
+          const saved = item.position?.[key];
+          const live = dragged?.index === item.sourceIndex && dragged.device === key ? dragged : null;
+          return [key, { x: percent(live?.x ?? saved?.x, fallback.x), y: percent(live?.y ?? saved?.y, fallback.y) }];
+        }));
+        const connector = (key) => {
+          const { x: cx, y: cy } = positions[key];
+          const edge = cx >= x ? cx - 11 : cx + 11;
+          const elbow = cx >= x ? edge - 3 : edge + 3;
+          return `${x},${y} ${elbow},${y} ${elbow},${cy} ${edge},${cy}`;
+        };
         const lineColor = safeHotspotColor(item.lineColor);
         const cardSelected = activeCard === index || (preview && selectedPart === `card:${item.sourceIndex}`);
         const CardTag = href && !preview ? 'a' : 'div';
-        return <div key={item.sourceIndex} className="rb-template__spot" data-active={cardSelected ? 'true' : undefined} style={{ '--rb-spot-x': `${x}%`, '--rb-spot-y': `${y}%`, '--rb-card-y': `${cardY}%`, '--rb-card-mobile-y': `${58 + index * 20}%`, '--rb-spot-color': lineColor }}>
+        return <div key={item.sourceIndex} className="rb-template__spot" data-active={cardSelected ? 'true' : undefined} style={{ '--rb-spot-x': `${x}%`, '--rb-spot-y': `${y}%`, '--rb-card-desktop-x': `${positions.desktop.x}%`, '--rb-card-desktop-y': `${positions.desktop.y}%`, '--rb-card-tablet-x': `${positions.tablet.x}%`, '--rb-card-tablet-y': `${positions.tablet.y}%`, '--rb-card-mobile-x': `${positions.mobile.x}%`, '--rb-card-mobile-y': `${positions.mobile.y}%`, '--rb-spot-color': lineColor }}>
           <svg className="rb-template__spot-connector" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <polyline points={`${x},${y} 73,${y} 73,${cardY} 76,${cardY}`} stroke={lineColor} />
+            <polyline className="rb-template__connector-desktop" points={connector('desktop')} stroke={lineColor} /><polyline className="rb-template__connector-tablet" points={connector('tablet')} stroke={lineColor} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
-          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={moveBannerButtonLight} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerDown={preview ? (event) => {
+            if (event.button !== 0 || placingCard !== null) return;
+            const root = rootRef.current?.getBoundingClientRect();
+            const rect = event.currentTarget.getBoundingClientRect();
+            if (!root?.width || !root?.height) return;
+            const currentDevice = ['mobile', 'tablet', 'desktop'].includes(device) ? device : 'desktop';
+            const center = positions[currentDevice];
+            dragRef.current = { pointerId: event.pointerId, index: item.sourceIndex, device: currentDevice, x: center.x, y: center.y, startX: event.clientX, startY: event.clientY, offsetX: event.clientX - (root.left + center.x * root.width / 100), offsetY: event.clientY - (root.top + center.y * root.height / 100), cardHeight: rect.height, moved: false, position: center };
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+          } : undefined} onPointerMove={(event) => { moveBannerButtonLight(event); if (preview) dragMove(event); }} onPointerUp={preview ? dragEnd : undefined} onPointerCancel={preview ? dragEnd : undefined} onClick={preview ? () => { if (!suppressClick.current) onSelect?.(`card:${item.sourceIndex}`); } : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
             {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
             <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
             <span className="rb-template__spot-arrow" aria-hidden="true">→</span>

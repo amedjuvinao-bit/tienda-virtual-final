@@ -42,7 +42,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   };
 }
 
-export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard }) {
+export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
   const { viewport, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
   const buttons = banner?.templateId === 'plain' ? [] : model.buttons;
@@ -58,7 +58,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
       <div className="banner-preview-viewport" data-device={device} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
         <div className="banner-preview-mini-header"><span>ROSA BOUTIQUE</span><span>⌕ · ≡</span></div>
         <div className="banner-preview-hero" style={{ height: `${heightPercent}%` }}>
-          {useTemplate ? <BannerTemplateView banner={banner} sections={sections} preview device={device} onSelect={onTemplateSelect} selectedPart={selectedTemplatePart} placingCard={placingCard} onPlaceCard={onPlaceCard}>{media}</BannerTemplateView> : media}
+          {useTemplate ? <BannerTemplateView banner={banner} sections={sections} preview device={device} onSelect={onTemplateSelect} selectedPart={selectedTemplatePart} placingCard={placingCard} onPlaceCard={onPlaceCard} onMoveCard={onMoveCard}>{media}</BannerTemplateView> : media}
           {!useTemplate && buttons.map((button, index) => {
             const requestedWidth = Number(button.widthPx);
             const width = Number.isFinite(requestedWidth) ? Math.max(80, Math.min(520, requestedWidth)) : 200;

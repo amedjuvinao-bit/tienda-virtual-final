@@ -40,7 +40,7 @@
 .rb-template__place-point span { max-width: 90%; padding: 7px 12px; border: 1px solid rgba(255,255,255,.75); border-radius: 999px; background: rgba(28,22,29,.72); color: white; font: 600 clamp(10px,1.1cqw,14px)/1.25 system-ui,sans-serif; pointer-events: none; }
 .rb-template__spot-trigger:hover,.rb-template__spot-trigger[aria-pressed='true'] { transform: translate(-50%,-50%) scale(1.12); box-shadow: 0 0 0 5px color-mix(in srgb,var(--rb-spot-color,#ffffff) 38%,transparent), inset 0 0 0 3px rgba(255,255,255,.3), 0 3px 19px rgba(54,16,24,.4); }
 .rb-template__spot-trigger:active { transform: translate(-50%,-50%) scale(.94); }
-.rb-template__spot-card { position: absolute; right: 2%; top: var(--rb-card-y); isolation: isolate; display: flex; width: 22%; min-height: 66px; align-items: center; gap: 10px; overflow: hidden; padding: 8px 11px; transform: translateY(-50%); border-radius: 999px; color: var(--rb-template-text); text-decoration: none; pointer-events: auto; cursor: pointer; }
+.rb-template__spot-card { position: absolute; left: var(--rb-card-desktop-x); top: var(--rb-card-desktop-y); isolation: isolate; display: flex; width: 22%; min-height: 66px; align-items: center; gap: 10px; overflow: hidden; padding: 8px 11px; transform: translate(-50%,-50%); border-radius: 999px; color: var(--rb-template-text); text-decoration: none; pointer-events: auto; cursor: pointer; }
 /* The four actions share the same material; each hotspot keeps its saved outline color. */
 @property --rb-light-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
 @property --rb-light-y { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
@@ -110,24 +110,24 @@
 .rb-liquid-button:is(:hover,:focus-visible)::before,.rb-template__spot-card:is(:hover,:focus-visible)::before { opacity: 1; }
 .rb-liquid-button:is(:hover,:focus-visible)::after,.rb-template__spot-card:is(:hover,:focus-visible)::after { opacity: 1; }
 .rb-liquid-button:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-2px) scale(1.018); }
-.rb-template__spot-card:hover { transform: translateY(-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.025); }
+.rb-template__spot-card:hover { transform: translate(-50%,-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.025); }
 .rb-template[data-button-animation='pearl'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='pearl']:hover { transform: translateY(-1px) scale(1.012); }
-.rb-template[data-button-animation='pearl'] .rb-template__spot-card:hover { transform: translateY(-50%) scale(1.012); }
+.rb-template[data-button-animation='pearl'] .rb-template__spot-card:hover { transform: translate(-50%,-50%) scale(1.012); }
 .rb-template[data-button-animation='pearl'] :is(.rb-liquid-button,.rb-template__spot-card),.banner-template-motion-choice__demo[data-button-animation='pearl'] { transition-duration: .48s; }
 @keyframes rb-aurora-flow { from { transform: translateX(-5%) skewX(-3deg); } to { transform: translateX(5%) skewX(3deg); } }
 .rb-template[data-button-animation='aurora'] :is(.rb-liquid-button,.rb-template__spot-card):hover::before,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover::before { animation: rb-aurora-flow 1.7s ease-in-out infinite alternate; }
 .rb-template[data-button-animation='aurora'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-3px) scale(1.027); }
-.rb-template[data-button-animation='aurora'] .rb-template__spot-card:hover { transform: translateY(-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.033); }
+.rb-template[data-button-animation='aurora'] .rb-template__spot-card:hover { transform: translate(-50%,-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.033); }
 @keyframes rb-rose-pulse { 0%,100% { opacity: 1; } 50% { opacity: .52; } }
 .rb-template[data-button-animation='rose'] :is(.rb-liquid-button,.rb-template__spot-card):hover::after,.banner-template-motion-choice__demo[data-button-animation='rose']:hover::after { animation: rb-rose-pulse 2.2s ease-in-out infinite; }
 .rb-template[data-button-animation='rose'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='rose']:hover { transform: translateY(-2px) scale(1.025); }
-.rb-template[data-button-animation='rose'] .rb-template__spot-card:hover { transform: translateY(-50%) scale(1.025); }
+.rb-template[data-button-animation='rose'] .rb-template__spot-card:hover { transform: translate(-50%,-50%) scale(1.025); }
 .rb-liquid-button > span:last-child { transition: transform .3s cubic-bezier(.2,1,.3,1); }
 .rb-liquid-button:hover > span:last-child { transform: translate(2px,-2px); }
 .rb-template__content a.rb-liquid-button:hover { text-decoration: none; }
 .rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template__spot-card:active { box-shadow: inset 0 6px 13px rgba(11,8,19,.29), 0 4px 12px rgba(11,8,19,.18); }
 .rb-liquid-button:active,.rb-liquid-button.is-pressed { transform: scale(.965); }
-.rb-template__spot-card:active { transform: translateY(-50%) scale(.965); }
+.rb-template__spot-card:active { transform: translate(-50%,-50%) scale(.965); }
 .rb-template__spot-card img { width: 52px; height: 52px; flex: none; object-fit: cover; border-radius: 10px; }
 .rb-template__spot-card img[hidden] { display: none; }
 .rb-template__spot-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
@@ -153,7 +153,7 @@
   .rb-template__spot-connector { display: none; }
   .rb-template__spot-trigger { width: clamp(13px,2.5cqw,20px); height: clamp(13px,2.5cqw,20px); }
   .rb-template__spot-trigger span { width: 3px; height: 3px; }
-  .rb-template__spot-card { right: 3%; top: var(--rb-card-mobile-y); width: 58%; min-height: 0; gap: 4px; padding: clamp(3px,.8cqw,7px); border-radius: 9px; }
+  .rb-template__spot-card { left: var(--rb-card-mobile-x); top: var(--rb-card-mobile-y); width: 58%; min-height: 0; gap: 4px; padding: clamp(3px,.8cqw,7px); border-radius: 9px; }
   .rb-template__spot-card img { width: clamp(18px,5cqw,37px); height: clamp(18px,5cqw,37px); border-radius: 5px; }
   .rb-template__spot-card strong { font-size: clamp(6px,1.7cqw,10px); }
   .rb-template__spot-card small { font-size: clamp(5px,1.25cqw,8px); }
@@ -196,7 +196,7 @@
 .rb-template[data-preview-device="mobile"] .rb-template__card > span:last-child { font-size: 2.5cqw; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-connector { display: block; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-trigger { width: clamp(8px,1.7cqw,20px); height: clamp(8px,1.7cqw,20px); }
-.rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card { top: var(--rb-card-y); right: 2%; width: 22%; min-height: 0; gap: .6cqw; padding: .6cqw; }
+.rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card { left: var(--rb-card-desktop-x); top: var(--rb-card-desktop-y); width: 22%; min-height: 0; gap: .6cqw; padding: .6cqw; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card img { width: 4cqw; height: 4cqw; border-radius: .6cqw; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card strong { font-size: 1.05cqw; }
 .rb-template:is([data-preview-device="desktop"],[data-preview-device="tablet"]) .rb-template__spot-card small { font-size: .7cqw; }
@@ -204,4 +204,17 @@
 .rb-template[data-preview-device] .rb-template__editable,.rb-template[data-preview-device] .rb-template__card,.rb-template[data-preview-device] .rb-template__spot-trigger { cursor: pointer; }
 .rb-template[data-preview-device] [data-selected="true"] { outline: 2px solid var(--rb-template-accent); outline-offset: 2px; }
 .rb-template[data-preview-device] .rb-template__editable:hover,.rb-template[data-preview-device] .rb-template__card:hover { outline: 1px solid var(--rb-template-accent); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-liquid-button::before,.rb-liquid-button::after,.rb-template__spot-card::before,.rb-template__spot-card::after { transition: none; animation: none !important; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template[data-button-animation] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation]:hover { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active,.rb-template[data-button-animation] .rb-template__spot-card:hover { transform: translateY(-50%); } }
+@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-liquid-button::before,.rb-liquid-button::after,.rb-template__spot-card::before,.rb-template__spot-card::after { transition: none; animation: none !important; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template[data-button-animation] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation]:hover { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active,.rb-template[data-button-animation] .rb-template__spot-card:hover { transform: translate(-50%,-50%); } }
+
+.rb-template__connector-tablet { display: none; }
+@container (min-width: 681px) and (max-width: 1024px) {
+  .rb-template:not([data-preview-device]) .rb-template__spot-card { left: var(--rb-card-tablet-x); top: var(--rb-card-tablet-y); }
+  .rb-template:not([data-preview-device]) .rb-template__connector-desktop { display: none; }
+  .rb-template:not([data-preview-device]) .rb-template__connector-tablet { display: block; }
+}
+.rb-template[data-preview-device="tablet"] .rb-template__spot-card { left: var(--rb-card-tablet-x) !important; top: var(--rb-card-tablet-y) !important; }
+.rb-template[data-preview-device="tablet"] .rb-template__connector-desktop { display: none; }
+.rb-template[data-preview-device="tablet"] .rb-template__connector-tablet { display: block; }
+.rb-template[data-preview-device="mobile"] .rb-template__spot-card { left: var(--rb-card-mobile-x); top: var(--rb-card-mobile-y); }
+.rb-template[data-preview-device] .rb-template__spot-card { cursor: grab; touch-action: none; }
+.rb-template[data-preview-device] .rb-template__spot-card:active { cursor: grabbing; }

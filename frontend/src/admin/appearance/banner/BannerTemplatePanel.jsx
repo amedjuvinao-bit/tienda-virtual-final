@@ -110,7 +110,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
         </div>
         {card && <div className="banner-template-inspector__fields">
           <strong>Acceso {index + 1}</strong>
-          {id === 'atelier' && <p className="banner-template-help">La línea une el punto señalado en la foto con esta tarjeta. Elige el lugar y el color para cada acceso.</p>}
+          {id === 'atelier' && <p className="banner-template-help">Arrastra esta tarjeta en la vista previa para ubicarla en cada tamaño de pantalla. La línea une la tarjeta con el punto señalado en la foto.</p>}
           <label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Mostrar en la portada</label>
           <label className="banner-template-field"><span>Usar esta categoría</span><select value={card.categoryId} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', link: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
           <Field label="Texto visible" placeholder={category?.title || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />

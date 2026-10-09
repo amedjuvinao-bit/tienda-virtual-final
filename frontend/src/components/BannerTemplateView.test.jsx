@@ -12,6 +12,30 @@ const categories = [{ id: 'categorias', type: 'categorias', config: { slides: [
 ] } }];
 
 describe('plantillas sobre contenido existente', () => {
+  it('arrastra una tarjeta y conserva la ubicación al mostrar la tienda', () => {
+    const onMoveCard = vi.fn();
+    const banner = { templateId: 'atelier', templateConfigs: { atelier: { cards: [
+      { categoryId: 'actual-a', x: 26, y: 63 }, { categoryId: 'actual-b', x: 78, y: 48 },
+    ] } } };
+    const { container, rerender, unmount } = render(<BannerTemplateView banner={banner} sections={categories} preview device="desktop" onMoveCard={onMoveCard} />);
+    const root = container.querySelector('.rb-template');
+    const card = container.querySelector('.rb-template__spot-card');
+    root.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 400 });
+    card.getBoundingClientRect = () => ({ left: 760, top: 50, width: 220, height: 60 });
+    fireEvent(card, new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 870, clientY: 80 }));
+    fireEvent(card, new MouseEvent('pointermove', { bubbles: true, clientX: 770, clientY: 160 }));
+    expect(container.querySelector('.rb-template__spot').style.getPropertyValue('--rb-card-desktop-x')).toBe('77%');
+    fireEvent(card, new MouseEvent('pointerup', { bubbles: true, clientX: 770, clientY: 160 }));
+    expect(onMoveCard).toHaveBeenCalledWith(0, 'desktop', 77, 40);
+    const saved = { ...banner, templateConfigs: { atelier: { cards: [
+      { ...banner.templateConfigs.atelier.cards[0], position: { desktop: { x: 77, y: 40 }, mobile: { x: 45, y: 65 } } },
+      banner.templateConfigs.atelier.cards[1],
+    ] } } };
+    rerender(<BannerTemplateView banner={saved} sections={categories} />);
+    expect(container.querySelector('.rb-template__spot').style.getPropertyValue('--rb-card-desktop-x')).toBe('77%');
+    expect(container.querySelector('.rb-template__spot').style.getPropertyValue('--rb-card-mobile-x')).toBe('45%');
+    unmount();
+  });
   it('toma categorías configuradas y conserva la configuración propia de cada diseño', () => {
     const banner = { templateId: 'discovery', templateConfigs: {
       discovery: { title: 'Nuestra selección', cards: [{ categoryId: 'actual-b', text: 'Explora tecnología', link: '/ofertas' }] },

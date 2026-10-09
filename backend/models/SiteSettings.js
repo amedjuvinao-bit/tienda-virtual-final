@@ -77,6 +77,11 @@ const BannerTemplateActionSchema = new Schema({
   link: { type: String, default: "" },
 }, { _id: false });
 
+const BannerCardPositionSchema = new Schema({
+  x: { type: Number, min: 0, max: 100 },
+  y: { type: Number, min: 0, max: 100 },
+}, { _id: false });
+
 const BannerTemplateCardSchema = new Schema({
   enabled: { type: Boolean, default: true },
   categoryId: { type: String, default: "" },
@@ -87,6 +92,11 @@ const BannerTemplateCardSchema = new Schema({
   x: { type: Number, min: 0, max: 100, default: 70 },
   y: { type: Number, min: 0, max: 100, default: 55 },
   lineColor: { type: String, match: /^#[0-9a-f]{6}$/i, default: "#ffffff" },
+  position: {
+    desktop: { type: BannerCardPositionSchema, default: undefined },
+    tablet: { type: BannerCardPositionSchema, default: undefined },
+    mobile: { type: BannerCardPositionSchema, default: undefined },
+  },
 }, { _id: false });
 
 const BannerTemplateConfigSchema = new Schema({
