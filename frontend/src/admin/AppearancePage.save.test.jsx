@@ -38,10 +38,13 @@ vi.mock('./appearance/header/HeaderPanel', () => ({
     <button onClick={() => setPath('header.searchBgColor', '#254254')}>Cambiar fondo del buscador</button>
   </>,
 }));
-vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }) => <button onClick={() => {
+vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }) => <><button onClick={() => {
   setPath('banner.sliderIntervalMs', 6200);
   setPath('banner.sliderShowProgress', false);
-}}>Ajustar slider ({theme.banner.sliderIntervalMs} ms)</button> }));
+}}>Ajustar slider ({theme.banner.sliderIntervalMs} ms)</button><button onClick={() => setPath('banner.templateConfigs.atelier', {
+  ...theme.banner.templateConfigs?.atelier,
+  cards: [{ categoryId: 'hogar', position: { desktop: { x: 45, y: 37 } } }],
+})}>Mover tarjeta</button></> }));
 vi.mock('./appearance/sections/SectionsPanel', () => ({
   default: ({ theme, setPath }) => <button onClick={() => setPath('sections', theme.sections.map((section) =>
     section.id === 'look' ? { ...section, title: 'Nuevos looks' } : section
@@ -133,6 +136,30 @@ describe('guardado seguro de Apariencia', () => {
     expect(saveSiteSettings.mock.calls[0][0].theme.banner.autoplayMs).toBe(6200);
     expect(saveSiteSettings.mock.calls[0][0].theme.banner.sliderShowProgress).toBe(false);
     expect(saveSiteSettings.mock.calls[0][0].theme.banner.sliderIntervalMs).toBeUndefined();
+  });
+
+  it('confirma la posición devuelta por el servidor antes de marcarla como guardada', async () => {
+    const user = userEvent.setup();
+    permissions.allowed = ['appearance:update'];
+    saveSiteSettings.mockImplementationOnce(async (payload) => ({
+      theme: { ...initial.theme, banner: { ...payload.theme.banner, templateConfigs: { atelier: { cards: [{ categoryId: 'hogar' }] } } } },
+      menus: initial.menus,
+      appearanceRevision: 4,
+    }));
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+    await user.click(screen.getByRole('button', { name: 'Mover tarjeta' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.templateConfigs.atelier.cards[0].position.desktop).toEqual({ x: 45, y: 37 });
+    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no conservó la posición');
+    expect(screen.getByText(/área pendiente por guardar/)).toBeInTheDocument();
+
+    saveSiteSettings.mockImplementationOnce(async (payload) => ({ theme: { ...initial.theme, ...payload.theme }, menus: initial.menus, appearanceRevision: 5 }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
   });
 
   it('persiste el icono de moda y su color como datos del enlace', async () => {

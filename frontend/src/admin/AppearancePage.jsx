@@ -944,6 +944,24 @@ export default function AppearancePage() {
         throw new Error('La respuesta de guardado no incluyó la revisión de Apariencia. Recarga antes de guardar de nuevo.');
       }
 
+      // El backend puede seguir ejecutando un modelo antiguo y descartar campos
+      // nuevos de las tarjetas aunque el PUT responda correctamente.
+      const requestedCards = changedTheme.banner?.templateConfigs?.atelier?.cards || [];
+      const storedCards = saved?.theme?.banner?.templateConfigs?.atelier?.cards || [];
+      const positionWasLost = requestedCards.some((card, index) =>
+        ['desktop', 'tablet', 'mobile'].some((device) => {
+          const requested = card?.position?.[device];
+          if (!requested) return false;
+          const stored = storedCards[index]?.position?.[device];
+          return Number(stored?.x) !== Number(requested.x) || Number(stored?.y) !== Number(requested.y);
+        })
+      );
+      if (positionWasLost) {
+        setAppearanceRevision(saved.appearanceRevision);
+        setServerSnapshot(buildThemeFromServer(saved.theme));
+        throw new Error('El servidor no conservó la posición de las tarjetas. Reinicia el backend con la versión actualizada y vuelve a guardar; los cambios siguen aquí en el editor.');
+      }
+
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
       setAppearanceRevision(saved.appearanceRevision);
