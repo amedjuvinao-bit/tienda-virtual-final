@@ -74,7 +74,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     </div>}
 
     {group === 'actions' && <div className="banner-template-buttons">
-      <div className="banner-template-motion-head"><strong>Animación de los botones</strong><span>Elige un estilo para los dos botones y los accesos de la vitrina. Pasa el mouse por cada muestra y observa la portada.</span></div>
+      <div className="banner-template-motion-head"><strong>Animación de los botones</strong><span>Elige un estilo para los botones y todas las tarjetas de categorías de la portada. Pasa el mouse por cada muestra y observa la portada.</span></div>
       <div className="banner-template-motion-choices" role="group" aria-label="Animación de los botones">
         {BANNER_BUTTON_ANIMATIONS.map((preset) => <button key={preset.id} type="button" className="banner-template-motion-choice" aria-pressed={config.buttonAnimation === preset.id} onClick={() => update({ buttonAnimation: preset.id })}>
           <span className="banner-template-motion-choice__stage"><span className="banner-template-motion-choice__demo rb-liquid-button" data-button-animation={preset.id} onPointerMove={moveBannerButtonLight} aria-hidden="true"><span>Explorar</span><span>↗</span></span></span>

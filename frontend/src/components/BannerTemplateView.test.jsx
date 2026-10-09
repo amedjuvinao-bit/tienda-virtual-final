@@ -12,6 +12,24 @@ const categories = [{ id: 'categorias', type: 'categorias', config: { slides: [
 ] } }];
 
 describe('plantillas sobre contenido existente', () => {
+  it('aplica a las tarjetas inferiores la animación elegida para los botones', () => {
+    for (const templateId of ['discovery', 'editorial']) {
+      for (const buttonAnimation of ['prism', 'pearl', 'aurora', 'rose']) {
+        const banner = { templateId, templateConfigs: { [templateId]: { buttonAnimation } } };
+        const { container, unmount } = render(<BannerTemplateView banner={banner} sections={categories} />);
+        expect(container.querySelector('.rb-template')).toHaveAttribute('data-button-animation', buttonAnimation);
+        const cards = container.querySelectorAll('.rb-template__card');
+        expect(cards).toHaveLength(2);
+        cards.forEach((card) => {
+          card.getBoundingClientRect = () => ({ left: 10, top: 20, width: 160, height: 64 });
+          fireEvent(card, new MouseEvent('pointermove', { bubbles: true, clientX: 90, clientY: 52 }));
+          expect(card.style.getPropertyValue('--rb-light-x')).toBe('50%');
+          expect(card.style.getPropertyValue('--rb-turn-x')).toBe('0.00deg');
+        });
+        unmount();
+      }
+    }
+  });
   it('arrastra una tarjeta y conserva la ubicación al mostrar la tienda', () => {
     const onMoveCard = vi.fn();
     const banner = { templateId: 'atelier', templateConfigs: { atelier: { cards: [

@@ -10,15 +10,15 @@
 .rb-template__description { max-width: 36ch; margin: 1.1em 0 1.5em; font: 400 clamp(12px,1.28cqw,18px)/1.5 system-ui,sans-serif; }
 .rb-template__actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .rb-liquid-button { position: relative; z-index: 0; display: inline-flex; align-items: center; justify-content: space-between; gap: 1.1em; overflow: hidden; min-height: 48px; padding: 12px 19px; border-radius: 999px; color: var(--rb-template-text); font: 700 clamp(11px,1.02cqw,16px)/1.2 system-ui,sans-serif; text-decoration: none; cursor: pointer; }
-.rb-liquid-button > *,.rb-template__spot-card > * { position: relative; z-index: 1; }
+.rb-liquid-button > *,.rb-template__spot-card > *,.rb-template__card > * { position: relative; z-index: 1; }
 .rb-liquid-button:focus-visible,.rb-template__spot-trigger:focus-visible,.rb-template__spot-card:focus-visible,.rb-template__card:focus-visible { outline: 3px solid var(--rb-template-accent); outline-offset: 3px; }
 .rb-liquid-button[aria-disabled='true'] { cursor: default; }
 .rb-template__rail { position: absolute; z-index: 2; bottom: 5%; left: 7%; right: 7%; }
 .rb-template__rail-heading { display: block; margin-bottom: 9px; font: 700 clamp(9px,.85cqw,13px) system-ui,sans-serif; letter-spacing: .15em; text-transform: uppercase; }
 .rb-template__cards { display: flex; gap: 12px; }
-.rb-template__card { display: flex; align-items: center; flex: 1; min-width: 0; gap: 12px; padding: 13px 17px; border-radius: 18px; border: 1px solid rgba(255,255,255,.76); background: color-mix(in srgb,var(--rb-template-glass) 38%,transparent); box-shadow: inset 0 2px 2px rgba(255,255,255,.8),0 9px 25px rgba(69,24,36,.11); backdrop-filter: blur(16px) saturate(145%); -webkit-backdrop-filter: blur(16px) saturate(145%); color: inherit; text-decoration: none; transition: transform .24s ease,background .24s ease; }
-.rb-template__card:hover { transform: translateY(-5px); background: color-mix(in srgb,var(--rb-template-glass) 62%,transparent); }
-.rb-template__card:active { transform: scale(.96) translateY(1px); background: color-mix(in srgb,var(--rb-template-glass) 75%,transparent); box-shadow: inset 0 4px 12px rgba(65,20,38,.15),0 3px 10px rgba(65,20,38,.12); }
+.rb-template__card { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; flex: 1; min-width: 0; gap: 12px; padding: 13px 17px; border-radius: 18px; border: 1px solid rgba(255,255,255,.76); background: color-mix(in srgb,var(--rb-template-glass) 38%,transparent); box-shadow: inset 0 2px 2px rgba(255,255,255,.8),0 9px 25px rgba(69,24,36,.11); backdrop-filter: blur(16px) saturate(145%); -webkit-backdrop-filter: blur(16px) saturate(145%); color: inherit; text-decoration: none; transition: transform .24s ease,background .24s ease; }
+
+
 .rb-template__card img { width: 38px; height: 38px; border-radius: 9px; object-fit: cover; }
 .rb-template__card-copy { display: grid; flex: 1; min-width: 0; }
 .rb-template__card small { color: var(--rb-template-accent); font: 700 clamp(10px,.8cqw,12px) system-ui,sans-serif; letter-spacing: .11em; }
@@ -68,7 +68,7 @@
   --rb-edge-c: rgba(255,209,137,.92);
   --rb-edge-d: rgba(255,248,229,.86);
 }
-.rb-liquid-button,.rb-template__spot-card {
+.rb-liquid-button,.rb-template__spot-card,.rb-template__card {
   --rb-action-edge: var(--rb-template-glass);
   --rb-light-x: 50%;
   --rb-light-y: 0%;
@@ -83,14 +83,15 @@
   transition: --rb-light-x .16s ease-out,--rb-light-y .16s ease-out,border-color .3s ease,background .3s ease,box-shadow .3s ease,backdrop-filter .3s ease,transform .3s cubic-bezier(.2,1,.3,1);
 }
 .rb-template__spot-card { --rb-action-edge: var(--rb-spot-color); }
-.rb-liquid-button::before,.rb-template__spot-card::before {
+.rb-template__card { --rb-action-edge: var(--rb-template-accent); }
+.rb-liquid-button::before,.rb-template__spot-card::before,.rb-template__card::before {
   content: ''; position: absolute; z-index: 0; inset: 0; border-radius: inherit; pointer-events: none;
   background:
     linear-gradient(105deg,transparent 7%,rgba(255,255,255,.035) 29%,rgba(255,255,255,.22) 45%,rgba(255,255,255,.035) 60%,transparent 78%) var(--rb-light-x) 0 / 210% 100% no-repeat,
     radial-gradient(ellipse 78% 145% at var(--rb-light-x) var(--rb-light-y),rgba(255,255,255,.22),rgba(255,255,255,.07) 36%,transparent 73%);
   opacity: 0; transition: opacity .35s ease;
 }
-.rb-liquid-button::after,.rb-template__spot-card::after {
+.rb-liquid-button::after,.rb-template__spot-card::after,.rb-template__card::after {
   content: ''; position: absolute; z-index: 0; inset: 0; border-radius: inherit; pointer-events: none;
   background: radial-gradient(ellipse 110px 51px at var(--rb-light-x) var(--rb-light-y),var(--rb-edge-a) 2%,var(--rb-edge-b) 24%,var(--rb-edge-c) 49%,var(--rb-edge-d) 66%,transparent 81%);
   padding: 2px;
@@ -99,7 +100,7 @@
   -webkit-mask-composite: xor; mask-composite: exclude;
   opacity: 0; transition: opacity .3s ease;
 }
-.rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card[data-open='true'] {
+.rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card[data-open='true'],.rb-template__card:hover,.rb-template__card:focus-visible {
   border-color: color-mix(in srgb,var(--rb-action-edge) 78%,rgba(255,255,255,.72));
   background: linear-gradient(155deg,rgba(255,255,255,.18),color-mix(in srgb,var(--rb-template-glass) 10%,transparent) 40%,rgba(19,10,29,.12) 84%,rgba(255,255,255,.13));
   box-shadow: inset 0 2px 1px rgba(255,255,255,.98),inset 0 -2px 3px rgba(255,255,255,.42),inset 0 -12px 20px rgba(11,8,19,.13),0 17px 31px rgba(11,8,19,.26),0 0 16px color-mix(in srgb,var(--rb-action-edge) 25%,transparent);
@@ -107,26 +108,28 @@
   -webkit-backdrop-filter: blur(2px) saturate(145%);
   text-decoration: none;
 }
-.rb-liquid-button:is(:hover,:focus-visible)::before,.rb-template__spot-card:is(:hover,:focus-visible)::before { opacity: 1; }
-.rb-liquid-button:is(:hover,:focus-visible)::after,.rb-template__spot-card:is(:hover,:focus-visible)::after { opacity: 1; }
+.rb-liquid-button:is(:hover,:focus-visible)::before,.rb-template__spot-card:is(:hover,:focus-visible)::before,.rb-template__card:is(:hover,:focus-visible)::before { opacity: 1; }
+.rb-liquid-button:is(:hover,:focus-visible)::after,.rb-template__spot-card:is(:hover,:focus-visible)::after,.rb-template__card:is(:hover,:focus-visible)::after { opacity: 1; }
+.rb-template__card:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-2px) scale(1.018); }
 .rb-liquid-button:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-2px) scale(1.018); }
 .rb-template__spot-card:hover { transform: translate(-50%,-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.025); }
-.rb-template[data-button-animation='pearl'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='pearl']:hover { transform: translateY(-1px) scale(1.012); }
+.rb-template[data-button-animation='pearl'] :is(.rb-liquid-button,.rb-template__card):hover,.banner-template-motion-choice__demo[data-button-animation='pearl']:hover { transform: translateY(-1px) scale(1.012); }
 .rb-template[data-button-animation='pearl'] .rb-template__spot-card:hover { transform: translate(-50%,-50%) scale(1.012); }
-.rb-template[data-button-animation='pearl'] :is(.rb-liquid-button,.rb-template__spot-card),.banner-template-motion-choice__demo[data-button-animation='pearl'] { transition-duration: .48s; }
+.rb-template[data-button-animation='pearl'] :is(.rb-liquid-button,.rb-template__spot-card,.rb-template__card),.banner-template-motion-choice__demo[data-button-animation='pearl'] { transition-duration: .48s; }
 @keyframes rb-aurora-flow { from { transform: translateX(-5%) skewX(-3deg); } to { transform: translateX(5%) skewX(3deg); } }
-.rb-template[data-button-animation='aurora'] :is(.rb-liquid-button,.rb-template__spot-card):hover::before,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover::before { animation: rb-aurora-flow 1.7s ease-in-out infinite alternate; }
-.rb-template[data-button-animation='aurora'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-3px) scale(1.027); }
+.rb-template[data-button-animation='aurora'] :is(.rb-liquid-button,.rb-template__spot-card,.rb-template__card):hover::before,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover::before { animation: rb-aurora-flow 1.7s ease-in-out infinite alternate; }
+.rb-template[data-button-animation='aurora'] :is(.rb-liquid-button,.rb-template__card):hover,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-3px) scale(1.027); }
 .rb-template[data-button-animation='aurora'] .rb-template__spot-card:hover { transform: translate(-50%,-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.033); }
 @keyframes rb-rose-pulse { 0%,100% { opacity: 1; } 50% { opacity: .52; } }
-.rb-template[data-button-animation='rose'] :is(.rb-liquid-button,.rb-template__spot-card):hover::after,.banner-template-motion-choice__demo[data-button-animation='rose']:hover::after { animation: rb-rose-pulse 2.2s ease-in-out infinite; }
-.rb-template[data-button-animation='rose'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='rose']:hover { transform: translateY(-2px) scale(1.025); }
+.rb-template[data-button-animation='rose'] :is(.rb-liquid-button,.rb-template__spot-card,.rb-template__card):hover::after,.banner-template-motion-choice__demo[data-button-animation='rose']:hover::after { animation: rb-rose-pulse 2.2s ease-in-out infinite; }
+.rb-template[data-button-animation='rose'] :is(.rb-liquid-button,.rb-template__card):hover,.banner-template-motion-choice__demo[data-button-animation='rose']:hover { transform: translateY(-2px) scale(1.025); }
 .rb-template[data-button-animation='rose'] .rb-template__spot-card:hover { transform: translate(-50%,-50%) scale(1.025); }
 .rb-liquid-button > span:last-child { transition: transform .3s cubic-bezier(.2,1,.3,1); }
 .rb-liquid-button:hover > span:last-child { transform: translate(2px,-2px); }
 .rb-template__content a.rb-liquid-button:hover { text-decoration: none; }
-.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template__spot-card:active { box-shadow: inset 0 6px 13px rgba(11,8,19,.29), 0 4px 12px rgba(11,8,19,.18); }
+.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template__spot-card:active,.rb-template__card:active { box-shadow: inset 0 6px 13px rgba(11,8,19,.29), 0 4px 12px rgba(11,8,19,.18); }
 .rb-liquid-button:active,.rb-liquid-button.is-pressed { transform: scale(.965); }
+.rb-template__card:active { transform: scale(.965); }
 .rb-template__spot-card:active { transform: translate(-50%,-50%) scale(.965); }
 .rb-template__spot-card img { width: 52px; height: 52px; flex: none; object-fit: cover; border-radius: 10px; }
 .rb-template__spot-card img[hidden] { display: none; }
@@ -204,7 +207,7 @@
 .rb-template[data-preview-device] .rb-template__editable,.rb-template[data-preview-device] .rb-template__card,.rb-template[data-preview-device] .rb-template__spot-trigger { cursor: pointer; }
 .rb-template[data-preview-device] [data-selected="true"] { outline: 2px solid var(--rb-template-accent); outline-offset: 2px; }
 .rb-template[data-preview-device] .rb-template__editable:hover,.rb-template[data-preview-device] .rb-template__card:hover { outline: 1px solid var(--rb-template-accent); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-liquid-button::before,.rb-liquid-button::after,.rb-template__spot-card::before,.rb-template__spot-card::after { transition: none; animation: none !important; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template[data-button-animation] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation]:hover { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active,.rb-template[data-button-animation] .rb-template__spot-card:hover { transform: translate(-50%,-50%); } }
+@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-liquid-button::before,.rb-liquid-button::after,.rb-template__spot-card::before,.rb-template__spot-card::after,.rb-template__card::before,.rb-template__card::after { transition: none; animation: none !important; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template[data-button-animation] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation]:hover { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active,.rb-template[data-button-animation] .rb-template__spot-card:hover { transform: translate(-50%,-50%); } .rb-template__card:hover,.rb-template__card:focus-visible,.rb-template__card:active,.rb-template[data-button-animation] .rb-template__card:hover { transform: none; } }
 
 .rb-template__connector-tablet { display: none; }
 @container (min-width: 681px) and (max-width: 1024px) {
