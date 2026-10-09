@@ -84,7 +84,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
         <label className="banner-template-toggle"><input type="checkbox" checked={config[actionKey].enabled !== false} onChange={(event) => updateAction(actionKey, { enabled: event.target.checked })} /> Mostrar en la portada</label>
         <Field label="Texto del botón" value={config[actionKey].text || ''} onChange={(event) => updateAction(actionKey, { text: event.target.value })} />
         <Field label="Al hacer clic, ir a" placeholder="/categoria/... o https://..." value={config[actionKey].link || ''} onChange={(event) => updateAction(actionKey, { link: event.target.value })} />
-        <p className="banner-template-help">Los botones tienen efecto de cristal y responden al clic en la tienda pública.</p>
+        {!config[actionKey].link?.trim() && config[actionKey].enabled !== false && <p className="banner-template-help" role="status">Este botón aún no abre ninguna página. Escribe un enlace y guarda la portada para activarlo en la tienda.</p>}
       </div>
     </div>}
 

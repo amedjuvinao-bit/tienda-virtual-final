@@ -57,4 +57,12 @@ describe('editor de plantillas', () => {
     expect(saved.templateConfigs.atelier.cards[0]).toEqual(expect.objectContaining({ x: 31, y: 62, lineColor: '#de468a' }));
     expect(saved.templateConfigs.atelier.cards[1]).toEqual(expect.objectContaining({ x: 74, y: 52 }));
   });
+
+  it('explica por qué un botón visible no abre nada hasta configurar su enlace', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: '② Botones' }));
+    expect(screen.getByText(/Este botón aún no abre ninguna página/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Al hacer clic, ir a'), { target: { value: '/categoria/hogar' } });
+    expect(screen.queryByText(/Este botón aún no abre ninguna página/)).toBeNull();
+  });
 });
