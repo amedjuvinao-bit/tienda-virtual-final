@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GeneralPanel from "./GeneralPanel";
@@ -121,6 +121,22 @@ describe("herramientas de Apariencia", () => {
     expect(loader.style.background).toBe("transparent");
     expect(loader.querySelector(".storefront-loader-icon")).toBeInTheDocument();
     expect(loader.querySelector(".storefront-liquid-icon")).not.toBeInTheDocument();
+  });
+
+  it("separa la navegación de las tarjetas inferiores de la portada", async () => {
+    const rail = document.createElement('div');
+    rail.className = 'rb-template__rail';
+    rail.getBoundingClientRect = () => ({ left: 80, right: 940, top: 710, bottom: 760, width: 860, height: 50 });
+    document.body.appendChild(rail);
+    const { container, unmount } = render(<ScrollButton config={{ enabled: true, position: 'center', bottomPx: 24 }} />);
+    fireEvent.scroll(window);
+    const controls = container.querySelector('button[aria-label="Sección anterior"]').parentElement;
+    await waitFor(() => expect(Number.parseInt(controls.style.bottom, 10)).toBeGreaterThan(24));
+    rail.getBoundingClientRect = () => ({ left: 80, right: 940, top: 100, bottom: 150, width: 860, height: 50 });
+    fireEvent.scroll(window);
+    await waitFor(() => expect(controls.style.bottom).toBe('24px'));
+    unmount();
+    rail.remove();
   });
 
   it("deja solo la imagen transparente de WhatsApp y permite ampliarla desde el panel", async () => {

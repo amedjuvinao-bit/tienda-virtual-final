@@ -1,5 +1,5 @@
 // src/components/ScrollButton.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import "./storefrontLiquidGlass.css";
 import {
@@ -104,6 +104,36 @@ export default function ScrollButton({ config }) {
     ? Number(safeConfig.downImageSizePercent)
     : 70;
 
+  const [railClearancePx, setRailClearancePx] = useState(0);
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const rail = document.querySelector('.rb-template__rail');
+      const bounds = rail?.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const count = Number(showUp) + Number(showDown);
+      const controlsWidth = count * buttonSizePx + Math.max(0, count - 1) * gapPx;
+      const left = position === 'left' ? 24 : position === 'right' ? viewportWidth - 24 - controlsWidth : (viewportWidth - controlsWidth) / 2;
+      const top = viewportHeight - bottomPx - buttonSizePx;
+      const intersectsRail = bounds && bounds.width > 0 && bounds.height > 0 &&
+        bounds.left < left + controlsWidth && bounds.right > left &&
+        bounds.top < top + buttonSizePx && bounds.bottom > top;
+      const clearance = intersectsRail ? Math.max(0, Math.ceil(viewportHeight - bounds.top + 14 - bottomPx)) : 0;
+      setRailClearancePx((previous) => previous === clearance ? previous : clearance);
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
+    schedule();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [position, bottomPx, gapPx, buttonSizePx, showUp, showDown, config]);
+
   const scrollToIndex = (index) => {
     const id = sectionIds[index];
     if (!id) return;
@@ -176,8 +206,9 @@ export default function ScrollButton({ config }) {
       <div
         className="hidden md:flex fixed z-50 items-center"
         style={{
-          bottom: `${bottomPx}px`,
+          bottom: `${bottomPx + railClearancePx}px`,
           gap: `${gapPx}px`,
+          transition: 'bottom .2s ease',
           ...wrapperPositionStyle,
         }}
       >
