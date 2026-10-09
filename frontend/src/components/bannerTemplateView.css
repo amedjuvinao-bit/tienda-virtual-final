@@ -53,17 +53,35 @@
   transition: border-color .32s ease,background .32s ease,box-shadow .32s ease,backdrop-filter .32s ease,transform .32s cubic-bezier(.2,1,.3,1);
 }
 .rb-template__spot-card { --rb-action-edge: var(--rb-spot-color); }
+.rb-liquid-button,.rb-template__spot-card { --rb-lens-x: 76%; --rb-lens-y: 50%; --rb-lens-size: 76px; }
+.rb-glass-lens {
+  position: absolute !important;
+  z-index: 0 !important;
+  left: var(--rb-lens-x);
+  top: var(--rb-lens-y);
+  width: var(--rb-lens-size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: url('../assets/banner-glass-ripple.webp') center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(circle, #000 0 55%, transparent 73%);
+  mask-image: radial-gradient(circle, #000 0 55%, transparent 73%);
+  backdrop-filter: blur(2px) contrast(140%) saturate(160%);
+  -webkit-backdrop-filter: blur(2px) contrast(140%) saturate(160%);
+  transform: translate(-50%,-50%) scale(.68);
+  transition: opacity .22s ease,transform .36s cubic-bezier(.2,1,.3,1);
+}
+.rb-liquid-button:is(:hover,:focus-visible) .rb-glass-lens,.rb-template__spot-card:is(:hover,:focus-visible) .rb-glass-lens { opacity: 1; transform: translate(-50%,-50%) scale(1); }
 .rb-liquid-button::before,.rb-template__spot-card::before { content: ''; position: absolute; inset: 1px 10px auto; height: 2px; border-radius: 999px; background: linear-gradient(90deg,transparent,color-mix(in srgb,var(--rb-template-glass) 82%,transparent),transparent); opacity: .35; transition: opacity .28s ease; pointer-events: none; }
 .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card[data-open='true'] {
-  border-color: color-mix(in srgb,var(--rb-action-edge) 94%,rgba(255,255,255,.65));
-  background: linear-gradient(145deg,color-mix(in srgb,var(--rb-template-glass) 37%,transparent),color-mix(in srgb,var(--rb-template-glass) 12%,rgba(15,10,20,.26)));
-  box-shadow: inset 0 2px 3px rgba(255,255,255,.84), inset 0 -10px 19px rgba(11,8,19,.24), 0 17px 32px rgba(11,8,19,.3);
-  backdrop-filter: blur(9px) saturate(165%);
-  -webkit-backdrop-filter: blur(9px) saturate(165%);
+  border-color: color-mix(in srgb,var(--rb-action-edge) 86%,rgba(255,255,255,.55));
+  background: linear-gradient(145deg,color-mix(in srgb,var(--rb-template-glass) 20%,transparent),color-mix(in srgb,var(--rb-template-glass) 7%,rgba(15,10,20,.23)));
+  box-shadow: inset 0 2px 3px rgba(255,255,255,.78), inset 0 -9px 18px rgba(11,8,19,.21), 0 14px 28px rgba(11,8,19,.26);
+  backdrop-filter: blur(2px) saturate(120%);
+  -webkit-backdrop-filter: blur(2px) saturate(120%);
   text-decoration: none;
 }
-.rb-liquid-button:hover,.rb-liquid-button:focus-visible { transform: scale(1.055); }
-.rb-template__spot-card:hover,.rb-template__spot-card:focus-visible { transform: translateY(-50%) scale(1.035); }
 .rb-liquid-button:hover::before,.rb-liquid-button:focus-visible::before,.rb-template__spot-card:hover::before,.rb-template__spot-card:focus-visible::before { opacity: 1; }
 .rb-template__content a.rb-liquid-button:hover { text-decoration: none; }
 .rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template__spot-card:active { box-shadow: inset 0 6px 13px rgba(11,8,19,.29), 0 4px 12px rgba(11,8,19,.18); }
@@ -145,4 +163,4 @@
 .rb-template[data-preview-device] .rb-template__editable,.rb-template[data-preview-device] .rb-template__card,.rb-template[data-preview-device] .rb-template__spot-trigger { cursor: pointer; }
 .rb-template[data-preview-device] [data-selected="true"] { outline: 2px solid var(--rb-template-accent); outline-offset: 2px; }
 .rb-template[data-preview-device] .rb-template__editable:hover,.rb-template[data-preview-device] .rb-template__card:hover { outline: 1px solid var(--rb-template-accent); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow { transition: none; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active { transform: translateY(-50%); } }
+@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-glass-lens { transition: none; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active { transform: translateY(-50%); } }

@@ -2,6 +2,18 @@ import React, { useState } from 'react';
 import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
 
+function moveGlassLens(event) {
+  if (event.pointerType === 'touch') return;
+  const element = event.currentTarget;
+  const bounds = element.getBoundingClientRect();
+  if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
+  const size = Math.max(26, Math.min(96, bounds.height * 1.6));
+  const inset = Math.min(bounds.width / 2, bounds.height / 2, size * .38);
+  element.style.setProperty('--rb-lens-size', `${size}px`);
+  element.style.setProperty('--rb-lens-x', `${Math.max(inset, Math.min(bounds.width - inset, event.clientX - bounds.left))}px`);
+  element.style.setProperty('--rb-lens-y', `${Math.max(inset, Math.min(bounds.height - inset, event.clientY - bounds.top))}px`);
+}
+
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {
   const [pressed, setPressed] = useState(false);
   if (action?.enabled === false || !action?.text) return null;
@@ -10,12 +22,13 @@ function GlassLink({ action, secondary = false, preview = false, onSelect, selec
   const props = {
     className,
     'data-selected': preview && selected ? 'true' : undefined,
+    onPointerMove: moveGlassLens,
     onPointerDown: () => { setPressed(true); window.setTimeout(() => setPressed(false), 440); },
     onClick: preview ? (event) => { event.preventDefault(); onSelect?.(); } : undefined,
   };
-  const contents = <><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
+  const contents = <><span className="rb-glass-lens" aria-hidden="true" /><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
   return href ? <a {...props} href={href}>{contents}</a>
-    : <span {...props} title={preview ? 'Editar este botón' : 'Configura un enlace en el panel'} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(); } } : undefined} aria-disabled={preview ? undefined : 'true'}>{contents}</span>;
+    : <span {...props} title={preview ? 'Editar este botón' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(); } } : undefined} aria-disabled={preview ? undefined : 'true'}>{contents}</span>;
 }
 
 function CopyLink({ href, preview, onSelect, selected, children }) {
@@ -64,7 +77,8 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
             <polyline points={`${x},${y} 73,${y} 73,${cardY} 76,${cardY}`} stroke={lineColor} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
-          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={moveGlassLens} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
+            <span className="rb-glass-lens" aria-hidden="true" />
             {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
             <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
             <span className="rb-template__spot-arrow" aria-hidden="true">→</span>
