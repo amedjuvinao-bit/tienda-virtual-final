@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
+import lensMap from '../assets/bannerLensDisplacement.png';
 import './bannerTemplateView.css';
 
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {
@@ -16,6 +17,109 @@ function GlassLink({ action, secondary = false, preview = false, onSelect, selec
   const contents = <><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
   return href ? <a {...props} href={href}>{contents}</a>
     : <span {...props} title={preview ? 'Editar este botón' : 'Configura un enlace en el panel'} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(); } } : undefined} aria-disabled={preview ? undefined : 'true'}>{contents}</span>;
+}
+
+function ActionLens({ primary, secondary, preview, onSelect, selectedPart }) {
+  const groupRef = useRef(null);
+  const lensRef = useRef(null);
+  const copyRef = useRef(null);
+  const animationRef = useRef(0);
+  const positionRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
+  const [visible, setVisible] = useState(false);
+  const filterId = useId().replace(/:/g, '');
+
+  useEffect(() => {
+    const group = groupRef.current;
+    const copy = copyRef.current;
+    if (!group || !copy) return undefined;
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => { copy.style.width = `${group.offsetWidth}px`; });
+    resize?.observe(group);
+    copy.style.width = `${group.offsetWidth}px`;
+    return () => { resize?.disconnect(); cancelAnimationFrame(animationRef.current); };
+  }, []);
+
+  const paint = () => {
+    const lens = lensRef.current;
+    const copy = copyRef.current;
+    if (!lens || !copy) return;
+    const pos = positionRef.current;
+    const width = lens.offsetWidth;
+    const height = lens.offsetHeight;
+    lens.style.transform = `translate3d(${pos.x - width / 2}px, ${pos.y - height / 2}px, 0)`;
+    copy.style.left = `${width / 2 - pos.x}px`;
+    copy.style.top = `${height / 2 - pos.y}px`;
+    copy.style.transformOrigin = `${pos.x}px ${pos.y}px`;
+  };
+
+  const animate = () => {
+    const pos = positionRef.current;
+    pos.x += (pos.targetX - pos.x) * .3;
+    pos.y += (pos.targetY - pos.y) * .3;
+    paint();
+    if (Math.abs(pos.targetX - pos.x) + Math.abs(pos.targetY - pos.y) > .3) {
+      animationRef.current = requestAnimationFrame(animate);
+    } else {
+      animationRef.current = 0;
+    }
+  };
+
+  const aim = (x, y) => {
+    const group = groupRef.current;
+    if (!group || !lensRef.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const pos = positionRef.current;
+    pos.targetX = Math.max(0, Math.min(group.offsetWidth, x));
+    pos.targetY = Math.max(0, Math.min(group.offsetHeight, y));
+    if (!visible) {
+      pos.x = pos.targetX;
+      pos.y = pos.targetY;
+      paint();
+      setVisible(true);
+    } else if (!animationRef.current) {
+      animationRef.current = requestAnimationFrame(animate);
+    }
+  };
+
+  const aimAtPointer = (event) => {
+    const group = groupRef.current;
+    const rect = group.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    aim((event.clientX - rect.left) * group.offsetWidth / rect.width,
+      (event.clientY - rect.top) * group.offsetHeight / rect.height);
+  };
+
+  const hide = () => { setVisible(false); cancelAnimationFrame(animationRef.current); animationRef.current = 0; };
+  const clone = (action, secondary) => action?.enabled === false || !action?.text ? null :
+    <span className={`rb-liquid-button${secondary ? ' rb-liquid-button--secondary' : ''}`}>
+      <span className="rb-liquid-button__label" data-label={action.text} /><span className="rb-action-lens__arrow" />
+    </span>;
+
+  return <div ref={groupRef} className="rb-template__actions"
+    onPointerEnter={aimAtPointer} onPointerMove={aimAtPointer} onPointerLeave={hide}
+    onPointerUp={(event) => { if (event.pointerType === 'touch') hide(); }}
+    onFocusCapture={(event) => {
+      const group = groupRef.current;
+      const rect = event.target.getBoundingClientRect();
+      const bounds = group.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      aim((rect.left + rect.width / 2 - bounds.left) * group.offsetWidth / bounds.width,
+        (rect.top + rect.height / 2 - bounds.top) * group.offsetHeight / bounds.height);
+    }}
+    onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) hide(); }}>
+    <GlassLink action={primary} preview={preview} selected={selectedPart === 'action:primary'} onSelect={() => onSelect?.('action:primary')} />
+    <GlassLink action={secondary} secondary preview={preview} selected={selectedPart === 'action:secondary'} onSelect={() => onSelect?.('action:secondary')} />
+    <svg className="rb-action-lens-filter" width="0" height="0" aria-hidden="true" focusable="false">
+      <filter id={filterId} x="0" y="0" width="1" height="1" primitiveUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
+        <feImage href={lensMap} x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="displacement" />
+        <feDisplacementMap in="SourceGraphic" in2="displacement" scale=".42" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+    <span ref={lensRef} className="rb-action-lens" data-visible={visible ? 'true' : 'false'} aria-hidden="true">
+      <span className="rb-action-lens__backdrop" style={{ backdropFilter: `url(#${filterId})`, WebkitBackdropFilter: `url(#${filterId})` }} />
+      <span className="rb-action-lens__distort" style={{ filter: `url(#${filterId})` }}>
+        <span ref={copyRef} className="rb-action-lens__copy">{clone(primary, false)}{clone(secondary, true)}</span>
+      </span>
+    </span>
+  </div>;
 }
 
 function CopyLink({ href, preview, onSelect, selected, children }) {
@@ -45,10 +149,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
       {c.eyebrow && <p className="rb-template__eyebrow"><CopyLink href={c.eyebrowLink} preview={preview} selected={selectedPart === 'copy:eyebrow'} onSelect={() => onSelect?.('copy:eyebrow')}>{c.eyebrow}</CopyLink></p>}
       {c.title && <h1 className="rb-template__title"><CopyLink href={c.titleLink} preview={preview} selected={selectedPart === 'copy:title'} onSelect={() => onSelect?.('copy:title')}>{c.title}</CopyLink></h1>}
       {c.description && <p className="rb-template__description"><CopyLink href={c.descriptionLink} preview={preview} selected={selectedPart === 'copy:description'} onSelect={() => onSelect?.('copy:description')}>{c.description}</CopyLink></p>}
-      <div className="rb-template__actions">
-        <GlassLink action={c.primary} preview={preview} selected={selectedPart === 'action:primary'} onSelect={() => onSelect?.('action:primary')} />
-        <GlassLink action={c.secondary} secondary preview={preview} selected={selectedPart === 'action:secondary'} onSelect={() => onSelect?.('action:secondary')} />
-      </div>
+      <ActionLens primary={c.primary} secondary={c.secondary} preview={preview} onSelect={onSelect} selectedPart={selectedPart} />
     </div>
     {id === 'atelier' ? <div className="rb-template__hotspots">
       {cards.map((item, index) => {
