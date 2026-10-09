@@ -1,19 +1,6 @@
 import React, { useState } from 'react';
-import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
+import { getBannerTemplate, moveBannerButtonLight, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
-
-function moveGlassSurface(event) {
-  if (event.pointerType === 'touch') return;
-  const element = event.currentTarget;
-  const bounds = element.getBoundingClientRect();
-  if (!bounds.width || !bounds.height || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
-  const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-  const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
-  element.style.setProperty('--rb-light-x', `${Math.round(x * 100)}%`);
-  element.style.setProperty('--rb-light-y', `${Math.round(y * 100)}%`);
-  element.style.setProperty('--rb-turn-x', `${((.5 - y) * 5).toFixed(2)}deg`);
-  element.style.setProperty('--rb-turn-y', `${((x - .5) * 5).toFixed(2)}deg`);
-}
 
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {
   const [pressed, setPressed] = useState(false);
@@ -23,7 +10,7 @@ function GlassLink({ action, secondary = false, preview = false, onSelect, selec
   const props = {
     className,
     'data-selected': preview && selected ? 'true' : undefined,
-    onPointerMove: moveGlassSurface,
+    onPointerMove: moveBannerButtonLight,
     onPointerDown: () => { setPressed(true); window.setTimeout(() => setPressed(false), 440); },
     onClick: preview ? (event) => { event.preventDefault(); onSelect?.(); } : undefined,
   };
@@ -52,7 +39,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   };
   const cards = c.cards.map((item, index) => ({ ...item, sourceIndex: index })).filter((item) => item.enabled !== false);
 
-  return <div className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-preview-device={preview ? device : undefined}>
+  return <div className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-button-animation={c.buttonAnimation} data-preview-device={preview ? device : undefined}>
     <div className="rb-template__picture">{children}</div>
     <div className="rb-template__wash" aria-hidden="true" />
     <div className="rb-template__content">
@@ -78,7 +65,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
             <polyline points={`${x},${y} 73,${y} 73,${cardY} 76,${cardY}`} stroke={lineColor} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
-          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={moveGlassSurface} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={moveBannerButtonLight} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
             {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
             <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
             <span className="rb-template__spot-arrow" aria-hidden="true">→</span>

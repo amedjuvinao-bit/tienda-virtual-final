@@ -65,4 +65,21 @@ describe('editor de plantillas', () => {
     fireEvent.change(screen.getByLabelText('Al hacer clic, ir a'), { target: { value: '/categoria/hogar' } });
     expect(screen.queryByText(/Este botón aún no abre ninguna página/)).toBeNull();
   });
+
+  it('ofrece cuatro animaciones y conserva la elección de cada plantilla', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: '② Botones' }));
+    const choices = screen.getByRole('group', { name: 'Animación de los botones' });
+    expect(choices.querySelectorAll('.banner-template-motion-choice')).toHaveLength(4);
+    fireEvent.click(screen.getByRole('button', { name: /Aurora/ }));
+    expect(screen.getByRole('button', { name: /Aurora/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /Editorial/ }));
+    expect(screen.getByRole('button', { name: /Prisma/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /Perla/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Descubrimiento/ }));
+    expect(screen.getByRole('button', { name: /Aurora/ })).toHaveAttribute('aria-pressed', 'true');
+    const saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.discovery.buttonAnimation).toBe('aurora');
+    expect(saved.templateConfigs.editorial.buttonAnimation).toBe('pearl');
+  });
 });

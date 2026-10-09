@@ -1,5 +1,27 @@
 export const BANNER_TEMPLATE_IDS = ['discovery', 'editorial', 'atelier'];
 
+export const BANNER_BUTTON_ANIMATIONS = [
+  { id: 'prism', name: 'Prisma', description: 'Reflejo nacarado y movimiento de cristal.' },
+  { id: 'pearl', name: 'Perla', description: 'Brillo neutro, elegante y pausado.' },
+  { id: 'aurora', name: 'Aurora', description: 'Luz azul y violeta con barrido fluido.' },
+  { id: 'rose', name: 'Rosa dorado', description: 'Destello cálido con pulso suave.' },
+];
+
+export const safeBannerButtonAnimation = (value) => BANNER_BUTTON_ANIMATIONS.some((item) => item.id === value) ? value : 'prism';
+
+export function moveBannerButtonLight(event) {
+  if (event.pointerType === 'touch') return;
+  const element = event.currentTarget;
+  const bounds = element.getBoundingClientRect();
+  if (!bounds.width || !bounds.height || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
+  const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+  const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+  element.style.setProperty('--rb-light-x', `${Math.round(x * 100)}%`);
+  element.style.setProperty('--rb-light-y', `${Math.round(y * 100)}%`);
+  element.style.setProperty('--rb-turn-x', `${((.5 - y) * 5).toFixed(2)}deg`);
+  element.style.setProperty('--rb-turn-y', `${((x - .5) * 5).toFixed(2)}deg`);
+}
+
 export const BANNER_TEMPLATE_META = {
   discovery: { name: 'Descubrimiento', description: 'Mensaje protagonista y accesos a tus categorías.' },
   editorial: { name: 'Editorial', description: 'Composición de revista y accesos discretos.' },
@@ -53,6 +75,7 @@ export function getBannerTemplate(banner, sections) {
     categories: existing,
     config: {
       ...defaults, ...raw,
+      buttonAnimation: safeBannerButtonAnimation(raw.buttonAnimation),
       primary: { ...defaults.primary, ...raw.primary },
       secondary: { ...defaults.secondary, ...raw.secondary },
       cards: saved.map((item) => {

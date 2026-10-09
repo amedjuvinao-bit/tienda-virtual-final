@@ -104,6 +104,7 @@ const BannerTemplateConfigSchema = new Schema({
   textColor: String,
   accentColor: String,
   glassColor: String,
+  buttonAnimation: { type: String, enum: ["prism", "pearl", "aurora", "rose"], default: "prism" },
   overlayOpacity: { type: Number, min: 0, max: 70 },
 }, { _id: false });
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getBannerTemplate, safeHotspotColor } from '../../../lib/bannerTemplates';
+import { BANNER_BUTTON_ANIMATIONS, getBannerTemplate, moveBannerButtonLight, safeHotspotColor } from '../../../lib/bannerTemplates';
 
 const Field = ({ label, ...props }) => <label className="banner-template-field"><span>{label}</span><input {...props} /></label>;
 
@@ -73,7 +73,15 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
       </div>
     </div>}
 
-    {group === 'actions' && <div className="banner-template-inspector">
+    {group === 'actions' && <div className="banner-template-buttons">
+      <div className="banner-template-motion-head"><strong>Animación de los botones</strong><span>Elige un estilo para los dos botones y los accesos de la vitrina. Pasa el mouse por cada muestra y observa la portada.</span></div>
+      <div className="banner-template-motion-choices" role="group" aria-label="Animación de los botones">
+        {BANNER_BUTTON_ANIMATIONS.map((preset) => <button key={preset.id} type="button" className="banner-template-motion-choice" aria-pressed={config.buttonAnimation === preset.id} onClick={() => update({ buttonAnimation: preset.id })}>
+          <span className="banner-template-motion-choice__stage"><span className="banner-template-motion-choice__demo rb-liquid-button" data-button-animation={preset.id} onPointerMove={moveBannerButtonLight} aria-hidden="true"><span>Explorar</span><span>↗</span></span></span>
+          <strong>{preset.name}</strong><small>{preset.description}</small>
+        </button>)}
+      </div>
+      <div className="banner-template-inspector">
       <div className="banner-template-parts" role="group" aria-label="Botón para editar">
         {['primary', 'secondary'].map((key) => <button key={key} type="button" aria-pressed={actionKey === key} onClick={() => choose(`action:${key}`)}>
           <small>{key === 'primary' ? 'Botón principal' : 'Botón secundario'}</small><strong>{config[key].text || 'Sin texto'}</strong>
@@ -85,6 +93,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
         <Field label="Texto del botón" value={config[actionKey].text || ''} onChange={(event) => updateAction(actionKey, { text: event.target.value })} />
         <Field label="Al hacer clic, ir a" placeholder="/categoria/... o https://..." value={config[actionKey].link || ''} onChange={(event) => updateAction(actionKey, { link: event.target.value })} />
         {!config[actionKey].link?.trim() && config[actionKey].enabled !== false && <p className="banner-template-help" role="status">Este botón aún no abre ninguna página. Escribe un enlace y guarda la portada para activarlo en la tienda.</p>}
+      </div>
       </div>
     </div>}
 

@@ -39,6 +39,17 @@
 .banner-template-tabs button { min-width: 0; min-height: 36px; padding: 5px 3px; border-radius: 8px; background: var(--admin-primary-soft-bg); color: var(--admin-card-text); font-size: 11px; font-weight: 700; }
 .banner-template-tabs button[aria-pressed="true"] { background: var(--admin-primary); color: var(--admin-primary-text); }
 .banner-template-inspector { display: grid; grid-template-columns: minmax(100px,.83fr) minmax(0,1.17fr); gap: 9px; align-items: start; }
+.banner-template-buttons { display: grid; gap: 10px; }
+.banner-template-motion-head { display: grid; gap: 3px; }
+.banner-template-motion-head strong { color: var(--admin-card-text); font-size: 12px; }
+.banner-template-motion-head span { color: var(--admin-card-muted-text); font-size: 10px; line-height: 1.4; }
+.banner-template-motion-choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.banner-template-motion-choice { display: grid; min-width: 0; gap: 4px; padding: 6px; border: 1px solid var(--admin-card-border); border-radius: 10px; background: var(--admin-card-bg); color: var(--admin-card-text); text-align: left; }
+.banner-template-motion-choice[aria-pressed='true'] { border-color: var(--admin-primary); box-shadow: inset 0 0 0 1px var(--admin-primary); }
+.banner-template-motion-choice__stage { display: grid; min-height: 62px; overflow: hidden; place-items: center; border-radius: 7px; background: linear-gradient(115deg,#485c6b,#8c7188 55%,#d8af9b); }
+.banner-template-motion-choice__demo.rb-liquid-button { --rb-template-text: #fff8fc; --rb-template-glass: #fff8fc; display: inline-flex; width: min(120px,calc(100% - 10px)); min-height: 36px; gap: 15px; padding: 7px 12px; color: #fff8fc; font-size: 10px; white-space: nowrap; cursor: pointer; }
+.banner-template-motion-choice > strong { font-size: 11px; }
+.banner-template-motion-choice > small { color: var(--admin-card-muted-text); font-size: 9px; line-height: 1.3; }
 .banner-template-parts { display: grid; gap: 4px; }
 .banner-template-parts button { display: grid; min-width: 0; gap: 2px; padding: 7px 8px; border: 1px solid var(--admin-card-border); border-radius: 8px; color: var(--admin-card-text); text-align: left; }
 .banner-template-parts button[aria-pressed="true"] { border-color: var(--admin-primary); background: var(--admin-primary-soft-bg); }

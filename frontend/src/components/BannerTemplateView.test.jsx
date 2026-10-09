@@ -73,6 +73,15 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-card[href="/categoria/hogar"]')).toBeInTheDocument();
   });
 
+  it('aplica el estilo guardado a la vista previa y a los cuatro botones públicos', () => {
+    const banner = { templateId: 'atelier', templateConfigs: { atelier: { buttonAnimation: 'rose' } } };
+    const { container, rerender } = render(<BannerTemplateView banner={banner} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
+    expect(container.querySelector('[data-banner-template="atelier"]')).toHaveAttribute('data-button-animation', 'rose');
+    expect(container.querySelectorAll('.rb-liquid-button, .rb-template__spot-card')).toHaveLength(4);
+    rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { atelier: { buttonAnimation: 'unknown' } } }} sections={categories} preview device="desktop"><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
+    expect(container.querySelector('[data-banner-template="atelier"]')).toHaveAttribute('data-button-animation', 'prism');
+  });
+
   it('permite señalar un punto desde la vista previa y colorea cada conexión', () => {
     const onPlaceCard = vi.fn();
     const banner = { templateId: 'atelier', templateConfigs: { atelier: { cards: [

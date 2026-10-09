@@ -44,6 +44,30 @@
 /* The four actions share the same material; each hotspot keeps its saved outline color. */
 @property --rb-light-x { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
 @property --rb-light-y { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
+:is(.rb-template,.banner-template-motion-choice__demo) {
+  --rb-edge-a: rgba(255,245,252,.98);
+  --rb-edge-b: rgba(248,187,226,.83);
+  --rb-edge-c: rgba(174,221,255,.86);
+  --rb-edge-d: rgba(255,255,255,.8);
+}
+:is(.rb-template[data-button-animation='pearl'],.banner-template-motion-choice__demo[data-button-animation='pearl']) {
+  --rb-edge-a: rgba(255,255,255,.98);
+  --rb-edge-b: rgba(234,225,209,.82);
+  --rb-edge-c: rgba(255,255,255,.86);
+  --rb-edge-d: rgba(203,214,223,.76);
+}
+:is(.rb-template[data-button-animation='aurora'],.banner-template-motion-choice__demo[data-button-animation='aurora']) {
+  --rb-edge-a: rgba(235,255,255,.98);
+  --rb-edge-b: rgba(109,231,231,.9);
+  --rb-edge-c: rgba(176,149,255,.92);
+  --rb-edge-d: rgba(245,243,255,.86);
+}
+:is(.rb-template[data-button-animation='rose'],.banner-template-motion-choice__demo[data-button-animation='rose']) {
+  --rb-edge-a: rgba(255,251,239,.98);
+  --rb-edge-b: rgba(255,182,198,.9);
+  --rb-edge-c: rgba(255,209,137,.92);
+  --rb-edge-d: rgba(255,248,229,.86);
+}
 .rb-liquid-button,.rb-template__spot-card {
   --rb-action-edge: var(--rb-template-glass);
   --rb-light-x: 50%;
@@ -68,7 +92,7 @@
 }
 .rb-liquid-button::after,.rb-template__spot-card::after {
   content: ''; position: absolute; z-index: 0; inset: 0; border-radius: inherit; pointer-events: none;
-  background: radial-gradient(ellipse 110px 51px at var(--rb-light-x) var(--rb-light-y),rgba(255,245,252,.98) 2%,rgba(248,187,226,.83) 24%,rgba(174,221,255,.86) 49%,rgba(255,255,255,.8) 66%,transparent 81%);
+  background: radial-gradient(ellipse 110px 51px at var(--rb-light-x) var(--rb-light-y),var(--rb-edge-a) 2%,var(--rb-edge-b) 24%,var(--rb-edge-c) 49%,var(--rb-edge-d) 66%,transparent 81%);
   padding: 2px;
   -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
@@ -87,6 +111,17 @@
 .rb-liquid-button:is(:hover,:focus-visible)::after,.rb-template__spot-card:is(:hover,:focus-visible)::after { opacity: 1; }
 .rb-liquid-button:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-2px) scale(1.018); }
 .rb-template__spot-card:hover { transform: translateY(-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.025); }
+.rb-template[data-button-animation='pearl'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='pearl']:hover { transform: translateY(-1px) scale(1.012); }
+.rb-template[data-button-animation='pearl'] .rb-template__spot-card:hover { transform: translateY(-50%) scale(1.012); }
+.rb-template[data-button-animation='pearl'] :is(.rb-liquid-button,.rb-template__spot-card),.banner-template-motion-choice__demo[data-button-animation='pearl'] { transition-duration: .48s; }
+@keyframes rb-aurora-flow { from { transform: translateX(-5%) skewX(-3deg); } to { transform: translateX(5%) skewX(3deg); } }
+.rb-template[data-button-animation='aurora'] :is(.rb-liquid-button,.rb-template__spot-card):hover::before,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover::before { animation: rb-aurora-flow 1.7s ease-in-out infinite alternate; }
+.rb-template[data-button-animation='aurora'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='aurora']:hover { transform: perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) translateY(-3px) scale(1.027); }
+.rb-template[data-button-animation='aurora'] .rb-template__spot-card:hover { transform: translateY(-50%) perspective(650px) rotateX(var(--rb-turn-x)) rotateY(var(--rb-turn-y)) scale(1.033); }
+@keyframes rb-rose-pulse { 0%,100% { opacity: 1; } 50% { opacity: .52; } }
+.rb-template[data-button-animation='rose'] :is(.rb-liquid-button,.rb-template__spot-card):hover::after,.banner-template-motion-choice__demo[data-button-animation='rose']:hover::after { animation: rb-rose-pulse 2.2s ease-in-out infinite; }
+.rb-template[data-button-animation='rose'] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation='rose']:hover { transform: translateY(-2px) scale(1.025); }
+.rb-template[data-button-animation='rose'] .rb-template__spot-card:hover { transform: translateY(-50%) scale(1.025); }
 .rb-liquid-button > span:last-child { transition: transform .3s cubic-bezier(.2,1,.3,1); }
 .rb-liquid-button:hover > span:last-child { transform: translate(2px,-2px); }
 .rb-template__content a.rb-liquid-button:hover { text-decoration: none; }
@@ -169,4 +204,4 @@
 .rb-template[data-preview-device] .rb-template__editable,.rb-template[data-preview-device] .rb-template__card,.rb-template[data-preview-device] .rb-template__spot-trigger { cursor: pointer; }
 .rb-template[data-preview-device] [data-selected="true"] { outline: 2px solid var(--rb-template-accent); outline-offset: 2px; }
 .rb-template[data-preview-device] .rb-template__editable:hover,.rb-template[data-preview-device] .rb-template__card:hover { outline: 1px solid var(--rb-template-accent); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-liquid-button::before,.rb-liquid-button::after,.rb-template__spot-card::before,.rb-template__spot-card::after { transition: none; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active { transform: translateY(-50%); } }
+@media (prefers-reduced-motion: reduce) { .rb-liquid-button,.rb-template__card,.rb-template__spot-trigger,.rb-template__spot-card,.rb-template__spot-arrow,.rb-liquid-button::before,.rb-liquid-button::after,.rb-template__spot-card::before,.rb-template__spot-card::after { transition: none; animation: none !important; } .rb-liquid-button:hover,.rb-liquid-button:focus-visible,.rb-liquid-button:active,.rb-liquid-button.is-pressed,.rb-template[data-button-animation] .rb-liquid-button:hover,.banner-template-motion-choice__demo[data-button-animation]:hover { transform: none; } .rb-template__spot-card:hover,.rb-template__spot-card:focus-visible,.rb-template__spot-card:active,.rb-template[data-button-animation] .rb-template__spot-card:hover { transform: translateY(-50%); } }
