@@ -25,6 +25,7 @@ import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAd
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
+import './storefrontSectionMotion.css';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
@@ -123,10 +124,31 @@ function GlobalFloatingButtons({ theme }) {
 }
 
 function Home({ theme }) {
+  const sectionsRef = useRef(null);
+
+  useEffect(() => {
+    const sections = Array.from(sectionsRef.current?.children || [])
+      .filter((node) => node.tagName === 'SECTION');
+    if (!sections.length || !('IntersectionObserver' in window)) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(({ target, isIntersecting }) => {
+        if (isIntersecting) {
+          if (target.dataset.sectionMotion !== 'entered') target.dataset.sectionMotion = 'entered';
+        } else {
+          delete target.dataset.sectionMotion;
+        }
+      });
+    }, { threshold: 0, rootMargin: '0px 0px -12% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div className="min-w-0 max-w-full flex-grow overflow-x-clip">
+      <div ref={sectionsRef} className="storefront-sections min-w-0 max-w-full flex-grow overflow-x-clip">
         <section id="banner" className="w-full"><CarouselBanner /></section>
         <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
         <section id="look" className="w-full"><LookSection theme={theme} /></section>

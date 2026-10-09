@@ -1,0 +1,27 @@
+@media (prefers-reduced-motion: no-preference) {
+  .storefront-sections > section[data-section-motion="entered"] > * {
+    animation: storefront-section-enter 680ms cubic-bezier(.18,.72,.2,1) both;
+  }
+  .storefront-sections > section[data-section-motion="leaving"] > * {
+    animation: storefront-section-leave 190ms ease-in both;
+  }
+  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__content,
+  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__actions,
+  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__rail {
+    animation: storefront-banner-detail 570ms ease-out both;
+  }
+  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__actions { animation-delay: 190ms; }
+  .storefront-sections > #banner[data-section-motion="entered"] .rb-template__rail { animation-delay: 250ms; }
+}
+@keyframes storefront-section-enter {
+  from { opacity: .65; transform: translate3d(0,18px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+@keyframes storefront-section-leave {
+  from { opacity: 1; transform: translate3d(0,0,0); }
+  to { opacity: .55; transform: translate3d(0,-12px,0); }
+}
+@keyframes storefront-banner-detail {
+  from { opacity: .35; }
+  to { opacity: 1; }
+}

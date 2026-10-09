@@ -36,10 +36,21 @@ function scrollExactlyToSection(id, options = {}) {
 
   const y = el.getBoundingClientRect().top + window.pageYOffset - extraOffsetPx;
 
-  window.scrollTo({
-    top: Math.max(0, y),
-    behavior,
-  });
+  const destination = Math.max(0, y);
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const current = Array.from(document.querySelectorAll('.storefront-sections > section'))
+    .find((section) => section.getBoundingClientRect().top <= window.innerHeight * 0.45 &&
+      section.getBoundingClientRect().bottom > window.innerHeight * 0.45);
+
+  if (current && current !== el && !reducedMotion && behavior === 'smooth') {
+    current.dataset.sectionMotion = 'leaving';
+    window.setTimeout(() => {
+      window.scrollTo({ top: destination, behavior });
+      if (current.dataset.sectionMotion === 'leaving') delete current.dataset.sectionMotion;
+    }, 190);
+  } else {
+    window.scrollTo({ top: destination, behavior: reducedMotion ? 'auto' : behavior });
+  }
 }
 
 export default function ScrollButton({ config }) {
