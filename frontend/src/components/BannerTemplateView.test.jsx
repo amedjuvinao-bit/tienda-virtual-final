@@ -52,39 +52,6 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-card[data-open="true"]')?.getAttribute('href')).toBe('/categoria/hogar');
   });
 
-  it('aplica la misma refracción dentro de los dos botones y las dos tarjetas', () => {
-    const banner = { templateId: 'atelier', templateConfigs: { atelier: {
-      primary: { text: 'Explorar piezas', link: '/catalogo' },
-      secondary: { text: 'Ver todo', link: '/todo' },
-    } } };
-    const { container } = render(<BannerTemplateView banner={banner} sections={categories}>
-      <img src="/portada.jpg" alt="" />
-    </BannerTemplateView>);
-    const button = screen.getByRole('link', { name: /Explorar piezas/ });
-    const surfaces = container.querySelectorAll('.rb-liquid-button, .rb-template__spot-card');
-    expect(surfaces).toHaveLength(4);
-    for (const surface of surfaces) {
-      expect(surface.querySelector('.rb-glass-ripple')).toBeInTheDocument();
-      expect(surface.querySelector('filter feImage')).toHaveAttribute('width', '96');
-      expect(surface.querySelector('filter feDisplacementMap')).toHaveAttribute('in2', 'ripples');
-    }
-    expect(button.querySelector('filter feDisplacementMap')).toHaveAttribute('in2', 'ripples');
-    expect(button).toHaveAttribute('href', '/catalogo');
-    button.getBoundingClientRect = () => ({ left: 20, top: 30, width: 190, height: 48 });
-    fireEvent(button, new MouseEvent('pointermove', { bubbles: true, clientX: 170, clientY: 52 }));
-    expect(button.style.getPropertyValue('--rb-ripple-x')).toBe('150px');
-    expect(button.style.getPropertyValue('--rb-ripple-y')).toBe('23px');
-    fireEvent(button, new MouseEvent('pointermove', { bubbles: true, clientX: 209, clientY: 31 }));
-    expect(button.style.getPropertyValue('--rb-ripple-x')).toBe('167px');
-    expect(button.style.getPropertyValue('--rb-ripple-y')).toBe('23px');
-    const card = surfaces[2];
-    card.getBoundingClientRect = () => ({ left: 300, top: 50, width: 280, height: 66 });
-    fireEvent(card, new MouseEvent('pointermove', { bubbles: true, clientX: 301, clientY: 51 }));
-    expect(card.style.getPropertyValue('--rb-ripple-x')).toBe('25px');
-    expect(card.style.getPropertyValue('--rb-ripple-y')).toBe('25px');
-    expect(button.querySelector('.rb-glass-ripple').parentElement).toBe(button);
-  });
-
   it('permite señalar un punto desde la vista previa y colorea cada conexión', () => {
     const onPlaceCard = vi.fn();
     const banner = { templateId: 'atelier', templateConfigs: { atelier: { cards: [

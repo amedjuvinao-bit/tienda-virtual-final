@@ -1,31 +1,6 @@
-import React, { useId, useState } from 'react';
+import React, { useState } from 'react';
 import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
-import rippleDisplacement from '../assets/ripple-displacement.png';
 import './bannerTemplateView.css';
-
-function trackGlassRipple(event) {
-  if (event.pointerType === 'touch' || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
-  const rect = event.currentTarget.getBoundingClientRect();
-  // Keep the refracted pixels away from the clipped pill edge.
-  const inset = Math.min(25, Math.max(0, Math.min(rect.width, rect.height) / 2 - 1));
-  const x = Math.min(rect.width - inset, Math.max(inset, event.clientX - rect.left));
-  const y = Math.min(rect.height - inset, Math.max(inset, event.clientY - rect.top));
-  event.currentTarget.style.setProperty('--rb-ripple-x', `${x}px`);
-  event.currentTarget.style.setProperty('--rb-ripple-y', `${y}px`);
-}
-
-function GlassRipple() {
-  const id = `rb-ripple-${useId().replace(/:/g, '')}`;
-  return <>
-    <svg className="rb-glass-filter" aria-hidden="true" focusable="false">
-      <filter id={id} x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
-        <feImage href={rippleDisplacement} x="0" y="0" width="96" height="96" preserveAspectRatio="none" result="ripples" />
-        <feDisplacementMap in="SourceGraphic" in2="ripples" scale="18" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </svg>
-    <span className="rb-glass-ripple" style={{ '--rb-ripple-filter': `url(#${id})` }} aria-hidden="true" />
-  </>;
-}
 
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {
   const [pressed, setPressed] = useState(false);
@@ -35,14 +10,10 @@ function GlassLink({ action, secondary = false, preview = false, onSelect, selec
   const props = {
     className,
     'data-selected': preview && selected ? 'true' : undefined,
-    onPointerMove: trackGlassRipple,
     onPointerDown: () => { setPressed(true); window.setTimeout(() => setPressed(false), 440); },
     onClick: preview ? (event) => { event.preventDefault(); onSelect?.(); } : undefined,
   };
-  const contents = <>
-    <GlassRipple />
-    <span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span>
-  </>;
+  const contents = <><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
   return href ? <a {...props} href={href}>{contents}</a>
     : <span {...props} title={preview ? 'Editar este botón' : 'Configura un enlace en el panel'} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(); } } : undefined} aria-disabled={preview ? undefined : 'true'}>{contents}</span>;
 }
@@ -93,8 +64,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
             <polyline points={`${x},${y} 73,${y} 73,${cardY} 76,${cardY}`} stroke={lineColor} />
           </svg>
           <button type="button" className="rb-template__spot-trigger" data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} aria-label={item.text || item.label} title={`Ver ${item.text || item.label}`} aria-pressed={cardSelected} onClick={() => { setActiveCard(index); if (preview) onSelect?.(`card:${item.sourceIndex}`); }}><span aria-hidden="true" /></button>
-          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onPointerMove={trackGlassRipple} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
-            <GlassRipple />
+          <CardTag className="rb-template__spot-card" href={href && !preview ? href : undefined} data-open={cardSelected ? 'true' : undefined} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>
             {item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
             <span className="rb-template__spot-copy"><strong>{item.text}</strong>{item.label && item.label !== item.text && <small>{item.label}</small>}</span>
             <span className="rb-template__spot-arrow" aria-hidden="true">→</span>
