@@ -1,19 +1,37 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { getBannerTemplate, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
+import rippleDisplacement from '../assets/ripple-displacement.png';
 import './bannerTemplateView.css';
 
 function GlassLink({ action, secondary = false, preview = false, onSelect, selected = false }) {
   const [pressed, setPressed] = useState(false);
+  const rippleFilterId = `rb-ripple-${useId().replace(/:/g, '')}`;
   if (action?.enabled === false || !action?.text) return null;
   const href = safeBannerLink(action.link);
   const className = `rb-liquid-button${secondary ? ' rb-liquid-button--secondary' : ''}${pressed ? ' is-pressed' : ''}${preview ? ' rb-template__editable' : ''}`;
   const props = {
     className,
     'data-selected': preview && selected ? 'true' : undefined,
+    style: { '--rb-ripple-filter': `url(#${rippleFilterId})` },
+    onPointerMove: (event) => {
+      if (event.pointerType === 'touch' || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      event.currentTarget.style.setProperty('--rb-ripple-x', `${event.clientX - rect.left}px`);
+      event.currentTarget.style.setProperty('--rb-ripple-y', `${event.clientY - rect.top}px`);
+    },
     onPointerDown: () => { setPressed(true); window.setTimeout(() => setPressed(false), 440); },
     onClick: preview ? (event) => { event.preventDefault(); onSelect?.(); } : undefined,
   };
-  const contents = <><span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span></>;
+  const contents = <>
+    <svg className="rb-liquid-button__filter" aria-hidden="true" focusable="false" width="0" height="0">
+      <filter id={rippleFilterId} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+        <feImage href={rippleDisplacement} x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="ripples" />
+        <feDisplacementMap in="SourceGraphic" in2="ripples" scale="24" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+    <span className="rb-liquid-button__ripple" aria-hidden="true" />
+    <span className="rb-liquid-button__label">{action.text}</span><span aria-hidden="true">↗</span>
+  </>;
   return href ? <a {...props} href={href}>{contents}</a>
     : <span {...props} title={preview ? 'Editar este botón' : 'Configura un enlace en el panel'} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(); } } : undefined} aria-disabled={preview ? undefined : 'true'}>{contents}</span>;
 }

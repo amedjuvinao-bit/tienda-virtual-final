@@ -52,6 +52,24 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-card[data-open="true"]')?.getAttribute('href')).toBe('/categoria/hogar');
   });
 
+  it('mantiene la ondulación dentro del botón y la sigue con el puntero', () => {
+    const banner = { templateId: 'discovery', templateConfigs: { discovery: {
+      primary: { text: 'Explorar piezas', link: '/catalogo' },
+    } } };
+    const { container } = render(<BannerTemplateView banner={banner} sections={categories}>
+      <img src="/portada.jpg" alt="" />
+    </BannerTemplateView>);
+    const button = screen.getByRole('link', { name: /Explorar piezas/ });
+    expect(button.querySelector('.rb-liquid-button__ripple')).toBeInTheDocument();
+    expect(button.querySelector('filter feDisplacementMap')).toHaveAttribute('in2', 'ripples');
+    expect(button).toHaveAttribute('href', '/catalogo');
+    button.getBoundingClientRect = () => ({ left: 20, top: 30, width: 190, height: 48 });
+    fireEvent(button, new MouseEvent('pointermove', { bubbles: true, clientX: 170, clientY: 52 }));
+    expect(button.style.getPropertyValue('--rb-ripple-x')).toBe('150px');
+    expect(button.style.getPropertyValue('--rb-ripple-y')).toBe('22px');
+    expect(container.querySelector('.rb-liquid-button__ripple').parentElement).toBe(button);
+  });
+
   it('permite señalar un punto desde la vista previa y colorea cada conexión', () => {
     const onPlaceCard = vi.fn();
     const banner = { templateId: 'atelier', templateConfigs: { atelier: { cards: [
