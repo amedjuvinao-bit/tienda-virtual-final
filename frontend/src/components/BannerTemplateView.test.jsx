@@ -52,20 +52,23 @@ describe('plantillas sobre contenido existente', () => {
     expect(container.querySelector('.rb-template__spot-card[data-open="true"]')?.getAttribute('href')).toBe('/categoria/hogar');
   });
 
-  it('sitúa la lente junto al puntero en los cuatro accesos sin modificar sus enlaces', () => {
+  it('actualiza el reflejo y la inclinación de los cuatro accesos sin modificar sus enlaces', () => {
     const { container } = render(<BannerTemplateView banner={{ templateId: 'atelier' }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     const actions = container.querySelectorAll('.rb-liquid-button, .rb-template__spot-card');
     expect(actions).toHaveLength(4);
     actions.forEach((action) => {
-      expect(action.querySelector('.rb-glass-lens')).toHaveAttribute('aria-hidden', 'true');
+      expect(action.querySelector('.rb-glass-lens')).toBeNull();
       action.getBoundingClientRect = () => ({ left: 10, top: 20, width: 160, height: 64 });
       fireEvent(action, new MouseEvent('pointermove', { bubbles: true, clientX: 90, clientY: 52 }));
-      expect(action.style.getPropertyValue('--rb-lens-x')).toBe('80px');
-      expect(action.style.getPropertyValue('--rb-lens-y')).toBe('32px');
-      expect(action.style.getPropertyValue('--rb-lens-size')).toBe('68px');
+      expect(action.style.getPropertyValue('--rb-light-x')).toBe('50%');
+      expect(action.style.getPropertyValue('--rb-light-y')).toBe('50%');
+      expect(action.style.getPropertyValue('--rb-turn-x')).toBe('0.00deg');
+      expect(action.style.getPropertyValue('--rb-turn-y')).toBe('0.00deg');
       fireEvent(action, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
-      expect(Number.parseFloat(action.style.getPropertyValue('--rb-lens-x'))).toBeGreaterThan(0);
-      expect(Number.parseFloat(action.style.getPropertyValue('--rb-lens-y'))).toBeGreaterThan(0);
+      expect(action.style.getPropertyValue('--rb-light-x')).toBe('0%');
+      expect(action.style.getPropertyValue('--rb-light-y')).toBe('0%');
+      expect(action.style.getPropertyValue('--rb-turn-x')).toBe('1.20deg');
+      expect(action.style.getPropertyValue('--rb-turn-y')).toBe('-1.20deg');
     });
     expect(container.querySelector('.rb-template__spot-card[href="/categoria/hogar"]')).toBeInTheDocument();
   });
