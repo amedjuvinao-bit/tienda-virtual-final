@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Crown, Flower2, Gem, Heart, ShoppingBag, Sparkles, Star } from "lucide-react";
 import WhatsAppGlyph from "../../../components/WhatsAppGlyph";
 import "../../../components/storefrontLiquidGlass.css";
+import '../../../components/storefrontChromeGlassHover.css';
+import { moveChromeGlassLight, resolveChromeGlassMotion } from '../../../lib/chromeGlassMotion';
 
 const loaderIcons = { sparkles: Sparkles, star: Star, heart: Heart, diamond: Gem, crown: Crown, flower: Flower2, bag: ShoppingBag };
 const bounded = (value, min, max, fallback) => {
@@ -17,7 +19,8 @@ function PreviewImage({ url, fallback, className, style }) {
     : fallback;
 }
 
-export default function AppearanceToolPreview({ activeTool, config }) {
+export default function AppearanceToolPreview({ activeTool, config, inheritedMotion = 'prism' }) {
+  const [previewClick, setPreviewClick] = useState(null);
   const whatsapp = config.whatsapp;
   const navigation = config.scrollButtons;
   const loader = config.loader;
@@ -64,12 +67,20 @@ export default function AppearanceToolPreview({ activeTool, config }) {
             transform: navigation.position === "center" ? "translateX(-50%)" : "none",
             gap: bounded(navigation.gapPx, 0, 32, 16),
           }}>
-            {navigation.showUp && <span className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
+            {navigation.showUp && <button type="button" aria-label="Probar animación de subir" onPointerMove={moveChromeGlassLight}
+              onClick={() => setPreviewClick('up')} onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setPreviewClick(null); }}
+              data-click-animation={previewClick === 'up'} data-button-animation={resolveChromeGlassMotion(navigation.glassMotion, inheritedMotion)}
+              className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
+              <span className="rb-chrome-hover__surface" aria-hidden="true" />
               <PreviewImage url={navigation.upUseCustomImage ? navigation.upImageUrl : ""} fallback={<ArrowUp size={21} color={navigation.iconColor} />} />
-            </span>}
-            {navigation.showDown && <span className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
+            </button>}
+            {navigation.showDown && <button type="button" aria-label="Probar animación de bajar" onPointerMove={moveChromeGlassLight}
+              onClick={() => setPreviewClick('down')} onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setPreviewClick(null); }}
+              data-click-animation={previewClick === 'down'} data-button-animation={resolveChromeGlassMotion(navigation.glassMotion, inheritedMotion)}
+              className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
+              <span className="rb-chrome-hover__surface" aria-hidden="true" />
               <PreviewImage url={navigation.downUseCustomImage ? navigation.downImageUrl : ""} fallback={<ArrowDown size={21} color={navigation.iconColor} />} />
-            </span>}
+            </button>}
           </div>
         )}
         {activeTool === "loader" && loader.enabled && (

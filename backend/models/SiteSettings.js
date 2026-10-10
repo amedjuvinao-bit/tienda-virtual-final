@@ -377,6 +377,7 @@ const ThemeSchema = new Schema(
       cornerRadiusPx: { type: Number, min: 0, max: 48, default: 16 },
       liquidGlassEnabled: { type: Boolean, default: false },
       glassStrength: { type: Number, min: 0, max: 100, default: 75 },
+      glassMotion: { type: String, enum: ['', 'prism', 'pearl', 'aurora', 'rose', 'halo', 'comet', 'facet'], default: '' },
     },
 
     home: {

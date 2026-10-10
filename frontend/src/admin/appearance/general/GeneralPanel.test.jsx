@@ -20,6 +20,20 @@ function Editor({ onUpload = async () => "https://res.cloudinary.com/demo/image/
 afterEach(cleanup);
 
 describe("herramientas de Apariencia", () => {
+  it('permite elegir el vidrio de las flechas y solo lo activa en la vista previa al pulsar', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    await user.click(screen.getByRole('button', { name: /Navegación Subir y bajar/ }));
+    await user.click(screen.getByRole('button', { name: 'Estilo' }));
+    const choices = screen.getByRole('group', { name: 'Efecto de vidrio de las flechas' });
+    await user.click(within(choices).getByRole('button', { name: /Facetas/ }));
+    const preview = screen.getByRole('button', { name: 'Probar animación de subir' });
+    expect(preview).toHaveAttribute('data-button-animation', 'facet');
+    expect(preview).toHaveAttribute('data-click-animation', 'false');
+    await user.click(preview);
+    expect(preview).toHaveAttribute('data-click-animation', 'true');
+  });
+
   it("muestra los tres procesos y refleja el contacto de WhatsApp en la vista previa", async () => {
     const user = userEvent.setup();
     render(<Editor />);

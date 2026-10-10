@@ -42,16 +42,39 @@
 }
 .rb-chrome-hover__surface::before {
   background:
-    linear-gradient(105deg,transparent 7%,rgba(255,255,255,.035) 29%,rgba(255,255,255,.22) 45%,rgba(255,255,255,.035) 60%,transparent 78%) var(--rb-light-x) 0 / 210% 100% no-repeat,
-    radial-gradient(ellipse 78% 145% at var(--rb-light-x) var(--rb-light-y),rgba(255,255,255,.22),rgba(255,255,255,.07) 36%,transparent 73%);
+    linear-gradient(105deg,transparent 7%,rgba(255,255,255,.035) 29%,rgba(255,255,255,.22) 45%,rgba(255,255,255,.035) 60%,transparent 78%) var(--rb-chrome-x, 50%) 0 / 210% 100% no-repeat,
+    radial-gradient(ellipse 78% 145% at var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%),rgba(255,255,255,.22),rgba(255,255,255,.07) 36%,transparent 73%);
 }
 .rb-chrome-hover__surface::after {
-  background: radial-gradient(ellipse 110px 51px at var(--rb-light-x) var(--rb-light-y),var(--rb-edge-a) 2%,var(--rb-edge-b) 24%,var(--rb-edge-c) 49%,var(--rb-edge-d) 66%,transparent 81%);
+  background: radial-gradient(ellipse 110px 51px at var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%),var(--rb-edge-a) 2%,var(--rb-edge-b) 24%,var(--rb-edge-c) 49%,var(--rb-edge-d) 66%,transparent 81%);
   padding: 2px;
   -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='halo'] {
+  --rb-edge-a: rgba(255,255,255,.96); --rb-edge-b: rgba(139,226,255,.92);
+  --rb-edge-c: rgba(191,157,255,.86); --rb-edge-d: rgba(255,255,255,.7);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='halo'] > .rb-chrome-hover__surface::before {
+  background: radial-gradient(circle 76px at var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%),rgba(255,255,255,.58) 0%,rgba(131,213,255,.22) 35%,transparent 75%);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='comet'] {
+  --rb-edge-a: rgba(255,255,255,.98); --rb-edge-b: rgba(154,238,240,.94);
+  --rb-edge-c: rgba(236,185,255,.86); --rb-edge-d: rgba(255,255,255,.66);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='comet'] > .rb-chrome-hover__surface::before {
+  background: linear-gradient(120deg,transparent 0%,rgba(255,255,255,.09) 32%,rgba(255,255,255,.52) 48%,rgba(149,237,255,.2) 56%,transparent 83%) var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%) / 170% 170% no-repeat;
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='facet'] {
+  --rb-edge-a: rgba(255,255,255,.98); --rb-edge-b: rgba(255,203,167,.9);
+  --rb-edge-c: rgba(166,191,255,.9); --rb-edge-d: rgba(255,255,255,.7);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='facet'] > .rb-chrome-hover__surface::before {
+  background:
+    linear-gradient(135deg,transparent 22%,rgba(255,255,255,.42) 42%,transparent 52%) var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%) / 180% 160% no-repeat,
+    linear-gradient(35deg,transparent 30%,rgba(167,220,255,.32) 50%,transparent 67%) var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%) / 155% 140% no-repeat;
 }
 .storefront-header-surface:is(:hover,:focus-within) > .rb-chrome-hover__surface::before,
 .storefront-header-surface:is(:hover,:focus-within) > .rb-chrome-hover__surface::after,
@@ -59,7 +82,16 @@
 .storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::after {
   opacity: 1;
 }
+.storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::before {
+  animation: rb-chrome-flash .55s ease-out both;
+}
+.storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::after {
+  animation: rb-chrome-edge .55s ease-out both;
+}
+@keyframes rb-chrome-flash { from { opacity: 0; transform: scale(.68); } 45% { opacity: 1; } to { opacity: 0; transform: scale(1.08); } }
+@keyframes rb-chrome-edge { from { opacity: 0; } 40% { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .rb-chrome-hover__surface::before,
-  .rb-chrome-hover__surface::after { transition: none; }
+  .rb-chrome-hover__surface::after { transition: none; animation: none !important; }
+  .rb-chrome-hover__surface::before { animation: none !important; }
 }

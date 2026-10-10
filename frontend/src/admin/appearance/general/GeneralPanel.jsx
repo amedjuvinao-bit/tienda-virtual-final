@@ -3,6 +3,8 @@ import React, { useMemo, useState } from "react";
 import { CircleOff, Crown, Flower2, Gem, Heart, LoaderCircle, MessageCircle, ShoppingBag, Sparkles, Star, ChevronsUpDown } from "lucide-react";
 import { normalizeGlobalConfig } from "./generalHelpers";
 import AppearanceToolPreview from "./AppearanceToolPreview";
+import GlassMotionPicker from "./GlassMotionPicker";
+import { safeBannerButtonAnimation } from '../../../lib/bannerTemplates';
 import CloudinaryImageField from "./CloudinaryImageField";
 import "./appearanceGeneral.css";
 
@@ -505,6 +507,9 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
 
               {scrollSubTab === "estilo" && (
                 <PanelBlock title="Estilo general">
+                  <GlassMotionPicker label="Efecto de vidrio de las flechas" value={globalConfig.scrollButtons.glassMotion}
+                    inherited={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)}
+                    onChange={(value) => setPath('global.scrollButtons.glassMotion', value)} />
                   <Input
                     type="number"
                     min={28}
@@ -888,7 +893,8 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
           </section>
         )}
           </div>
-          <AppearanceToolPreview activeTool={activeMainTab} config={globalConfig} />
+          <AppearanceToolPreview activeTool={activeMainTab} config={globalConfig}
+            inheritedMotion={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)} />
         </div>
       </div>
     </div>

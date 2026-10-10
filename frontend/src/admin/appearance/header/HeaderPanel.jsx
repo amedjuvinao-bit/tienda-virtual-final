@@ -4,10 +4,12 @@ import { ChevronDown, Image, Link2, Palette, Smartphone } from 'lucide-react';
 import CloudinaryImageField from '../general/CloudinaryImageField';
 import HeaderPreview from './HeaderPreview';
 import MobileMenuEditor from './MobileMenuEditor';
+import GlassMotionPicker from '../general/GlassMotionPicker';
 import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
 import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
 import { headerSearchColorVariables, resolveHeaderSearchColors } from '../../../components/headerSearchTheme';
 import { MOBILE_MENU_ICON_OPTIONS, MobileMenuLinkIcon, normalizeMobileMenuIcon, normalizeMobileMenuIconColor } from '../../../components/mobileMenuIcons';
+import { safeBannerButtonAnimation } from '../../../lib/bannerTemplates';
 import '../../../components/headerSearch.css';
 import './headerWorkspace.css';
 import '../general/appearanceGeneral.css';
@@ -375,6 +377,9 @@ export default function HeaderPanel({
                         onChange={(event) => setPath('header.glassStrength', Number(event.target.value))} />
                     </label>
                   )}
+                  <GlassMotionPicker label="Efecto de vidrio del encabezado" value={theme.header?.glassMotion}
+                    inherited={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)}
+                    onChange={(value) => setPath('header.glassMotion', value)} />
                 </div>
               )}
             </div>

@@ -21,7 +21,8 @@ import WhatsAppMenuIcon from './WhatsAppMenuIcon';
 import { resolveWhatsAppHref } from './whatsappLink';
 import MobileMenuTrigger from './MobileMenuTrigger';
 import { MobileMenuLinkIcon } from './mobileMenuIcons';
-import { moveBannerButtonLight, safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import './storefrontChromeGlassHover.css';
 
 function Header() {
@@ -65,7 +66,7 @@ function Header() {
 
         const t = s?.theme || {};
         const h = t?.header || {};
-        setButtonAnimation(safeBannerButtonAnimation(t?.banner?.templateConfigs?.[t?.banner?.templateId]?.buttonAnimation));
+        setButtonAnimation(resolveChromeGlassMotion(h?.glassMotion, safeBannerButtonAnimation(t?.banner?.templateConfigs?.[t?.banner?.templateId]?.buttonAnimation)));
 
         const hl = h?.logoLight || t?.logo?.light || "";
         const hd = h?.logoDark || t?.logo?.dark || "";
@@ -401,7 +402,7 @@ function Header() {
   return createPortal(
     <>
       <header
-        onPointerMove={moveBannerButtonLight}
+        onPointerMove={moveChromeGlassLight}
         data-button-animation={buttonAnimation}
         style={headerInlineStyle}
         data-shape={headerSurface.shape}

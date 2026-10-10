@@ -47,6 +47,7 @@ export const GLOBAL_DEFAULTS = {
     shadow: "soft", // none | soft | strong
 
     // ✅ animaciones
+    glassMotion: "", // vacío = sigue el efecto de la portada
     upAnimation: "moveUp", // none | moveUp | pulse | bounce
     downAnimation: "moveDown", // none | moveDown | pulse | bounce
 

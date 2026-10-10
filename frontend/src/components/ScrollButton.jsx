@@ -3,7 +3,8 @@ import React, { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import "./storefrontLiquidGlass.css";
 import './storefrontChromeGlassHover.css';
-import { moveBannerButtonLight, safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import {
   DEFAULT_SECTION_IDS,
   getCurrentSectionIndex,
@@ -231,10 +232,10 @@ export default function ScrollButton({ config, buttonAnimation }) {
         {showUp && (
           <button
             onClick={handlePrev}
-            onPointerMove={moveBannerButtonLight}
-            data-button-animation={safeBannerButtonAnimation(buttonAnimation)}
+            onPointerMove={moveChromeGlassLight}
+            data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
             data-click-animation={activeAnimation === 'up'}
-            onAnimationEnd={() => setActiveAnimation(null)}
+            onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
             className="storefront-liquid-icon"
             style={{
               ...baseButtonStyle,
@@ -269,10 +270,10 @@ export default function ScrollButton({ config, buttonAnimation }) {
         {showDown && (
           <button
             onClick={handleNext}
-            onPointerMove={moveBannerButtonLight}
-            data-button-animation={safeBannerButtonAnimation(buttonAnimation)}
+            onPointerMove={moveChromeGlassLight}
+            data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
             data-click-animation={activeAnimation === 'down'}
-            onAnimationEnd={() => setActiveAnimation(null)}
+            onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
             className="storefront-liquid-icon"
             style={{
               ...baseButtonStyle,
