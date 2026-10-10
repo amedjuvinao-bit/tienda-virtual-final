@@ -4,8 +4,12 @@ import { useKeenSlider } from "keen-slider/react"
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { X } from "lucide-react"
 import { fetchSiteSettings } from "../lib/siteSettingsApi" // ✅ MISMA RUTA QUE APPEARANCEPAGE
+import { getBannerHeightStyle } from "../lib/bannerHeight"
+import BannerTemplateView from './BannerTemplateView'
 
-export default function CarouselBanner() {
+export default function CarouselBanner({ bannerOverride = null, sectionsOverride = null }) {
+  const overrideRef = useRef({ banner: bannerOverride, sections: sectionsOverride })
+  overrideRef.current = { banner: bannerOverride, sections: sectionsOverride }
   const [loaded, setLoaded] = useState(false)
   const intervalRef = useRef(null)
   const rafRef = useRef(null)
@@ -16,6 +20,7 @@ export default function CarouselBanner() {
 
   // ✅ settings banner
   const [banner, setBanner] = useState(null) // theme.banner
+  const [bannerSections, setBannerSections] = useState([])
   const [bannerLoading, setBannerLoading] = useState(true)
 
   // ✅ Para dots / slide actual
@@ -67,7 +72,8 @@ export default function CarouselBanner() {
       if (!opts?.silent) setBannerLoading(true)
       const settings = await fetchSiteSettings()
       const b = settings?.theme?.banner || null
-      setBanner(b)
+      setBanner(overrideRef.current.banner || b)
+      setBannerSections(overrideRef.current.sections || settings?.theme?.sections || [])
 
       console.log("RB BANNER LOADED", {
         type: b?.type || "slider",
@@ -83,6 +89,11 @@ export default function CarouselBanner() {
       setBannerLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (bannerOverride) setBanner(bannerOverride)
+    if (sectionsOverride) setBannerSections(sectionsOverride)
+  }, [bannerOverride, sectionsOverride])
 
   useEffect(() => {
     return () => {
@@ -221,8 +232,8 @@ export default function CarouselBanner() {
   }, [loadBannerSettings])
 
   const bannerType = bannerLoading ? "loading" : String(banner?.type || "slider")
-  const heightMode = banner?.heightMode || "auto"
-
+  const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId)
+  const plainMedia = banner?.templateId === 'plain'
   const isMobile = viewportWidth < 640
   const isTablet = viewportWidth >= 640 && viewportWidth < 1024
   const isDesktop = viewportWidth >= 1024
@@ -238,21 +249,7 @@ export default function CarouselBanner() {
     ? Math.max(1200, Math.min(20000, autoplayMsRaw))
     : 3500
 
-  const heightPxRaw = Number(banner?.heightPx)
-  const heightPx = Number.isFinite(heightPxRaw) ? heightPxRaw : 520
-  const clampedHeightPx = Math.max(240, Math.min(1200, heightPx))
-
-  // ✅ en móvil y tablet el banner cubre toda la pantalla
-  const responsiveHeightPx = useMemo(() => {
-    if (isMobile) return Math.max(520, Math.min(860, clampedHeightPx))
-    if (isTablet) return Math.max(560, Math.min(920, clampedHeightPx))
-    return clampedHeightPx
-  }, [isMobile, isTablet, clampedHeightPx])
-
-  const responsiveFullscreenHeight = useMemo(() => {
-    if (isMobile || isTablet) return "100dvh"
-    return "100vh"
-  }, [isMobile, isTablet])
+  const heightDevice = isMobile ? "mobile" : isTablet ? "tablet" : "desktop"
 
   // ✅ SIN fondo / SIN espacio artificial debajo del header
   const heroWrapStyle = useMemo(() => ({}), [])
@@ -262,12 +259,7 @@ export default function CarouselBanner() {
 
   const heroContainerClass = "w-full relative"
 
-  const heroContainerStyle =
-    heightMode === "fullscreen"
-      ? { height: responsiveFullscreenHeight }
-      : isMobile || isTablet
-      ? { height: "100dvh" }
-      : { height: `${responsiveHeightPx}px` }
+  const heroContainerStyle = getBannerHeightStyle(banner, heightDevice)
 
   const heroFullscreenClass = ""
 
@@ -645,7 +637,7 @@ export default function CarouselBanner() {
       })
       .filter((s) => !!s.image)
 
-    if (normalized.length > 0) return normalized.map((s) => ({ ...s, text: "" }))
+    if (normalized.length > 0 || useTemplate || plainMedia) return normalized.map((s) => ({ ...s, text: "" }))
 
     return fallbackSlides.map((s) => ({
       image: s.image,
@@ -657,7 +649,7 @@ export default function CarouselBanner() {
       buttons: null,
       text: s.text || "",
     }))
-  }, [bannerType, banner?.slides, fallbackSlides])
+  }, [bannerType, banner?.slides, fallbackSlides, useTemplate, plainMedia])
 
   const sliderMountKey = useMemo(() => {
     if (bannerType !== "slider") return "noslider"
@@ -848,9 +840,47 @@ export default function CarouselBanner() {
     )
   }
 
+  if (useTemplate && bannerType === 'slider') {
+    return <div className={heroWrapClass} style={heroWrapStyle}
+      onMouseEnter={() => { isPaused.current = true }}
+      onMouseLeave={() => { startTsRef.current = performance.now() - progress * autoplayMs; isPaused.current = false }}>
+      <div className={heroContainerClass} style={heroContainerStyle}>
+        <BannerTemplateView banner={banner} sections={bannerSections}>
+          <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
+            {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
+              <img src={slide.image} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: `${clamp0_100(slide.posX)}% ${clamp0_100(slide.posY)}%` }} />
+            </div>)}
+          </div>
+        </BannerTemplateView>
+        {loaded && slides.length > 1 && <div className={dotsWrapperClass}>
+          {slides.map((_, index) => <button key={index} type="button" className="rb-ring" aria-label={`Ir al slide ${index + 1}`} onClick={() => { instanceRef.current?.moveToIdx(index); startTsRef.current = performance.now(); setProgress(0) }}
+            style={{ width: `${ringSize}px`, height: `${ringSize}px`, backgroundImage: index === currentSlide && banner?.sliderShowProgress !== false ? `conic-gradient(rgba(255,255,255,.95) ${Math.round(progress * 360)}deg, rgba(255,255,255,.18) 0deg)` : 'none' }}>
+            <span className="rb-ring__inner" style={{ width: `${ringInnerSize}px`, height: `${ringInnerSize}px` }} />
+          </button>)}
+        </div>}
+      </div>
+    </div>
+  }
+
+  if (useTemplate && bannerType === 'image') {
+    return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
+      <BannerTemplateView banner={banner} sections={bannerSections}>
+        {banner?.imageUrl && <img src={banner.imageUrl} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: `${clamp0_100(banner.imagePosX)}% ${clamp0_100(banner.imagePosY)}%` }} />}
+      </BannerTemplateView>
+    </div></div>
+  }
+
+  if (useTemplate && bannerType === 'video') {
+    return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
+      <BannerTemplateView banner={banner} sections={bannerSections}>
+        {banner?.videoUrl && <video src={banner.videoUrl} autoPlay={!!banner.videoAutoplay} muted={!!banner.videoMuted} loop={!!banner.videoLoop} playsInline />}
+      </BannerTemplateView>
+    </div></div>
+  }
+
   if (bannerType === "video") {
     const videoUrl = String(banner?.videoUrl || "").trim()
-    const videoBtnPayload = pickButtons(banner?.videoButtons, banner?.videoButton)
+    const videoBtnPayload = plainMedia ? [] : pickButtons(banner?.videoButtons, banner?.videoButton)
 
     return (
       <div className={heroWrapClass} style={heroWrapStyle}>
@@ -884,14 +914,14 @@ export default function CarouselBanner() {
 
   if (bannerType === "image") {
     const imageUrl = String(banner?.imageUrl || "").trim()
-    const imageLink = String(banner?.imageLink || "").trim()
+    const imageLink = plainMedia ? "" : String(banner?.imageLink || "").trim()
 
     const imageFit = normalizeFit(banner?.imageFit)
     const imagePosX = clamp0_100(banner?.imagePosX, 50)
     const imagePosY = clamp0_100(banner?.imagePosY, 50)
     const imageObjectPosition = `${imagePosX}% ${imagePosY}%`
 
-    const imageBtnPayload = pickButtons(banner?.imageButtons, banner?.imageButton)
+    const imageBtnPayload = plainMedia ? [] : pickButtons(banner?.imageButtons, banner?.imageButton)
 
     const Img = (
       <img
@@ -992,13 +1022,14 @@ export default function CarouselBanner() {
             const posY = clamp0_100(slide?.posY, 50)
             const objectPosition = `${posX}% ${posY}%`
 
-            const slideButtons = pickButtons(slide?.buttons, slide?.button)
+            const slideButtons = plainMedia ? [] : pickButtons(slide?.buttons, slide?.button)
             const isActive = idx === currentSlide
 
             return (
               <div
                 key={idx}
                 className="keen-slider__slide relative h-full w-full"
+                data-active={isActive}
                 onClick={(e) => {
                   if (isClickFromButton(e)) return
                   setSelectedImage(slide.image)
@@ -1045,7 +1076,7 @@ export default function CarouselBanner() {
                   style={{
                     width: `${ringSize}px`,
                     height: `${ringSize}px`,
-                    backgroundImage: active
+                    backgroundImage: active && banner?.sliderShowProgress !== false
                       ? `conic-gradient(rgba(212,175,55,.95) ${deg}deg, rgba(255,255,255,.15) 0deg)`
                       : "none",
                   }}

@@ -25,6 +25,8 @@ import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAd
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
+import { mountStorefrontSectionMotion } from './lib/storefrontSectionMotion';
+import './storefrontSectionMotion.css';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
@@ -47,6 +49,7 @@ const DynamicPage = lazy(() => import('./pages/DynamicPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const Carrito = lazy(() => import('./pages/Carrito'));
 const Favoritos = lazy(() => import('./pages/Favoritos'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const Login = lazy(() => import('./admin/Login'));
@@ -116,16 +119,20 @@ function GlobalFloatingButtons({ theme }) {
   return (
     <>
       <WhatsAppButton config={theme?.global?.whatsapp} />
-      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} />}
+      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} buttonAnimation={theme?.banner?.templateConfigs?.[theme?.banner?.templateId]?.buttonAnimation} />}
     </>
   );
 }
 
 function Home({ theme }) {
+  const sectionsRef = useRef(null);
+
+  useEffect(() => mountStorefrontSectionMotion(sectionsRef.current), []);
+
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div className="flex-grow">
+      <div ref={sectionsRef} className="storefront-sections min-w-0 max-w-full flex-grow overflow-x-clip">
         <section id="banner" className="w-full"><CarouselBanner /></section>
         <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
         <section id="look" className="w-full"><LookSection theme={theme} /></section>
@@ -259,6 +266,7 @@ export default function App() {
                   <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/carrito" element={<Carrito />} />
                   <Route path="/favoritos" element={<Favoritos />} />
+                  <Route path="/buscar" element={<SearchResults theme={themeFromServer} />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
                   <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />

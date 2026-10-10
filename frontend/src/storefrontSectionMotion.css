@@ -1,0 +1,70 @@
+/* A single visual language for section changes: a soft aperture, depth and staggered content. */
+@media (prefers-reduced-motion: no-preference) {
+  .storefront-sections > section[data-section-motion="entering"] {
+    animation: storefront-aperture-in 1050ms cubic-bezier(.16,1,.3,1) backwards;
+  }
+  .storefront-sections > section[data-section-motion="leaving"] {
+    animation: storefront-aperture-out 260ms cubic-bezier(.55,0,.85,.35) both;
+  }
+  .storefront-sections > section[data-section-motion="entering"][data-section-direction="up"] {
+    animation-name: storefront-aperture-in-up;
+  }
+  .storefront-sections > section[data-section-motion="leaving"][data-section-direction="up"] {
+    animation-name: storefront-aperture-out-up;
+  }
+  .storefront-sections > section[data-section-motion="entering"] :is(h1,h2,h3) {
+    animation: storefront-copy-rise 780ms cubic-bezier(.16,1,.3,1) 170ms backwards;
+  }
+  .storefront-sections > section[data-section-motion="entering"] :is(article,.rb-template__card) {
+    animation: storefront-object-arrive 730ms cubic-bezier(.16,1,.3,1) 280ms backwards;
+  }
+  .storefront-sections > section[data-section-motion="entering"] :is(article,.rb-template__card):nth-child(2) { animation-delay: 370ms; }
+  .storefront-sections > section[data-section-motion="entering"] :is(article,.rb-template__card):nth-child(3) { animation-delay: 460ms; }
+  .storefront-sections > section[data-section-motion="entering"] :is(article,.rb-template__card):nth-child(n+4) { animation-delay: 520ms; }
+  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__content {
+    animation: storefront-banner-layer 850ms cubic-bezier(.16,1,.3,1) 120ms backwards;
+  }
+  .storefront-sections > #banner[data-section-motion="entering"] :is(.rb-template__rail,.rb-template__hotspots) {
+    animation: storefront-banner-layer 900ms cubic-bezier(.16,1,.3,1) 280ms backwards;
+  }
+}
+@keyframes storefront-aperture-in {
+  from { opacity: .38; clip-path: inset(9% 4% 5% round 32px); transform: translate3d(0,72px,0) scale(.96); }
+  62% { opacity: 1; }
+  to { opacity: 1; clip-path: inset(0 0 0 round 0); transform: translate3d(0,0,0) scale(1); }
+}
+@keyframes storefront-aperture-out {
+  from { opacity: 1; clip-path: inset(0 0 0 round 0); transform: translate3d(0,0,0) scale(1); }
+  to { opacity: .48; clip-path: inset(0 3% 6% round 26px); transform: translate3d(0,-20px,0) scale(.985); }
+}
+@keyframes storefront-aperture-in-up {
+  from { opacity: .38; clip-path: inset(5% 4% 9% round 32px); transform: translate3d(0,-72px,0) scale(.96); }
+  62% { opacity: 1; }
+  to { opacity: 1; clip-path: inset(0 0 0 round 0); transform: translate3d(0,0,0) scale(1); }
+}
+@keyframes storefront-aperture-out-up {
+  from { opacity: 1; clip-path: inset(0 0 0 round 0); transform: translate3d(0,0,0) scale(1); }
+  to { opacity: .48; clip-path: inset(6% 3% 0 round 26px); transform: translate3d(0,20px,0) scale(.985); }
+}
+@keyframes storefront-copy-rise {
+  from { opacity: 0; translate: 0 38px; filter: blur(7px); }
+  to { opacity: 1; translate: 0 0; filter: blur(0); }
+}
+@keyframes storefront-object-arrive {
+  from { opacity: 0; translate: 0 26px; scale: .94; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes storefront-banner-layer {
+  from { opacity: 0; translate: 0 34px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  @keyframes storefront-aperture-in {
+    from { opacity: .48; clip-path: inset(6% 2% 3% round 20px); transform: translate3d(0,42px,0) scale(.975); }
+    to { opacity: 1; clip-path: inset(0 0 0 round 0); transform: translate3d(0,0,0) scale(1); }
+  }
+  @keyframes storefront-aperture-in-up {
+    from { opacity: .48; clip-path: inset(3% 2% 6% round 20px); transform: translate3d(0,-42px,0) scale(.975); }
+    to { opacity: 1; clip-path: inset(0 0 0 round 0); transform: translate3d(0,0,0) scale(1); }
+  }
+}

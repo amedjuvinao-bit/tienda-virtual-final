@@ -11,6 +11,11 @@ export async function fetchAdminSiteSettings() {
   return data;
 }
 
+export async function fetchAppearanceSettings() {
+  const { data } = await api.get('/api/site-settings/appearance');
+  return data;
+}
+
 export async function saveSiteSettings(payload) {
   const { data } = await api.put("/api/site-settings", payload);
   return data;

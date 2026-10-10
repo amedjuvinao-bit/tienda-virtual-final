@@ -9,10 +9,12 @@ export const GLOBAL_DEFAULTS = {
     enabled: true,
     phone: "",
     message: "",
+    greeting: "¡Hola! ¿En qué podemos ayudarte?",
     position: "right", // right | left
     bottomPx: 24,
     sizePx: 56,
     bgColor: "#25D366",
+    showBackground: true,
 
     // ✅ personalización visual
     useCustomImage: false,
@@ -45,6 +47,7 @@ export const GLOBAL_DEFAULTS = {
     shadow: "soft", // none | soft | strong
 
     // ✅ animaciones
+    glassMotion: "", // vacío = sigue el efecto de la portada
     upAnimation: "moveUp", // none | moveUp | pulse | bounce
     downAnimation: "moveDown", // none | moveDown | pulse | bounce
 

@@ -1,6 +1,10 @@
 // src/components/ScrollButton.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import "./storefrontLiquidGlass.css";
+import './storefrontChromeGlassHover.css';
+import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import {
   DEFAULT_SECTION_IDS,
   getCurrentSectionIndex,
@@ -16,10 +20,10 @@ function getShadowValue(shadow) {
 
 function getButtonAnimation(name, fallback) {
   if (name === "none") return "none";
-  if (name === "pulse") return "rbScrollPulse 2s ease-in-out infinite";
-  if (name === "bounce") return "rbScrollBounce 2s ease-in-out infinite";
-  if (name === "moveUp") return "rbScrollMoveUp 2s ease-in-out infinite";
-  if (name === "moveDown") return "rbScrollMoveDown 2s ease-in-out infinite";
+  if (name === "pulse") return "rbScrollPulse 450ms ease-in-out 1";
+  if (name === "bounce") return "rbScrollBounce 550ms ease-in-out 1";
+  if (name === "moveUp") return "rbScrollMoveUp 450ms ease-in-out 1";
+  if (name === "moveDown") return "rbScrollMoveDown 450ms ease-in-out 1";
   return fallback;
 }
 
@@ -35,13 +39,25 @@ function scrollExactlyToSection(id, options = {}) {
 
   const y = el.getBoundingClientRect().top + window.pageYOffset - extraOffsetPx;
 
-  window.scrollTo({
-    top: Math.max(0, y),
-    behavior,
-  });
+  const destination = Math.max(0, y);
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const current = Array.from(document.querySelectorAll('.storefront-sections > section'))
+    .find((section) => section.getBoundingClientRect().top <= window.innerHeight * 0.45 &&
+      section.getBoundingClientRect().bottom > window.innerHeight * 0.45);
+
+  if (current && current !== el && !reducedMotion && behavior === 'smooth') {
+    current.dataset.sectionMotion = 'leaving';
+    window.setTimeout(() => {
+      window.scrollTo({ top: destination, behavior });
+      if (current.dataset.sectionMotion === 'leaving') delete current.dataset.sectionMotion;
+    }, 190);
+  } else {
+    window.scrollTo({ top: destination, behavior: reducedMotion ? 'auto' : behavior });
+  }
 }
 
-export default function ScrollButton({ config }) {
+export default function ScrollButton({ config, buttonAnimation }) {
+  const [activeAnimation, setActiveAnimation] = useState(null);
   const safeConfig = config && typeof config === "object" ? config : {};
 
   const sectionIds =
@@ -103,6 +119,36 @@ export default function ScrollButton({ config }) {
     ? Number(safeConfig.downImageSizePercent)
     : 70;
 
+  const [railClearancePx, setRailClearancePx] = useState(0);
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const rail = document.querySelector('.rb-template__rail');
+      const bounds = rail?.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const count = Number(showUp) + Number(showDown);
+      const controlsWidth = count * buttonSizePx + Math.max(0, count - 1) * gapPx;
+      const left = position === 'left' ? 24 : position === 'right' ? viewportWidth - 24 - controlsWidth : (viewportWidth - controlsWidth) / 2;
+      const top = viewportHeight - bottomPx - buttonSizePx;
+      const intersectsRail = bounds && bounds.width > 0 && bounds.height > 0 &&
+        bounds.left < left + controlsWidth && bounds.right > left &&
+        bounds.top < top + buttonSizePx && bounds.bottom > top;
+      const clearance = intersectsRail ? Math.max(0, Math.ceil(viewportHeight - bounds.top + 14 - bottomPx)) : 0;
+      setRailClearancePx((previous) => previous === clearance ? previous : clearance);
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
+    schedule();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [position, bottomPx, gapPx, buttonSizePx, showUp, showDown, config]);
+
   const scrollToIndex = (index) => {
     const id = sectionIds[index];
     if (!id) return;
@@ -114,12 +160,14 @@ export default function ScrollButton({ config }) {
   };
 
   const handlePrev = () => {
+    setActiveAnimation('up');
     const currentIndex = getCurrentSectionIndex(sectionIds);
     const prevIndex = getPrevSectionIndex(currentIndex, sectionIds);
     scrollToIndex(prevIndex);
   };
 
   const handleNext = () => {
+    setActiveAnimation('down');
     const currentIndex = getCurrentSectionIndex(sectionIds);
     const nextIndex = getNextSectionIndex(currentIndex, sectionIds);
     scrollToIndex(nextIndex);
@@ -137,7 +185,7 @@ export default function ScrollButton({ config }) {
   const baseButtonStyle = {
     width: `${buttonSizePx}px`,
     height: `${buttonSizePx}px`,
-    background: bgColor,
+    "--liquid-tint": bgColor,
     border: `${borderWidthPx}px solid ${borderColor}`,
     borderRadius: `${borderRadiusPx}px`,
     boxShadow: getShadowValue(shadow),
@@ -175,22 +223,28 @@ export default function ScrollButton({ config }) {
       <div
         className="hidden md:flex fixed z-50 items-center"
         style={{
-          bottom: `${bottomPx}px`,
+          bottom: `${bottomPx + railClearancePx}px`,
           gap: `${gapPx}px`,
+          transition: 'bottom .2s ease',
           ...wrapperPositionStyle,
         }}
       >
         {showUp && (
           <button
             onClick={handlePrev}
-            className="flex items-center justify-center transition-transform duration-200 hover:scale-105"
+            onPointerMove={moveChromeGlassLight}
+            data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
+            data-click-animation={activeAnimation === 'up'}
+            onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
+            className="storefront-liquid-icon"
             style={{
               ...baseButtonStyle,
-              animation: getButtonAnimation(upAnimation, "rbScrollMoveUp 2s ease-in-out infinite"),
+              animation: activeAnimation === 'up' ? getButtonAnimation(upAnimation, "rbScrollMoveUp 450ms ease-in-out 1") : 'none',
             }}
             aria-label="Sección anterior"
             type="button"
           >
+            <span className="rb-chrome-hover__surface" aria-hidden="true" />
             {upUseCustomImage && upImageUrl ? (
               <img
                 src={upImageUrl}
@@ -216,17 +270,22 @@ export default function ScrollButton({ config }) {
         {showDown && (
           <button
             onClick={handleNext}
-            className="flex items-center justify-center transition-transform duration-200 hover:scale-105"
+            onPointerMove={moveChromeGlassLight}
+            data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
+            data-click-animation={activeAnimation === 'down'}
+            onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
+            className="storefront-liquid-icon"
             style={{
               ...baseButtonStyle,
-              animation: getButtonAnimation(
+              animation: activeAnimation === 'down' ? getButtonAnimation(
                 downAnimation,
-                "rbScrollMoveDown 2s ease-in-out infinite"
-              ),
+                "rbScrollMoveDown 450ms ease-in-out 1"
+              ) : 'none',
             }}
             aria-label="Siguiente sección"
             type="button"
           >
+            <span className="rb-chrome-hover__surface" aria-hidden="true" />
             {downUseCustomImage && downImageUrl ? (
               <img
                 src={downImageUrl}

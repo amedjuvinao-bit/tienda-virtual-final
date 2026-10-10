@@ -1,5 +1,18 @@
 // frontend/src/admin/appearance/header/HeaderPanel.jsx
 import React, { useMemo, useState } from "react";
+import { ChevronDown, Image, Link2, Palette, Smartphone } from 'lucide-react';
+import CloudinaryImageField from '../general/CloudinaryImageField';
+import HeaderPreview from './HeaderPreview';
+import MobileMenuEditor from './MobileMenuEditor';
+import GlassMotionPicker from '../general/GlassMotionPicker';
+import { HEADER_FONT_PRESETS, isDarkHeaderBackground, resolveHeaderTypography } from '../../../components/headerPresentation';
+import { HEADER_ICON_SETS, HeaderActionGlyph, getHeaderIconSource, resolveHeaderIcons } from '../../../components/HeaderActionIcons';
+import { headerSearchColorVariables, resolveHeaderSearchColors } from '../../../components/headerSearchTheme';
+import { MOBILE_MENU_ICON_OPTIONS, MobileMenuLinkIcon, normalizeMobileMenuIcon, normalizeMobileMenuIconColor } from '../../../components/mobileMenuIcons';
+import { safeBannerButtonAnimation } from '../../../lib/bannerTemplates';
+import '../../../components/headerSearch.css';
+import './headerWorkspace.css';
+import '../general/appearanceGeneral.css';
 
 const Input = ({ label, ...rest }) => (
   <label className="block min-w-0">
@@ -47,44 +60,31 @@ const ColorInput = ({ value, onChange }) => {
   );
 };
 
-const SectionHeader = ({ title, description, onPreview }) => (
-  <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+const pickerColor = (value) => {
+  const hex = normalizeMobileMenuIconColor(value) || '#ac7950';
+  return hex.length === 4 ? `#${[...hex.slice(1)].map((digit) => digit + digit).join('')}` : hex;
+};
+
+const SectionHeader = ({ title, description }) => (
+  <div className="mb-3">
     <div>
       <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
       <p className="mt-1 text-sm text-gray-500">{description}</p>
     </div>
 
-    <button
-      type="button"
-      onClick={onPreview}
-      className="inline-flex shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
-      title="Aplica cambios en vista previa"
-    >
-      Ver cambios
-    </button>
   </div>
 );
 
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
-
-const MainTabButton = ({ active, label, description, onClick }) => (
+const MainTabButton = ({ active, label, description, onClick, Icon }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      "rounded-2xl border px-4 py-3 text-left transition-all duration-200",
-      active
-        ? "border-pink-300 bg-gradient-to-r from-pink-50 to-rose-50 shadow-sm"
-        : "border-gray-200 bg-white hover:border-pink-200 hover:bg-pink-50/40",
-    ].join(" ")}
+    className="appearance-panel-main-tab"
+    aria-pressed={active}
+    data-active={active}
   >
-    <div className="text-sm font-semibold text-gray-900">{label}</div>
-    <div className="mt-1 text-xs leading-5 text-gray-500">{description}</div>
+    <span className="appearance-header__tab-icon"><Icon size={22} aria-hidden="true" /></span>
+    <span><strong>{label}</strong><small>{description}</small></span>
   </button>
 );
 
@@ -92,12 +92,9 @@ const SubTabButton = ({ active, label, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      "rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200",
-      active
-        ? "border-pink-300 bg-pink-600 text-white shadow-sm"
-        : "border-gray-200 bg-white text-gray-700 hover:border-pink-200 hover:text-pink-700",
-    ].join(" ")}
+    className="appearance-panel-sub-tab"
+    aria-pressed={active}
+    data-active={active}
   >
     {label}
   </button>
@@ -123,37 +120,41 @@ export default function HeaderPanel({
   menus,
   routeOptions,
   uploading,
-  onPreview,
-  onUploadLogo,
-  setLogoLightFile,
-  setLogoDarkFile,
+  setUploading,
+  savedRevision,
+  uploadToCloudinaryViaBackend,
   addHeaderMenuItem,
   removeHeaderMenuItem,
   moveHeaderMenuItem,
   setHeaderMenuItem,
+  canEditTheme = true,
+  canEditMenus = true,
 }) {
   const mainTabs = useMemo(
     () => [
       {
         id: "branding",
-        label: "Logo y fondo",
-        description: "Logo, tamaño, subida, URLs manuales y fondo del header.",
+        label: "Identidad",
+        description: "Logos, tamaño y fondo.",
+        Icon: Image,
       },
       {
         id: "styles",
-        label: "Tipografía y estilos",
-        description: "Fuente, tamaños, colores del menú y animaciones visuales.",
+        label: "Estilo",
+        description: "Fuente, colores y movimiento.",
+        Icon: Palette,
       },
       {
         id: "responsive",
-        label: "Responsive y menú móvil",
-        description:
-          "Configura la experiencia en pantallas pequeñas, el botón hamburguesa y la transición del panel.",
+        label: "Menú móvil",
+        description: "Panel, controles y transición.",
+        Icon: Smartphone,
       },
       {
         id: "menu",
-        label: "Menú del header",
-        description: "Botones, textos, rutas, orden y eliminación.",
+        label: "Enlaces",
+        description: "Destinos y orden visibles.",
+        Icon: Link2,
       },
     ],
     []
@@ -162,96 +163,107 @@ export default function HeaderPanel({
   const [activeMainTab, setActiveMainTab] = useState("branding");
   const [brandingSubTab, setBrandingSubTab] = useState("logo");
   const [stylesSubTab, setStylesSubTab] = useState("tipografia");
-  const [responsiveSubTab, setResponsiveSubTab] = useState("estructura");
+  const [editingHeaderMenuIndex, setEditingHeaderMenuIndex] = useState(0);
+  const [customDestinationIndex, setCustomDestinationIndex] = useState(-1);
+  const headerMenuItems = menus?.header || [];
+  const activeHeaderMenuIndex = Math.min(editingHeaderMenuIndex, headerMenuItems.length - 1);
+  const addAndEditHeaderMenuItem = () => {
+    addHeaderMenuItem();
+    setEditingHeaderMenuIndex(headerMenuItems.length);
+    setCustomDestinationIndex(-1);
+  };
+  const moveAndKeepHeaderMenuItem = (from, to) => {
+    if (to < 0 || to >= headerMenuItems.length) return;
+    moveHeaderMenuItem(from, to);
+    setEditingHeaderMenuIndex((active) => active === from ? to : active === to ? from : active);
+    setCustomDestinationIndex((active) => active === from ? to : active === to ? from : active);
+  };
+  const removeAndSelectHeaderMenuItem = (index) => {
+    removeHeaderMenuItem(index);
+    setEditingHeaderMenuIndex((active) => active === index ? Math.max(0, index - 1) : active > index ? active - 1 : active);
+    setCustomDestinationIndex((active) => active === index ? -1 : active > index ? active - 1 : active);
+  };
+  const searchColors = resolveHeaderSearchColors(theme.header, theme.colors);
+  const iconSelection = resolveHeaderIcons(theme.header);
+  const logoMode = theme.header?.logoMode || 'auto';
+  const preferredLogo = logoMode === 'auto'
+    ? (isDarkHeaderBackground(theme.header?.bgColor) ? 'claro' : 'oscuro')
+    : (logoMode === 'light' ? 'claro' : 'oscuro');
+  const lightLogo = theme.header?.logoLight || theme.logo?.light || '';
+  const darkLogo = theme.header?.logoDark || theme.logo?.dark || '';
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div className="rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
+    <div className="appearance-header min-w-0">
+      <div className="appearance-header__shell rounded-2xl p-3 md:p-4">
         <SectionHeader
-          title="Header"
-          description="Organiza el logo, fondo, tipografía, estilos del menú y la configuración responsive del header sin sobrecargar al usuario."
-          onPreview={onPreview}
+          title="Logo y menú"
+          description="Diseña y comprueba cómo queda el encabezado en escritorio y móvil."
         />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {mainTabs.map((tab) => (
             <MainTabButton
               key={tab.id}
               active={activeMainTab === tab.id}
               label={tab.label}
               description={tab.description}
+              Icon={tab.Icon}
               onClick={() => setActiveMainTab(tab.id)}
             />
           ))}
         </div>
 
-        {activeMainTab === "branding" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo visual"
-                text="Primero define el logo y su tamaño. Después sube archivos o pega las URLs. Al final ajusta el fondo y la transparencia del header."
-              />
-            </div>
+        <div data-admin-storefront-preview="true"><HeaderPreview theme={theme} menus={menus} /></div>
 
-            <div className="mb-5 flex flex-wrap gap-2">
+        <fieldset disabled={!canEditTheme}>
+        {activeMainTab === "branding" && (
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={brandingSubTab === "logo"}
                 label="Logo"
                 onClick={() => setBrandingSubTab("logo")}
               />
               <SubTabButton
-                active={brandingSubTab === "subida"}
-                label="Subida y URLs"
-                onClick={() => setBrandingSubTab("subida")}
-              />
-              <SubTabButton
                 active={brandingSubTab === "fondo"}
                 label="Fondo"
                 onClick={() => setBrandingSubTab("fondo")}
+              />
+              <SubTabButton
+                active={brandingSubTab === "forma"}
+                label="Forma y vidrio"
+                onClick={() => setBrandingSubTab("forma")}
               />
             </div>
 
             <div className="space-y-4">
               {brandingSubTab === "logo" && (
                 <>
-                  <PanelBlock title="Vista previa del logo">
-                    <div className="rounded-2xl border bg-white p-3">
-                      <div className="mb-2 text-xs text-gray-500">Vista previa (Light)</div>
-                      <div
-                        data-admin-storefront-preview="true"
-                        className="flex h-20 items-center justify-center rounded-xl border bg-gray-50"
-                      >
-                        {theme.header?.logoLight ? (
-                          <img
-                            src={theme.header.logoLight}
-                            alt="Logo Light"
-                            className="max-h-16 max-w-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">Sin logo</span>
-                        )}
-                      </div>
+                  <div className="appearance-header__logo-grid">
+                    <div><p className="appearance-header__logo-hint">Para fondos oscuros · logo claro</p>
+                      <CloudinaryImageField label="Logo claro" value={theme.header?.logoLight || ''}
+                        onChange={(url) => setPath('header.logoLight', url)} onUpload={uploadToCloudinaryViaBackend}
+                        uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} /></div>
+                    <div><p className="appearance-header__logo-hint">Para fondos claros · logo oscuro</p>
+                      <CloudinaryImageField label="Logo oscuro" value={theme.header?.logoDark || ''}
+                        onChange={(url) => setPath('header.logoDark', url)} onUpload={uploadToCloudinaryViaBackend}
+                        uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} /></div>
+                  </div>
+                  <div className="appearance-header__logo-choice">
+                    <strong>¿Qué logo debe mostrar el encabezado?</strong>
+                    <div role="group" aria-label="Versión de logo visible" className="appearance-header__logo-options">
+                      {[
+                        { value: 'auto', title: 'Automático', detail: 'Según el color del fondo' },
+                        { value: 'light', title: 'Logo claro', detail: 'Siempre priorizar claro' },
+                        { value: 'dark', title: 'Logo oscuro', detail: 'Siempre priorizar oscuro' },
+                      ].map(({ value, title, detail }) => <button type="button" key={value} aria-pressed={logoMode === value}
+                        onClick={() => setPath('header.logoMode', value)}><strong>{title}</strong><small>{detail}</small></button>)}
                     </div>
-
-                    <div className="rounded-2xl border bg-white p-3">
-                      <div className="mb-2 text-xs text-gray-500">Vista previa (Dark)</div>
-                      <div
-                        data-admin-storefront-preview="true"
-                        className="flex h-20 items-center justify-center rounded-xl border bg-gray-50"
-                      >
-                        {theme.header?.logoDark ? (
-                          <img
-                            src={theme.header.logoDark}
-                            alt="Logo Dark"
-                            className="max-h-16 max-w-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">Sin logo</span>
-                        )}
-                      </div>
-                    </div>
-                  </PanelBlock>
+                    <p className="appearance-header__logo-current">Ahora se prioriza el <strong>logo {preferredLogo}</strong>.{logoMode === 'auto' && ' En fondos transparentes puedes elegir una versión fija.'}</p>
+                    {preferredLogo === 'claro' && !lightLogo && darkLogo && <p role="status" className="appearance-header__logo-warning">No has cargado el logo claro. Se verá el oscuro hasta que lo cargues.</p>}
+                    {preferredLogo === 'oscuro' && !darkLogo && lightLogo && <p role="status" className="appearance-header__logo-warning">No has cargado el logo oscuro. Se verá el claro hasta que lo cargues.</p>}
+                    {lightLogo && darkLogo && lightLogo === darkLogo && <p role="status" className="appearance-header__logo-warning">Ambas versiones usan la misma imagen. Carga archivos diferentes para ver el cambio.</p>}
+                  </div>
 
                   <PanelBlock title="Tamaño del logo" columns={1}>
                     <div className="rounded-2xl border bg-white p-4">
@@ -284,75 +296,9 @@ export default function HeaderPanel({
                         />
                       </div>
 
-                      <div className="mt-2 text-xs text-gray-500">
-                        Nota: mueve la barra, luego presiona{" "}
-                        <span className="font-medium">Guardar</span>.
-                      </div>
+                      <div className="mt-2 text-xs text-gray-500">La vista previa cambia al mover la barra. Guarda para publicarlo.</div>
                     </div>
                   </PanelBlock>
-                </>
-              )}
-
-              {brandingSubTab === "subida" && (
-                <>
-                  <PanelBlock title="Subir logo desde tu PC (Cloudinary)">
-                    <div className="rounded-2xl border bg-white p-4">
-                      <div className="mb-2 text-sm font-medium text-gray-800">Logo Light</div>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => setLogoLightFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={uploading}
-                        onClick={() => onUploadLogo("light")}
-                        className="mt-3 w-full rounded-xl bg-pink-600 px-3 py-2 text-sm text-white transition hover:bg-pink-700 disabled:opacity-60"
-                      >
-                        {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-                      </button>
-                    </div>
-
-                    <div className="rounded-2xl border bg-white p-4">
-                      <div className="mb-2 text-sm font-medium text-gray-800">Logo Dark</div>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => setLogoDarkFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={uploading}
-                        onClick={() => onUploadLogo("dark")}
-                        className="mt-3 w-full rounded-xl bg-pink-600 px-3 py-2 text-sm text-white transition hover:bg-pink-700 disabled:opacity-60"
-                      >
-                        {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-                      </button>
-                    </div>
-                  </PanelBlock>
-
-                  <PanelBlock title="URLs manuales del logo">
-                    <Input
-                      label="Logo del Header (Light) — URL"
-                      value={theme.header?.logoLight || ""}
-                      onChange={(e) => setPath("header.logoLight", e.target.value)}
-                      placeholder="https://.../logo_header_light.png"
-                    />
-
-                    <Input
-                      label="Logo del Header (Dark) — URL"
-                      value={theme.header?.logoDark || ""}
-                      onChange={(e) => setPath("header.logoDark", e.target.value)}
-                      placeholder="https://.../logo_header_dark.png"
-                    />
-                  </PanelBlock>
-
-                  <div className="text-xs text-gray-500">
-                    Nota: después de subir, presiona <span className="font-medium">Guardar</span>{" "}
-                    para que quede fijo.
-                  </div>
                 </>
               )}
 
@@ -395,20 +341,54 @@ export default function HeaderPanel({
                   </div>
                 </PanelBlock>
               )}
+
+              {brandingSubTab === "forma" && (
+                <div className="appearance-header__surface-editor">
+                  <div>
+                    <h3>Forma del encabezado</h3>
+                    <p>Elige cómo se integra con la parte superior de la tienda.</p>
+                  </div>
+                  <div className="appearance-header__surface-options" role="group" aria-label="Forma del encabezado">
+                    {[
+                      { value: 'attached', label: 'Ancho completo', detail: 'Unido a los bordes de la pantalla.' },
+                      { value: 'floating', label: 'Flotante', detail: 'Separado del borde, con relieve alrededor.' },
+                    ].map(({ value, label, detail }) => (
+                      <button key={value} type="button" aria-pressed={(theme.header?.surfaceShape || 'attached') === value}
+                        onClick={() => setPath('header.surfaceShape', value)}>
+                        <span className={`appearance-header__shape-icon appearance-header__shape-icon--${value}`} aria-hidden="true" />
+                        <strong>{label}</strong><small>{detail}</small>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="appearance-header__surface-slider">
+                    <span><strong>Redondeo de bordes</strong><output>{theme.header?.cornerRadiusPx ?? 16} px</output></span>
+                    <input type="range" aria-label="Redondeo de bordes" min="0" max="48" step="1" value={theme.header?.cornerRadiusPx ?? 16}
+                      onChange={(event) => setPath('header.cornerRadiusPx', Number(event.target.value))} />
+                  </label>
+                  <label className="appearance-header__glass-switch">
+                    <span><strong>Vidrio líquido con relieve 3D</strong><small>Reflejos, profundidad y transparencia sobre la imagen de la tienda.</small></span>
+                    <input type="checkbox" aria-label="Vidrio líquido con relieve 3D" checked={theme.header?.liquidGlassEnabled === true}
+                      onChange={(event) => setPath('header.liquidGlassEnabled', event.target.checked)} />
+                  </label>
+                  {theme.header?.liquidGlassEnabled && (
+                    <label className="appearance-header__surface-slider">
+                      <span><strong>Intensidad del brillo y desenfoque</strong><output>{theme.header?.glassStrength ?? 75}%</output></span>
+                      <input type="range" aria-label="Intensidad del brillo y desenfoque" min="0" max="100" step="1" value={theme.header?.glassStrength ?? 75}
+                        onChange={(event) => setPath('header.glassStrength', Number(event.target.value))} />
+                    </label>
+                  )}
+                  <GlassMotionPicker label="Efecto de vidrio del encabezado" value={theme.header?.glassMotion}
+                    inherited={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)}
+                    onChange={(value) => setPath('header.glassMotion', value)} />
+                </div>
+              )}
             </div>
           </section>
         )}
 
         {activeMainTab === "styles" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo de diseño"
-                text="Aquí separé la fuente del header, el estilo del menú y el estilo de los íconos para que el usuario solo abra el grupo que necesita y no haga scroll innecesario."
-              />
-            </div>
-
-            <div className="mb-5 flex flex-wrap gap-2">
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
               <SubTabButton
                 active={stylesSubTab === "tipografia"}
                 label="Tipografía"
@@ -420,6 +400,11 @@ export default function HeaderPanel({
                 onClick={() => setStylesSubTab("menu")}
               />
               <SubTabButton
+                active={stylesSubTab === "buscador"}
+                label="Buscador"
+                onClick={() => setStylesSubTab("buscador")}
+              />
+              <SubTabButton
                 active={stylesSubTab === "iconos"}
                 label="Íconos"
                 onClick={() => setStylesSubTab("iconos")}
@@ -428,36 +413,33 @@ export default function HeaderPanel({
 
             <div className="space-y-4">
               {stylesSubTab === "tipografia" && (
-                <PanelBlock title="Tipografía del header">
-                  <Select
-                    label="Preset de fuente del Header"
-                    value={theme.header?.fontPreset || ""}
-                    onChange={(e) => setPath("header.fontPreset", e.target.value)}
-                  >
-                    <option value="">(Sin preset)</option>
-                    <option value="classic">Classic (Playfair)</option>
-                    <option value="modern">Modern (Inter)</option>
-                    <option value="elegant">Elegant (Cormorant)</option>
-                    <option value="cute">Cute (Baloo)</option>
-                  </Select>
-
-                  <Input
-                    label="Tamaño de fuente header (px)"
-                    type="number"
-                    min={12}
-                    max={30}
-                    step="1"
+                <PanelBlock title="Personalidad del menú" columns={1}>
+                  <p className="appearance-header__font-intro">Cuatro formas de letra distintas, mostradas a tamaño de menú. Elige una y mira arriba cómo queda.</p>
+                  <div className="appearance-header__font-grid" role="group" aria-label="Modelos de tipografía">
+                    {Object.entries(HEADER_FONT_PRESETS).map(([key, preset]) => (
+                      <button key={key} type="button" className="appearance-header__font-option"
+                        aria-pressed={theme.header?.fontPreset === key && !theme.header?.fontFamily}
+                        onClick={() => { setPath('header.fontPreset', key); setPath('header.fontFamily', ''); }}>
+                        <span className="appearance-header__font-option-heading"><strong>{preset.label}</strong><small>{preset.description}</small></span>
+                        <span className="appearance-header__font-example" style={{ fontFamily: preset.family, fontWeight: preset.weight, fontStyle: preset.style, letterSpacing: preset.spacing, textTransform: preset.transform }}>Lo Nuevo · Boutique</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="appearance-header__font-detail">
+                    <strong>Texto seleccionado · tamaño real</strong>
+                    <span style={{ ...resolveHeaderTypography(theme.header), fontSize: `${theme.header?.fontSizePx ?? 16}px` }}>Lo Nuevo · Colecciones · Boutique</span>
+                  </div>
+                  <Input label="Tamaño del texto del menú (px)" type="number" min={12} max={30} step="1"
                     value={theme.header?.fontSizePx ?? 16}
-                    onChange={(e) => setPath("header.fontSizePx", Number(e.target.value))}
-                  />
-
-                  <div className="xl:col-span-2">
+                    onChange={(e) => setPath("header.fontSizePx", Number(e.target.value))} />
+                  <div>
                     <Input
                       label="Fuente personalizada (CSS font-family) — opcional"
                       value={theme.header?.fontFamily || ""}
                       onChange={(e) => setPath("header.fontFamily", e.target.value)}
                       placeholder='"Playfair Display", Georgia, serif'
                     />
+                    {theme.header?.fontFamily && <p className="mt-2 text-xs text-gray-500">La fuente personalizada tiene prioridad. Selecciona un modelo para volver a usarlo.</p>}
                   </div>
                 </PanelBlock>
               )}
@@ -500,29 +482,65 @@ export default function HeaderPanel({
                 </PanelBlock>
               )}
 
+              {stylesSubTab === "buscador" && (
+                <PanelBlock title="Colores de la barra de búsqueda">
+                  <p className="xl:col-span-2 text-xs text-gray-600">Por defecto, el buscador sigue los colores del encabezado. Cambia solo los que quieras personalizar; al pulsar «Usar colores del tema», vuelve a seguirlos.</p>
+                  {[
+                    ['searchBgColor', 'Fondo', searchColors.background],
+                    ['searchTextColor', 'Texto', searchColors.text],
+                    ['searchAccentColor', 'Flecha y enfoque', searchColors.accent],
+                    ['searchBorderColor', 'Borde', searchColors.border],
+                  ].map(([key, label, fallback]) => <label className="block min-w-0" key={key}>
+                    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+                    <ColorInput value={theme.header?.[key] || fallback} onChange={(event) => setPath(`header.${key}`, event.target.value)} />
+                  </label>)}
+                  <button type="button" className="w-fit rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 xl:col-span-2" onClick={() => {
+                    ['searchBgColor', 'searchTextColor', 'searchAccentColor', 'searchBorderColor'].forEach((key) => setPath(`header.${key}`, ''));
+                  }}>Usar colores del tema</button>
+                  <div className="relative min-h-16 rounded-xl p-3 xl:col-span-2" style={{ ...headerSearchColorVariables(theme.header, theme.colors), background: theme.header?.bgColor || '#ffe3ec' }}>
+                    <div className="header-search-form max-w-[244px]" aria-label="Vista previa de colores del buscador">
+                      <span style={{ flex: 1, color: searchColors.text, fontSize: 12 }}>Buscar productos...</span>
+                      <span className="grid h-[31px] w-[31px] place-items-center rounded-full" style={{ color: searchColors.accent, background: `color-mix(in srgb, ${searchColors.background} 70%, white)` }} aria-hidden="true">→</span>
+                    </div>
+                  </div>
+                </PanelBlock>
+              )}
+
               {stylesSubTab === "iconos" && (
-                <PanelBlock title="Íconos (colores y animación)">
-                  <label className="block min-w-0">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Color de íconos
-                    </span>
-                    <ColorInput
-                      value={theme.header?.iconColor || ""}
-                      onChange={(e) => setPath("header.iconColor", e.target.value)}
-                    />
-                  </label>
-
-                  <label className="block min-w-0">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Color hover (íconos)
-                    </span>
-                    <ColorInput
-                      value={theme.header?.iconHoverColor || ""}
-                      onChange={(e) => setPath("header.iconHoverColor", e.target.value)}
-                    />
-                  </label>
-
-                  <div className="xl:col-span-2">
+                <div className="appearance-header__icon-editor">
+                  <div className="appearance-header__icon-heading"><strong>Elige tus íconos</strong><span>Compara búsqueda, favoritos y carrito en cuatro estilos. Puedes cambiar cada imagen por separado.</span></div>
+                  <div className="appearance-header__icon-options" role="group" aria-label="Modelo de íconos">
+                    {HEADER_ICON_SETS.map(({ value, label, description }) => <button key={value} type="button" aria-pressed={iconSelection === value}
+                      onClick={() => setPath('header.iconSet', value)} className="appearance-header__icon-option">
+                      <span className="appearance-header__icon-samples" aria-hidden="true">
+                        {['search', 'favorites', 'cart'].map((kind) => <span className="storefront-action-button" key={kind}>
+                          <HeaderActionGlyph kind={kind} iconSet={value} iconOverrides={theme.header?.iconOverrides} /></span>)}
+                      </span><strong>{label}</strong><small>{description}</small>
+                    </button>)}
+                  </div>
+                  <div className="appearance-header__custom-icons">
+                    <strong>Personaliza {HEADER_ICON_SETS.find(({ value }) => value === iconSelection)?.label || 'este juego'}</strong>
+                    <p>Selecciona una imagen para reemplazar solo ese icono. Si la quitas, vuelve al diseño original del juego. Se recomienda PNG o WebP transparente y cuadrado.</p>
+                    <div className="appearance-header__custom-icon-fields">
+                      {[
+                        ['search', 'Búsqueda'],
+                        ['favorites', 'Favoritos'],
+                        ['cart', 'Bolsa de compras'],
+                      ].map(([kind, label]) => <CloudinaryImageField key={`${iconSelection}-${kind}`} label={`Icono de ${label}`}
+                        value={theme.header?.iconOverrides?.[iconSelection]?.[kind] || ''}
+                        fallbackPreview={getHeaderIconSource(iconSelection, kind)}
+                        onChange={(url) => setPath(`header.iconOverrides.${iconSelection}.${kind}`, url)}
+                        onUpload={uploadToCloudinaryViaBackend} uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} transparentOnly />)}
+                    </div>
+                  </div>
+                  <div className="appearance-header__icon-controls">
+                    <strong>Tamaño y movimiento</strong>
+                    <label className="appearance-header__icon-size">
+                      <span>Tamaño en la tienda <output>{theme.header?.iconSizePx ?? 34} px</output></span>
+                      <input type="range" aria-label="Tamaño en la tienda" min="28" max="40" step="1" value={theme.header?.iconSizePx ?? 34}
+                        onChange={(e) => setPath('header.iconSizePx', Number(e.target.value))} />
+                    </label>
+                  <div>
                     <Select
                       label="Animación de íconos"
                       value={theme.header?.iconAnimation || "soft"}
@@ -535,687 +553,23 @@ export default function HeaderPanel({
                       <option value="pop">Pop (más fuerte)</option>
                     </Select>
                   </div>
-                </PanelBlock>
+                  </div>
+                </div>
               )}
             </div>
           </section>
         )}
 
-        {activeMainTab === "responsive" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Responsive y menú móvil"
-                text="Aquí defines cómo se comporta el header en pantallas pequeñas: estilo del botón hamburguesa, transición del panel, fondo, bordes, botones y acabados visuales."
-              />
-            </div>
+        {activeMainTab === "responsive" && <MobileMenuEditor
+          theme={theme} setPath={setPath} menus={menus} uploading={uploading}
+          setUploading={setUploading} savedRevision={savedRevision}
+          uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} />}
 
-            <div className="mb-5 flex flex-wrap gap-2">
-              <SubTabButton
-                active={responsiveSubTab === "estructura"}
-                label="Estructura"
-                onClick={() => setResponsiveSubTab("estructura")}
-              />
-              <SubTabButton
-                active={responsiveSubTab === "estilo"}
-                label="Estilo visual"
-                onClick={() => setResponsiveSubTab("estilo")}
-              />
-              <SubTabButton
-                active={responsiveSubTab === "bordes"}
-                label="Bordes y radios"
-                onClick={() => setResponsiveSubTab("bordes")}
-              />
-              <SubTabButton
-                active={responsiveSubTab === "botones"}
-                label="Botones y redes"
-                onClick={() => setResponsiveSubTab("botones")}
-              />
-              <SubTabButton
-                active={responsiveSubTab === "animacion"}
-                label="Animación"
-                onClick={() => setResponsiveSubTab("animacion")}
-              />
-            </div>
+        </fieldset>
 
-            <div className="space-y-4">
-              {responsiveSubTab === "estructura" && (
-                <>
-                  <PanelBlock title="Botón hamburguesa">
-                    <Select
-                      label="Estilo del botón hamburguesa"
-                      value={theme.header?.mobileMenuTriggerStyle || "soft-circle"}
-                      onChange={(e) => setPath("header.mobileMenuTriggerStyle", e.target.value)}
-                    >
-                      <option value="soft-circle">Círculo suave</option>
-                      <option value="outline-circle">Círculo con borde</option>
-                      <option value="soft-square">Cuadrado suave</option>
-                      <option value="minimal">Minimalista</option>
-                      <option value="luxury">Elegante / lujo</option>
-                    </Select>
-
-                    <Select
-                      label="Tipo de icono hamburguesa"
-                      value={theme.header?.mobileMenuTriggerIcon || "classic"}
-                      onChange={(e) => setPath("header.mobileMenuTriggerIcon", e.target.value)}
-                    >
-                      <option value="classic">Tres líneas clásicas</option>
-                      <option value="rounded">Tres líneas redondeadas</option>
-                      <option value="thin">Tres líneas finas</option>
-                      <option value="bold">Tres líneas gruesas</option>
-                    </Select>
-
-                    <Input
-                      label="Tamaño del botón hamburguesa (px)"
-                      type="number"
-                      min={32}
-                      max={80}
-                      step="1"
-                      value={theme.header?.mobileMenuTriggerSizePx ?? 44}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuTriggerSizePx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño del icono hamburguesa (px)"
-                      type="number"
-                      min={14}
-                      max={36}
-                      step="1"
-                      value={theme.header?.mobileMenuTriggerIconSizePx ?? 20}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuTriggerIconSizePx", Number(e.target.value))
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Panel móvil">
-                    <Input
-                      label="Ancho del menú móvil (%)"
-                      type="number"
-                      min={60}
-                      max={100}
-                      step="1"
-                      value={theme.header?.mobileMenuWidthPercent ?? 88}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuWidthPercent", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Radio general del panel (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuRadiusPx ?? 0}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuRadiusPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Separación interna del panel (px)"
-                      type="number"
-                      min={8}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuPaddingPx ?? 20}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuPaddingPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Select
-                      label="Comportamiento del panel móvil"
-                      value={theme.header?.mobileMenuLayout || "drawer-left"}
-                      onChange={(e) => setPath("header.mobileMenuLayout", e.target.value)}
-                    >
-                      <option value="drawer-left">Drawer desde la izquierda</option>
-                      <option value="drawer-right">Drawer desde la derecha</option>
-                      <option value="center-panel">Panel centrado</option>
-                      <option value="full-screen">Pantalla completa</option>
-                    </Select>
-                  </PanelBlock>
-                </>
-              )}
-
-              {responsiveSubTab === "estilo" && (
-                <>
-                  <PanelBlock title="Colores base del menú móvil">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo del menú móvil
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuBgColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuBgColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de texto principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuTextColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuTextColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color acento / hover
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuAccentColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuAccentColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de texto suave
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuMutedColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuMutedColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color del título
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuTitleColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuTitleColor", e.target.value)}
-                      />
-                    </label>
-
-                    <Input
-                      label="Fuente personalizada del menú móvil"
-                      value={theme.header?.mobileMenuFontFamily || ""}
-                      onChange={(e) => setPath("header.mobileMenuFontFamily", e.target.value)}
-                      placeholder='"Playfair Display", Georgia, serif'
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Botón hamburguesa y botón cerrar">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo del botón hamburguesa
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuTriggerBgColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuTriggerBgColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color del icono hamburguesa
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuTriggerIconColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuTriggerIconColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo del botón cerrar
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuCloseBgColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuCloseBgColor", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color del icono cerrar
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuCloseIconColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuCloseIconColor", e.target.value)
-                        }
-                      />
-                    </label>
-                  </PanelBlock>
-                </>
-              )}
-
-              {responsiveSubTab === "bordes" && (
-                <>
-                  <PanelBlock title="Bordes del panel y separadores">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de borde del panel
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuBorderColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuBorderColor", e.target.value)}
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor del borde del panel (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuBorderWidthPx ?? 0}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuBorderWidthPx", Number(e.target.value))
-                      }
-                    />
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de separadores de items
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuItemBorderColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuItemBorderColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor de separadores de items (px)"
-                      type="number"
-                      min={0}
-                      max={6}
-                      step="1"
-                      value={theme.header?.mobileMenuItemBorderWidthPx ?? 1}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuItemBorderWidthPx", Number(e.target.value))
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Bordes del botón hamburguesa y botón cerrar">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de borde del botón hamburguesa
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuTriggerBorderColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuTriggerBorderColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor del borde hamburguesa (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuTriggerBorderWidthPx ?? 1}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuTriggerBorderWidthPx", Number(e.target.value))
-                      }
-                    />
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de borde del botón cerrar
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuCloseBorderColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuCloseBorderColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor del borde cerrar (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuCloseBorderWidthPx ?? 1}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuCloseBorderWidthPx", Number(e.target.value))
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Radios de botones y panel">
-                    <Input
-                      label="Radio botón hamburguesa (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuTriggerRadiusPx ?? 999}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuTriggerRadiusPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Radio botón cerrar (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuCloseRadiusPx ?? 999}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuCloseRadiusPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Radio botón principal (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuButtonRadiusPx ?? 999}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuButtonRadiusPx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Radio botón secundario (px)"
-                      type="number"
-                      min={0}
-                      max={40}
-                      step="1"
-                      value={theme.header?.mobileMenuSecondaryButtonRadiusPx ?? 999}
-                      onChange={(e) =>
-                        setPath(
-                          "header.mobileMenuSecondaryButtonRadiusPx",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </PanelBlock>
-                </>
-              )}
-
-              {responsiveSubTab === "botones" && (
-                <>
-                  <PanelBlock title="Botón principal">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo botón principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuButtonBg || ""}
-                        onChange={(e) => setPath("header.mobileMenuButtonBg", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Texto botón principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuButtonTextColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuButtonTextColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color borde botón principal
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuButtonBorderColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuButtonBorderColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor borde botón principal (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuButtonBorderWidthPx ?? 0}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuButtonBorderWidthPx", Number(e.target.value))
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Botón secundario">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo botón secundario
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSecondaryButtonBg || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuSecondaryButtonBg", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Texto botón secundario
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSecondaryButtonTextColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuSecondaryButtonTextColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color borde botón secundario
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSecondaryButtonBorderColor || ""}
-                        onChange={(e) =>
-                          setPath(
-                            "header.mobileMenuSecondaryButtonBorderColor",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Grosor borde botón secundario (px)"
-                      type="number"
-                      min={0}
-                      max={8}
-                      step="1"
-                      value={theme.header?.mobileMenuSecondaryButtonBorderWidthPx ?? 1}
-                      onChange={(e) =>
-                        setPath(
-                          "header.mobileMenuSecondaryButtonBorderWidthPx",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Redes sociales y pie">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Fondo de botones sociales
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSocialBg || ""}
-                        onChange={(e) => setPath("header.mobileMenuSocialBg", e.target.value)}
-                      />
-                    </label>
-
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color de íconos sociales
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuSocialIconColor || ""}
-                        onChange={(e) =>
-                          setPath("header.mobileMenuSocialIconColor", e.target.value)
-                        }
-                      />
-                    </label>
-
-                    <Input
-                      label="Tamaño de botones sociales (px)"
-                      type="number"
-                      min={28}
-                      max={72}
-                      step="1"
-                      value={theme.header?.mobileMenuSocialSizePx ?? 44}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuSocialSizePx", Number(e.target.value))
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño texto pie inferior (px)"
-                      type="number"
-                      min={10}
-                      max={20}
-                      step="1"
-                      value={theme.header?.mobileMenuFooterTextSizePx ?? 13}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuFooterTextSizePx", Number(e.target.value))
-                      }
-                    />
-                  </PanelBlock>
-                </>
-              )}
-
-              {responsiveSubTab === "animacion" && (
-                <>
-                  <PanelBlock title="Overlay y transición">
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-sm font-medium text-gray-700">
-                        Color del overlay
-                      </span>
-                      <ColorInput
-                        value={theme.header?.mobileMenuOverlayColor || ""}
-                        onChange={(e) => setPath("header.mobileMenuOverlayColor", e.target.value)}
-                      />
-                    </label>
-
-                    <div className="rounded-2xl border bg-white p-4">
-                      <div className="mb-1 text-sm font-medium text-gray-700">
-                        Opacidad del overlay (0 a 1)
-                      </div>
-                      <div className="grid min-w-0 grid-cols-[1fr_96px] items-center gap-3">
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          value={theme.header?.mobileMenuOverlayOpacity ?? 0.35}
-                          onChange={(e) =>
-                            setPath("header.mobileMenuOverlayOpacity", Number(e.target.value))
-                          }
-                          className="w-full min-w-0"
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          value={theme.header?.mobileMenuOverlayOpacity ?? 0.35}
-                          onChange={(e) =>
-                            setPath("header.mobileMenuOverlayOpacity", Number(e.target.value))
-                          }
-                          className="w-24 rounded-xl border border-gray-300 bg-white px-3 py-2.5"
-                        />
-                      </div>
-                    </div>
-
-                    <Select
-                      label="Transición del menú"
-                      value={theme.header?.mobileMenuAnimation || "slide-left"}
-                      onChange={(e) => setPath("header.mobileMenuAnimation", e.target.value)}
-                    >
-                      <option value="slide-left">Deslizar desde la izquierda</option>
-                      <option value="slide-right">Deslizar desde la derecha</option>
-                      <option value="fade">Desvanecer</option>
-                      <option value="scale">Escala suave</option>
-                      <option value="slide-fade">Deslizar + desvanecer</option>
-                      <option value="luxury-soft">Suave elegante</option>
-                    </Select>
-
-                    <Input
-                      label="Duración de transición (ms)"
-                      type="number"
-                      min={120}
-                      max={1200}
-                      step="10"
-                      value={theme.header?.mobileMenuAnimationDurationMs ?? 300}
-                      onChange={(e) =>
-                        setPath(
-                          "header.mobileMenuAnimationDurationMs",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </PanelBlock>
-
-                  <PanelBlock title="Animación del botón hamburguesa">
-                    <Select
-                      label="Animación del botón hamburguesa"
-                      value={theme.header?.mobileMenuTriggerAnimation || "soft"}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuTriggerAnimation", e.target.value)
-                      }
-                    >
-                      <option value="none">Sin animación</option>
-                      <option value="soft">Suave</option>
-                      <option value="pop">Pop</option>
-                      <option value="rotate">Giro suave</option>
-                      <option value="pulse">Pulso</option>
-                    </Select>
-
-                    <Select
-                      label="Transformación al abrir"
-                      value={theme.header?.mobileMenuTriggerOpenEffect || "to-x"}
-                      onChange={(e) =>
-                        setPath("header.mobileMenuTriggerOpenEffect", e.target.value)
-                      }
-                    >
-                      <option value="none">Ninguna</option>
-                      <option value="to-x">Se transforma en X</option>
-                      <option value="fade">Se desvanece</option>
-                      <option value="rotate">Rota suavemente</option>
-                    </Select>
-                  </PanelBlock>
-                </>
-              )}
-            </div>
-          </section>
-        )}
-
+        <fieldset disabled={!canEditMenus}>
         {activeMainTab === "menu" && (
-          <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-            <div className="mb-4">
-              <InfoCard
-                title="Consejo funcional"
-                text="Toda la administración de botones del menú quedó concentrada en un solo bloque, con más ancho útil y sin competir con otros formularios del header."
-              />
-            </div>
-
+          <section className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 md:p-4">
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -1223,31 +577,48 @@ export default function HeaderPanel({
                     Menú del Header (botones)
                   </div>
                   <p className="mt-1 text-sm text-gray-600">
-                    Edita texto y ruta. Luego presiona <span className="font-medium">Guardar</span>.
+                    Elige una página pública o escribe un enlace externo seguro. El orden se refleja arriba.
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={addHeaderMenuItem}
+                  onClick={addAndEditHeaderMenuItem}
                   className="inline-flex shrink-0 items-center justify-center rounded-xl bg-pink-600 px-4 py-2 text-sm text-white transition hover:bg-pink-700"
                 >
                   + Agregar
                 </button>
               </div>
 
-              {!menus?.header || menus.header.length === 0 ? (
+              {headerMenuItems.length === 0 ? (
                 <div className="rounded-2xl border border-dashed bg-white p-4 text-gray-500">
                   No hay botones en el menú. Presiona{" "}
                   <span className="font-medium">“+ Agregar”</span>.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {menus.header.map((item, idx) => (
-                    <div key={item?._id || idx} className="rounded-2xl border bg-white p-4 min-w-0">
-                      <div className="grid min-w-0 gap-4 xl:grid-cols-[1fr_1.2fr_auto] xl:items-end">
+                <div className="appearance-header__menu-list">
+                  {headerMenuItems.map((item, idx) => (
+                    <div key={item?._id || idx} className="appearance-header__menu-entry" data-active={activeHeaderMenuIndex === idx}>
+                      <div className="appearance-header__menu-row">
+                        <button type="button" className="appearance-header__menu-summary"
+                          aria-expanded={activeHeaderMenuIndex === idx}
+                          aria-controls={`header-menu-editor-${idx}`}
+                          onClick={() => { setEditingHeaderMenuIndex(idx); setCustomDestinationIndex(-1); }}>
+                          <span className="appearance-header__menu-number">{idx + 1}</span>
+                          <span className="appearance-header__menu-icon-sample"><MobileMenuLinkIcon name={item?.icon} color={item?.iconColor || theme?.header?.mobileMenuAccentColor || '#ac7950'} size={25} /></span>
+                          <span className="appearance-header__menu-summary-copy"><strong>{item?.title || `Enlace ${idx + 1}`}</strong><small>{item?.ref || 'Sin destino'}</small></span>
+                          <ChevronDown className="appearance-header__menu-chevron" size={18} aria-hidden="true" />
+                        </button>
+                        <div className="appearance-header__menu-actions">
+                          <button type="button" onClick={() => moveAndKeepHeaderMenuItem(idx, idx - 1)} disabled={idx === 0} aria-label={`Subir ${item?.title || `enlace ${idx + 1}`}`} title="Subir">↑</button>
+                          <button type="button" onClick={() => moveAndKeepHeaderMenuItem(idx, idx + 1)} disabled={idx === headerMenuItems.length - 1} aria-label={`Bajar ${item?.title || `enlace ${idx + 1}`}`} title="Bajar">↓</button>
+                          <button type="button" onClick={() => removeAndSelectHeaderMenuItem(idx)} aria-label={`Eliminar ${item?.title || `enlace ${idx + 1}`}`} title="Eliminar">Eliminar</button>
+                        </div>
+                      </div>
+                      {activeHeaderMenuIndex === idx && <div id={`header-menu-editor-${idx}`} className="appearance-header__menu-details">
+                        <div className="grid min-w-0 gap-3 md:grid-cols-2">
                         <Input
-                          label={`Texto del botón #${idx + 1}`}
+                          label="Texto del botón"
                           value={item?.title || ""}
                           onChange={(e) => setHeaderMenuItem(idx, { title: e.target.value })}
                           placeholder="Ej: Lo Nuevo"
@@ -1255,87 +626,71 @@ export default function HeaderPanel({
 
                         <div className="min-w-0">
                           <label className="block min-w-0">
-                            <span className="mb-1 block text-sm font-medium text-gray-700">
-                              Ruta / link
-                            </span>
-
+                            <span className="mb-1 block text-sm font-medium text-gray-700">Página o destino</span>
                             <select
-                              className="mb-2 w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-                              value={item?.ref || ""}
-                              onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
+                              className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
+                              value={customDestinationIndex === idx || (item?.ref && !routeOptions.public.some((route) => route.value === item.ref)) ? '__custom__' : item?.ref || ''}
+                              onChange={(e) => {
+                                if (e.target.value === '__custom__') setCustomDestinationIndex(idx);
+                                else { setCustomDestinationIndex(-1); setHeaderMenuItem(idx, { ref: e.target.value }); }
+                              }}
                             >
-                              <option value="">(Selecciona una ruta)</option>
-                              <optgroup label="Público">
+                              <option value="">Selecciona una página</option>
+                              <optgroup label="Páginas públicas">
                                 {routeOptions.public.map((r) => (
                                   <option key={r.value} value={r.value}>
                                     {r.label} — {r.value}
                                   </option>
                                 ))}
                               </optgroup>
-                              <optgroup label="Admin">
-                                {routeOptions.admin.map((r) => (
-                                  <option key={r.value} value={r.value}>
-                                    {r.label} — {r.value}
-                                  </option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Utilidades">
-                                {routeOptions.util.map((r) => (
-                                  <option key={r.value} value={r.value}>
-                                    {r.label} — {r.value}
-                                  </option>
-                                ))}
-                              </optgroup>
+                              <option value="__custom__">Escribir enlace personalizado…</option>
                             </select>
-
-                            <input
-                              className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-                              value={item?.ref || ""}
-                              onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
-                              placeholder="Ej: /lo-nuevo"
-                            />
                           </label>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 xl:justify-end">
-                          <button
-                            type="button"
-                            onClick={() => moveHeaderMenuItem(idx, idx - 1)}
-                            className="rounded-xl border border-gray-300 px-3 py-2 text-sm transition hover:bg-gray-50"
-                            title="Subir"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveHeaderMenuItem(idx, idx + 1)}
-                            className="rounded-xl border border-gray-300 px-3 py-2 text-sm transition hover:bg-gray-50"
-                            title="Bajar"
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeHeaderMenuItem(idx)}
-                            className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700 transition hover:bg-red-50"
-                            title="Eliminar"
-                          >
-                            Eliminar
-                          </button>
+                          {(customDestinationIndex === idx || (item?.ref && !routeOptions.public.some((route) => route.value === item.ref))) &&
+                            <Input label="Ruta o URL" value={item?.ref || ''}
+                              onChange={(e) => setHeaderMenuItem(idx, { ref: e.target.value })}
+                              placeholder="/producto/123 o https://sitio.com" />}
                         </div>
                       </div>
 
-                      <div className="mt-2 text-xs text-gray-500">
-                        Tip: para productos usa <span className="font-mono">/producto/:id</span>{" "}
-                        o <span className="font-mono">/p/:id</span>.
+                      <div className="appearance-header__menu-icon-editor">
+                        <span className="appearance-header__menu-icon-sample"><MobileMenuLinkIcon name={item?.icon} color={item?.iconColor || theme?.header?.mobileMenuAccentColor || '#ac7950'} size={25} /></span>
+                        <label className="appearance-header__menu-icon-select">
+                          <span>Ícono en menú móvil</span>
+                          <select value={normalizeMobileMenuIcon(item?.icon)}
+                            onChange={(e) => setHeaderMenuItem(idx, { icon: e.target.value })}
+                            aria-label={`Ícono móvil para ${item?.title || `enlace ${idx + 1}`}`}>
+                            <optgroup label="Moda y accesorios">
+                              {MOBILE_MENU_ICON_OPTIONS.filter((option) => option.group === 'fashion')
+                                .map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </optgroup>
+                            <optgroup label="Otras categorías">
+                              {MOBILE_MENU_ICON_OPTIONS.filter((option) => option.group !== 'fashion')
+                                .map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </optgroup>
+                          </select>
+                        </label>
+                        <label className="appearance-header__menu-icon-color">
+                          <span>Color del ícono</span>
+                          <span><input type="color" aria-label={`Color del ícono móvil para ${item?.title || `enlace ${idx + 1}`}`}
+                            value={pickerColor(item?.iconColor || theme?.header?.mobileMenuAccentColor)}
+                            onChange={(e) => setHeaderMenuItem(idx, { iconColor: e.target.value })} />
+                            <small>{normalizeMobileMenuIconColor(item?.iconColor) || 'Color general'}</small></span>
+                        </label>
+                        {item?.iconColor && <button type="button" className="appearance-header__menu-icon-reset"
+                          onClick={() => setHeaderMenuItem(idx, { iconColor: '' })}>Usar color general</button>}
                       </div>
+
+                      </div>}
                     </div>
                   ))}
+                  <p className="appearance-header__menu-hint">Para enlazar un producto, usa su ruta real (por ejemplo, /producto/123).</p>
                 </div>
               )}
             </div>
           </section>
         )}
+        </fieldset>
       </div>
     </div>
   );

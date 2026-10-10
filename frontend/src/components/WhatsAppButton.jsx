@@ -1,5 +1,9 @@
 // src/components/WhatsAppButton.jsx
 import React from "react";
+import WhatsAppGlyph from "./WhatsAppGlyph";
+import { resolveWhatsAppHref } from './whatsappLink';
+import "./storefrontLiquidGlass.css";
+import "./whatsappButton.css";
 
 function getShadowValue(shadow) {
   if (shadow === "none") return "none";
@@ -17,10 +21,9 @@ function getAnimationName(animation) {
 export default function WhatsAppButton({ config }) {
   const safeConfig = config && typeof config === "object" ? config : {};
 
-  const enabled = safeConfig.enabled !== false;
-
-  const phone = String(safeConfig.phone || "").replace(/\D/g, "");
-  const message = encodeURIComponent(safeConfig.message || "");
+  const href = resolveWhatsAppHref(safeConfig);
+  const greeting = String(safeConfig.greeting ?? "¡Hola! ¿En qué podemos ayudarte?").trim().slice(0, 120);
+  const greetingId = React.useId();
 
   const isLeft = safeConfig.position === "left";
 
@@ -28,17 +31,20 @@ export default function WhatsAppButton({ config }) {
     ? Number(safeConfig.bottomPx)
     : 24;
 
-  const sizePx = Number.isFinite(Number(safeConfig.sizePx))
-    ? Number(safeConfig.sizePx)
-    : 56;
+  const configuredSize = Number(safeConfig.sizePx);
+  const sizePx = Number.isFinite(configuredSize) ? Math.max(44, Math.min(140, configuredSize)) : 56;
+  const showBackground = safeConfig.showBackground !== false;
 
   const bgColor = safeConfig.bgColor || "#25D366";
 
   const useCustomImage = safeConfig.useCustomImage === true;
   const imageUrl = String(safeConfig.imageUrl || "").trim();
+  const [imageFailed, setImageFailed] = React.useState(false);
+  React.useEffect(() => setImageFailed(false), [imageUrl]);
 
-  const iconSizePercent = Number.isFinite(Number(safeConfig.iconSizePercent))
-    ? Number(safeConfig.iconSizePercent)
+  const configuredIconSize = Number(safeConfig.iconSizePercent);
+  const iconSizePercent = Number.isFinite(configuredIconSize)
+    ? Math.max(20, Math.min(100, configuredIconSize))
     : 80;
 
   const borderRadiusPx = Number.isFinite(Number(safeConfig.borderRadiusPx))
@@ -53,10 +59,8 @@ export default function WhatsAppButton({ config }) {
   const shadow = safeConfig.shadow || "soft";
   const animation = safeConfig.animation || "none";
 
-  if (!enabled || !phone) return null;
-
-  const href = `https://wa.me/${phone}${message ? `?text=${message}` : ""}`;
-  const internalIconSizePx = (sizePx * iconSizePercent) / 100;
+  if (!href) return null;
+  const internalIconSizePx = showBackground ? (sizePx * iconSizePercent) / 100 : sizePx;
   const animationName = getAnimationName(animation);
 
   return (
@@ -83,26 +87,29 @@ export default function WhatsAppButton({ config }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed flex items-center justify-center transition-transform hover:scale-110"
+        className={showBackground ? "whatsapp-button storefront-liquid-icon transition-transform hover:scale-105" : "whatsapp-button whatsapp-button--plain transition-transform hover:scale-105"}
         style={{
+          position: "fixed",
           bottom: `${bottomPx}px`,
           width: `${sizePx}px`,
           height: `${sizePx}px`,
-          backgroundColor: bgColor,
+          "--liquid-tint": bgColor,
           zIndex: 9999,
-          borderRadius: `${borderRadiusPx}px`,
-          border: `${borderWidthPx}px solid ${borderColor}`,
-          boxShadow: getShadowValue(shadow),
+          borderRadius: showBackground ? `${borderRadiusPx}px` : "0",
+          border: showBackground ? `${borderWidthPx}px solid ${borderColor}` : "0",
+          boxShadow: showBackground && shadow !== "none" ? getShadowValue(shadow) : "none",
           animation: animationName ? `${animationName} 2s ease-in-out infinite` : "none",
           [isLeft ? "left" : "right"]: "24px",
-          overflow: "hidden",
+          overflow: showBackground ? "hidden" : "visible",
         }}
         aria-label="WhatsApp"
+        aria-describedby={greeting ? greetingId : undefined}
       >
-        {useCustomImage && imageUrl ? (
+        {useCustomImage && imageUrl && !imageFailed ? (
           <img
             src={imageUrl}
             alt="WhatsApp"
+            onError={() => setImageFailed(true)}
             style={{
               width: `${internalIconSizePx}px`,
               height: `${internalIconSizePx}px`,
@@ -110,17 +117,21 @@ export default function WhatsAppButton({ config }) {
             }}
           />
         ) : (
-          <img
-            src="/icons/Whatsapp.svg"
-            alt="WhatsApp"
-            style={{
-              width: `${internalIconSizePx}px`,
-              height: `${internalIconSizePx}px`,
-              objectFit: "contain",
-            }}
-          />
+          <span style={{ color: "#0e7548", display: "grid", placeItems: "center" }}>
+            <WhatsAppGlyph size={internalIconSizePx} />
+          </span>
         )}
       </a>
+      {greeting && (
+        <span
+          id={greetingId}
+          role="tooltip"
+          className="whatsapp-button__greeting"
+          style={{ bottom: `min(${bottomPx + sizePx + 12}px, calc(100dvh - 96px))`, [isLeft ? "left" : "right"]: "24px" }}
+        >
+          {greeting}
+        </span>
+      )}
     </>
   );
 }

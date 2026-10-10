@@ -1,11 +1,14 @@
-import { adminFetch } from '../lib/api';
+import api, { adminFetch } from '../lib/api';
 // src/admin/AppearancePage.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from 'react-dom';
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
-import { fetchSiteSettings, saveSiteSettings } from "../lib/siteSettingsApi";
+import { fetchAppearanceSettings, saveSiteSettings } from "../lib/siteSettingsApi";
 import { applyTheme } from "../theme/applyTheme";
+import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
+import { validateHeaderMenu } from '../components/headerPresentation';
 import { normalizeGlobalConfig } from "./appearance/general/generalHelpers";
 import { API_BASE_URL } from "../config/apiBaseUrl";
 
@@ -13,7 +16,10 @@ import { API_BASE_URL } from "../config/apiBaseUrl";
 import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
-import AdminModuleHero from "./components/AdminModuleHero";
+import "./appearance/appearanceWorkspace.css";
+import useAdminPermissions from './security/useAdminPermissions';
+import AdminLoadingScreen from './loading/AdminLoadingScreen';
+import { getRememberedAdminLoader } from './loading/adminLoaderConfig';
 import {
   LOOK_SECTION_DEFAULTS,
   normalizeLookSection,
@@ -239,6 +245,10 @@ function buildThemeFromServer(themeRaw) {
     videoLoop: true,
     heightMode: "auto", // auto | fullscreen
     heightPx: 520,
+    tabletHeightMode: "fullscreen",
+    tabletHeightPx: 1180,
+    mobileHeightMode: "fullscreen",
+    mobileHeightPx: 844,
 
     imagePosX: 50,
     imagePosY: 50,
@@ -291,11 +301,17 @@ function buildThemeFromServer(themeRaw) {
 
       textColor: "",
       linkColor: "",
+      searchBgColor: "",
+      searchTextColor: "",
+      searchAccentColor: "",
+      searchBorderColor: "",
       menuAnimation: "soft",
 
       iconColor: "",
       iconHoverColor: "",
       iconAnimation: "soft",
+      iconImages: { account: "", favorites: "", cart: "" },
+      iconSizePx: 34,
 
       fontPreset: "",
       fontFamily: "",
@@ -303,14 +319,20 @@ function buildThemeFromServer(themeRaw) {
 
       logoLight: "",
       logoDark: "",
+      logoMode: "auto",
       logoHeightPx: 80,
+      surfaceShape: "attached",
+      cornerRadiusPx: 16,
+      liquidGlassEnabled: false,
+      glassStrength: 75,
 
       // ✅ NUEVO: menú móvil premium
-      mobileMenuBgColor: "#fffdfd",
-      mobileMenuTextColor: "#1f1f1f",
+      mobileMenuBgColor: "#fff4f3",
+      mobileMenuTextColor: "#4e1e39",
       mobileMenuBorderColor: "#e7c2cf",
-      mobileMenuAccentColor: "#b76e79",
-      mobileMenuMutedColor: "#8a6b74",
+      mobileMenuItemBorderColor: "#d2a997",
+      mobileMenuAccentColor: "#ac7950",
+      mobileMenuMutedColor: "#815269",
       mobileMenuTitleColor: "#1f1f1f",
 
       mobileMenuButtonBg: "#d8b2bf",
@@ -321,15 +343,25 @@ function buildThemeFromServer(themeRaw) {
       mobileMenuSocialBg: "#c98ea2",
       mobileMenuSocialIconColor: "#ffffff",
 
-      mobileMenuOverlayColor: "#000000",
-      mobileMenuOverlayOpacity: 0.35,
+      mobileMenuOverlayColor: "#54233d",
+      mobileMenuOverlayOpacity: 0.22,
 
       mobileMenuFontFamily: "",
       mobileMenuAnimation: "slide-left",
       mobileMenuAnimationDurationMs: 300,
+      mobileMenuTriggerIcon: 'classic',
+      mobileMenuTriggerAnimation: 'glide',
+      mobileMenuTriggerBgOpacity: 30,
+      mobileMenuTriggerMotionDurationMs: 440,
       mobileMenuWidthPercent: 88,
+      mobileMenuLayout: 'atelier-sheet',
 
       ...(t.header || {}),
+      iconSet: ['gold', 'wine', 'satin', 'porcelain'].includes(t.header?.iconSet) ? t.header.iconSet : 'gold',
+      iconOverrides: {
+        ...(t.header?.iconOverrides || {}),
+        ...(t.header?.iconSet === 'custom' ? { gold: { ...(t.header?.iconImages || {}), ...(t.header?.iconOverrides?.gold || {}) } } : {}),
+      },
     },
 
     // ✅ SECCIONES (Estrategia B)
@@ -363,7 +395,9 @@ function buildThemeFromServer(themeRaw) {
 
       sliderIntervalMs: Number.isFinite(Number(bannerRaw?.sliderIntervalMs))
         ? Number(bannerRaw.sliderIntervalMs)
-        : bannerDefaults.sliderIntervalMs,
+        : Number.isFinite(Number(bannerRaw?.autoplayMs))
+          ? Number(bannerRaw.autoplayMs)
+          : bannerDefaults.sliderIntervalMs,
       sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
     },
   };
@@ -418,7 +452,6 @@ function normalizeThemeForSave(theme) {
 
   // No mandes campos solo-UI al backend (evita inconsistencias)
   delete b.sliderIntervalMs;
-  delete b.sliderShowProgress;
 
   // Asegura imageUrl si el tipo es imagen (por si algún panel guardó en otro nombre)
   if (type === "image") {
@@ -460,8 +493,20 @@ function deepEqual(a, b) {
 }
 
 export default function AppearancePage() {
+  const { can } = useAdminPermissions();
+  const canEditAppearance = can('appearance:update');
+  const canEditSections = can('appearance:sections');
+  const canEditMenus = can('appearance:menus');
+  const canEditAny = canEditAppearance || canEditSections || canEditMenus;
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [serverSnapshot, setServerSnapshot] = useState(null);
+  const [appearanceRevision, setAppearanceRevision] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveConflict, setSaveConflict] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(null);
+  const savingRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState("general");
   const [theme, setTheme] = useState(buildThemeFromServer(null));
@@ -470,9 +515,41 @@ export default function AppearancePage() {
   const [menus, setMenus] = useState(buildMenusFromServer(null));
   const [menusSnapshot, setMenusSnapshot] = useState(buildMenusFromServer(null));
 
-  // ✅ Upload state (LOGO)
-  const [logoLightFile, setLogoLightFile] = useState(null);
-  const [logoDarkFile, setLogoDarkFile] = useState(null);
+  const changedAreas = useMemo(() => {
+    if (!serverSnapshot) return [];
+    const current = normalizeThemeForSave(theme);
+    const original = normalizeThemeForSave(serverSnapshot);
+    const changed = new Set();
+    for (const key of Object.keys(current)) {
+      if (!deepEqual(current[key], original[key])) {
+        changed.add(['header', 'banner', 'sections', 'footer'].includes(key) ? key : 'general');
+      }
+    }
+    if (!deepEqual(menus.header, menusSnapshot.header)) changed.add('header');
+    if (!deepEqual(menus.footer, menusSnapshot.footer)) changed.add('footer');
+    return [...changed];
+  }, [theme, serverSnapshot, menus, menusSnapshot]);
+
+  useEffect(() => {
+    if (changedAreas.length && ['success', 'info'].includes(saveMessage?.type)) setSaveMessage(null);
+  }, [changedAreas.length, saveMessage]);
+
+  useEffect(() => {
+    if (!saveMessage || saveMessage.type === 'error') return undefined;
+    const timeout = window.setTimeout(() => setSaveMessage((current) => current === saveMessage ? null : current), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [saveMessage]);
+
+  useEffect(() => {
+    if (!changedAreas.length) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [changedAreas.length]);
+
   const [uploading, setUploading] = useState(false);
 
   // ✅ Páginas dinámicas para rutas del Header
@@ -482,53 +559,54 @@ export default function AppearancePage() {
   const routeOptions = useMemo(
     () => ({
       public: [
-        { label: "Home", value: "/" },
+        { label: "Inicio", value: "/" },
         { label: "Lo Nuevo", value: "/lo-nuevo" },
         { label: "Carrito", value: "/carrito" },
         { label: "Favoritos", value: "/favoritos" },
-        { label: "Checkout", value: "/checkout" },
-        { label: "Gracias", value: "/gracias" },
-        { label: "Producto (por id o slug)", value: "/producto/:id" },
-        { label: "Producto corto (por id o slug)", value: "/p/:id" },
 
         ...dynamicPages.map((page) => ({
           label: `Página · ${page.name}`,
           value: `/pagina/${page.slug}`,
         })),
       ],
-      admin: [
-        { label: "Login admin", value: "/admin/login" },
-        { label: "Admin · Dashboard", value: "/admin/dashboard" },
-        { label: "Admin · Productos", value: "/admin/productos" },
-        { label: "Admin · Productos (nuevo)", value: "/admin/productos/nuevo" },
-        { label: "Admin · Productos (editar)", value: "/admin/productos/editar/:id" },
-        { label: "Admin · Carritos", value: "/admin/carritos" },
-        { label: "Admin · Favoritos", value: "/admin/favoritos" },
-        { label: "Admin · Órdenes", value: "/admin/ordenes" },
-        { label: "Admin · Apariencia", value: "/admin/apariencia" },
-      ],
-      util: [{ label: "Probe Site Settings", value: "/probe-site-settings" }],
     }),
     [dynamicPages]
   );
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
-        const settings = await fetchSiteSettings();
+        const settings = await fetchAppearanceSettings();
+        if (!settings?.theme || !settings?.menus ||
+          !Number.isSafeInteger(settings.appearanceRevision) || settings.appearanceRevision < 0) {
+          throw new Error("La configuración de apariencia llegó incompleta.");
+        }
+        if (cancelled) return;
         const merged = buildThemeFromServer(settings?.theme);
         setTheme(merged);
         setServerSnapshot(merged);
+        setAppearanceRevision(settings.appearanceRevision);
+        setSaveConflict(false);
+        setSaveMessage(null);
         applyTheme(merged);
 
         const mergedMenus = buildMenusFromServer(settings?.menus);
         setMenus(mergedMenus);
         setMenusSnapshot(mergedMenus);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("No se pudo cargar Apariencia:", error);
+          setLoadError(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [loadAttempt]);
 
   useEffect(() => {
     (async () => {
@@ -582,9 +660,17 @@ export default function AppearancePage() {
     });
   }, []);
 
-  const onPreview = () => applyTheme(theme);
+  const onPreview = () => {
+    applyTheme(theme);
+    if (!changedAreas.length) setSaveMessage({ type: 'info', text: 'La vista previa ya muestra la configuración guardada.' });
+  };
 
   const onReset = () => {
+    if (savingRef.current || saveConflict) return;
+    if (!changedAreas.length) {
+      setSaveMessage({ type: 'info', text: 'No hay cambios por descartar.' });
+      return;
+    }
     if (serverSnapshot) {
       const merged = buildThemeFromServer(serverSnapshot);
       setTheme(merged);
@@ -594,8 +680,7 @@ export default function AppearancePage() {
       const mm = buildMenusFromServer(menusSnapshot);
       setMenus(mm);
     }
-    setLogoLightFile(null);
-    setLogoDarkFile(null);
+    setSaveMessage(null);
   };
 
   // ✅ Helpers del menú header
@@ -617,6 +702,7 @@ export default function AppearancePage() {
         title: "Nuevo botón",
         type: "url",
         ref: "/",
+        icon: "grid",
         children: [],
       });
       return draft;
@@ -645,68 +731,67 @@ export default function AppearancePage() {
 
   // ✅ Subir archivo a Cloudinary usando tu backend (campo por defecto: "image")
   const uploadToCloudinaryViaBackend = async (file, fieldName = "image") => {
-    const url = `${API_BASE}/api/uploads`;
     const form = new FormData();
     form.append(fieldName, file);
 
-    const res = await adminFetch(url, {
-      method: "POST",
-      body: form,
-    });
-
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Error subiendo archivo: HTTP ${res.status} ${t}`);
+    let data;
+    try {
+      ({ data } = await api.post('/api/uploads', form));
+    } catch (error) {
+      throw new Error(error?.userMessage || error?.response?.data?.message || error?.response?.data?.error || 'No se pudo subir la imagen. Inténtalo de nuevo.');
     }
 
-    const data = await res.json();
     if (!data?.url) throw new Error("El backend no devolvió { url }");
     return data.url;
   };
 
-  const onUploadLogo = async (which) => {
+  const onSave = async () => {
+    if (savingRef.current || saveConflict || serverSnapshot === null || appearanceRevision === null || uploading) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveConflict(false);
+    setSaveMessage(null);
+    const showValidation = (message) => setSaveMessage({ type: 'error', text: message });
     try {
-      const file = which === "light" ? logoLightFile : logoDarkFile;
-      if (!file) {
-        alert("Selecciona una imagen primero.");
+      const normalizedTheme = normalizeThemeForSave(theme);
+      const originalTheme = normalizeThemeForSave(serverSnapshot);
+      const changedTheme = {};
+      for (const key of Object.keys(normalizedTheme)) {
+        if (!deepEqual(normalizedTheme[key], originalTheme[key])) {
+          changedTheme[key] = normalizedTheme[key];
+        }
+      }
+
+      const changedMenus = {};
+      if (!deepEqual(menus.header, menusSnapshot.header)) {
+        changedMenus.header = (menus.header || []).map((it) => ({
+          ...it,
+          title: String(it?.title || '').trim(),
+          type: String(it?.type || 'url').trim(),
+          ref: String(it?.ref || '').trim(),
+          children: Array.isArray(it?.children) ? it.children : [],
+        }));
+      }
+      if (!deepEqual(menus.footer, menusSnapshot.footer)) changedMenus.footer = menus.footer;
+
+      const payload = { appearanceRevision };
+      if (Object.keys(changedTheme).length) payload.theme = changedTheme;
+      if (Object.keys(changedMenus).length) payload.menus = changedMenus;
+      if (!payload.theme && !payload.menus) {
+        setSaveMessage({ type: 'info', text: 'No hay cambios por guardar.' });
         return;
       }
 
-      setUploading(true);
-      const uploadedUrl = await uploadToCloudinaryViaBackend(file, "image");
-
-      if (which === "light") {
-        setPath("header.logoLight", uploadedUrl);
-        setLogoLightFile(null);
-      } else {
-        setPath("header.logoDark", uploadedUrl);
-        setLogoDarkFile(null);
+      if (changedMenus.header) {
+        const menuError = validateHeaderMenu(changedMenus.header);
+        if (menuError) { showValidation(menuError); return; }
       }
 
-      applyTheme({
-        ...theme,
-        header: {
-          ...(theme.header || {}),
-          [which === "light" ? "logoLight" : "logoDark"]: uploadedUrl,
-        },
-      });
-
-      alert("Logo subido a Cloudinary ✅ (ahora dale Guardar para dejarlo fijo)");
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || "Error subiendo logo");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const onSave = async () => {
-    try {
       const hexOk = (v) => !v || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
 
       const c = theme.colors || {};
-      if (![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
-        alert("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
+      if (changedTheme.colors && ![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
+        showValidation("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
         return;
       }
 
@@ -715,6 +800,10 @@ export default function AppearancePage() {
         h.bgColor,
         h.textColor,
         h.linkColor,
+        h.searchBgColor,
+        h.searchTextColor,
+        h.searchAccentColor,
+        h.searchBorderColor,
         h.iconColor,
         h.iconHoverColor,
         h.mobileMenuBgColor,
@@ -732,106 +821,154 @@ export default function AppearancePage() {
         h.mobileMenuOverlayColor,
       ];
 
-      if (!headerColorList.every(hexOk)) {
-        alert("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
+      if (changedTheme.header && !headerColorList.every(hexOk)) {
+        showValidation("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
+        return;
+      }
+
+      if (changedTheme.header && !['gold', 'wine', 'satin', 'porcelain'].includes(h.iconSet)) {
+        showValidation('Selecciona un modelo válido para los íconos.');
+        return;
+      }
+      if (changedTheme.header && (!Number.isInteger(h.iconSizePx) || h.iconSizePx < 28 || h.iconSizePx > 40)) {
+        showValidation('El tamaño de los íconos debe estar entre 28 y 40 px.');
+        return;
+      }
+      if (changedTheme.header && !Object.values(h.iconOverrides || {}).every((icons) =>
+        Object.values(icons || {}).every((url) => !url || /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url))
+      )) {
+        showValidation('Carga las imágenes personalizadas en Cloudinary.');
         return;
       }
 
       const op = Number(h.bgOpacity);
-      if (Number.isNaN(op) || op < 0 || op > 1) {
-        alert("La transparencia del header debe estar entre 0 y 1.");
+      if (changedTheme.header && (Number.isNaN(op) || op < 0 || op > 1)) {
+        showValidation("La transparencia del header debe estar entre 0 y 1.");
         return;
       }
 
       const mobileOverlayOpacity = Number(h.mobileMenuOverlayOpacity);
-      if (
+      if (changedTheme.header && (
         Number.isNaN(mobileOverlayOpacity) ||
         mobileOverlayOpacity < 0 ||
         mobileOverlayOpacity > 1
-      ) {
-        alert("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
+      )) {
+        showValidation("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
         return;
       }
 
       const lh = Number(h.logoHeightPx);
-      if (Number.isNaN(lh) || lh < 30 || lh > 160) {
-        alert("El tamaño del logo debe estar entre 30 y 160 px.");
+      if (changedTheme.header && (Number.isNaN(lh) || lh < 30 || lh > 160)) {
+        showValidation("El tamaño del logo debe estar entre 30 y 160 px.");
+        return;
+      }
+
+      if (changedTheme.header && !['attached', 'floating'].includes(h.surfaceShape)) {
+        showValidation('Elige una forma válida para el encabezado.');
+        return;
+      }
+      if (changedTheme.header && (h.liquidGlassEnabled !== true && h.liquidGlassEnabled !== false)) {
+        showValidation('Revisa la opción de vidrio líquido.');
+        return;
+      }
+      const cornerRadius = Number(h.cornerRadiusPx);
+      const glassStrength = Number(h.glassStrength);
+      if (changedTheme.header && (!Number.isFinite(cornerRadius) || cornerRadius < 0 || cornerRadius > 48 || !Number.isFinite(glassStrength) || glassStrength < 0 || glassStrength > 100)) {
+        showValidation('El redondeo debe estar entre 0 y 48 px y la intensidad del vidrio entre 0 y 100%.');
         return;
       }
 
       const mobileAnimDuration = Number(h.mobileMenuAnimationDurationMs);
-      if (
+      if (changedTheme.header && (
         Number.isNaN(mobileAnimDuration) ||
         mobileAnimDuration < 120 ||
         mobileAnimDuration > 1200
-      ) {
-        alert("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
+      )) {
+        showValidation("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
         return;
       }
 
       const mobileWidth = Number(h.mobileMenuWidthPercent);
-      if (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100) {
-        alert("El ancho del menú móvil debe estar entre 60% y 100%.");
+      if (changedTheme.header && (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100)) {
+        showValidation("El ancho del menú móvil debe estar entre 60% y 100%.");
         return;
       }
 
       // ✅ Validación básica banner (tipo + altura + sliderInterval)
       const b = theme.banner || {};
       const bannerType = String(b.type || "slider");
-      if (!["slider", "image", "video"].includes(bannerType)) {
-        alert("El tipo de banner debe ser: slider, image o video.");
+      if (changedTheme.banner && !["slider", "image", "video"].includes(bannerType)) {
+        showValidation("El tipo de banner debe ser: slider, image o video.");
         return;
       }
       const hm = String(b.heightMode || "auto");
-      if (!["auto", "fullscreen"].includes(hm)) {
-        alert("heightMode debe ser: auto o fullscreen.");
+      if (changedTheme.banner && !["auto", "fullscreen"].includes(hm)) {
+        showValidation("El modo de altura del banner debe ser automático o pantalla completa.");
         return;
       }
-      if (hm === "auto") {
+      if (changedTheme.banner && hm === "auto") {
         const hp = Number(b.heightPx);
         if (Number.isNaN(hp) || hp < 240 || hp > 1200) {
-          alert("La altura del banner (px) debe estar entre 240 y 1200.");
+          showValidation("La altura del banner debe estar entre 240 y 1200 px.");
           return;
         }
       }
-      if (bannerType === "slider") {
+      for (const [label, modeKey, heightKey] of [
+        ["tableta", "tabletHeightMode", "tabletHeightPx"],
+        ["móvil", "mobileHeightMode", "mobileHeightPx"],
+      ]) {
+        if (!changedTheme.banner) break;
+        const mode = b[modeKey] || "fullscreen";
+        const height = Number(b[heightKey]);
+        if (!["auto", "fullscreen"].includes(mode) || (mode === "auto" && (!Number.isFinite(height) || height < 240 || height > 1200))) {
+          showValidation(`La altura de ${label} debe estar entre 240 y 1200 px o usar pantalla completa.`);
+          return;
+        }
+      }
+      if (changedTheme.banner && bannerType === "slider") {
         const iv = Number(b.sliderIntervalMs);
         if (Number.isFinite(iv) && (iv < 1000 || iv > 15000)) {
-          alert("En slider: el intervalo (ms) debe estar entre 1000 y 15000.");
+          showValidation("El intervalo entre diapositivas debe estar entre 1000 y 15000 ms.");
           return;
         }
         const slides = Array.isArray(b.slides) ? b.slides : [];
         const bad = slides.find((s) => s && s.image === "");
         if (bad) {
-          alert("En slider: cada slide debe tener una imagen (o elimina el slide vacío).");
+          showValidation("Cada diapositiva debe tener una imagen; elimina las que estén vacías.");
           return;
         }
       }
 
-      const cleanedHeaderMenu = (menus?.header || []).map((it) => ({
-        ...it,
-        title: String(it?.title || "").trim(),
-        type: String(it?.type || "url").trim(),
-        ref: String(it?.ref || "").trim(),
-        children: Array.isArray(it?.children) ? it.children : [],
-      }));
-
-      const payload = {
-        theme: normalizeThemeForSave(theme), // ✅ FIX CLAVE
-        menus: {
-          ...(menus || {}),
-          header: cleanedHeaderMenu,
-        },
-      };
-
       const saved = await saveSiteSettings(payload);
+      if (!Number.isSafeInteger(saved?.appearanceRevision)) {
+        throw new Error('La respuesta de guardado no incluyó la revisión de Apariencia. Recarga antes de guardar de nuevo.');
+      }
+
+      // El backend puede seguir ejecutando un modelo antiguo y descartar campos
+      // nuevos de las tarjetas aunque el PUT responda correctamente.
+      const requestedCards = changedTheme.banner?.templateConfigs?.atelier?.cards || [];
+      const storedCards = saved?.theme?.banner?.templateConfigs?.atelier?.cards || [];
+      const positionWasLost = requestedCards.some((card, index) =>
+        ['desktop', 'tablet', 'mobile'].some((device) => {
+          const requested = card?.position?.[device];
+          if (!requested) return false;
+          const stored = storedCards[index]?.position?.[device];
+          return Number(stored?.x) !== Number(requested.x) || Number(stored?.y) !== Number(requested.y);
+        })
+      );
+      if (positionWasLost) {
+        setAppearanceRevision(saved.appearanceRevision);
+        setServerSnapshot(buildThemeFromServer(saved.theme));
+        throw new Error('El servidor no conservó la posición de las tarjetas. Reinicia el backend con la versión actualizada y vuelve a guardar; los cambios siguen aquí en el editor.');
+      }
 
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
+      setAppearanceRevision(saved.appearanceRevision);
       setTheme(merged);
       applyTheme(merged);
 
-      const mergedMenus = buildMenusFromServer(saved?.menus || payload.menus);
+      const mergedMenus = buildMenusFromServer(saved?.menus || menus);
       setMenus(mergedMenus);
       setMenusSnapshot(mergedMenus);
 
@@ -841,61 +978,66 @@ export default function AppearancePage() {
         window.dispatchEvent(new Event("rb_site_settings_updated"));
       } catch (_) {}
 
-      alert("Apariencia guardada ✅");
+      setSaveMessage({ type: 'success', text: 'Cambios guardados. La tienda pública ya usa esta configuración.' });
     } catch (err) {
       console.error("❌ Error guardando apariencia:", err);
-      alert(err.userMessage || "Error al guardar apariencia.");
+      if (['APPEARANCE_REVISION_CONFLICT', 'APPEARANCE_REVISION_REQUIRED'].includes(err?.response?.data?.error)) {
+        setSaveConflict(true);
+      } else {
+        setSaveMessage({ type: 'error', text: err.userMessage || err.message || 'Error al guardar apariencia.' });
+      }
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
-  if (loading) return <div className="p-6">Cargando apariencia…</div>;
+  if (loading) return <AdminLoadingScreen compact model={getRememberedAdminLoader()} message="Cargando Apariencia…" />;
+  if (loadError) {
+    return (
+      <div className="admin-widget-surface mx-auto max-w-xl rounded-2xl p-6" role="alert">
+        <h1 className="text-xl font-semibold">No se pudo cargar Apariencia</h1>
+        <p className="mt-2 text-sm">La configuración guardada no está disponible. Vuelve a intentar para editarla sin perder el diseño vigente.</p>
+        <button type="button" className="mt-4 rounded-xl px-4 py-2 font-semibold" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+          Reintentar carga
+        </button>
+      </div>
+    );
+  }
 
-  // ✅ Tabs: reemplazado Home/Body por Secciones
   const tabs = [
-    { id: "general", label: "General", detail: "Colores y tipografías", icon: Palette },
-    { id: "header", label: "Encabezado", detail: "Logo y navegación", icon: LayoutTemplate },
-    { id: "banner", label: "Banner", detail: "Portada visual", icon: Image },
-    { id: "sections", label: "Secciones", detail: "Contenido de inicio", icon: Rows3 },
-    { id: "footer", label: "Pie de página", detail: "Cierre y enlaces", icon: Type },
+    { id: "general", label: "General", detail: "WhatsApp y carga", icon: Palette, help: "Configura WhatsApp, navegación y pantalla de carga." },
+    { id: "header", label: "Encabezado", detail: "Logo y menú", icon: LayoutTemplate, help: "Configura el logo y los enlaces del menú." },
+    { id: "banner", label: "Portada", detail: "Imagen o video", icon: Image, help: "Configura la primera imagen o video que ve el cliente." },
+    { id: "sections", label: "Secciones", detail: "Página de inicio", icon: Rows3, help: "Organiza el contenido debajo de la portada." },
+    { id: "footer", label: "Pie de página", detail: "Datos y enlaces", icon: Type, help: "Configura la información del final de la tienda." },
   ];
+  const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const canEditCurrentArea = activeTab === 'sections'
+    ? canEditSections
+    : activeTab === 'header'
+      ? canEditAppearance || canEditMenus
+      : canEditAppearance;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
-      <AdminModuleHero
-        icon={Palette}
-        eyebrow="Identidad visual de la tienda"
-        title="Apariencia del sitio"
-        description="Personaliza el estilo público de la tienda y revisa cada cambio antes de guardarlo."
-        actions={(
-          <>
-          <button
-            onClick={onPreview}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
-            type="button"
-          >
-            <Eye size={17} /> Aplicar
+    <div className="appearance-workspace mx-auto max-w-6xl p-4 md:p-6">
+      {saveConflict && (
+        <div className="admin-widget-surface rounded-2xl p-4" role="alert">
+          <p>La Apariencia guardada cambió mientras editabas. Tus cambios siguen en este panel; no se sobrescribió la versión guardada.</p>
+          <button type="button" className="mt-3 rounded-xl border px-4 py-2" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+            Cargar versión actual y descartar mis cambios
           </button>
-          <button
-            onClick={onSave}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white"
-            style={{ background: 'var(--admin-primary)' }}
-            type="button"
-          >
-            <Save size={17} /> Guardar
-          </button>
-          <button
-            onClick={onReset}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-            style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
-            type="button"
-          >
-            <RotateCcw size={17} /> Restaurar
-          </button>
-          </>
-        )}
-      >
-        <nav className="admin-module-hero__metrics" aria-label="Áreas de apariencia">
+        </div>
+      )}
+      <header className="appearance-workspace__header">
+        <div className="appearance-workspace__intro">
+          <h1>Apariencia de la tienda</h1>
+          <p>
+            {changedAreas.length > 0 && <span className="appearance-workspace__pending" title={`Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.`}>{changedAreas.length} {changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar</span>}
+            <span className="appearance-workspace__help">{canEditCurrentArea ? currentTab.help : 'Solo lectura para tu perfil.'}</span>
+          </p>
+        </div>
+        <nav className="appearance-navigation" aria-label="Áreas de apariencia">
           {tabs.map((tab) => {
             const TabIcon = tab.icon;
             const selected = activeTab === tab.id;
@@ -903,26 +1045,49 @@ export default function AppearancePage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="admin-module-hero__metric admin-module-hero__nav-card"
+                className="appearance-navigation__item"
                 data-active={selected}
+                aria-pressed={selected}
+                aria-label={`${tab.label} ${tab.detail}`}
+                title={`${tab.label}: ${tab.detail}`}
                 type="button"
               >
-                <TabIcon size={19} />
+                <TabIcon size={18} aria-hidden="true" />
                 <span>
                   <strong>{tab.label}</strong>
                   <small>{tab.detail}</small>
                 </span>
+                {changedAreas.includes(tab.id) && <span className="appearance-navigation__pending" aria-label="Cambios sin guardar" title="Cambios sin guardar" />}
               </button>
             );
           })}
         </nav>
-      </AdminModuleHero>
+      </header>
+      {saveMessage && createPortal(
+        <div className="appearance-feedback" data-feedback={saveMessage.type} role={saveMessage.type === 'error' ? 'alert' : 'status'} aria-live={saveMessage.type === 'error' ? 'assertive' : 'polite'}>
+          <span className="appearance-feedback__indicator" aria-hidden="true" />
+          <div><strong>{saveMessage.type === 'success' ? 'Cambios guardados' : saveMessage.type === 'error' ? 'Revisa los cambios' : 'Estado de Apariencia'}</strong><p>{saveMessage.text}</p></div>
+          <button type="button" onClick={() => setSaveMessage(null)} aria-label="Cerrar aviso" title="Cerrar aviso">×</button>
+        </div>, document.body
+      )}
+      {createPortal(
+        <div className="appearance-action-dock" role="group" aria-label="Acciones de apariencia">
+          <button onClick={onPreview} disabled={saving} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><PremiumAdminNavIcon icon={Eye} compact /></button>
+          <button onClick={onReset} disabled={saving || saveConflict} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios"><PremiumAdminNavIcon icon={RotateCcw} compact /></button>
+          <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'}><PremiumAdminNavIcon icon={Save} compact /></button>
+        </div>, document.body
+      )}
 
       {/* Contenido */}
-      <main className="admin-widget-surface min-w-0 overflow-hidden rounded-[28px] border">
-        <div className="p-4 md:p-5 min-w-0">
+      <main className="appearance-workspace__editor min-w-0">
+        <fieldset disabled={saving} className="min-w-0">
+        <div className="min-w-0">
           {/* GENERAL */}
-          {activeTab === "general" && <GeneralPanel theme={theme} setPath={setPath} />}
+          {activeTab === "general" && <fieldset disabled={!canEditAppearance}><GeneralPanel
+            theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading}
+            savedRevision={appearanceRevision}
+            uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
+          /></fieldset>}
 
           {/* HEADER */}
           {activeTab === "header" && (
@@ -932,31 +1097,35 @@ export default function AppearancePage() {
               menus={menus}
               routeOptions={routeOptions}
               uploading={uploading}
-              onPreview={onPreview}
-              onUploadLogo={onUploadLogo}
-              setLogoLightFile={setLogoLightFile}
-              setLogoDarkFile={setLogoDarkFile}
+              setUploading={setUploading}
+              savedRevision={appearanceRevision}
+              uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
               addHeaderMenuItem={addHeaderMenuItem}
               removeHeaderMenuItem={removeHeaderMenuItem}
               moveHeaderMenuItem={moveHeaderMenuItem}
               setHeaderMenuItem={setHeaderMenuItem}
+              canEditTheme={canEditAppearance}
+              canEditMenus={canEditMenus}
             />
           )}
 
           {/* ✅ BANNER */}
           {activeTab === "banner" && (
+            <fieldset disabled={!canEditAppearance}>
             <BannerPanel
               theme={theme}
               setPath={setPath}
+              disabled={saving || !canEditAppearance}
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
-              onPreview={onPreview}
             />
+            </fieldset>
           )}
 
           {/* ✅ SECCIONES (reemplaza Home/Body) */}
           {activeTab === "sections" && (
+            <fieldset disabled={!canEditSections}>
             <SectionsPanel
               theme={theme}
               setPath={setPath}
@@ -964,10 +1133,12 @@ export default function AppearancePage() {
               setUploading={setUploading}
               uploadToCloudinary={uploadToCloudinaryViaBackend}
             />
+            </fieldset>
           )}
 
           {/* ✅ FOOTER separado */}
           {activeTab === "footer" && (
+            <fieldset disabled={!canEditAppearance}>
             <FooterPanel
               theme={theme}
               setPath={setPath}
@@ -975,42 +1146,10 @@ export default function AppearancePage() {
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
             />
+            </fieldset>
           )}
         </div>
-
-        {/* Barra inferior sticky */}
-        <div className="border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="p-3 flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-end">
-            <div className="text-xs text-gray-500 md:mr-auto">
-              Consejo: usa <span className="font-medium">Ver cambios</span> para previsualizar y
-              luego <span className="font-medium">Guardar</span>.
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={onPreview}
-                className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
-                type="button"
-              >
-                Aplicar (vista previa)
-              </button>
-              <button
-                onClick={onSave}
-                className="px-4 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700"
-                type="button"
-              >
-                Guardar cambios
-              </button>
-              <button
-                onClick={onReset}
-                className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50"
-                type="button"
-              >
-                Reset a valores del servidor
-              </button>
-            </div>
-          </div>
-        </div>
+        </fieldset>
       </main>
     </div>
   );

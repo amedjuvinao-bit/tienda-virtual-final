@@ -1,0 +1,97 @@
+/* Reuse the banner button's pointer-following glass light on storefront chrome. */
+.storefront-header-surface,
+.storefront-liquid-icon[data-button-animation] {
+  --rb-edge-a: rgba(255,245,252,.98);
+  --rb-edge-b: rgba(248,187,226,.83);
+  --rb-edge-c: rgba(174,221,255,.86);
+  --rb-edge-d: rgba(255,255,255,.8);
+  --rb-light-x: 50%;
+  --rb-light-y: 0%;
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='pearl'] {
+  --rb-edge-a: rgba(255,255,255,.98); --rb-edge-b: rgba(234,225,209,.82);
+  --rb-edge-c: rgba(255,255,255,.86); --rb-edge-d: rgba(203,214,223,.76);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='aurora'] {
+  --rb-edge-a: rgba(235,255,255,.98); --rb-edge-b: rgba(109,231,231,.9);
+  --rb-edge-c: rgba(176,149,255,.92); --rb-edge-d: rgba(245,243,255,.86);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='rose'] {
+  --rb-edge-a: rgba(255,251,239,.98); --rb-edge-b: rgba(255,182,198,.9);
+  --rb-edge-c: rgba(255,209,137,.92); --rb-edge-d: rgba(255,248,229,.86);
+}
+.storefront-header-surface > .rb-chrome-hover__surface,
+.storefront-liquid-icon > .rb-chrome-hover__surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+}
+.storefront-header-surface > .rb-chrome-hover__surface { z-index: 1; }
+.rb-chrome-hover__surface::before,
+.rb-chrome-hover__surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+.rb-chrome-hover__surface::before {
+  background:
+    linear-gradient(105deg,transparent 7%,rgba(255,255,255,.035) 29%,rgba(255,255,255,.22) 45%,rgba(255,255,255,.035) 60%,transparent 78%) var(--rb-chrome-x, 50%) 0 / 210% 100% no-repeat,
+    radial-gradient(ellipse 78% 145% at var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%),rgba(255,255,255,.22),rgba(255,255,255,.07) 36%,transparent 73%);
+}
+.rb-chrome-hover__surface::after {
+  background: radial-gradient(ellipse 110px 51px at var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%),var(--rb-edge-a) 2%,var(--rb-edge-b) 24%,var(--rb-edge-c) 49%,var(--rb-edge-d) 66%,transparent 81%);
+  padding: 2px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='halo'] {
+  --rb-edge-a: rgba(255,255,255,.96); --rb-edge-b: rgba(139,226,255,.92);
+  --rb-edge-c: rgba(191,157,255,.86); --rb-edge-d: rgba(255,255,255,.7);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='halo'] > .rb-chrome-hover__surface::before {
+  background: radial-gradient(circle 76px at var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%),rgba(255,255,255,.58) 0%,rgba(131,213,255,.22) 35%,transparent 75%);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='comet'] {
+  --rb-edge-a: rgba(255,255,255,.98); --rb-edge-b: rgba(154,238,240,.94);
+  --rb-edge-c: rgba(236,185,255,.86); --rb-edge-d: rgba(255,255,255,.66);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='comet'] > .rb-chrome-hover__surface::before {
+  background: linear-gradient(120deg,transparent 0%,rgba(255,255,255,.09) 32%,rgba(255,255,255,.52) 48%,rgba(149,237,255,.2) 56%,transparent 83%) var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%) / 170% 170% no-repeat;
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='facet'] {
+  --rb-edge-a: rgba(255,255,255,.98); --rb-edge-b: rgba(255,203,167,.9);
+  --rb-edge-c: rgba(166,191,255,.9); --rb-edge-d: rgba(255,255,255,.7);
+}
+:is(.storefront-header-surface,.storefront-liquid-icon)[data-button-animation='facet'] > .rb-chrome-hover__surface::before {
+  background:
+    linear-gradient(135deg,transparent 22%,rgba(255,255,255,.42) 42%,transparent 52%) var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%) / 180% 160% no-repeat,
+    linear-gradient(35deg,transparent 30%,rgba(167,220,255,.32) 50%,transparent 67%) var(--rb-chrome-x, 50%) var(--rb-chrome-y, 0%) / 155% 140% no-repeat;
+}
+.storefront-header-surface:is(:hover,:focus-within) > .rb-chrome-hover__surface::before,
+.storefront-header-surface:is(:hover,:focus-within) > .rb-chrome-hover__surface::after,
+.storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::before,
+.storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::after {
+  opacity: 1;
+}
+.storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::before {
+  animation: rb-chrome-flash .55s ease-out both;
+}
+.storefront-liquid-icon[data-click-animation='true'] > .rb-chrome-hover__surface::after {
+  animation: rb-chrome-edge .55s ease-out both;
+}
+@keyframes rb-chrome-flash { from { opacity: 0; transform: scale(.68); } 45% { opacity: 1; } to { opacity: 0; transform: scale(1.08); } }
+@keyframes rb-chrome-edge { from { opacity: 0; } 40% { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .rb-chrome-hover__surface::before,
+  .rb-chrome-hover__surface::after { transition: none; animation: none !important; }
+  .rb-chrome-hover__surface::before { animation: none !important; }
+}

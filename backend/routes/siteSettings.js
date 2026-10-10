@@ -14,6 +14,10 @@ const {
   getUnsupportedSiteSettingsKeys,
   resolveSiteSettingsWritePermissions,
 } = require("../security/siteSettingsWritePermissions");
+const {
+  isAppearanceWrite,
+  updateAppearanceWithRevision,
+} = require('../services/appearanceSettingsRevisionService');
 
 /**
  * 🔎 Ping de diagnóstico
@@ -64,16 +68,29 @@ function buildDefaultSettings() {
         bgOpacity: 1,
         textColor: "",
         linkColor: "",
+        searchBgColor: "",
+        searchTextColor: "",
+        searchAccentColor: "",
+        searchBorderColor: "",
         menuAnimation: "soft",
         iconColor: "",
         iconHoverColor: "",
         iconAnimation: "soft",
+        iconSet: "gold",
+        iconImages: { account: "", favorites: "", cart: "" },
+        iconOverrides: {},
+        iconSizePx: 34,
         fontPreset: "",
         fontFamily: "",
         fontSizePx: 16,
         logoLight: "",
         logoDark: "",
+        logoMode: "auto",
         logoHeightPx: 80,
+        surfaceShape: "attached",
+        cornerRadiusPx: 16,
+        liquidGlassEnabled: false,
+        glassStrength: 75,
       },
 
       home: {
@@ -90,6 +107,7 @@ function buildDefaultSettings() {
 
       banner: {
         type: "slider",
+        sliderShowProgress: true,
         slides: [],
         imageUrl: "",
         imageLink: "",
@@ -102,6 +120,10 @@ function buildDefaultSettings() {
         videoLoop: true,
         heightMode: "auto",
         heightPx: 520,
+        tabletHeightMode: "fullscreen",
+        tabletHeightPx: 1180,
+        mobileHeightMode: "fullscreen",
+        mobileHeightPx: 844,
         imageButton: {
           enabled: true,
           kind: "image",
@@ -126,6 +148,8 @@ function buildDefaultSettings() {
 
       sections: [],
     },
+
+    appearanceRevision: 0,
 
     admin: {
       theme: {},
@@ -508,6 +532,21 @@ router.get(
   }
 );
 
+router.get('/appearance', requireAdmin, requirePermission('appearance:view'), async (_req, res, next) => {
+  try {
+    const doc = await loadSettingsDocument();
+    const safe = buildAdminSiteSettings(doc);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.json({
+      theme: safe.theme,
+      menus: safe.menus,
+      appearanceRevision: Number(safe.appearanceRevision || 0),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/", async (_req, res, next) => {
   try {
     const doc = await loadSettingsDocument();
@@ -528,7 +567,7 @@ router.get("/", async (_req, res, next) => {
  */
 router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, res, next) => {
   try {
-    const { theme, menus, admin, billing } = req.body || {};
+    const { theme, menus, admin, billing, appearanceRevision } = req.body || {};
     const unsupportedKeys = getUnsupportedSiteSettingsKeys(req.body);
 
     if (unsupportedKeys.length) {
@@ -540,12 +579,21 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       });
     }
 
-    if (!resolveSiteSettingsWritePermissions(req.body).length) {
+    const requiredPermissions = resolveSiteSettingsWritePermissions(req.body);
+    if (!requiredPermissions.length) {
       return res.status(400).json({
         ok: false,
         error: "EMPTY_SETTINGS_UPDATE",
         message: "Debes enviar al menos una sección de configuración válida.",
       });
+    }
+
+    const appearanceWrite = isAppearanceWrite(requiredPermissions);
+    if (!appearanceWrite && appearanceRevision !== undefined) {
+      return res.status(400).json({ ok: false, error: 'UNEXPECTED_APPEARANCE_REVISION', message: 'Esta revisión solo corresponde a Apariencia.' });
+    }
+    if (appearanceWrite && (!Number.isSafeInteger(appearanceRevision) || appearanceRevision < 0)) {
+      return res.status(409).json({ ok: false, error: 'APPEARANCE_REVISION_REQUIRED', message: 'Recarga Apariencia antes de guardar.' });
     }
 
     if (Object.prototype.hasOwnProperty.call(req.body || {}, "store")) {
@@ -589,8 +637,53 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (isInvalidSettingsSection(theme)) {
       return res.status(400).json({ error: "theme debe ser un objeto" });
     }
+    if (theme && Object.prototype.hasOwnProperty.call(theme, 'sections') && !Array.isArray(theme.sections)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_SECTIONS', message: 'Las secciones deben ser una lista.' });
+    }
+    if (theme?.header?.iconSet === 'custom') {
+      const iconImages = theme.header.iconImages;
+      const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
+      if (!['account', 'favorites', 'cart'].every((kind) => validCloudinaryImage(iconImages?.[kind]))) {
+        return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_IMAGES', message: 'Carga los tres iconos en Cloudinary antes de guardar.' });
+      }
+    }
+    if (theme?.header && ['searchBgColor', 'searchTextColor', 'searchAccentColor', 'searchBorderColor'].some((key) => {
+      const value = theme.header[key];
+      return value !== undefined && value !== '' && (typeof value !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value));
+    })) {
+      return res.status(400).json({ ok: false, error: 'INVALID_HEADER_SEARCH_COLORS', message: 'Los colores del buscador deben ser hexadecimales válidos.' });
+    }
+    if (theme?.header?.iconOverrides !== undefined) {
+      const overrides = theme.header.iconOverrides;
+      const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
+      const validKinds = ['account', 'search', 'favorites', 'cart'];
+      const validSets = ['gold', 'wine', 'satin', 'porcelain'];
+      const valid = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+        && Object.entries(overrides).every(([set, images]) => validSets.includes(set)
+          && images && typeof images === 'object' && !Array.isArray(images)
+          && Object.entries(images).every(([kind, url]) => validKinds.includes(kind) && (url === '' || validCloudinaryImage(url))));
+      if (!valid) return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_OVERRIDES', message: 'Los iconos personalizados deben ser imágenes de Cloudinary.' });
+    }
+    if (theme?.header?.mobileMenuFeatureImage !== undefined &&
+      theme.header.mobileMenuFeatureImage !== '' &&
+      (typeof theme.header.mobileMenuFeatureImage !== 'string' ||
+        !/^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(theme.header.mobileMenuFeatureImage))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_MOBILE_MENU_FEATURE_IMAGE', message: 'La imagen destacada del menú móvil debe estar en Cloudinary.' });
+    }
+    if (theme?.header?.iconSizePx !== undefined && (!Number.isInteger(theme.header.iconSizePx) || theme.header.iconSizePx < 28 || theme.header.iconSizePx > 40)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_SIZE', message: 'El tamaño de los iconos debe estar entre 28 y 40 px.' });
+    }
     if (isInvalidSettingsSection(menus)) {
       return res.status(400).json({ error: "menus debe ser un objeto" });
+    }
+    if (menus && ['header', 'footer', 'social'].some((key) =>
+      Object.prototype.hasOwnProperty.call(menus, key) && !Array.isArray(menus[key])
+    )) {
+      return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_MENUS', message: 'Los menús deben ser listas.' });
+    }
+    if (menus?.header?.some((item) => item?.iconColor !== undefined && item.iconColor !== '' &&
+      (typeof item.iconColor !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(item.iconColor)))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_MOBILE_MENU_ICON_COLOR', message: 'El color de cada ícono debe ser hexadecimal.' });
     }
     if (isInvalidSettingsSection(admin)) {
       return res.status(400).json({ error: "admin debe ser un objeto" });
@@ -646,17 +739,26 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
 
     const protectedSet = stripProtectedWriteFields($set);
 
-    const updated = await SiteSettings.findByIdAndUpdate(
-      id,
-      { $set: protectedSet },
-      {
-        new: true,
-        strict: false,
-        runValidators: false,
-      }
-    ).lean();
+    const updated = appearanceWrite
+      ? await updateAppearanceWithRevision({ id, revision: appearanceRevision, changes: protectedSet })
+      : await SiteSettings.findByIdAndUpdate(
+        id,
+        { $set: protectedSet },
+        { new: true, strict: false, runValidators: false }
+      ).lean();
 
-    res.json(buildAdminSiteSettings(updated));
+    if (!updated) {
+      return res.status(409).json({
+        ok: false,
+        error: 'APPEARANCE_REVISION_CONFLICT',
+        message: 'La Apariencia guardada cambió. Recarga los datos y revisa tus cambios antes de guardar.',
+      });
+    }
+
+    const safe = buildAdminSiteSettings(updated);
+    res.json(appearanceWrite && !admin && !billing
+      ? { theme: safe.theme, menus: safe.menus, appearanceRevision: safe.appearanceRevision }
+      : safe);
   } catch (err) {
     next(err);
   }

@@ -1,0 +1,74 @@
+.atelier-menu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 100%;
+  max-height: calc(100dvh - 8px);
+  min-height: 0;
+  overflow: hidden;
+  padding: 9px clamp(15px, 4.5vw, 27px) max(10px, env(safe-area-inset-bottom));
+  border: 1px solid rgba(255, 255, 255, .82);
+  border-bottom: 0;
+  border-radius: 39px 39px 0 0;
+  color: var(--atelier-ink, #4e1e39);
+  background-color: color-mix(in srgb, var(--atelier-surface, #fff4f3) 47%, transparent);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, .96), inset 0 -12px 24px rgba(165, 91, 107, .08), 0 -14px 48px rgba(66, 24, 44, .27);
+  backdrop-filter: blur(25px) saturate(1.4) brightness(1.08);
+  -webkit-backdrop-filter: blur(25px) saturate(1.4) brightness(1.08);
+}
+.atelier-menu::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: url('/atelier/menu-blush.webp') center 59% / cover no-repeat;
+  opacity: .19;
+}
+.atelier-menu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 95% 38% at 18% -8%, rgba(255,255,255,.76), transparent 75%), linear-gradient(165deg, rgba(255,255,255,.35), transparent 43%, rgba(255,224,230,.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 15px 28px rgba(255, 255, 255, .22);
+}
+.atelier-menu__handle { position: relative; z-index: 1; align-self: center; width: 43px; height: 4px; flex: none; border-radius: 8px; background: linear-gradient(90deg, #dfb89a, #a87450, #ead0ac); box-shadow: 0 1px rgba(255,255,255,.9); }
+.atelier-menu__top { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; flex: none; min-height: 56px; border-bottom: var(--atelier-separator-width, 1px) solid color-mix(in srgb, var(--atelier-line, #d2a997) 55%, transparent); }
+.atelier-menu__brand { max-width: 75%; color: var(--atelier-ink, #4e1e39); font-family: var(--atelier-font, Georgia, serif); font-size: clamp(17px, 4.5vw, 21px); font-weight: 400; line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atelier-menu__close { position: absolute; right: -4px; top: 50%; display: grid; place-items: center; width: 42px; height: 42px; transform: translateY(-50%); color: var(--atelier-ink, #4e1e39); border: 0; background: transparent; }
+.atelier-menu__close:hover, .atelier-menu__bottom button:hover { color: var(--atelier-accent, #ac7950); }
+.atelier-menu__links { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(61px, auto); align-content: start; column-gap: 14px; flex: 0 1 auto; max-height: min(37dvh, 245px); min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--atelier-line, #d2a997) 60%, transparent) transparent; background: linear-gradient(90deg, transparent calc(50% - .5px), color-mix(in srgb, var(--atelier-line, #d2a997) 55%, transparent) 50%, transparent calc(50% + .5px)); }
+.atelier-menu__link { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; min-height: 61px; padding: 9px 2px; border: 0; border-bottom: var(--atelier-separator-width, 1px) solid color-mix(in srgb, var(--atelier-line, #d2a997) 55%, transparent); background: transparent; color: var(--atelier-ink, #4e1e39); font-family: var(--atelier-font, Georgia, serif); font-size: clamp(14px, 3.9vw, 17px); font-weight: 400; line-height: 1.25; text-align: left; text-decoration: none; transition: color .2s, background-color .2s; }
+.atelier-menu__link:last-child, .atelier-menu__link:nth-last-child(2):nth-child(odd) { border-bottom-color: transparent; }
+.atelier-menu__link:hover { color: var(--atelier-accent, #ac7950); background: rgba(255,255,255,.14); }
+.atelier-menu__link > svg:first-child { flex: none; color: var(--atelier-accent, #ac7950); }
+.mobile-menu-link-icon { flex: none; }
+.atelier-menu__link > span { min-width: 0; overflow-wrap: anywhere; }
+.atelier-menu__chevron { flex: none; margin-left: auto; color: var(--atelier-muted, #815269); }
+.atelier-menu__empty { grid-column: 1 / -1; padding: 20px 0; color: var(--atelier-muted, #815269); font-size: 14px; }
+.atelier-menu__feature { position: relative; z-index: 1; flex: none; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 3px; min-height: 94px; width: 100%; margin: 8px 0 0; padding: 11px 17px; border: 1px solid rgba(247,216,181,.8); border-radius: 14px; color: #fff7ef; text-align: left; background-color: #512238; background-image: linear-gradient(90deg, rgba(45, 15, 29, .46), transparent 78%), url('/atelier/feature-satin.webp'); background-position: center; background-size: cover; box-shadow: inset 0 1px rgba(255,255,255,.38), 0 6px 14px rgba(96,39,79,.16); overflow: hidden; }
+.atelier-menu__feature-eyebrow { font-size: 9px; font-weight: 600; letter-spacing: .19em; }
+.atelier-menu__feature strong { max-width: 77%; font-family: var(--atelier-font, Georgia, serif); font-size: clamp(18px, 5vw, 23px); font-weight: 400; line-height: 1.15; overflow-wrap: anywhere; }
+.atelier-menu__feature-action { display: flex; align-items: center; gap: 3px; margin-top: 3px; font-size: 12px; }
+.atelier-menu__bottom { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: none; margin-top: 10px; padding-top: 5px; border-top: var(--atelier-separator-width, 1px) solid color-mix(in srgb, var(--atelier-line, #d2a997) 55%, transparent); }
+.atelier-menu__bottom[data-has-whatsapp="true"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.atelier-menu__bottom button, .atelier-menu__bottom a { position: relative; display: grid; justify-items: center; align-content: center; gap: 3px; min-width: 0; min-height: 59px; padding: 2px; color: var(--atelier-ink, #4e1e39); background: transparent; border: 0; font-family: var(--atelier-font, Georgia, serif); font-size: 12px; text-decoration: none; }
+.atelier-menu__bottom > :not(:first-child) { border-left: 1px solid color-mix(in srgb, var(--atelier-line, #d2a997) 55%, transparent); }
+.atelier-menu__bottom svg { width: 25px; height: 25px; }
+.atelier-menu__bottom .whatsapp-menu-icon > svg { width: var(--whatsapp-icon-size); height: var(--whatsapp-icon-size); }
+.atelier-menu__cart small { position: absolute; top: -2px; left: calc(50% + 10px); display: grid; place-items: center; min-width: 18px; height: 18px; border-radius: 50%; background: #68213c; color: #fff; font: 10px/1 system-ui, sans-serif; }
+.atelier-menu__social { position: relative; z-index: 1; display: flex; justify-content: center; gap: 15px; padding: 5px 0 0; }
+.atelier-menu__social a { color: var(--atelier-muted, #815269); }
+.atelier-menu button:focus-visible, .atelier-menu a:focus-visible { outline: 2px solid var(--atelier-accent, #ac7950); outline-offset: -2px; border-radius: 7px; }
+@media (max-height: 630px) {
+  .atelier-menu__top { min-height: 48px; }
+  .atelier-menu__links { grid-auto-rows: minmax(52px, auto); max-height: min(34dvh, 180px); }
+  .atelier-menu__link { min-height: 52px; }
+  .atelier-menu__feature { min-height: 76px; }
+  .atelier-menu__bottom button, .atelier-menu__bottom a { min-height: 48px; }
+}
+@media (max-width: 360px) { .atelier-menu__links { column-gap: 8px; } .atelier-menu__link { gap: 5px; font-size: 13px; } .atelier-menu__link > svg:first-child { width: 19px; } }
+@media (prefers-reduced-motion: reduce) { .atelier-menu__link { transition: none; } }
