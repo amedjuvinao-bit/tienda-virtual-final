@@ -1,8 +1,9 @@
 // src/components/ScrollButton.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import "./storefrontLiquidGlass.css";
-import { animateStorefrontEntrance, STOREFRONT_SECTION_CHANGE } from '../lib/storefrontSectionMotion';
+import './storefrontChromeGlassHover.css';
+import { moveBannerButtonLight, safeBannerButtonAnimation } from '../lib/bannerTemplates';
 import {
   DEFAULT_SECTION_IDS,
   getCurrentSectionIndex,
@@ -18,10 +19,10 @@ function getShadowValue(shadow) {
 
 function getButtonAnimation(name, fallback) {
   if (name === "none") return "none";
-  if (name === "pulse") return "rbScrollPulse 2s ease-in-out infinite";
-  if (name === "bounce") return "rbScrollBounce 2s ease-in-out infinite";
-  if (name === "moveUp") return "rbScrollMoveUp 2s ease-in-out infinite";
-  if (name === "moveDown") return "rbScrollMoveDown 2s ease-in-out infinite";
+  if (name === "pulse") return "rbScrollPulse 450ms ease-in-out 1";
+  if (name === "bounce") return "rbScrollBounce 550ms ease-in-out 1";
+  if (name === "moveUp") return "rbScrollMoveUp 450ms ease-in-out 1";
+  if (name === "moveDown") return "rbScrollMoveDown 450ms ease-in-out 1";
   return fallback;
 }
 
@@ -54,20 +55,8 @@ function scrollExactlyToSection(id, options = {}) {
   }
 }
 
-export default function ScrollButton({ config }) {
-  const controlsRef = useRef(null);
-  useEffect(() => {
-    let animations = [];
-    const animate = () => {
-      animations.forEach((item) => item.cancel());
-      animations = animateStorefrontEntrance(controlsRef.current?.querySelectorAll('button') || [], { delay: 380 });
-    };
-    window.addEventListener(STOREFRONT_SECTION_CHANGE, animate);
-    return () => {
-      window.removeEventListener(STOREFRONT_SECTION_CHANGE, animate);
-      animations.forEach((item) => item.cancel());
-    };
-  }, []);
+export default function ScrollButton({ config, buttonAnimation }) {
+  const [activeAnimation, setActiveAnimation] = useState(null);
   const safeConfig = config && typeof config === "object" ? config : {};
 
   const sectionIds =
@@ -170,12 +159,14 @@ export default function ScrollButton({ config }) {
   };
 
   const handlePrev = () => {
+    setActiveAnimation('up');
     const currentIndex = getCurrentSectionIndex(sectionIds);
     const prevIndex = getPrevSectionIndex(currentIndex, sectionIds);
     scrollToIndex(prevIndex);
   };
 
   const handleNext = () => {
+    setActiveAnimation('down');
     const currentIndex = getCurrentSectionIndex(sectionIds);
     const nextIndex = getNextSectionIndex(currentIndex, sectionIds);
     scrollToIndex(nextIndex);
@@ -229,7 +220,6 @@ export default function ScrollButton({ config }) {
       `}</style>
 
       <div
-        ref={controlsRef}
         className="hidden md:flex fixed z-50 items-center"
         style={{
           bottom: `${bottomPx + railClearancePx}px`,
@@ -241,14 +231,19 @@ export default function ScrollButton({ config }) {
         {showUp && (
           <button
             onClick={handlePrev}
-            className="storefront-liquid-icon transition-transform duration-200 hover:scale-105"
+            onPointerMove={moveBannerButtonLight}
+            data-button-animation={safeBannerButtonAnimation(buttonAnimation)}
+            data-click-animation={activeAnimation === 'up'}
+            onAnimationEnd={() => setActiveAnimation(null)}
+            className="storefront-liquid-icon"
             style={{
               ...baseButtonStyle,
-              animation: getButtonAnimation(upAnimation, "rbScrollMoveUp 2s ease-in-out infinite"),
+              animation: activeAnimation === 'up' ? getButtonAnimation(upAnimation, "rbScrollMoveUp 450ms ease-in-out 1") : 'none',
             }}
             aria-label="Sección anterior"
             type="button"
           >
+            <span className="rb-chrome-hover__surface" aria-hidden="true" />
             {upUseCustomImage && upImageUrl ? (
               <img
                 src={upImageUrl}
@@ -274,17 +269,22 @@ export default function ScrollButton({ config }) {
         {showDown && (
           <button
             onClick={handleNext}
-            className="storefront-liquid-icon transition-transform duration-200 hover:scale-105"
+            onPointerMove={moveBannerButtonLight}
+            data-button-animation={safeBannerButtonAnimation(buttonAnimation)}
+            data-click-animation={activeAnimation === 'down'}
+            onAnimationEnd={() => setActiveAnimation(null)}
+            className="storefront-liquid-icon"
             style={{
               ...baseButtonStyle,
-              animation: getButtonAnimation(
+              animation: activeAnimation === 'down' ? getButtonAnimation(
                 downAnimation,
-                "rbScrollMoveDown 2s ease-in-out infinite"
-              ),
+                "rbScrollMoveDown 450ms ease-in-out 1"
+              ) : 'none',
             }}
             aria-label="Siguiente sección"
             type="button"
           >
+            <span className="rb-chrome-hover__surface" aria-hidden="true" />
             {downUseCustomImage && downImageUrl ? (
               <img
                 src={downImageUrl}

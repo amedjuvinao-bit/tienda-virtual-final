@@ -21,25 +21,11 @@ import WhatsAppMenuIcon from './WhatsAppMenuIcon';
 import { resolveWhatsAppHref } from './whatsappLink';
 import MobileMenuTrigger from './MobileMenuTrigger';
 import { MobileMenuLinkIcon } from './mobileMenuIcons';
-import { animateStorefrontEntrance, STOREFRONT_SECTION_CHANGE } from '../lib/storefrontSectionMotion';
+import { moveBannerButtonLight, safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import './storefrontChromeGlassHover.css';
 
 function Header() {
-  const surfaceRef = useRef(null);
   const [showHeader, setShowHeader] = useState(true);
-  useEffect(() => {
-    let animations = [];
-    const animate = () => {
-      animations.forEach((item) => item.cancel());
-      animations = surfaceRef.current?.dataset.visible === 'true'
-        ? animateStorefrontEntrance([surfaceRef.current], { from: '0 -28px', scale: .96, delay: 110 })
-        : [];
-    };
-    window.addEventListener(STOREFRONT_SECTION_CHANGE, animate);
-    return () => {
-      window.removeEventListener(STOREFRONT_SECTION_CHANGE, animate);
-      animations.forEach((item) => item.cancel());
-    };
-  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -60,6 +46,7 @@ function Header() {
   const [logoHeightPx, setLogoHeightPx] = useState(80);
   const [menuItems, setMenuItems] = useState([]);
   const [headerConfig, setHeaderConfig] = useState({});
+  const [buttonAnimation, setButtonAnimation] = useState('prism');
   const [themeColors, setThemeColors] = useState({});
   const iconPresentation = resolveHeaderIcons(headerConfig);
   const [footerConfig, setFooterConfig] = useState({});
@@ -78,6 +65,7 @@ function Header() {
 
         const t = s?.theme || {};
         const h = t?.header || {};
+        setButtonAnimation(safeBannerButtonAnimation(t?.banner?.templateConfigs?.[t?.banner?.templateId]?.buttonAnimation));
 
         const hl = h?.logoLight || t?.logo?.light || "";
         const hd = h?.logoDark || t?.logo?.dark || "";
@@ -106,6 +94,7 @@ function Header() {
         setLogoHeightPx(80);
         setMenuItems([]);
         setHeaderConfig({});
+        setButtonAnimation('prism');
         setThemeColors({});
         setFooterConfig({});
         setMobileMenuFeatureImage('');
@@ -412,7 +401,8 @@ function Header() {
   return createPortal(
     <>
       <header
-        ref={surfaceRef}
+        onPointerMove={moveBannerButtonLight}
+        data-button-animation={buttonAnimation}
         style={headerInlineStyle}
         data-shape={headerSurface.shape}
         data-glass={headerSurface.glass}
@@ -420,6 +410,7 @@ function Header() {
         data-visible={showHeader}
         className="theme-header storefront-header-surface px-4 fixed z-50"
       >
+        <span className="rb-chrome-hover__surface" aria-hidden="true" />
         <div className="relative w-full h-[70px]">
           {/* Desktop */}
           <div className="hidden lg:flex w-full h-full items-center justify-between gap-4">
