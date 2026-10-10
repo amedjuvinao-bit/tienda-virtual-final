@@ -24,16 +24,11 @@
   .storefront-sections > #banner[data-section-motion="entering"] .rb-template__content {
     animation: storefront-banner-layer 850ms cubic-bezier(.16,1,.3,1) 120ms backwards;
   }
-  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__rail,
-  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__hotspots {
-    animation: storefront-banner-layer 850ms cubic-bezier(.16,1,.3,1) 360ms backwards;
+  .storefront-sections > #banner[data-section-motion="entering"] :is(.rb-template__rail,.rb-template__hotspots) {
+    animation: storefront-banner-layer 900ms cubic-bezier(.16,1,.3,1) 280ms backwards;
   }
   .storefront-sections #banner .keen-slider__slide[data-active="true"] > img {
     animation: storefront-slide-reveal 1150ms cubic-bezier(.16,1,.3,1) backwards;
-  }
-  .storefront-sections > #banner[data-section-motion="entering"] .rb-template__spot-connector polyline {
-    stroke-dasharray: 210;
-    animation: storefront-line-draw 950ms cubic-bezier(.16,1,.3,1) 410ms backwards;
   }
 }
 @keyframes storefront-aperture-in {
@@ -69,10 +64,6 @@
 @keyframes storefront-slide-reveal {
   from { opacity: .55; filter: blur(5px) saturate(.86); transform: translate3d(3%,0,0) scale(1.11); }
   to { opacity: 1; filter: blur(0) saturate(1); transform: translate3d(0,0,0) scale(1); }
-}
-@keyframes storefront-line-draw {
-  from { stroke-dashoffset: 210; opacity: .25; }
-  to { stroke-dashoffset: 0; opacity: 1; }
 }
 @media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
   @keyframes storefront-aperture-in {
