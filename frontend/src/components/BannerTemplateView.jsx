@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { getBannerTemplate, moveBannerButtonLight, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
 
@@ -28,32 +28,13 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
 
-export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, onMoveCard, motionKey, children }) {
+export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, onMoveCard, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
   const [activeCard, setActiveCard] = useState(null);
   const [dragged, setDragged] = useState(null);
   const dragRef = useRef(null);
   const suppressClick = useRef(false);
   const rootRef = useRef(null);
-  useEffect(() => {
-    if (preview || motionKey == null || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
-    const root = rootRef.current;
-    if (!root || !Element.prototype.animate) return undefined;
-    const animations = [];
-    const animate = (selector, delay, from, duration = 780) => {
-      root.querySelectorAll(selector).forEach((element, index) => {
-        animations.push(element.animate([from, { opacity: 1, translate: '0 0', scale: 1, filter: 'blur(0)', clipPath: 'inset(0 0 0 0)' }],
-          { duration, delay: delay + index * 105, easing: 'cubic-bezier(.16,1,.3,1)' }));
-      });
-    };
-    animate('.rb-template__eyebrow', 90, { opacity: 0, translate: '0 22px' }, 620);
-    animate('.rb-template__title', 160, { opacity: 0, translate: '0 40px', filter: 'blur(8px)', clipPath: 'inset(100% 0 0 0)' }, 920);
-    animate('.rb-template__description', 360, { opacity: 0, translate: '0 28px' });
-    animate('.rb-liquid-button', 480, { opacity: 0, translate: '0 32px', scale: .86 }, 840);
-    animate('.rb-template__rail-heading', 390, { opacity: 0, translate: '0 18px' }, 650);
-    animate('.rb-template__card, .rb-template__spot-card', 580, { opacity: 0, translate: '0 36px', scale: .9 }, 860);
-    return () => animations.forEach((animation) => animation.cancel());
-  }, [motionKey, preview, id]);
   const dragMove = (event) => {
     const drag = dragRef.current;
     if (!drag || event.pointerId !== drag.pointerId) return;

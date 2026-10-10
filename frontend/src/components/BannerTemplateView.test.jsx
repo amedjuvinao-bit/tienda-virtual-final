@@ -76,17 +76,20 @@ describe('plantillas sobre contenido existente', () => {
     }
   });
 
-  it('vuelve a animar el texto y los accesos al cambiar la imagen activa', () => {
-    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+  it('mantiene textos, botones y conexiones estables cuando cambia la imagen', () => {
+    const animate = vi.fn(function animateElement() { return { cancel: vi.fn() }; });
     const original = Element.prototype.animate;
     Element.prototype.animate = animate;
     try {
       const banner = { templateId: 'atelier' };
-      const { rerender, unmount } = render(<BannerTemplateView banner={banner} sections={categories} motionKey={0}><img src="/primera.jpg" alt="" /></BannerTemplateView>);
-      const firstCount = animate.mock.calls.length;
-      expect(firstCount).toBeGreaterThan(3);
-      rerender(<BannerTemplateView banner={banner} sections={categories} motionKey={1}><img src="/segunda.jpg" alt="" /></BannerTemplateView>);
-      expect(animate.mock.calls.length).toBe(firstCount * 2);
+      const { container, rerender, unmount } = render(<BannerTemplateView banner={banner} sections={categories}><img src="/primera.jpg" alt="" /></BannerTemplateView>);
+      const actions = container.querySelectorAll('.rb-liquid-button, .rb-template__spot-card');
+      const connectors = container.querySelectorAll('.rb-template__spot-connector polyline');
+      rerender(<BannerTemplateView banner={banner} sections={categories}><img src="/segunda.jpg" alt="" /></BannerTemplateView>);
+      expect(container.querySelector('.rb-template__picture img')).toHaveAttribute('src', '/segunda.jpg');
+      expect([...container.querySelectorAll('.rb-liquid-button, .rb-template__spot-card')]).toEqual([...actions]);
+      expect([...container.querySelectorAll('.rb-template__spot-connector polyline')]).toEqual([...connectors]);
+      expect(animate).not.toHaveBeenCalled();
       unmount();
     } finally {
       if (original) Element.prototype.animate = original;
