@@ -1,3 +1,13 @@
+export const STOREFRONT_SECTION_CHANGE = 'storefront:section-change';
+
+export function animateStorefrontEntrance(elements, { from = '0 32px', scale = .86, delay = 0 } = {}) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return [];
+  return Array.from(elements).filter((element) => element?.animate).map((element, index) => element.animate([
+    { opacity: 0, translate: from, scale },
+    { opacity: 1, translate: '0 0', scale: 1 },
+  ], { duration: 840, delay: delay + index * 105, easing: 'cubic-bezier(.16,1,.3,1)' }));
+}
+
 export function mountStorefrontSectionMotion(container) {
   const sections = Array.from(container?.children || []).filter((node) => node.tagName === 'SECTION');
   if (!sections.length) return () => {};
@@ -20,6 +30,7 @@ export function mountStorefrontSectionMotion(container) {
     next.dataset.sectionDirection = direction;
     next.dataset.sectionMotion = 'entering';
     active = next;
+    window.dispatchEvent(new CustomEvent(STOREFRONT_SECTION_CHANGE, { detail: { direction, sectionId: next.id } }));
   };
   const schedule = () => { if (!frame) frame = window.requestAnimationFrame(update); };
   schedule();

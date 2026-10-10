@@ -1,7 +1,8 @@
 // src/components/ScrollButton.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import "./storefrontLiquidGlass.css";
+import { animateStorefrontEntrance, STOREFRONT_SECTION_CHANGE } from '../lib/storefrontSectionMotion';
 import {
   DEFAULT_SECTION_IDS,
   getCurrentSectionIndex,
@@ -54,6 +55,19 @@ function scrollExactlyToSection(id, options = {}) {
 }
 
 export default function ScrollButton({ config }) {
+  const controlsRef = useRef(null);
+  useEffect(() => {
+    let animations = [];
+    const animate = () => {
+      animations.forEach((item) => item.cancel());
+      animations = animateStorefrontEntrance(controlsRef.current?.querySelectorAll('button') || [], { delay: 380 });
+    };
+    window.addEventListener(STOREFRONT_SECTION_CHANGE, animate);
+    return () => {
+      window.removeEventListener(STOREFRONT_SECTION_CHANGE, animate);
+      animations.forEach((item) => item.cancel());
+    };
+  }, []);
   const safeConfig = config && typeof config === "object" ? config : {};
 
   const sectionIds =
@@ -215,6 +229,7 @@ export default function ScrollButton({ config }) {
       `}</style>
 
       <div
+        ref={controlsRef}
         className="hidden md:flex fixed z-50 items-center"
         style={{
           bottom: `${bottomPx + railClearancePx}px`,
