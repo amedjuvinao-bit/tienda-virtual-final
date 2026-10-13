@@ -195,3 +195,8 @@
 .banner-preview-stage .banner-preview-mini-header { font-size: 22px; padding: 14px 20px; }
 .banner-preview-viewport[data-device="tablet"] .banner-preview-stage .banner-preview-mini-header,
 .banner-preview-viewport[data-device="mobile"] .banner-preview-stage .banner-preview-mini-header { font-size: 13px; padding: 8px 12px; }
+
+.banner-template-card-media { display: grid; gap: 9px; padding: 12px; border: 1px solid rgba(116,58,75,.2); border-radius: 14px; }
+.banner-template-card-media__preview { width: 100%; max-width: 170px; height: 110px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.45); }
+.banner-template-upload-preview { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.banner-template-upload-preview img { width: 54px; height: 54px; object-fit: contain; border-radius: 12px; background: rgba(255,255,255,.55); }
