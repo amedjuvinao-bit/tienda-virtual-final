@@ -69,7 +69,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   };
   const cards = c.cards.map((item, index) => ({ ...item, sourceIndex: index })).filter((item) => item.enabled !== false);
 
-  return <div ref={rootRef} className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-button-animation={c.buttonAnimation} data-preview-device={preview ? device : undefined}>
+  return <div ref={rootRef} className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-card-count={cards.length} data-button-animation={c.buttonAnimation} data-preview-device={preview ? device : undefined}>
     <div className="rb-template__picture">{children}</div>
     <div className="rb-template__wash" aria-hidden="true" />
     <div className="rb-template__content">
@@ -132,7 +132,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
       <div className="rb-template__cards">
         {cards.map((item, index) => {
           const href = safeBannerLink(item.link);
-          const content = <>{item.image && <img src={item.image} alt="" />}<span className="rb-template__card-copy"><small>{item.label}</small><strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
+          const content = <>{item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}<span className="rb-template__card-copy"><small>{item.label}</small><strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
           return href ? <a key={index} className="rb-template__card" href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
             : <div key={index} className="rb-template__card" onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}

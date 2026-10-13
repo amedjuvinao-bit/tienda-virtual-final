@@ -221,3 +221,40 @@
 .rb-template[data-preview-device="mobile"] .rb-template__spot-card { left: var(--rb-card-mobile-x); top: var(--rb-card-mobile-y); }
 .rb-template[data-preview-device] .rb-template__spot-card { cursor: grab; touch-action: none; }
 .rb-template[data-preview-device] .rb-template__spot-card:active { cursor: grabbing; }
+
+/* The editorial rail must give each category enough width to show its name. */
+.rb-template--editorial[data-card-count="2"] .rb-template__rail { width: min(60%, 720px); }
+.rb-template--editorial[data-card-count="3"] .rb-template__rail,
+.rb-template--editorial[data-card-count="4"] .rb-template__rail { width: min(78%, 980px); }
+.rb-template__card { box-sizing: border-box; min-height: 78px; }
+.rb-template__card img { flex: none; }
+.rb-template__card img[hidden] { display: none; }
+.rb-template__card-copy { gap: 3px; overflow-wrap: anywhere; }
+.rb-template__card small { line-height: 1.25; overflow-wrap: anywhere; }
+.rb-template__card strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+.rb-template__card > span:last-child { flex: none; margin-left: auto; }
+.rb-template--editorial[data-preview-device="desktop"][data-card-count="2"] .rb-template__rail,
+.rb-template--editorial[data-preview-device="tablet"][data-card-count="2"] .rb-template__rail { width: min(60%, 720px); }
+.rb-template--editorial[data-preview-device="desktop"]:is([data-card-count="3"],[data-card-count="4"]) .rb-template__rail,
+.rb-template--editorial[data-preview-device="tablet"]:is([data-card-count="3"],[data-card-count="4"]) .rb-template__rail { width: min(78%, 980px); }
+@container (max-width: 680px) {
+  .rb-template--editorial:not([data-preview-device]) .rb-template__rail,
+  .rb-template--editorial[data-preview-device="mobile"] .rb-template__rail { left: 6%; right: 6%; width: auto; }
+  .rb-template__cards { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
+  .rb-template__card { flex: 0 0 min(78%, 300px); min-width: 0; min-height: 64px; scroll-snap-align: start; gap: 8px; }
+  .rb-template__card img { width: 28px; height: 28px; }
+  .rb-template__card small { font-size: clamp(9px, 2.2cqw, 11px); }
+  .rb-template__card strong { font-size: clamp(11px, 2.9cqw, 14px); }
+  .rb-template__card > span:last-child { font-size: 17px; }
+}
+.rb-template[data-preview-device="mobile"] .rb-template__cards { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
+.rb-template[data-preview-device="mobile"] .rb-template__card { flex: 0 0 78%; min-width: 0; min-height: 64px; gap: 8px; }
+.rb-template[data-preview-device="mobile"] .rb-template__card img { width: 28px; height: 28px; }
+.rb-template[data-preview-device="mobile"] .rb-template__card small { font-size: clamp(9px, 2.2cqw, 11px); }
+.rb-template[data-preview-device="mobile"] .rb-template__card strong { font-size: clamp(11px, 2.9cqw, 14px); }
