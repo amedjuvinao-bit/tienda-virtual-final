@@ -79,3 +79,14 @@
 @media (max-width: 1050px) { .appearance-general__workspace { grid-template-columns: 1fr; } .appearance-general__preview { position: static; order: -1; } .appearance-general__preview-stage { height: 170px; } .appearance-general__preview-product { margin: 8px auto; width: 35%; } .appearance-general__preview-product-image { height: 66px; } }
 @media (max-width: 680px) { .appearance-general__tabs { grid-template-columns: 1fr; } .appearance-general .appearance-panel-main-tab { min-height: 58px; } .appearance-general__tab-status { align-self: center; } .appearance-general__icon-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .appearance-general__section { padding: 11px; } .appearance-general__upload-field { align-items: flex-start; } .appearance-general__upload-preview { flex-basis: 62px; width: 62px; height: 62px; } }
 @media (prefers-reduced-motion: reduce) { .appearance-general__loader-mark, .appearance-general__preview-loader-icon, .appearance-general .appearance-panel-main-tab { animation: none; transition: none; } }
+
+.appearance-general__nav-styles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.appearance-general__nav-style-choice { display: grid; justify-items: start; gap: 5px; min-width: 0; padding: 14px; text-align: left; border: 1px solid rgba(219,174,191,.68); border-radius: 16px; background: rgba(255,255,255,.52); color: #59374b; transition: border-color .2s, background .2s, transform .2s; }
+.appearance-general__nav-style-choice:hover { transform: translateY(-2px); border-color: #ce719c; }
+.appearance-general__nav-style-choice[data-active="true"] { border-color: #bf477a; background: rgba(255,231,243,.82); box-shadow: inset 0 0 0 1px rgba(191,71,122,.3); }
+.appearance-general__nav-style-choice strong { font-size: 13px; }
+.appearance-general__nav-style-choice small { color: #775d6a; font-size: 11px; line-height: 1.35; }
+.appearance-general__nav-style-icons { display: flex; align-items: center; gap: 10px; min-height: 38px; }
+.appearance-general__nav-style-choice .storefront-liquid-icon { pointer-events: none; }
+.appearance-general__nav-style-note { color: #745565; font-size: 12px; line-height: 1.45; }
+@media (max-width: 520px) { .appearance-general__nav-styles { grid-template-columns: 1fr; } }
