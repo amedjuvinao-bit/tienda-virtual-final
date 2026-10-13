@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import BannerTemplatePanel from './BannerTemplatePanel';
+import { getBannerTemplate } from '../../../lib/bannerTemplates';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function Editor() {
   const [theme, setTheme] = useState({ banner: { templateId: 'discovery' }, sections: [{ id: 'categorias', config: { slides: [
@@ -31,11 +32,11 @@ describe('editor de plantillas', () => {
     fireEvent.click(screen.getByRole('button', { name: /Descubrimiento/ }));
     expect(screen.getByLabelText('Título').value).toBe('Mi portada');
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
-    const select = screen.getByLabelText('Usar esta categoría');
+    const select = screen.getByLabelText('Categoría de destino');
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['Hogar', 'Regalos']);
-    expect(screen.getAllByLabelText('Usar esta categoría')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Categoría de destino')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: /Acceso 2/ }));
-    fireEvent.change(screen.getByLabelText('Texto visible'), { target: { value: 'Un regalo' } });
+    fireEvent.change(screen.getByLabelText('Texto visible (opcional)'), { target: { value: 'Un regalo' } });
     fireEvent.click(screen.getByRole('button', { name: '② Botones' }));
     fireEvent.change(screen.getByLabelText('Texto del botón'), { target: { value: 'Comprar' } });
     const saved = JSON.parse(screen.getByTestId('state').textContent);
@@ -82,4 +83,27 @@ describe('editor de plantillas', () => {
     expect(saved.templateConfigs.discovery.buttonAnimation).toBe('aurora');
     expect(saved.templateConfigs.editorial.buttonAnimation).toBe('pearl');
   });
+  it('enlaza un producto del catálogo y conserva su imagen al guardar', async () => {
+    const productId = '68a4a78a59706e44cade0316';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ products: [{ _id: productId, title: 'Vestido floral', image: '/vestido.png' }] }),
+    }));
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: /Editorial/ }));
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.change(screen.getByLabelText('Al hacer clic, abrir'), { target: { value: 'product' } });
+    fireEvent.change(screen.getByLabelText('Buscar producto'), { target: { value: 'Vestido' } });
+    fireEvent.click(await screen.findByRole('button', { name: /Vestido floral Elegir/ }));
+    const saved = JSON.parse(screen.getByTestId('state').textContent);
+    const sections = [{ id: 'categorias', config: { slides: [{ id: 'hogar', title: 'Hogar', href: '/categoria/hogar', enabled: true }] } }];
+    let card = getBannerTemplate({ templateId: 'editorial', templateConfigs: saved.templateConfigs }, sections).config.cards[0];
+    expect(card.link).toBe(`/producto/${productId}`);
+    expect(card.image).toBe('/vestido.png');
+    fireEvent.change(screen.getByLabelText('Al hacer clic, abrir'), { target: { value: 'category' } });
+    const updated = JSON.parse(screen.getByTestId('state').textContent);
+    card = getBannerTemplate({ templateId: 'editorial', templateConfigs: updated.templateConfigs }, sections).config.cards[0];
+    expect(card.link).toBe('/categoria/hogar');
+  });
+
 });
