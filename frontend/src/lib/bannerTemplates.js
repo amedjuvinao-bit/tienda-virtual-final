@@ -30,6 +30,12 @@ export const BANNER_TEMPLATE_META = {
 
 const action = (text) => ({ enabled: true, text, link: '' });
 
+export const EDITORIAL_TRUST_DEFAULTS = [
+  { text: 'Envíos a todo el país', image: '' },
+  { text: 'Empaque especial', image: '' },
+  { text: 'Moda que inspira', image: '' },
+];
+
 export const BANNER_TEMPLATE_DEFAULTS = {
   discovery: {
     eyebrow: 'DESCUBRE TU TIENDA', title: 'Tu próximo favorito',
@@ -40,7 +46,7 @@ export const BANNER_TEMPLATE_DEFAULTS = {
   editorial: {
     eyebrow: 'UNA NUEVA MIRADA', title: 'Lo nuevo empieza aquí',
     description: 'Selecciones que invitan a descubrir.', footerText: 'Una selección para ti',
-    primary: action('Ver novedades'), secondary: action('Descubrir'),
+    primary: action('Ver novedades'), secondary: action('Descubrir'), trustItems: EDITORIAL_TRUST_DEFAULTS,
     textColor: '#fffaf5', accentColor: '#f7d9d5', glassColor: '#ffffff', overlayOpacity: 42,
   },
   atelier: {
@@ -67,7 +73,7 @@ export function getBannerTemplate(banner, sections) {
   const raw = banner?.templateConfigs?.[id] || {};
   const defaults = BANNER_TEMPLATE_DEFAULTS[id];
   const existing = getExistingBannerCategories(sections);
-  const saved = Array.isArray(raw.cards) && raw.cards.length ? raw.cards : existing.slice(0, id === 'atelier' ? 2 : 3).map((entry, index) => ({
+  const saved = Array.isArray(raw.cards) && raw.cards.length ? raw.cards : existing.slice(0, id === 'atelier' ? 2 : id === 'editorial' ? 8 : 3).map((entry, index) => ({
     categoryId: entry.id, x: id === 'atelier' ? 45 + index * 29 : 68 + index * 13, y: id === 'atelier' ? 28 + index * 24 : 42 + index * 26,
   }));
   return {
@@ -78,6 +84,7 @@ export function getBannerTemplate(banner, sections) {
       buttonAnimation: safeBannerButtonAnimation(raw.buttonAnimation),
       primary: { ...defaults.primary, ...raw.primary },
       secondary: { ...defaults.secondary, ...raw.secondary },
+      trustItems: EDITORIAL_TRUST_DEFAULTS.map((fallback, index) => ({ ...fallback, ...(raw.trustItems?.[index] || {}) })),
       cards: saved.map((item) => {
         const category = existing.find((entry) => entry.id === item.categoryId);
         return category ? {
