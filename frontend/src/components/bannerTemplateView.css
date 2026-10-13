@@ -265,11 +265,12 @@
   html.rb-section-dock-enabled .rb-template--editorial:not([data-preview-device]) .rb-template__rail { bottom: max(6%, var(--rb-scroll-dock-height, 80px)); }
 }
 
-/* Mobile art direction: preserve the complete product photo and keep actions readable. */
+
+/* Mobile art direction for the public banner and mobile preview only. */
 .rb-template__picture .rb-template__mobile-backdrop { display: none; }
 @container (max-width: 680px) {
-  .rb-template__picture { background: color-mix(in srgb, var(--rb-template-glass) 42%, #d8a8a8); }
-  .rb-template__picture .rb-template__mobile-backdrop {
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__picture { background: color-mix(in srgb, var(--rb-template-glass) 42%, #d8a8a8); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__picture .rb-template__mobile-backdrop {
     display: block;
     position: absolute;
     inset: -12%;
@@ -280,8 +281,8 @@
     opacity: .78;
     pointer-events: none;
   }
-  .rb-template__picture img:not(.rb-template__mobile-backdrop),
-  .rb-template__picture video {
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__picture img:not(.rb-template__mobile-backdrop),
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__picture video {
     position: absolute;
     top: 34% !important;
     right: 0;
@@ -292,47 +293,38 @@
     object-fit: contain !important;
     object-position: center !important;
   }
-  .rb-template__wash {
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__wash {
     background: linear-gradient(180deg, rgba(22,10,20,.42), rgba(22,10,20,.18) 34%, transparent 58%, rgba(22,10,20,.28));
   }
-  .rb-template__content,
-  .rb-template--editorial .rb-template__content,
-  .rb-template--atelier .rb-template__content {
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__content {
     top: clamp(88px, 15%, 120px);
     left: 6%;
     width: 88%;
   }
-  .rb-template__title,
-  .rb-template--editorial .rb-template__title,
-  .rb-template--atelier .rb-template__title { font-size: clamp(26px, 8.2cqw, 36px); }
-  .rb-template__eyebrow { font-size: clamp(9px, 2.7cqw, 12px); }
-  .rb-template__description { font-size: clamp(11px, 3.1cqw, 14px); }
-  .rb-template__actions { gap: 8px; }
-  .rb-liquid-button { min-height: 38px; padding: 9px 12px; font-size: clamp(11px, 3cqw, 13px); }
-  .rb-template__rail,
-  .rb-template--editorial .rb-template__rail { bottom: 3%; left: 6%; right: 6%; width: auto; }
-  .rb-template__rail-heading { font-size: clamp(9px, 2.5cqw, 11px); }
-  .rb-template__cards,
-  .rb-template[data-preview-device="mobile"] .rb-template__cards {
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__title { font-size: clamp(26px, 8.2cqw, 36px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__eyebrow { font-size: clamp(9px, 2.7cqw, 12px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__description { font-size: clamp(11px, 3.1cqw, 14px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__actions { gap: 8px; }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-liquid-button { min-height: 38px; padding: 9px 12px; font-size: clamp(11px, 3cqw, 13px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__rail { bottom: 3%; left: 6%; right: 6%; width: auto; }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__rail-heading { font-size: clamp(9px, 2.5cqw, 11px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__cards {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
     overflow: visible;
     scroll-snap-type: none;
   }
-  .rb-template__card,
-  .rb-template[data-preview-device="mobile"] .rb-template__card {
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card {
     min-width: 0;
     min-height: 52px;
     width: 100%;
     gap: 7px;
     padding: 8px;
   }
-  .rb-template__card:first-child:nth-last-child(3) { grid-column: 1 / -1; }
-  .rb-template__card img { width: 25px; height: 25px; }
-  .rb-template__card small,
-  .rb-template[data-preview-device="mobile"] .rb-template__card small { font-size: clamp(9px, 2.45cqw, 11px); }
-  .rb-template__card strong,
-  .rb-template[data-preview-device="mobile"] .rb-template__card strong { font-size: clamp(11px, 3cqw, 13px); }
-  .rb-template__card > span:last-child { font-size: 15px; }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card:first-child:nth-last-child(3) { grid-column: 1 / -1; }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card img { width: 25px; height: 25px; }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card small { font-size: clamp(9px, 2.45cqw, 11px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card strong { font-size: clamp(11px, 3cqw, 13px); }
+  :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card > span:last-child { font-size: 15px; }
 }
