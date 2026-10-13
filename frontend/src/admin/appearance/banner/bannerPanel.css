@@ -188,3 +188,10 @@
 .banner-panel--preview .banner-preview-viewport[data-device="mobile"] { width: min(100%, 220px); aspect-ratio: 390 / 844; }
 .banner-panel--preview .banner-preview-viewport[data-device="tablet"] { width: min(100%, 240px); aspect-ratio: 820 / 1180; }
 .banner-panel--preview .banner-preview-viewport[data-device="mobile"] .banner-preview-mini-header { font-size: 9px; }
+
+/* La vista previa conserva el ancho real de cada dispositivo y se escala completa. */
+.banner-preview-stage { position: absolute; inset: 0 auto auto 0; transform-origin: top left; overflow: hidden; background: var(--admin-page-bg); }
+.banner-preview-stage .banner-preview-hero { width: 100%; }
+.banner-preview-stage .banner-preview-mini-header { font-size: 22px; padding: 14px 20px; }
+.banner-preview-viewport[data-device="tablet"] .banner-preview-stage .banner-preview-mini-header,
+.banner-preview-viewport[data-device="mobile"] .banner-preview-stage .banner-preview-mini-header { font-size: 13px; padding: 8px 12px; }
