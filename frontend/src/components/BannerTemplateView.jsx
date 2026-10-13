@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Truck, Gift, Heart } from 'lucide-react';
 import { getBannerTemplate, moveBannerButtonLight, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
 
@@ -80,6 +81,15 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
         <GlassLink action={c.primary} preview={preview} selected={selectedPart === 'action:primary'} onSelect={() => onSelect?.('action:primary')} />
         <GlassLink action={c.secondary} secondary preview={preview} selected={selectedPart === 'action:secondary'} onSelect={() => onSelect?.('action:secondary')} />
       </div>
+      {id === 'editorial' && <div className="rb-template__trust" aria-label="Beneficios de la tienda">
+        {c.trustItems.map((item, index) => {
+          const Icon = [Truck, Gift, Heart][index];
+          return <span key={index} className="rb-template__trust-item" data-selected={preview && selectedPart === `trust:${index}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`trust:${index}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`trust:${index}`); } } : undefined}>
+            <span className="rb-template__trust-icon"><Icon size={19} strokeWidth={1.6} aria-hidden="true" />{item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}</span>
+            <span>{item.text}</span>
+          </span>;
+        })}
+      </div>}
     </div>
     {id === 'atelier' ? <div className="rb-template__hotspots">
       {cards.map((item, index) => {
@@ -132,7 +142,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
       <div className="rb-template__cards">
         {cards.map((item, index) => {
           const href = safeBannerLink(item.link);
-          const content = <>{item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}<span className="rb-template__card-copy"><small>{item.label}</small><strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
+          const content = <>{item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}<span className="rb-template__card-copy">{item.label && item.label !== item.text && <small>{item.label}</small>}<strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
           return href ? <a key={index} className="rb-template__card" href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
             : <div key={index} className="rb-template__card" onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}
