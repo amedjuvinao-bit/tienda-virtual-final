@@ -168,3 +168,18 @@
 .banner-image-devices button.is-active { border-color: #995a83; background: #f7edf4; color: #743c65; }
 .banner-image-guidance { font-size: 13px; line-height: 1.5; color: #493d49; margin: 8px 0; }
 .banner-image-fallback { font-size: 12px; color: #755b60; margin: 0 0 10px; }
+
+/* Encuadre integrado: queda junto a los archivos y no cubre la vista previa. */
+.banner-crop-editor { margin-top: 14px; padding: 14px; border: 1px solid color-mix(in srgb, var(--admin-primary) 26%, var(--admin-card-border)); border-radius: 16px; background: var(--admin-widget-surface-bg, var(--admin-card-bg)); }
+.banner-crop-editor__head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.banner-crop-editor__head strong { display: block; font-size: 14px; }
+.banner-crop-editor__head small { display: block; max-width: 320px; font-size: 11px; line-height: 1.4; color: var(--admin-card-muted-text); }
+.banner-crop-frame { display: grid; justify-items: center; gap: 7px; }
+.banner-crop-frame__image { width: min(100%, 390px); max-height: 330px; overflow: hidden; border: 2px solid color-mix(in srgb, var(--admin-primary) 42%, var(--admin-card-border)); border-radius: 13px; background: var(--admin-card-bg); cursor: grab; touch-action: none; user-select: none; }
+.banner-crop-frame__image:active { cursor: grabbing; }
+.banner-crop-frame[data-device="tablet"] .banner-crop-frame__image { width: min(100%, 220px); }
+.banner-crop-frame[data-device="mobile"] .banner-crop-frame__image { width: min(100%, 150px); }
+.banner-crop-frame__image img { width: 100%; height: 100%; display: block; pointer-events: none; }
+.banner-crop-frame__image span { display: grid; place-items: center; height: 100%; padding: 10px; font-size: 12px; text-align: center; }
+.banner-panel .banner-crop-frame p { margin: 0; font-size: 11px; text-align: center; }
+.banner-crop-editor__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; }
