@@ -75,12 +75,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       setBanner(overrideRef.current.banner || b)
       setBannerSections(overrideRef.current.sections || settings?.theme?.sections || [])
 
-      console.log("RB BANNER LOADED", {
-        type: b?.type || "slider",
-        slidesLen: Array.isArray(b?.slides) ? b.slides.length : 0,
-        heightMode: b?.heightMode || "auto",
-        firstSlideKeys: b?.slides?.[0] ? Object.keys(b.slides[0]) : [],
-      })
 
       setSlideAnimTick((t) => t + 1)
     } catch (e) {
@@ -218,16 +212,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     window.addEventListener("storage", onStorage)
     window.addEventListener("focus", onFocus)
 
-    const poll = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        loadBannerSettings({ silent: true })
-      }
-    }, 6000)
 
     return () => {
       window.removeEventListener("storage", onStorage)
       window.removeEventListener("focus", onFocus)
-      clearInterval(poll)
     }
   }, [loadBannerSettings])
 
@@ -694,15 +682,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
             setShowButtons(true)
             setSlideAnimTick((t) => t + 1)
 
-            const totalSlides = s?.track?.details?.slides?.length ?? null
-            const rel = s?.track?.details?.rel ?? 0
-            console.log("RB SLIDER CREATED", {
-              totalSlides,
-              rel,
-              abs: s?.track?.details?.abs ?? 0,
-              bannerLoading,
-              slidesLenReact: slidesLenRef.current,
-            })
           },
 
           slideChanged(s) {
@@ -716,18 +695,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
             startTsRef.current = performance.now()
             setProgress(0)
 
-            const totalSlides = s?.track?.details?.slides?.length ?? null
-            const abs = s?.track?.details?.abs ?? null
-
-            console.log("RB SLIDER CHANGE", {
-              rel: relSafe,
-              relRaw,
-              abs,
-              totalSlides,
-              bannerLoading,
-              bannerType,
-              slideImage: slides[relSafe]?.image,
-            })
           },
 
           animationEnded() {
