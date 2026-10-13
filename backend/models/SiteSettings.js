@@ -58,6 +58,8 @@ const ButtonSchema = new Schema(
 const BannerSlideSchema = new Schema(
   {
     image: { type: String, default: "" },
+    imageTablet: { type: String, default: "" },
+    imageMobile: { type: String, default: "" },
     link: { type: String, default: "" },
 
     posX: { type: Number, default: 50 },
@@ -138,6 +140,8 @@ const BannerSchema = new Schema(
     sliderShowProgress: { type: Boolean, default: true },
 
     imageUrl: { type: String, default: "" },
+    imageTabletUrl: { type: String, default: "" },
+    imageMobileUrl: { type: String, default: "" },
     imageLink: { type: String, default: "" },
 
     imagePosX: { type: Number, default: 50 },
