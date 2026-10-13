@@ -962,6 +962,37 @@ export default function AppearancePage() {
         throw new Error('El servidor no conservó la posición de las tarjetas. Reinicia el backend con la versión actualizada y vuelve a guardar; los cambios siguen aquí en el editor.');
       }
 
+      const requestedBanner = changedTheme.banner;
+      const storedBanner = saved?.theme?.banner;
+      if (requestedBanner) {
+        const devicePositionKeys = ['posX', 'posY', 'tabletPosX', 'tabletPosY', 'mobilePosX', 'mobilePosY'];
+        const singlePositionKeys = ['imagePosX', 'imagePosY', 'imageTabletPosX', 'imageTabletPosY', 'imageMobilePosX', 'imageMobilePosY'];
+        const imageKeys = ['image', 'imageTablet', 'imageMobile'];
+        const singleImageKeys = ['imageUrl', 'imageTabletUrl', 'imageMobileUrl'];
+        const mismatches = [];
+        const checkFields = (requested, stored, keys, label) => {
+          for (const key of keys) {
+            if (requested?.[key] === undefined) continue;
+            const expected = key.toLowerCase().includes('pos') ? Number(requested[key]) : String(requested[key] || '');
+            const actual = key.toLowerCase().includes('pos') ? Number(stored?.[key]) : String(stored?.[key] || '');
+            if (!Object.is(actual, expected)) mismatches.push(label);
+          }
+        };
+        if (requestedBanner.type === 'slider') {
+          const wanted = requestedBanner.slides || [];
+          const received = storedBanner?.slides || [];
+          if (received.length !== wanted.length) mismatches.push('galería');
+          wanted.forEach((slide, index) => checkFields(slide, received[index], [...devicePositionKeys, ...imageKeys], `slide ${index + 1}`));
+        } else if (requestedBanner.type === 'image') {
+          checkFields(requestedBanner, storedBanner, [...singlePositionKeys, ...singleImageKeys], 'imagen principal');
+        }
+        if (mismatches.length) {
+          setAppearanceRevision(saved.appearanceRevision);
+          setServerSnapshot(buildThemeFromServer(saved.theme));
+          throw new Error(`El servidor no conservó el encuadre o las imágenes de ${[...new Set(mismatches)].join(', ')}. El ajuste sigue en el editor. Sincroniza y reinicia el backend con esta versión, luego vuelve a guardar.`);
+        }
+      }
+
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
       setAppearanceRevision(saved.appearanceRevision);
