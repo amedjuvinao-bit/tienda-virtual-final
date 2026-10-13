@@ -10,6 +10,8 @@ import {
   getCurrentSectionIndex,
   getNextSectionIndex,
   getPrevSectionIndex,
+  resolveSectionControlStyle,
+  getSectionControlPresetStyle,
 } from "../admin/appearance/general/generalHelpers";
 
 function getShadowValue(shadow) {
@@ -66,6 +68,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
       : DEFAULT_SECTION_IDS;
 
   const enabled = safeConfig.enabled !== false;
+  const visualStyle = resolveSectionControlStyle(safeConfig.visualStyle);
   const showUp = safeConfig.showUp !== false;
   const showDown = safeConfig.showDown !== false;
 
@@ -123,8 +126,12 @@ export default function ScrollButton({ config, buttonAnimation }) {
   const [bannerDockBottomPx, setBannerDockBottomPx] = useState(null);
   useEffect(() => {
     document.documentElement.classList.toggle("rb-section-dock-enabled", enabled);
-    return () => document.documentElement.classList.remove("rb-section-dock-enabled");
-  }, [enabled]);
+    document.documentElement.style.setProperty("--rb-scroll-dock-height", `${buttonSizePx + 20}px`);
+    return () => {
+      document.documentElement.classList.remove("rb-section-dock-enabled");
+      document.documentElement.style.removeProperty("--rb-scroll-dock-height");
+    };
+  }, [enabled, buttonSizePx]);
   useEffect(() => {
     let frame = 0;
     const measure = () => {
@@ -203,7 +210,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
     borderRadius: `${borderRadiusPx}px`,
     boxShadow: getShadowValue(shadow),
     overflow: "hidden",
-    ...(isBannerDocked ? { "--liquid-tint": "transparent", background: "transparent", border: "0", borderRadius: "0", boxShadow: "none", overflow: "visible" } : {}),
+    ...getSectionControlPresetStyle(visualStyle, safeConfig),
   };
 
   const upImageSizePx = (buttonSizePx * upImageSizePercent) / 100;
@@ -232,17 +239,13 @@ export default function ScrollButton({ config, buttonAnimation }) {
           40% { transform: translateY(-10px); }
           60% { transform: translateY(-5px); }
         }
-        .rb-banner-section-control { background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-        .rb-banner-section-control .rb-chrome-hover__surface, .rb-banner-section-control::after { display: none; }
-        .rb-banner-section-control:hover { transform: translateY(-2px); filter: drop-shadow(0 2px 5px rgba(49, 22, 27, .32)); }
-        .rb-banner-section-control:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 5px; }
       `}</style>
 
       <div
         className="hidden md:flex fixed z-50 items-center"
         style={{
           bottom: `${isBannerDocked ? bannerDockBottomPx : bottomPx + railClearancePx}px`,
-          gap: `${isBannerDocked ? Math.max(gapPx, 22) : gapPx}px`,
+          gap: `${visualStyle === "editorial" ? Math.max(gapPx, 22) : gapPx}px`,
           transition: 'bottom .2s ease',
           ...(isBannerDocked ? { left: "50%", transform: "translateX(-50%)" } : wrapperPositionStyle),
         }}
@@ -254,7 +257,8 @@ export default function ScrollButton({ config, buttonAnimation }) {
             data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
             data-click-animation={activeAnimation === 'up'}
             onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
-            className={`storefront-liquid-icon${isBannerDocked ? " rb-banner-section-control" : ""}`}
+            className="storefront-liquid-icon"
+            data-scroll-style={visualStyle}
             style={{
               ...baseButtonStyle,
               animation: activeAnimation === 'up' ? getButtonAnimation(upAnimation, "rbScrollMoveUp 450ms ease-in-out 1") : 'none',
@@ -274,7 +278,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
                 }}
               />
             ) : (
-              isBannerDocked ? <ChevronUp
+              visualStyle === "editorial" ? <ChevronUp
                 style={{
                   width: `${buttonSizePx * 0.55}px`,
                   height: `${buttonSizePx * 0.55}px`,
@@ -287,7 +291,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
           </button>
         )}
 
-        {isBannerDocked && showUp && showDown && <span aria-hidden="true" style={{ width: "1px", height: `${Math.round(buttonSizePx * .55)}px`, background: iconColor, opacity: .55 }} />}
+        {visualStyle === "editorial" && showUp && showDown && <span aria-hidden="true" style={{ width: "1px", height: `${Math.round(buttonSizePx * .55)}px`, background: iconColor, opacity: .55 }} />}
 
         {showDown && (
           <button
@@ -296,7 +300,8 @@ export default function ScrollButton({ config, buttonAnimation }) {
             data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
             data-click-animation={activeAnimation === 'down'}
             onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
-            className={`storefront-liquid-icon${isBannerDocked ? " rb-banner-section-control" : ""}`}
+            className="storefront-liquid-icon"
+            data-scroll-style={visualStyle}
             style={{
               ...baseButtonStyle,
               animation: activeAnimation === 'down' ? getButtonAnimation(
@@ -319,7 +324,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
                 }}
               />
             ) : (
-              isBannerDocked ? <ChevronDown
+              visualStyle === "editorial" ? <ChevronDown
                 style={{
                   width: `${buttonSizePx * 0.55}px`,
                   height: `${buttonSizePx * 0.55}px`,
