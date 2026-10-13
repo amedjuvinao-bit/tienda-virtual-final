@@ -7,9 +7,6 @@ import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
 import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import {
   DEFAULT_SECTION_IDS,
-  getCurrentSectionIndex,
-  getNextSectionIndex,
-  getPrevSectionIndex,
   resolveSectionControlStyle,
   getSectionControlPresetStyle,
 } from "../admin/appearance/general/generalHelpers";
@@ -29,33 +26,31 @@ function getButtonAnimation(name, fallback) {
   return fallback;
 }
 
-function scrollExactlyToSection(id, options = {}) {
-  const el = document.getElementById(id);
-  if (!el) return;
+function getLayoutTop(element) {
+  let top = 0;
+  for (let node = element; node; node = node.offsetParent) top += node.offsetTop;
+  return top;
+}
 
-  const extraOffsetPx = Number.isFinite(Number(options.offsetTopPx))
-    ? Number(options.offsetTopPx)
-    : 0;
+function getSectionTargets(sectionIds) {
+  return sectionIds
+    .map((id) => document.getElementById(id))
+    .filter(Boolean)
+    .map((element) => ({
+      id: element.id,
+      top: getLayoutTop(element),
+    }))
+    .sort((a, b) => a.top - b.top);
+}
 
-  const behavior = options.behavior === "auto" ? "auto" : "smooth";
-
-  const y = el.getBoundingClientRect().top + window.pageYOffset - extraOffsetPx;
-
-  const destination = Math.max(0, y);
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const current = Array.from(document.querySelectorAll('.storefront-sections > section'))
-    .find((section) => section.getBoundingClientRect().top <= window.innerHeight * 0.45 &&
-      section.getBoundingClientRect().bottom > window.innerHeight * 0.45);
-
-  if (current && current !== el && !reducedMotion && behavior === 'smooth') {
-    current.dataset.sectionMotion = 'leaving';
-    window.setTimeout(() => {
-      window.scrollTo({ top: destination, behavior });
-      if (current.dataset.sectionMotion === 'leaving') delete current.dataset.sectionMotion;
-    }, 190);
-  } else {
-    window.scrollTo({ top: destination, behavior: reducedMotion ? 'auto' : behavior });
-  }
+function scrollExactlyToSection(target, options = {}) {
+  if (!target) return;
+  const offset = Math.max(0, Number(options.offsetTopPx) || 0);
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  window.scrollTo({
+    top: Math.max(0, target.top - offset),
+    behavior: reducedMotion || options.behavior === "auto" ? "auto" : "smooth",
+  });
 }
 
 export default function ScrollButton({ config, buttonAnimation }) {
@@ -122,73 +117,38 @@ export default function ScrollButton({ config, buttonAnimation }) {
     ? Number(safeConfig.downImageSizePercent)
     : 70;
 
-  const [railClearancePx, setRailClearancePx] = useState(0);
-  const [bannerDockBottomPx, setBannerDockBottomPx] = useState(null);
   useEffect(() => {
     document.documentElement.classList.toggle("rb-section-dock-enabled", enabled);
-    document.documentElement.style.setProperty("--rb-scroll-dock-height", `${buttonSizePx + 20}px`);
+    document.documentElement.style.setProperty(
+      "--rb-scroll-dock-height",
+      `${Math.max(0, bottomPx + buttonSizePx + 12)}px`
+    );
     return () => {
       document.documentElement.classList.remove("rb-section-dock-enabled");
       document.documentElement.style.removeProperty("--rb-scroll-dock-height");
     };
-  }, [enabled, buttonSizePx]);
-  useEffect(() => {
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const rail = document.querySelector('.rb-template:not([data-preview-device]) .rb-template__rail');
-      const bounds = rail?.getBoundingClientRect();
-      const bannerBounds = rail?.closest('.rb-template')?.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const count = Number(showUp) + Number(showDown);
-      const controlsWidth = count * buttonSizePx + Math.max(0, count - 1) * gapPx;
-      const left = position === 'left' ? 24 : position === 'right' ? viewportWidth - 24 - controlsWidth : (viewportWidth - controlsWidth) / 2;
-      const top = viewportHeight - bottomPx - buttonSizePx;
-      const intersectsRail = bounds && bounds.width > 0 && bounds.height > 0 &&
-        bounds.left < left + controlsWidth && bounds.right > left &&
-        bounds.top < top + buttonSizePx && bounds.bottom > top;
-      const canDock = bounds && bannerBounds && bounds.width > 0 && bounds.height > 0 &&
-        bannerBounds.top < viewportHeight && bannerBounds.bottom > 0 &&
-        bounds.bottom > 0 && bounds.bottom + buttonSizePx + 8 <= Math.min(bannerBounds.bottom - 10, viewportHeight - 8);
-      const dockBottom = canDock ? Math.max(8, Math.round(viewportHeight - bounds.bottom - 8 - buttonSizePx)) : null;
-      setBannerDockBottomPx((previous) => previous === dockBottom ? previous : dockBottom);
-      const clearance = !canDock && intersectsRail ? Math.max(0, Math.ceil(viewportHeight - bounds.top + 14 - bottomPx)) : 0;
-      setRailClearancePx((previous) => previous === clearance ? previous : clearance);
-    };
-    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
-    schedule();
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    return () => {
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
-  }, [position, bottomPx, gapPx, buttonSizePx, showUp, showDown, config]);
+  }, [enabled, bottomPx, buttonSizePx]);
 
-  const scrollToIndex = (index) => {
-    const id = sectionIds[index];
-    if (!id) return;
-
-    scrollExactlyToSection(id, {
-      offsetTopPx,
-      behavior,
-    });
+  const navigate = (direction) => {
+    const targets = getSectionTargets(sectionIds);
+    if (!targets.length) return;
+    const offset = Math.max(0, offsetTopPx);
+    const at = window.scrollY + offset;
+    const tolerance = 4;
+    const target = direction === "next"
+      ? targets.find((item) => item.top > at + tolerance) || targets[0]
+      : [...targets].reverse().find((item) => item.top < at - tolerance) || targets[targets.length - 1];
+    scrollExactlyToSection(target, { offsetTopPx: offset, behavior });
   };
 
   const handlePrev = () => {
-    setActiveAnimation('up');
-    const currentIndex = getCurrentSectionIndex(sectionIds);
-    const prevIndex = getPrevSectionIndex(currentIndex, sectionIds);
-    scrollToIndex(prevIndex);
+    setActiveAnimation("up");
+    navigate("prev");
   };
 
   const handleNext = () => {
-    setActiveAnimation('down');
-    const currentIndex = getCurrentSectionIndex(sectionIds);
-    const nextIndex = getNextSectionIndex(currentIndex, sectionIds);
-    scrollToIndex(nextIndex);
+    setActiveAnimation("down");
+    navigate("next");
   };
 
   if (!enabled) return null;
@@ -199,8 +159,6 @@ export default function ScrollButton({ config, buttonAnimation }) {
       : position === "right"
       ? { right: "24px" }
       : { left: "50%", transform: "translateX(-50%)" };
-
-  const isBannerDocked = bannerDockBottomPx !== null;
 
   const baseButtonStyle = {
     width: `${buttonSizePx}px`,
@@ -244,10 +202,9 @@ export default function ScrollButton({ config, buttonAnimation }) {
       <div
         className="hidden md:flex fixed z-50 items-center"
         style={{
-          bottom: `${isBannerDocked ? bannerDockBottomPx : bottomPx + railClearancePx}px`,
+          bottom: `${bottomPx}px`,
           gap: `${visualStyle === "editorial" ? Math.max(gapPx, 22) : gapPx}px`,
-          transition: 'bottom .2s ease',
-          ...(isBannerDocked ? { left: "50%", transform: "translateX(-50%)" } : wrapperPositionStyle),
+          ...wrapperPositionStyle,
         }}
       >
         {showUp && (
