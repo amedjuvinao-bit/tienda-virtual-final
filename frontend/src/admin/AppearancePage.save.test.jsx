@@ -44,7 +44,7 @@ vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }
 }}>Ajustar slider ({theme.banner.sliderIntervalMs} ms)</button><button onClick={() => setPath('banner.templateConfigs.atelier', {
   ...theme.banner.templateConfigs?.atelier,
   cards: [{ categoryId: 'hogar', position: { desktop: { x: 45, y: 37 } } }],
-})}>Mover tarjeta</button></> }));
+})}>Mover tarjeta</button><button onClick={() => setPath('banner.slides', [{ image: '/portada.jpg', posX: 50, posY: 50, mobilePosX: 73, mobilePosY: 31 }])}>Ajustar encuadre móvil</button></> }));
 vi.mock('./appearance/sections/SectionsPanel', () => ({
   default: ({ theme, setPath }) => <button onClick={() => setPath('sections', theme.sections.map((section) =>
     section.id === 'look' ? { ...section, title: 'Nuevos looks' } : section
@@ -157,6 +157,35 @@ describe('guardado seguro de Apariencia', () => {
     expect(screen.getByText(/área pendiente por guardar/)).toBeInTheDocument();
 
     saveSiteSettings.mockImplementationOnce(async (payload) => ({ theme: { ...initial.theme, ...payload.theme }, menus: initial.menus, appearanceRevision: 5 }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
+  });
+
+  it('no confirma un encuadre que el backend descartó y permite volver a guardarlo', async () => {
+    const user = userEvent.setup();
+    permissions.allowed = ['appearance:update'];
+    saveSiteSettings.mockImplementationOnce(async (payload) => ({
+      theme: { banner: { ...payload.theme.banner, slides: [{ image: '/portada.jpg', posX: 50, posY: 50 }] } },
+      menus: initial.menus,
+      appearanceRevision: 4,
+    }));
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+    await user.click(screen.getByRole('button', { name: 'Ajustar encuadre móvil' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.slides[0]).toMatchObject({ mobilePosX: 73, mobilePosY: 31 });
+    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no conservó el encuadre');
+    expect(screen.getByText(/área pendiente por guardar/)).toBeInTheDocument();
+
+    saveSiteSettings.mockImplementationOnce(async (payload) => ({
+      theme: { banner: payload.theme.banner },
+      menus: initial.menus,
+      appearanceRevision: 5,
+    }));
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
