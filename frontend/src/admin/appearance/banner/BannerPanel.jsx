@@ -39,6 +39,9 @@ const clampNum = (n, min, max, fallback) => {
   return Math.max(min, Math.min(max, x));
 };
 
+const IMAGE_SIZES = { desktop: { label: 'Escritorio', size: '1920 × 1080 px' }, tablet: { label: 'Tableta', size: '1200 × 1600 px' }, mobile: { label: 'Móvil', size: '1080 × 1920 px' } };
+const imageFieldForDevice = (device, single = false) => single ? ({ desktop: 'imageUrl', tablet: 'imageTabletUrl', mobile: 'imageMobileUrl' })[device] : ({ desktop: 'image', tablet: 'imageTablet', mobile: 'imageMobile' })[device];
+
 const buildDefaultButton = () => ({
   enabled: true,
   kind: "image",
@@ -347,9 +350,9 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const slides = useMemo(() => (Array.isArray(b.slides) ? b.slides : []), [b.slides]);
 
   // Local files (solo banner)
-  const [bannerImageFile, setBannerImageFile] = useState(null);
+  const [bannerImageFiles, setBannerImageFiles] = useState({});
   const [bannerVideoFile, setBannerVideoFile] = useState(null);
-  const [bannerSlideFiles, setBannerSlideFiles] = useState({}); // { [idx]: File }
+  const [bannerSlideFiles, setBannerSlideFiles] = useState({}); // { [idx]: { desktop, tablet, mobile } }
 
   // UI states
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -520,13 +523,14 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     }
   };
 
-  const onUploadBannerImage = async () => {
+  const onUploadBannerImage = async (device) => {
     try {
-      if (!bannerImageFile) return setUploadStatus({ type: 'error', text: 'Selecciona una imagen primero.' });
+      const file = bannerImageFiles[device];
+      if (!file) return setUploadStatus({ type: 'error', text: 'Selecciona una imagen primero.' });
       setUploading(true);
-      const url = await uploadToCloudinaryViaBackend(bannerImageFile, "image");
-      setPath("banner.imageUrl", url);
-      setBannerImageFile(null);
+      const url = await uploadToCloudinaryViaBackend(file, "image");
+      setPath(`banner.${imageFieldForDevice(device, true)}`, url);
+      setBannerImageFiles((prev) => ({ ...prev, [device]: null }));
       setUploadStatus({ type: 'success', text: 'Imagen subida. Guarda los cambios para publicarla.' });
     } catch (e) {
       console.error(e);
@@ -536,14 +540,14 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
     }
   };
 
-  const onUploadBannerSlideImage = async (idx) => {
+  const onUploadBannerSlideImage = async (idx, device) => {
     try {
-      const file = bannerSlideFiles?.[idx] || null;
+      const file = bannerSlideFiles?.[idx]?.[device] || null;
       if (!file) return setUploadStatus({ type: 'error', text: 'Selecciona una imagen primero.' });
       setUploading(true);
       const url = await uploadToCloudinaryViaBackend(file, "image");
-      setSlide(idx, { image: url });
-      setBannerSlideFiles((prev) => ({ ...prev, [idx]: null }));
+      setSlide(idx, { [imageFieldForDevice(device)]: url });
+      setBannerSlideFiles((prev) => ({ ...prev, [idx]: { ...prev[idx], [device]: null } }));
       setUploadStatus({ type: 'success', text: 'Slide subido. Guarda los cambios para publicarlo.' });
     } catch (e) {
       console.error(e);
@@ -689,8 +693,13 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
                 <button type="button" className="banner-btn" onClick={() => editCurrent()}>{legacyButtons ? 'Editar' : 'Encuadre'}</button>
                 <button type="button" className="banner-btn banner-btn--danger" onClick={() => removeSlide(activeSlideIdx)} aria-label={`Eliminar slide ${activeSlideIdx + 1}`}>Eliminar</button>
               </div>
-              <label className="banner-upload-field"><span>Imagen del slide</span><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Elegir imagen del slide" onChange={(e) => setBannerSlideFiles((prev) => ({ ...prev, [activeSlideIdx]: e.target.files?.[0] || null }))} /></label>
-              {bannerSlideFiles[activeSlideIdx] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerSlideImage(activeSlideIdx)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
+              <div className="banner-image-devices" role="group" aria-label="Imagen para cada dispositivo">
+                {Object.entries(IMAGE_SIZES).map(([device, option]) => <button key={device} type="button" className={previewDevice === device ? 'is-active' : ''} onClick={() => setPreviewDevice(device)}>{option.label}{slides[activeSlideIdx]?.[imageFieldForDevice(device)] ? ' ✓' : ''}</button>)}
+              </div>
+              <p className="banner-image-guidance"><strong>{IMAGE_SIZES[previewDevice].label}: {IMAGE_SIZES[previewDevice].size}</strong> · Imagen horizontal para escritorio y vertical para tableta o móvil. Deja espacio para el texto y los botones; algunas pantallas recortan los bordes.</p>
+              {previewDevice !== 'desktop' && !slides[activeSlideIdx]?.[imageFieldForDevice(previewDevice)] && <p className="banner-image-fallback">Mientras no subas esta versión, se mostrará la imagen de escritorio recortada.</p>}
+              <label className="banner-upload-field"><span>Imagen para {IMAGE_SIZES[previewDevice].label.toLowerCase()}</span><input key={`slide-${activeSlideIdx}-${previewDevice}`} type="file" accept="image/png,image/jpeg,image/webp" aria-label={`Elegir imagen para ${IMAGE_SIZES[previewDevice].label.toLowerCase()}`} onChange={(e) => setBannerSlideFiles((prev) => ({ ...prev, [activeSlideIdx]: { ...prev[activeSlideIdx], [previewDevice]: e.target.files?.[0] || null } }))} /></label>
+              {bannerSlideFiles[activeSlideIdx]?.[previewDevice] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerSlideImage(activeSlideIdx, previewDevice)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
             </> : <p className="banner-empty">Agrega una imagen para empezar.</p>}
           </div>
         )}
@@ -698,9 +707,13 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
         {bannerType === 'image' && (
           <div className="banner-content-card">
             <div className="banner-content-card__head"><strong>Imagen principal</strong><button type="button" className="banner-btn" onClick={() => editCurrent()}>{legacyButtons ? 'Ajustar encuadre y botón' : 'Ajustar encuadre'}</button></div>
-            <label className="banner-upload-field"><span>Subir imagen</span><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Elegir imagen principal" onChange={(e) => setBannerImageFile(e.target.files?.[0] || null)} /></label>
-            {bannerImageFile && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={onUploadBannerImage}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
-            <details className="banner-inline-details"><summary>Usar una imagen ya alojada</summary><Input label="URL de la imagen" value={b.imageUrl || ''} onChange={(e) => setPath('banner.imageUrl', e.target.value)} placeholder="https://..." /></details>
+            <div className="banner-image-devices" role="group" aria-label="Imagen para cada dispositivo">
+              {Object.entries(IMAGE_SIZES).map(([device, option]) => <button key={device} type="button" className={previewDevice === device ? 'is-active' : ''} onClick={() => setPreviewDevice(device)}>{option.label}{b[imageFieldForDevice(device, true)] ? ' ✓' : ''}</button>)}
+            </div>
+            <p className="banner-image-guidance"><strong>{IMAGE_SIZES[previewDevice].label}: {IMAGE_SIZES[previewDevice].size}</strong> · Imagen horizontal para escritorio y vertical para tableta o móvil. Deja espacio para el texto y los botones; algunas pantallas recortan los bordes.</p>
+            {previewDevice !== 'desktop' && !b[imageFieldForDevice(previewDevice, true)] && <p className="banner-image-fallback">Mientras no subas esta versión, se mostrará la imagen de escritorio recortada.</p>}
+            <label className="banner-upload-field"><span>Imagen para {IMAGE_SIZES[previewDevice].label.toLowerCase()}</span><input key={`single-${previewDevice}`} type="file" accept="image/png,image/jpeg,image/webp" aria-label={`Elegir imagen para ${IMAGE_SIZES[previewDevice].label.toLowerCase()}`} onChange={(e) => setBannerImageFiles((prev) => ({ ...prev, [previewDevice]: e.target.files?.[0] || null }))} /></label>
+            {bannerImageFiles[previewDevice] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerImage(previewDevice)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
             {legacyButtons && <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/coleccion o https://..." />}
           </div>
         )}
