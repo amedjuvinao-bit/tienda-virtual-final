@@ -59,68 +59,36 @@ const buildDefaultButton = () => ({
 /* =======================
    Drag Preview (image crop)
 ======================= */
-const BannerDragPreview = ({ src, fit = "cover", posX = 50, posY = 50, height = 220, onChange }) => {
-  const [dragging, setDragging] = useState(false);
+const cropFields = (device, single = false) => {
+  const prefix = device === 'desktop' ? (single ? 'imagePos' : 'pos') : device === 'tablet' ? (single ? 'imageTabletPos' : 'tabletPos') : (single ? 'imageMobilePos' : 'mobilePos');
+  return [prefix + 'X', prefix + 'Y'];
+};
+const imageForDevice = (item, device, single = false) =>
+  item?.[imageFieldForDevice(device, single)] ||
+  (device === 'mobile' ? item?.[imageFieldForDevice('tablet', single)] : '') ||
+  item?.[imageFieldForDevice('desktop', single)] || '';
 
-  const computePos = (e) => {
-    const el = e.currentTarget;
-    const rect = el.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    return { posX: clamp01(x), posY: clamp01(y) };
+const BannerDragPreview = ({ src, fit = 'cover', posX = 50, posY = 50, device = 'desktop', onChange }) => {
+  const dragging = useRef(false);
+  const viewport = BANNER_DEVICES[device] || BANNER_DEVICES.desktop;
+  const update = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    onChange?.({
+      posX: Math.round(clamp01(((event.clientX - rect.left) / rect.width) * 100)),
+      posY: Math.round(clamp01(((event.clientY - rect.top) / rect.height) * 100)),
+    });
   };
-
-  const onDown = (e) => {
-    if (!onChange) return;
-    setDragging(true);
-    onChange(computePos(e));
-    try {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-    } catch (_) {}
-  };
-
-  const onMove = (e) => {
-    if (!dragging || !onChange) return;
-    onChange(computePos(e));
-  };
-
-  const onUp = () => setDragging(false);
-
-  return (
-    <div className="min-w-0">
-      <div
-        data-admin-storefront-preview="true"
-        className={"rounded-xl border bg-gray-50 overflow-hidden select-none " + (onChange ? "cursor-grab active:cursor-grabbing" : "")}
-        style={{ height }}
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
-        title={onChange ? "Arrastra para encuadrar" : ""}
-      >
-        {src ? (
-          <img
-            src={src}
-            alt="preview"
-            className="h-full w-full"
-            style={{
-              objectFit: fit === "contain" ? "contain" : "cover",
-              objectPosition: `${clampNum(posX, 0, 100, 50)}% ${clampNum(posY, 0, 100, 50)}%`,
-            }}
-            draggable={false}
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-xs text-gray-400">Sin imagen</div>
-        )}
-      </div>
-
-      {onChange && (
-        <div className="mt-2 text-xs text-gray-600">
-          Tip: <span className="font-medium">arrastra</span> para mover encuadre (X/Y).
-        </div>
-      )}
+  return <div className="banner-crop-frame" data-device={device}>
+    <div className="banner-crop-frame__image" style={{ aspectRatio: `${viewport.width} / ${viewport.height}` }}
+      onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture?.(e.pointerId); update(e); }}
+      onPointerMove={(e) => { if (dragging.current) update(e); }}
+      onPointerUp={() => { dragging.current = false; }}
+      onPointerCancel={() => { dragging.current = false; }}
+      aria-label={`Arrastra para elegir el encuadre en ${viewport.label}`}>
+      {src ? <img src={src} alt={`Encuadre para ${viewport.label}`} draggable={false} style={{ objectFit: fit, objectPosition: `${clampNum(posX, 0, 100, 50)}% ${clampNum(posY, 0, 100, 50)}%` }} /> : <span>Sube una imagen para ajustar el encuadre</span>}
     </div>
-  );
+    <p>Arrastra la foto para elegir el área visible. Comprueba el resultado en la vista previa.</p>
+  </div>;
 };
 
 /* =======================
@@ -360,11 +328,13 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const [activeButtonIdx, setActiveButtonIdx] = useState(0);
   const [activePanel, setActivePanel] = useState('content');
   const [previewDevice, setPreviewDevice] = useState('desktop');
+  const [cropOpen, setCropOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
   const [templateSelection, setTemplateSelection] = useState('copy:title');
   const [placingCard, setPlacingCard] = useState(null);
   const [compactPreview, setCompactPreview] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 1050px)').matches);
   const workspaceRef = useRef(null);
+  const mediaSectionRef = useRef(null);
   const previewAnchorRef = useRef(null);
   const previewCardRef = useRef(null);
   const [floatingPreview, setFloatingPreview] = useState(null);
@@ -617,8 +587,13 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const effectiveInterval = b.sliderIntervalMs ?? b.autoplayMs ?? 3500;
   const activeSlideIdx = Math.min(selectedIdx, Math.max(0, slides.length - 1));
   const editCurrent = (buttonIndex = 0) => {
-    setActiveButtonIdx(Number.isInteger(buttonIndex) ? buttonIndex : 0);
-    setEditIdx(bannerType === "slider" ? activeSlideIdx : bannerType);
+    setActivePanel('content');
+    setCropOpen(true);
+    if (mediaSectionRef.current?.tagName === 'DETAILS') mediaSectionRef.current.open = true;
+    if (legacyButtons) {
+      setActiveButtonIdx(Number.isInteger(buttonIndex) ? buttonIndex : 0);
+      setEditIdx(bannerType === 'slider' ? activeSlideIdx : bannerType);
+    }
   };
   const chooseSlide = (step) => setSelectedIdx((current) => (current + step + slides.length) % slides.length);
   const placeCard = (index, x, y) => {
@@ -672,7 +647,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
           </Select>
         </div>
 
-        {activePanel === 'content' && <MediaShell className={templateActive ? 'banner-template-media' : 'banner-media-section'} {...(templateActive ? { open: !hasMedia } : {})} key={`${bannerType}-${b.templateId || 'classic'}`}>
+        {activePanel === 'content' && <MediaShell ref={mediaSectionRef} className={templateActive ? 'banner-template-media' : 'banner-media-section'} {...(templateActive ? { open: !hasMedia } : {})} key={`${bannerType}-${b.templateId || 'classic'}`}>
           {templateActive ? <summary>2. {hasMedia ? `Tu archivo · ${bannerType === 'slider' ? `${slides.length} imágenes` : bannerType === 'image' ? 'Imagen cargada' : 'Video cargado'}` : 'Falta el archivo · abrir para cargar'}</summary> : <strong className="banner-template-mode__title">2. {bannerType === 'slider' ? 'Tus imágenes' : bannerType === 'video' ? 'Tu video' : 'Tu imagen'}</strong>}
         {bannerType === 'slider' && (
           <div className="banner-content-card">
@@ -690,7 +665,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
                 <div className="banner-slide-current__details"><strong>Slide {activeSlideIdx + 1}</strong><small>{slides[activeSlideIdx]?.image ? 'Imagen lista' : 'Sube una imagen para mostrarlo en la tienda'}</small></div>
                 <button type="button" className="banner-btn" onClick={() => moveSlide(activeSlideIdx, -1)} disabled={activeSlideIdx === 0} aria-label="Mover slide antes" title="Mover antes">↑</button>
                 <button type="button" className="banner-btn" onClick={() => moveSlide(activeSlideIdx, 1)} disabled={activeSlideIdx === slides.length - 1} aria-label="Mover slide después" title="Mover después">↓</button>
-                <button type="button" className="banner-btn" onClick={() => editCurrent()}>{legacyButtons ? 'Editar' : 'Encuadre'}</button>
+                <button type="button" className="banner-btn" onClick={() => editCurrent()}>{legacyButtons ? 'Editar botón y encuadre' : 'Ajustar encuadre'}</button>
                 <button type="button" className="banner-btn banner-btn--danger" onClick={() => removeSlide(activeSlideIdx)} aria-label={`Eliminar slide ${activeSlideIdx + 1}`}>Eliminar</button>
               </div>
               <div className="banner-image-devices" role="group" aria-label="Imagen para cada dispositivo">
@@ -700,6 +675,11 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
               {previewDevice !== 'desktop' && !slides[activeSlideIdx]?.[imageFieldForDevice(previewDevice)] && <p className="banner-image-fallback">Mientras no subas esta versión, se mostrará la imagen de escritorio recortada.</p>}
               <label className="banner-upload-field"><span>Imagen para {IMAGE_SIZES[previewDevice].label.toLowerCase()}</span><input key={`slide-${activeSlideIdx}-${previewDevice}`} type="file" accept="image/png,image/jpeg,image/webp" aria-label={`Elegir imagen para ${IMAGE_SIZES[previewDevice].label.toLowerCase()}`} onChange={(e) => setBannerSlideFiles((prev) => ({ ...prev, [activeSlideIdx]: { ...prev[activeSlideIdx], [previewDevice]: e.target.files?.[0] || null } }))} /></label>
               {bannerSlideFiles[activeSlideIdx]?.[previewDevice] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerSlideImage(activeSlideIdx, previewDevice)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
+              {cropOpen && <div className="banner-crop-editor">
+                <div className="banner-crop-editor__head"><div><strong>Encuadre para {IMAGE_SIZES[previewDevice].label.toLowerCase()}</strong><small>El ajuste cambia en la vista previa mientras arrastras.</small></div><button type="button" className="banner-btn" onClick={() => setCropOpen(false)}>Cerrar ajuste</button></div>
+                <BannerDragPreview device={previewDevice} src={imageForDevice(slides[activeSlideIdx], previewDevice)} fit={slides[activeSlideIdx]?.fit === 'contain' ? 'contain' : 'cover'} posX={slides[activeSlideIdx]?.[cropFields(previewDevice)[0]] ?? 50} posY={slides[activeSlideIdx]?.[cropFields(previewDevice)[1]] ?? 50} onChange={({ posX, posY }) => setSlide(activeSlideIdx, { [cropFields(previewDevice)[0]]: posX, [cropFields(previewDevice)[1]]: posY })} />
+                <div className="banner-crop-editor__actions"><span>Posición: {Math.round(Number(slides[activeSlideIdx]?.[cropFields(previewDevice)[0]] ?? 50))}% · {Math.round(Number(slides[activeSlideIdx]?.[cropFields(previewDevice)[1]] ?? 50))}%</span><button type="button" className="banner-btn" onClick={() => setSlide(activeSlideIdx, { [cropFields(previewDevice)[0]]: 50, [cropFields(previewDevice)[1]]: 50 })}>Centrar imagen</button></div>
+              </div>}
             </> : <p className="banner-empty">Agrega una imagen para empezar.</p>}
           </div>
         )}
@@ -714,6 +694,11 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
             {previewDevice !== 'desktop' && !b[imageFieldForDevice(previewDevice, true)] && <p className="banner-image-fallback">Mientras no subas esta versión, se mostrará la imagen de escritorio recortada.</p>}
             <label className="banner-upload-field"><span>Imagen para {IMAGE_SIZES[previewDevice].label.toLowerCase()}</span><input key={`single-${previewDevice}`} type="file" accept="image/png,image/jpeg,image/webp" aria-label={`Elegir imagen para ${IMAGE_SIZES[previewDevice].label.toLowerCase()}`} onChange={(e) => setBannerImageFiles((prev) => ({ ...prev, [previewDevice]: e.target.files?.[0] || null }))} /></label>
             {bannerImageFiles[previewDevice] && <button type="button" className="banner-btn banner-btn--primary" disabled={uploading} onClick={() => onUploadBannerImage(previewDevice)}>{uploading ? 'Subiendo…' : 'Subir imagen'}</button>}
+            {cropOpen && <div className="banner-crop-editor">
+              <div className="banner-crop-editor__head"><div><strong>Encuadre para {IMAGE_SIZES[previewDevice].label.toLowerCase()}</strong><small>El ajuste cambia en la vista previa mientras arrastras.</small></div><button type="button" className="banner-btn" onClick={() => setCropOpen(false)}>Cerrar ajuste</button></div>
+              <BannerDragPreview device={previewDevice} src={imageForDevice(b, previewDevice, true)} fit={b.imageFit === 'contain' ? 'contain' : 'cover'} posX={b[cropFields(previewDevice, true)[0]] ?? 50} posY={b[cropFields(previewDevice, true)[1]] ?? 50} onChange={({ posX, posY }) => { setPath(`banner.${cropFields(previewDevice, true)[0]}`, posX); setPath(`banner.${cropFields(previewDevice, true)[1]}`, posY); }} />
+              <div className="banner-crop-editor__actions"><span>Posición: {Math.round(Number(b[cropFields(previewDevice, true)[0]] ?? 50))}% · {Math.round(Number(b[cropFields(previewDevice, true)[1]] ?? 50))}%</span><button type="button" className="banner-btn" onClick={() => { setPath(`banner.${cropFields(previewDevice, true)[0]}`, 50); setPath(`banner.${cropFields(previewDevice, true)[1]}`, 50); }}>Centrar imagen</button></div>
+            </div>}
             {legacyButtons && <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/coleccion o https://..." />}
           </div>
         )}
@@ -770,140 +755,18 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
         {!compactPreview && issues.length > 0 && <div className="banner-issues" role="status"><strong>Antes de publicar</strong><ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul></div>}
         {!compactPreview && <details className="banner-inline-details banner-json"><summary>Datos técnicos</summary><pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
       </section>
-      {floatingPreview && workspaceRef.current?.closest('.admin-area') && createPortal(
+      {floatingPreview && editIdx === null && workspaceRef.current?.closest('.admin-area') && createPortal(
         <fieldset disabled={disabled} className="banner-panel banner-panel--preview banner-preview-floating" role="region" aria-label="Vista previa de portada" style={{ ...floatingPreview, maxHeight: `calc(100dvh - ${floatingPreview.top + 8}px)` }}>
           {previewCard}
         </fieldset>, workspaceRef.current.closest('.admin-area')
       )}
 
-      {/* =======================
-          MODALS (Editor completo)
-      ======================= */}
-      <Modal
-        open={editIdx !== null && editIdx !== "image" && editIdx !== "video"}
-        title={typeof editIdx === "number" ? `Editar Slide #${editIdx + 1}` : "Editar"}
-        onClose={() => setEditIdx(null)}
-      >
-        {typeof editIdx === "number" && slides[editIdx] && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div>
-              <div className="font-semibold text-gray-900 mb-2">Encuadre</div>
-              <BannerDragPreview
-                src={slides[editIdx]?.image || ""}
-                fit={slides[editIdx]?.fit || "cover"}
-                posX={Number.isFinite(Number(slides[editIdx]?.posX)) ? Number(slides[editIdx]?.posX) : 50}
-                posY={Number.isFinite(Number(slides[editIdx]?.posY)) ? Number(slides[editIdx]?.posY) : 50}
-                height={220}
-                onChange={(p) => setSlide(editIdx, { posX: p.posX, posY: p.posY })}
-              />
-
-              <div className="grid sm:grid-cols-2 gap-3 mt-3">
-                <Select label="Ajuste (fit)" value={slides[editIdx]?.fit || "cover"} onChange={(e) => setSlide(editIdx, { fit: e.target.value })}>
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                </Select>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Input type="number" min={0} max={100} step="1" label="X" value={Number.isFinite(Number(slides[editIdx]?.posX)) ? Number(slides[editIdx]?.posX) : 50} onChange={(e) => setSlide(editIdx, { posX: Number(e.target.value) })} />
-                  <Input type="number" min={0} max={100} step="1" label="Y" value={Number.isFinite(Number(slides[editIdx]?.posY)) ? Number(slides[editIdx]?.posY) : 50} onChange={(e) => setSlide(editIdx, { posY: Number(e.target.value) })} />
-                </div>
-              </div>
-
-              <div className="mt-2 flex justify-end">
-                <button type="button" onClick={() => setSlide(editIdx, { posX: 50, posY: 50 })} className="px-3 py-1.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm">
-                  Centrar encuadre
-                </button>
-              </div>
-
-              <Input label="Imagen (URL)" value={slides[editIdx]?.image || ""} onChange={(e) => setSlide(editIdx, { image: e.target.value })} placeholder="https://.../slide.png" />
-              {legacyButtons && <Input label="Link (opcional)" value={slides[editIdx]?.link || ""} onChange={(e) => setSlide(editIdx, { link: e.target.value })} placeholder="/lo-nuevo ó https://..." />}
-
-              <div className="rounded-2xl border bg-gray-50 p-3">
-                <div className="text-sm font-medium mb-2">Subir imagen del slide</div>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) => setBannerSlideFiles((prev) => ({ ...prev, [editIdx]: e.target.files?.[0] || null }))}
-                  className="block w-full text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => onUploadBannerSlideImage(editIdx)}
-                  className="mt-2 w-full px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700 text-sm disabled:opacity-60"
-                >
-                  {uploading ? "Subiendo..." : "Subir a Cloudinary"}
-                </button>
-              </div>
-            </div>
-
-            {legacyButtons && <div>
-              <BannerButtonEditor
-                title={`Botón ${activeButtonIdx + 1} del slide`}
-                value={buttonFor(slides[editIdx], 'buttons', 'button')}
-                uploading={uploading}
-                onUploadImage={uploadButtonImage}
-                onChange={(nextBtn) => setSlideButton(editIdx, nextBtn)}
-              />
-            </div>}
-          </div>
-        )}
-      </Modal>
-
-      <Modal open={editIdx === "image"} title="Editar Imagen única (avanzado)" onClose={() => setEditIdx(null)}>
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div>
-            <div className="font-semibold text-gray-900 mb-2">Encuadre</div>
-            <BannerDragPreview
-              src={b.imageUrl || ""}
-              fit={b.imageFit || "cover"}
-              posX={Number.isFinite(Number(b.imagePosX)) ? Number(b.imagePosX) : 50}
-              posY={Number.isFinite(Number(b.imagePosY)) ? Number(b.imagePosY) : 50}
-              height={240}
-              onChange={(p) => {
-                setPath("banner.imagePosX", p.posX);
-                setPath("banner.imagePosY", p.posY);
-              }}
-            />
-
-            <div className="grid sm:grid-cols-2 gap-3 mt-3">
-              <Select label="Ajuste (fit)" value={b.imageFit || "cover"} onChange={(e) => setPath("banner.imageFit", e.target.value)}>
-                <option value="cover">Cover</option>
-                <option value="contain">Contain</option>
-              </Select>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Input type="number" min={0} max={100} step="1" label="X" value={Number.isFinite(Number(b.imagePosX)) ? Number(b.imagePosX) : 50} onChange={(e) => setPath("banner.imagePosX", Number(e.target.value))} />
-                <Input type="number" min={0} max={100} step="1" label="Y" value={Number.isFinite(Number(b.imagePosY)) ? Number(b.imagePosY) : 50} onChange={(e) => setPath("banner.imagePosY", Number(e.target.value))} />
-              </div>
-            </div>
-
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setPath("banner.imagePosX", 50);
-                  setPath("banner.imagePosY", 50);
-                }}
-                className="px-3 py-1.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-              >
-                Centrar
-              </button>
-            </div>
-          </div>
-
-          {legacyButtons && <div>
-            <BannerButtonEditor
-              title="Botón de Imagen única"
-              value={buttonFor(b, 'imageButtons', 'imageButton')}
-              uploading={uploading}
-              onUploadImage={uploadButtonImage}
-              onChange={(nextBtn) => setSingleOrMultipleButton('imageButtons', 'imageButton', nextBtn)}
-            />
-          </div>}
-        </div>
-      </Modal>
-
+      {legacyButtons && typeof editIdx === 'number' && slides[editIdx] && <Modal open title={`Botones del slide ${editIdx + 1}`} onClose={() => setEditIdx(null)}>
+        <BannerButtonEditor title={`Botón ${activeButtonIdx + 1} del slide`} value={buttonFor(slides[editIdx], 'buttons', 'button')} uploading={uploading} onUploadImage={uploadButtonImage} onChange={(nextBtn) => setSlideButton(editIdx, nextBtn)} />
+      </Modal>}
+      {legacyButtons && <Modal open={editIdx === 'image'} title="Botón de la imagen" onClose={() => setEditIdx(null)}>
+        <BannerButtonEditor title="Botón de la imagen" value={buttonFor(b, 'imageButtons', 'imageButton')} uploading={uploading} onUploadImage={uploadButtonImage} onChange={(nextBtn) => setSingleOrMultipleButton('imageButtons', 'imageButton', nextBtn)} />
+      </Modal>}
       <Modal open={editIdx === "video"} title="Editar Video (botón avanzado)" onClose={() => setEditIdx(null)}>
         <BannerButtonEditor
           title="Botón del video"
