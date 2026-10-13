@@ -255,8 +255,9 @@ export default function TrendingSection({ theme }) {
     return Math.max(0, Math.min(24, n));
   }, [config]);
 
+  const productRefsKey = JSON.stringify(Array.isArray(config?.products) ? config.products : []);
   const refs = useMemo(() => {
-    const arr = Array.isArray(config?.products) ? config.products : [];
+    const arr = JSON.parse(productRefsKey);
 
     return arr
       .map((r) => {
@@ -289,7 +290,7 @@ export default function TrendingSection({ theme }) {
       })
       .filter((r) => r.productId)
       .slice(0, maxItems);
-  }, [config, maxItems]);
+  }, [productRefsKey, maxItems]);
 
   const shouldUseConfig = !!config && tendenciaSection?.enabled !== false && refs.length > 0;
 
