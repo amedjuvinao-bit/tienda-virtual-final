@@ -310,6 +310,11 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   const selectDeviceImage = (item, device) => device === "mobile" ? item?.imageMobile || item?.imageTablet || item?.image : device === "tablet" ? item?.imageTablet || item?.image : item?.image
   const selectSingleImage = (item, device) => device === "mobile" ? item?.imageMobileUrl || item?.imageTabletUrl || item?.imageUrl : device === "tablet" ? item?.imageTabletUrl || item?.imageUrl : item?.imageUrl
 
+  const positionForDevice = (item, device, single = false) => {
+    const prefix = device === "mobile" ? (single ? "imageMobilePos" : "mobilePos") : device === "tablet" ? (single ? "imageTabletPos" : "tabletPos") : (single ? "imagePos" : "pos")
+    return `${clamp0_100(item?.[prefix + "X"], 50)}% ${clamp0_100(item?.[prefix + "Y"], 50)}%`
+  }
+
   const defaultButton = useMemo(
     () => ({
       enabled: true,
@@ -636,6 +641,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
           fit: normalizeFit(s?.fit),
           posX: clamp0_100(s?.posX, 50),
           posY: clamp0_100(s?.posY, 50),
+          tabletPosX: clamp0_100(s?.tabletPosX, 50),
+          tabletPosY: clamp0_100(s?.tabletPosY, 50),
+          mobilePosX: clamp0_100(s?.mobilePosX, 50),
+          mobilePosY: clamp0_100(s?.mobilePosY, 50),
           button: s?.button || null,
           buttons: Array.isArray(s?.buttons) ? s.buttons : null,
         }
@@ -855,7 +864,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         <BannerTemplateView banner={banner} sections={bannerSections}>
           <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
             {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
-              <img src={selectDeviceImage(slide, heightDevice)} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: `${clamp0_100(slide.posX)}% ${clamp0_100(slide.posY)}%` }} />
+              <img src={selectDeviceImage(slide, heightDevice)} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: positionForDevice(slide, heightDevice) }} />
             </div>)}
           </div>
         </BannerTemplateView>
@@ -872,7 +881,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   if (useTemplate && bannerType === 'image') {
     return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
       <BannerTemplateView banner={banner} sections={bannerSections}>
-        {banner?.imageUrl && <img src={selectSingleImage(banner, heightDevice)} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: `${clamp0_100(banner.imagePosX)}% ${clamp0_100(banner.imagePosY)}%` }} />}
+        {banner?.imageUrl && <img src={selectSingleImage(banner, heightDevice)} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: positionForDevice(banner, heightDevice, true) }} />}
       </BannerTemplateView>
     </div></div>
   }
@@ -924,9 +933,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     const imageLink = plainMedia ? "" : String(banner?.imageLink || "").trim()
 
     const imageFit = normalizeFit(banner?.imageFit)
-    const imagePosX = clamp0_100(banner?.imagePosX, 50)
-    const imagePosY = clamp0_100(banner?.imagePosY, 50)
-    const imageObjectPosition = `${imagePosX}% ${imagePosY}%`
+    const imageObjectPosition = positionForDevice(banner, heightDevice, true)
 
     const imageBtnPayload = plainMedia ? [] : pickButtons(banner?.imageButtons, banner?.imageButton)
 
@@ -1025,9 +1032,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
           {slides.map((slide, idx) => {
             const fit = normalizeFit(slide?.fit)
-            const posX = clamp0_100(slide?.posX, 50)
-            const posY = clamp0_100(slide?.posY, 50)
-            const objectPosition = `${posX}% ${posY}%`
+            const objectPosition = positionForDevice(slide, heightDevice)
 
             const slideButtons = plainMedia ? [] : pickButtons(slide?.buttons, slide?.button)
             const isActive = idx === currentSlide
