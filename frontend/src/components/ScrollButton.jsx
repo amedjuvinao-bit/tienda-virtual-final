@@ -1,6 +1,6 @@
 // src/components/ScrollButton.jsx
 import React, { useEffect, useState } from "react";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUp, ArrowDown, ChevronUp, ChevronDown } from "lucide-react";
 import "./storefrontLiquidGlass.css";
 import './storefrontChromeGlassHover.css';
 import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
@@ -120,12 +120,18 @@ export default function ScrollButton({ config, buttonAnimation }) {
     : 70;
 
   const [railClearancePx, setRailClearancePx] = useState(0);
+  const [bannerDockBottomPx, setBannerDockBottomPx] = useState(null);
+  useEffect(() => {
+    document.documentElement.classList.toggle("rb-section-dock-enabled", enabled);
+    return () => document.documentElement.classList.remove("rb-section-dock-enabled");
+  }, [enabled]);
   useEffect(() => {
     let frame = 0;
     const measure = () => {
       frame = 0;
-      const rail = document.querySelector('.rb-template__rail');
+      const rail = document.querySelector('.rb-template:not([data-preview-device]) .rb-template__rail');
       const bounds = rail?.getBoundingClientRect();
+      const bannerBounds = rail?.closest('.rb-template')?.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const count = Number(showUp) + Number(showDown);
@@ -135,7 +141,12 @@ export default function ScrollButton({ config, buttonAnimation }) {
       const intersectsRail = bounds && bounds.width > 0 && bounds.height > 0 &&
         bounds.left < left + controlsWidth && bounds.right > left &&
         bounds.top < top + buttonSizePx && bounds.bottom > top;
-      const clearance = intersectsRail ? Math.max(0, Math.ceil(viewportHeight - bounds.top + 14 - bottomPx)) : 0;
+      const canDock = bounds && bannerBounds && bounds.width > 0 && bounds.height > 0 &&
+        bannerBounds.top < viewportHeight && bannerBounds.bottom > 0 &&
+        bounds.bottom > 0 && bounds.bottom + buttonSizePx + 8 <= Math.min(bannerBounds.bottom - 10, viewportHeight - 8);
+      const dockBottom = canDock ? Math.max(8, Math.round(viewportHeight - bounds.bottom - 8 - buttonSizePx)) : null;
+      setBannerDockBottomPx((previous) => previous === dockBottom ? previous : dockBottom);
+      const clearance = !canDock && intersectsRail ? Math.max(0, Math.ceil(viewportHeight - bounds.top + 14 - bottomPx)) : 0;
       setRailClearancePx((previous) => previous === clearance ? previous : clearance);
     };
     const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
@@ -182,6 +193,8 @@ export default function ScrollButton({ config, buttonAnimation }) {
       ? { right: "24px" }
       : { left: "50%", transform: "translateX(-50%)" };
 
+  const isBannerDocked = bannerDockBottomPx !== null;
+
   const baseButtonStyle = {
     width: `${buttonSizePx}px`,
     height: `${buttonSizePx}px`,
@@ -190,6 +203,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
     borderRadius: `${borderRadiusPx}px`,
     boxShadow: getShadowValue(shadow),
     overflow: "hidden",
+    ...(isBannerDocked ? { "--liquid-tint": "transparent", background: "transparent", border: "0", borderRadius: "0", boxShadow: "none", overflow: "visible" } : {}),
   };
 
   const upImageSizePx = (buttonSizePx * upImageSizePercent) / 100;
@@ -218,15 +232,19 @@ export default function ScrollButton({ config, buttonAnimation }) {
           40% { transform: translateY(-10px); }
           60% { transform: translateY(-5px); }
         }
+        .rb-banner-section-control { background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+        .rb-banner-section-control .rb-chrome-hover__surface, .rb-banner-section-control::after { display: none; }
+        .rb-banner-section-control:hover { transform: translateY(-2px); filter: drop-shadow(0 2px 5px rgba(49, 22, 27, .32)); }
+        .rb-banner-section-control:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 5px; }
       `}</style>
 
       <div
         className="hidden md:flex fixed z-50 items-center"
         style={{
-          bottom: `${bottomPx + railClearancePx}px`,
-          gap: `${gapPx}px`,
+          bottom: `${isBannerDocked ? bannerDockBottomPx : bottomPx + railClearancePx}px`,
+          gap: `${isBannerDocked ? Math.max(gapPx, 22) : gapPx}px`,
           transition: 'bottom .2s ease',
-          ...wrapperPositionStyle,
+          ...(isBannerDocked ? { left: "50%", transform: "translateX(-50%)" } : wrapperPositionStyle),
         }}
       >
         {showUp && (
@@ -236,7 +254,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
             data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
             data-click-animation={activeAnimation === 'up'}
             onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
-            className="storefront-liquid-icon"
+            className={`storefront-liquid-icon${isBannerDocked ? " rb-banner-section-control" : ""}`}
             style={{
               ...baseButtonStyle,
               animation: activeAnimation === 'up' ? getButtonAnimation(upAnimation, "rbScrollMoveUp 450ms ease-in-out 1") : 'none',
@@ -256,16 +274,20 @@ export default function ScrollButton({ config, buttonAnimation }) {
                 }}
               />
             ) : (
-              <ArrowUp
+              isBannerDocked ? <ChevronUp
                 style={{
                   width: `${buttonSizePx * 0.55}px`,
                   height: `${buttonSizePx * 0.55}px`,
                   color: iconColor,
                 }}
+              /> : <ArrowUp
+                style={{ width: `${buttonSizePx * 0.55}px`, height: `${buttonSizePx * 0.55}px`, color: iconColor }}
               />
             )}
           </button>
         )}
+
+        {isBannerDocked && showUp && showDown && <span aria-hidden="true" style={{ width: "1px", height: `${Math.round(buttonSizePx * .55)}px`, background: iconColor, opacity: .55 }} />}
 
         {showDown && (
           <button
@@ -274,7 +296,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
             data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
             data-click-animation={activeAnimation === 'down'}
             onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
-            className="storefront-liquid-icon"
+            className={`storefront-liquid-icon${isBannerDocked ? " rb-banner-section-control" : ""}`}
             style={{
               ...baseButtonStyle,
               animation: activeAnimation === 'down' ? getButtonAnimation(
@@ -297,12 +319,14 @@ export default function ScrollButton({ config, buttonAnimation }) {
                 }}
               />
             ) : (
-              <ArrowDown
+              isBannerDocked ? <ChevronDown
                 style={{
                   width: `${buttonSizePx * 0.55}px`,
                   height: `${buttonSizePx * 0.55}px`,
                   color: iconColor,
                 }}
+              /> : <ArrowDown
+                style={{ width: `${buttonSizePx * 0.55}px`, height: `${buttonSizePx * 0.55}px`, color: iconColor }}
               />
             )}
           </button>
