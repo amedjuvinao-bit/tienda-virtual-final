@@ -200,3 +200,11 @@
 .banner-template-card-media__preview { width: 100%; max-width: 170px; height: 110px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.45); }
 .banner-template-upload-preview { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .banner-template-upload-preview img { width: 54px; height: 54px; object-fit: contain; border-radius: 12px; background: rgba(255,255,255,.55); }
+
+.banner-template-product-picker { display: grid; gap: 8px; }
+.banner-template-product-picker__selected { margin: 0; font-size: .84rem; }
+.banner-template-product-picker__results { display: grid; gap: 6px; max-height: 250px; overflow: auto; padding: 5px; border: 1px solid rgba(116,58,75,.2); border-radius: 12px; }
+.banner-template-product-picker__results button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; text-align: left; border: 0; border-radius: 9px; background: transparent; color: inherit; cursor: pointer; }
+.banner-template-product-picker__results button:hover, .banner-template-product-picker__results button:focus-visible { background: rgba(116,58,75,.1); }
+.banner-template-product-picker__results img { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; }
+.banner-template-product-picker__results span { flex: 1; }
