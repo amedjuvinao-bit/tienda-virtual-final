@@ -277,8 +277,8 @@
     width: 124%;
     height: 124%;
     object-fit: cover;
-    filter: blur(30px) brightness(.78);
-    opacity: .78;
+    filter: blur(24px) saturate(1.2) brightness(.98);
+    opacity: .94;
     pointer-events: none;
   }
   :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__picture img:not(.rb-template__mobile-backdrop),
@@ -292,6 +292,8 @@
     height: 43% !important;
     object-fit: contain !important;
     object-position: center !important;
+    mask-image: linear-gradient(to bottom, transparent, #000 26%, #000 70%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 26%, #000 70%, transparent);
   }
   :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__wash {
     background: linear-gradient(180deg, rgba(22,10,20,.42), rgba(22,10,20,.18) 34%, transparent 58%, rgba(22,10,20,.28));
