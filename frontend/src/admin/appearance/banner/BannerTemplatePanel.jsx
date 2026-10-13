@@ -17,11 +17,11 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const [error, setError] = useState('');
   const selected = selection || localSelection;
   const choose = onSelectionChange || setLocalSelection;
-  const group = selected.startsWith('action:') ? 'actions' : selected.startsWith('card:') ? 'categories' : selected === 'style' ? 'style' : 'copy';
+  const group = selected.startsWith('action:') ? 'actions' : selected.startsWith('card:') ? 'categories' : selected.startsWith('trust:') ? 'trust' : selected === 'style' ? 'style' : 'copy';
   const current = banner.templateConfigs?.[id] || {};
   const update = (patch) => setPath(`banner.templateConfigs.${id}`, { ...current, ...patch });
   const updateAction = (key, patch) => update({ [key]: { ...config[key], ...patch } });
-  const maxCards = id === 'atelier' ? 2 : 3;
+  const maxCards = id === 'atelier' ? 2 : id === 'editorial' ? 8 : 3;
   const refs = Array.isArray(current.cards) && current.cards.length
     ? current.cards
     : categories.slice(0, maxCards).map((category, index) => ({ categoryId: category.id, enabled: true, x: id === 'atelier' ? 45 + index * 29 : 68 + index * 13, y: id === 'atelier' ? 28 + index * 24 : 42 + index * 26 }));
@@ -40,6 +40,23 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     }
   };
 
+  const updateTrust = (index, patch) => update({
+    trustItems: config.trustItems.map((item, i) => i === index ? { ...item, ...patch } : item),
+  });
+  const uploadTrustImage = async (index, file) => {
+    if (!file) return;
+    setError('');
+    setUploading(true);
+    try {
+      const url = await uploadToCloudinaryViaBackend(file, 'image');
+      updateTrust(index, { image: url });
+    } catch (cause) {
+      setError(cause?.message || 'No se pudo subir el icono.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const copyParts = id === 'atelier' ? COPY_PARTS.slice(0, 3) : COPY_PARTS;
   const selectedCopy = copyParts.find((part) => selected === `copy:${part.key}`) || copyParts[1];
   const actionKey = selected === 'action:secondary' ? 'secondary' : 'primary';
@@ -53,7 +70,8 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
       <button type="button" aria-pressed={group === 'copy'} onClick={() => choose('copy:title')}>① Mensajes</button>
       <button type="button" aria-pressed={group === 'actions'} onClick={() => choose('action:primary')}>② Botones</button>
       <button type="button" aria-pressed={group === 'categories'} onClick={() => choose('card:0')}>③ Categorías</button>
-      <button type="button" aria-pressed={group === 'style'} onClick={() => choose('style')}>④ Colores</button>
+      {id === 'editorial' && <button type="button" aria-pressed={group === 'trust'} onClick={() => choose('trust:0')}>④ Distintivos</button>}
+      <button type="button" aria-pressed={group === 'style'} onClick={() => choose('style')}>{id === 'editorial' ? '⑤' : '④'} Colores</button>
     </div>
 
     {group === 'copy' && <div className="banner-template-inspector">
@@ -122,14 +140,30 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             <div className="banner-template-position"><Field type="number" min="0" max="100" label="Punto horizontal %" value={card.x ?? 45 + index * 29} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Punto vertical %" value={card.y ?? 28 + index * 24} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>
             <Field type="color" label="Color de línea y punto" value={safeHotspotColor(card.lineColor)} onChange={(event) => updateCard(index, { lineColor: event.target.value })} />
           </div>}
-          <details className="banner-template-more" open={!!card.image || !!card.label}><summary>Imagen y etiqueta <span>opcional</span></summary>
+          <div className="banner-template-card-media"><strong>Imagen de esta categoría</strong><p className="banner-template-help">Se muestra la imagen de la categoría; puedes sustituirla por una foto del artículo.</p>
             <Field label="Etiqueta pequeña" placeholder={category?.title || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
+            {(card.image || category?.image) && <img src={card.image || category.image} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
             {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen de la categoría</button>}
-          </details>
+          </div>
           {error && <p role="alert">{error}</p>}
         </div>}
       </>}
+    </div>}
+
+    {group === 'trust' && id === 'editorial' && <div className="banner-template-inspector">
+      <div className="banner-template-parts" role="group" aria-label="Distintivo para editar">
+        {config.trustItems.map((item, itemIndex) => <button key={itemIndex} type="button" aria-pressed={selected === `trust:${itemIndex}`} onClick={() => choose(`trust:${itemIndex}`)}>
+          <small>Distintivo {itemIndex + 1}</small><strong>{item.text || 'Sin texto'}</strong>
+        </button>)}
+      </div>
+      {config.trustItems.map((item, itemIndex) => selected === `trust:${itemIndex}` && <div key={itemIndex} className="banner-template-inspector__fields">
+        <strong>Distintivo {itemIndex + 1}</strong>
+        <Field label="Texto visible" value={item.text || ''} onChange={(event) => updateTrust(itemIndex, { text: event.target.value })} />
+        <label className="banner-template-field"><span>Imagen del icono (PNG o WebP transparente)</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => { uploadTrustImage(itemIndex, event.target.files?.[0]); event.target.value = ''; }} /></label>
+        {item.image ? <div className="banner-template-upload-preview"><img src={item.image} alt="Icono cargado" /><button type="button" className="banner-btn" onClick={() => updateTrust(itemIndex, { image: '' })}>Usar icono de cristal</button></div> : <p className="banner-template-help">Se muestra el icono de cristal prediseñado.</p>}
+        {error && <p role="alert">{error}</p>}
+      </div>)}
     </div>}
 
     {group === 'style' && <div className="banner-template-inspector__fields banner-template-inspector__fields--style">
