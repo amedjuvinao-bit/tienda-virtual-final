@@ -312,3 +312,66 @@
   :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card strong { font-size: clamp(11px, 3cqw, 13px); }
   :is(.rb-template:not([data-preview-device]), .rb-template[data-preview-device='mobile']) .rb-template__card > span:last-child { font-size: 15px; }
 }
+
+
+/* Editorial category gallery: product photography inside compact glass cards. */
+.rb-template--editorial .rb-template__rail,
+.rb-template--editorial[data-preview-device='desktop'] .rb-template__rail,
+.rb-template--editorial[data-preview-device='tablet'] .rb-template__rail {
+  left: 4.5%; right: 4.5%; width: auto; bottom: 4.5%;
+}
+.rb-template--editorial .rb-template__cards {
+  display: flex; gap: clamp(5px,.65cqw,11px); flex-wrap: nowrap;
+}
+.rb-template--editorial .rb-template__card {
+  flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-start;
+  min-width: 0; min-height: 116px; gap: 3px; padding: clamp(6px,.75cqw,12px);
+  border-radius: 15px; background: rgba(255,246,245,.68);
+  color: #713844; text-align: center;
+}
+.rb-template--editorial .rb-template__card img,
+.rb-template--editorial[data-preview-device] .rb-template__card img {
+  width: min(58%, 76px); height: clamp(46px,5.2cqw,78px);
+  border-radius: 8px; object-fit: contain; background: transparent;
+}
+.rb-template--editorial .rb-template__card-copy { display: grid; flex: none; width: 100%; gap: 2px; }
+.rb-template--editorial .rb-template__card strong,
+.rb-template--editorial[data-preview-device] .rb-template__card strong {
+  font: 600 clamp(9px,1cqw,14px)/1.1 Georgia,serif; color: #713844;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.rb-template--editorial .rb-template__card small { color: #ad6975; font-size: clamp(8px,.7cqw,10px); }
+.rb-template--editorial .rb-template__card > span:last-child { margin: auto 0 0; font-size: 13px; color: #b78156; }
+.rb-template__trust { display: flex; align-items: center; flex-wrap: wrap; gap: clamp(8px,1.5cqw,22px); margin-top: clamp(10px,1.4cqw,20px); }
+.rb-template__trust-item { display: inline-flex; align-items: center; gap: 6px; font: 500 clamp(9px,.82cqw,12px)/1.2 system-ui,sans-serif; }
+.rb-template__trust-icon { position: relative; display: grid; width: 24px; height: 24px; flex: none; place-items: center; border: 1px solid rgba(255,255,255,.6); border-radius: 8px; background: rgba(255,255,255,.22); box-shadow: inset 0 1px 2px rgba(255,255,255,.7); backdrop-filter: blur(8px); }
+.rb-template__trust-icon img { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); object-fit: contain; }
+.rb-template__trust-icon img[hidden] { display: none; }
+.rb-template__trust-item[role='button'] { cursor: pointer; }
+.rb-template__trust-item[data-selected='true'] { outline: 1px solid var(--rb-template-accent); outline-offset: 3px; }
+@container (max-width: 680px) {
+  .rb-template--editorial .rb-template__rail,
+  .rb-template--editorial[data-preview-device='mobile'] .rb-template__rail { left: 6%; right: 6%; width: auto; bottom: 3%; }
+  .rb-template--editorial .rb-template__cards,
+  .rb-template--editorial[data-preview-device='mobile'] .rb-template__cards {
+    display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: 38%; gap: 6px; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scrollbar-width: none;
+  }
+  .rb-template--editorial .rb-template__card,
+  .rb-template--editorial[data-preview-device='mobile'] .rb-template__card {
+    grid-column: auto; min-height: 80px; height: 80px; padding: 5px;
+    gap: 1px; width: auto; flex: none;
+  }
+  .rb-template--editorial .rb-template__card:first-child:nth-last-child(3) { grid-column: auto; }
+  .rb-template--editorial .rb-template__card img,
+  .rb-template--editorial[data-preview-device='mobile'] .rb-template__card img {
+    width: 38px; height: 42px;
+  }
+  .rb-template--editorial .rb-template__card strong,
+  .rb-template--editorial[data-preview-device='mobile'] .rb-template__card strong { font-size: clamp(9px,2.5cqw,12px); }
+  .rb-template--editorial .rb-template__card > span:last-child { display: none; }
+  .rb-template--editorial .rb-template__trust { gap: 5px 9px; margin-top: 8px; }
+  .rb-template--editorial .rb-template__trust-item { font-size: clamp(8px,2.1cqw,10px); }
+  .rb-template--editorial .rb-template__trust-icon { width: 19px; height: 19px; }
+}
