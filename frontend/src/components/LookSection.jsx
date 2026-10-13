@@ -177,52 +177,59 @@ export default function LookSection({ theme }) {
     return Math.min(12, Math.max(0, n));
   }, [style?.mobileSliderControlSeparatorWidthPx]);
 
+  const productRefsKey = JSON.stringify(
+    Array.isArray(config?.products) ? config.products.slice(0, LOOK_MAX_PRODUCTS) : []
+  );
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadProducts() {
-      const refs = Array.isArray(config?.products) ? config.products.slice(0, LOOK_MAX_PRODUCTS) : [];
+      const refs = JSON.parse(productRefsKey);
+      const productIds = [...new Set(refs.map((ref) => String(ref?.productId || "").trim()).filter(Boolean))];
 
-      if (!refs.length) {
+      if (!productIds.length) {
         setProducts([]);
+        setLoading(false);
         return;
       }
 
       setLoading(true);
-
       try {
-        const results = await Promise.all(
-          refs.map(async (ref) => {
-            const productId = String(ref?.productId || "").trim();
-            if (!productId) return null;
+        const params = new URLSearchParams({
+          productKeys: productIds.join(","),
+          limit: String(productIds.length),
+        });
+        const res = await fetch(`${API_BASE}/api/products?${params.toString()}`);
+        if (!res.ok) throw new Error(`El catálogo respondió ${res.status}`);
 
-            try {
-              const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(productId)}`);
-              if (!res.ok) return null;
-              const data = await res.json();
-              const payload = data?.product || data?.data || data;
-              return mapProductFromApi(payload, ref);
-            } catch {
-              return null;
-            }
-          })
+        const data = await res.json();
+        const byId = new Map(
+          (Array.isArray(data?.products) ? data.products : []).map((product) => [
+            String(product?._id || product?.id || ""),
+            product,
+          ])
         );
-
         if (cancelled) return;
 
-        const clean = results.filter(Boolean).slice(0, LOOK_MAX_PRODUCTS);
-        setProducts(clean);
+        setProducts(
+          refs.map((ref) => mapProductFromApi(
+            byId.get(String(ref?.productId || "").trim()),
+            ref
+          )).filter(Boolean)
+        );
+      } catch {
+        if (!cancelled) setProducts([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     loadProducts();
-
     return () => {
       cancelled = true;
     };
-  }, [config?.products]);
+  }, [productRefsKey]);
 
   useEffect(() => {
     if (!products.length) {
