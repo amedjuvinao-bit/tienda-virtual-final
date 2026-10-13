@@ -38,3 +38,14 @@
 @media (prefers-reduced-motion: reduce) {
   .storefront-liquid-icon, .storefront-liquid-icon > svg { animation: none !important; transition: none !important; }
 }
+
+/* Shared navigation presets for the storefront and the admin preview. */
+.storefront-liquid-icon[data-scroll-style="editorial"],
+.storefront-liquid-icon[data-scroll-style="contour"] { transition: transform .22s ease, filter .22s ease; }
+.storefront-liquid-icon[data-scroll-style="editorial"]::after,
+.storefront-liquid-icon[data-scroll-style="contour"]::after { display: none; }
+.storefront-liquid-icon[data-scroll-style="editorial"] > .rb-chrome-hover__surface,
+.storefront-liquid-icon[data-scroll-style="contour"] > .rb-chrome-hover__surface { display: none; }
+.storefront-liquid-icon[data-scroll-style="editorial"]:hover { transform: translateY(-2px); filter: drop-shadow(0 2px 5px rgba(49,22,27,.32)); }
+.storefront-liquid-icon[data-scroll-style="contour"]:hover { transform: translateY(-2px); }
+.storefront-liquid-icon[data-scroll-style="editorial"]:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 5px; }
