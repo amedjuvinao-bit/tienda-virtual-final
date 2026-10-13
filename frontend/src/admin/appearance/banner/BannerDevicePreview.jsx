@@ -19,8 +19,9 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   const slide = slides[selectedIdx] || null;
   const mediaUrl = type === 'slider' ? (device === 'mobile' ? slide?.imageMobile || slide?.imageTablet || slide?.image : device === 'tablet' ? slide?.imageTablet || slide?.image : slide?.image) : type === 'image' ? (device === 'mobile' ? banner?.imageMobileUrl || banner?.imageTabletUrl || banner?.imageUrl : device === 'tablet' ? banner?.imageTabletUrl || banner?.imageUrl : banner?.imageUrl) : banner?.videoUrl;
   const fit = type === 'slider' ? slide?.fit : banner?.imageFit;
-  const x = type === 'slider' ? slide?.posX : banner?.imagePosX;
-  const y = type === 'slider' ? slide?.posY : banner?.imagePosY;
+  const position = device === 'mobile' ? ['mobilePosX', 'mobilePosY', 'imageMobilePosX', 'imageMobilePosY'] : device === 'tablet' ? ['tabletPosX', 'tabletPosY', 'imageTabletPosX', 'imageTabletPosY'] : ['posX', 'posY', 'imagePosX', 'imagePosY'];
+  const x = type === 'slider' ? slide?.[position[0]] : banner?.[position[2]];
+  const y = type === 'slider' ? slide?.[position[1]] : banner?.[position[3]];
   const many = type === 'slider' ? slide?.buttons : type === 'image' ? banner?.imageButtons : banner?.videoButtons;
   const one = type === 'slider' ? slide?.button : type === 'image' ? banner?.imageButton : banner?.videoButton;
   const buttons = Array.isArray(many) && many.length ? many : one ? [one] : [];
@@ -33,7 +34,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
     viewport,
     type,
     mediaUrl: String(mediaUrl || '').trim(),
-    fit: fit === 'contain' ? 'contain' : 'cover',
+    fit: device !== 'mobile' && fit === 'contain' ? 'contain' : 'cover',
     objectPosition: `${percent(x)}% ${percent(y)}%`,
     heroHeight,
     heightPercent: (heroHeight / frameHeight) * 100,
