@@ -64,6 +64,10 @@ const BannerSlideSchema = new Schema(
 
     posX: { type: Number, default: 50 },
     posY: { type: Number, default: 50 },
+    tabletPosX: { type: Number, min: 0, max: 100, default: 50 },
+    tabletPosY: { type: Number, min: 0, max: 100, default: 50 },
+    mobilePosX: { type: Number, min: 0, max: 100, default: 50 },
+    mobilePosY: { type: Number, min: 0, max: 100, default: 50 },
 
     fit: { type: String, enum: ["cover", "contain"], default: "cover" },
 
@@ -146,6 +150,10 @@ const BannerSchema = new Schema(
 
     imagePosX: { type: Number, default: 50 },
     imagePosY: { type: Number, default: 50 },
+    imageTabletPosX: { type: Number, min: 0, max: 100, default: 50 },
+    imageTabletPosY: { type: Number, min: 0, max: 100, default: 50 },
+    imageMobilePosX: { type: Number, min: 0, max: 100, default: 50 },
+    imageMobilePosY: { type: Number, min: 0, max: 100, default: 50 },
     imageFit: { type: String, enum: ["cover", "contain"], default: "cover" },
 
     imageButton: { type: ButtonSchema, default: () => ({}) },
