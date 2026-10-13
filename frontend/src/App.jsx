@@ -177,9 +177,7 @@ export default function App() {
           global: normalizeGlobalConfig(data.theme?.global),
         };
         setThemeFromServer(normalizedTheme);
-        console.log('theme.sections =', normalizedTheme?.sections);
         applyTheme(normalizedTheme);
-        console.log('Tema aplicado desde /api/site-settings');
       }
       succeeded = true;
       adminConnectionErrorLogged.current = false;
