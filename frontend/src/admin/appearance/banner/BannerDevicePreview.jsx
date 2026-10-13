@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { getBannerHeightSettings } from '../../../lib/bannerHeight';
 import BannerTemplateView from '../../../components/BannerTemplateView';
 
@@ -32,6 +32,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   const heroHeight = heightSettings.mode === 'fullscreen' ? viewport.height : heightSettings.heightPx;
   return {
     viewport,
+    frameHeight,
     type,
     mediaUrl: String(mediaUrl || '').trim(),
     fit: device !== 'mobile' && fit === 'contain' ? 'contain' : 'cover',
@@ -45,7 +46,18 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
 
 export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
-  const { viewport, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
+  const { viewport, frameHeight, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
+  const viewportRef = useRef(null);
+  const [previewWidth, setPreviewWidth] = useState(0);
+  useLayoutEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return undefined;
+    const update = () => setPreviewWidth(element.clientWidth);
+    update();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    observer?.observe(element);
+    return () => observer?.disconnect();
+  }, [device]);
   const buttons = banner?.templateId === 'plain' ? [] : model.buttons;
   const noMediaText = type === 'video' ? 'Agrega un video para verlo aquí' : 'Agrega una imagen para verla aquí';
   const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId);
@@ -56,7 +68,8 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
 
   return (
     <div className="banner-preview-shell" data-device={device}>
-      <div className="banner-preview-viewport" data-device={device} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
+      <div ref={viewportRef} className="banner-preview-viewport" data-device={device} style={{ aspectRatio: `${viewport.width} / ${frameHeight}` }} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
+        <div className="banner-preview-stage" style={{ width: viewport.width, height: frameHeight, transform: `scale(${previewWidth ? previewWidth / viewport.width : 0})` }}>
         <div className="banner-preview-mini-header"><span>ROSA BOUTIQUE</span><span>⌕ · ≡</span></div>
         <div className="banner-preview-hero" style={{ height: `${heightPercent}%` }}>
           {useTemplate ? <BannerTemplateView banner={banner} sections={sections} preview device={device} onSelect={onTemplateSelect} selectedPart={selectedTemplatePart} placingCard={placingCard} onPlaceCard={onPlaceCard} onMoveCard={onMoveCard}>{media}</BannerTemplateView> : media}
@@ -77,6 +90,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
         </div>
         {foldPercent < 100 && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>{viewport.height} px visibles</span></div>}
         {heightPercent < 100 && <div className="banner-preview-below" style={{ top: `${heightPercent}%` }}>Contenido debajo de la portada</div>}
+        </div>
       </div>
       <p className="banner-preview-caption">{viewport.label} · {viewport.width} × {viewport.height} px · portada {heroHeight} px</p>
     </div>
