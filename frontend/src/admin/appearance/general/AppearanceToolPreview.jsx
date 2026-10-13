@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Crown, Flower2, Gem, Heart, ShoppingBag, Sparkles, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Crown, Flower2, Gem, Heart, ShoppingBag, Sparkles, Star } from "lucide-react";
 import WhatsAppGlyph from "../../../components/WhatsAppGlyph";
+import { resolveSectionControlStyle, getSectionControlPresetStyle } from "./generalHelpers";
 import "../../../components/storefrontLiquidGlass.css";
 import '../../../components/storefrontChromeGlassHover.css';
 import { moveChromeGlassLight, resolveChromeGlassMotion } from '../../../lib/chromeGlassMotion';
@@ -23,6 +24,7 @@ export default function AppearanceToolPreview({ activeTool, config, inheritedMot
   const [previewClick, setPreviewClick] = useState(null);
   const whatsapp = config.whatsapp;
   const navigation = config.scrollButtons;
+  const navStyle = resolveSectionControlStyle(navigation.visualStyle);
   const loader = config.loader;
   const Icon = loaderIcons[loader.icon];
 
@@ -65,21 +67,22 @@ export default function AppearanceToolPreview({ activeTool, config, inheritedMot
             left: navigation.position === "left" ? 18 : navigation.position === "right" ? "auto" : "50%",
             right: navigation.position === "right" ? 18 : "auto",
             transform: navigation.position === "center" ? "translateX(-50%)" : "none",
-            gap: bounded(navigation.gapPx, 0, 32, 16),
+            gap: navStyle === "editorial" ? Math.max(22, bounded(navigation.gapPx, 0, 32, 16)) : bounded(navigation.gapPx, 0, 32, 16),
           }}>
             {navigation.showUp && <button type="button" aria-label="Probar animación de subir" onPointerMove={moveChromeGlassLight}
               onClick={() => setPreviewClick('up')} onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setPreviewClick(null); }}
               data-click-animation={previewClick === 'up'} data-button-animation={resolveChromeGlassMotion(navigation.glassMotion, inheritedMotion)}
-              className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
+              className="storefront-liquid-icon" data-scroll-style={navStyle} style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor, ...getSectionControlPresetStyle(navStyle, navigation) }}>
               <span className="rb-chrome-hover__surface" aria-hidden="true" />
-              <PreviewImage url={navigation.upUseCustomImage ? navigation.upImageUrl : ""} fallback={<ArrowUp size={21} color={navigation.iconColor} />} />
+              <PreviewImage url={navigation.upUseCustomImage ? navigation.upImageUrl : ""} fallback={navStyle === "editorial" ? <ChevronUp size={21} color={navigation.iconColor} /> : <ArrowUp size={21} color={navigation.iconColor} />} />
             </button>}
+            {navStyle === "editorial" && navigation.showUp && navigation.showDown && <span aria-hidden="true" style={{ width: 1, height: 22, background: navigation.iconColor || "#D4AF37", opacity: .55 }} />}
             {navigation.showDown && <button type="button" aria-label="Probar animación de bajar" onPointerMove={moveChromeGlassLight}
               onClick={() => setPreviewClick('down')} onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setPreviewClick(null); }}
               data-click-animation={previewClick === 'down'} data-button-animation={resolveChromeGlassMotion(navigation.glassMotion, inheritedMotion)}
-              className="storefront-liquid-icon" style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor }}>
+              className="storefront-liquid-icon" data-scroll-style={navStyle} style={{ width: bounded(navigation.buttonSizePx, 28, 70, 44), height: bounded(navigation.buttonSizePx, 28, 70, 44), borderRadius: bounded(navigation.borderRadiusPx, 0, 999, 999), "--liquid-tint": navigation.bgColor, ...getSectionControlPresetStyle(navStyle, navigation) }}>
               <span className="rb-chrome-hover__surface" aria-hidden="true" />
-              <PreviewImage url={navigation.downUseCustomImage ? navigation.downImageUrl : ""} fallback={<ArrowDown size={21} color={navigation.iconColor} />} />
+              <PreviewImage url={navigation.downUseCustomImage ? navigation.downImageUrl : ""} fallback={navStyle === "editorial" ? <ChevronDown size={21} color={navigation.iconColor} /> : <ArrowDown size={21} color={navigation.iconColor} />} />
             </button>}
           </div>
         )}
@@ -100,7 +103,7 @@ export default function AppearanceToolPreview({ activeTool, config, inheritedMot
       </div>
       <p className="appearance-general__preview-note">
         {activeTool === "whatsapp" && (whatsapp.enabled ? (whatsapp.phone ? "El botón abre el chat con el número configurado." : "Añade un número para que el botón aparezca en la tienda.") : "El botón está apagado en la tienda.")}
-        {activeTool === "scroll" && (navigation.enabled ? "Los botones permiten moverse entre secciones de la portada." : "La navegación está apagada en la tienda.")}
+        {activeTool === "scroll" && (navigation.enabled ? "El estilo elegido se mantiene al navegar por toda la tienda." : "La navegación está apagada en la tienda.")}
         {activeTool === "loader" && (loader.enabled ? "La figura elegida se muestra directamente sobre la tienda, sin fondo ni tarjeta." : "La pantalla de carga está apagada.")}
       </p>
     </aside>
