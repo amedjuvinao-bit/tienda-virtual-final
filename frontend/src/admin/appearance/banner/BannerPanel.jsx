@@ -69,21 +69,23 @@ const imageForDevice = (item, device, single = false) =>
   item?.[imageFieldForDevice('desktop', single)] || '';
 
 const BannerDragPreview = ({ src, fit = 'cover', posX = 50, posY = 50, device = 'desktop', onChange }) => {
-  const dragging = useRef(false);
+  const dragStart = useRef(null);
   const viewport = BANNER_DEVICES[device] || BANNER_DEVICES.desktop;
-  const update = (event) => {
+  const move = (event) => {
+    if (!dragStart.current) return;
     const rect = event.currentTarget.getBoundingClientRect();
+    const { x, y, initialX, initialY } = dragStart.current;
     onChange?.({
-      posX: Math.round(clamp01(((event.clientX - rect.left) / rect.width) * 100)),
-      posY: Math.round(clamp01(((event.clientY - rect.top) / rect.height) * 100)),
+      posX: Math.round(clamp01(initialX - ((event.clientX - x) / rect.width) * 100)),
+      posY: Math.round(clamp01(initialY - ((event.clientY - y) / rect.height) * 100)),
     });
   };
   return <div className="banner-crop-frame" data-device={device}>
     <div className="banner-crop-frame__image" style={{ aspectRatio: `${viewport.width} / ${viewport.height}` }}
-      onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture?.(e.pointerId); update(e); }}
-      onPointerMove={(e) => { if (dragging.current) update(e); }}
-      onPointerUp={() => { dragging.current = false; }}
-      onPointerCancel={() => { dragging.current = false; }}
+      onPointerDown={(e) => { dragStart.current = { x: e.clientX, y: e.clientY, initialX: clampNum(posX, 0, 100, 50), initialY: clampNum(posY, 0, 100, 50) }; e.currentTarget.setPointerCapture?.(e.pointerId); }}
+      onPointerMove={move}
+      onPointerUp={() => { dragStart.current = null; }}
+      onPointerCancel={() => { dragStart.current = null; }}
       aria-label={`Arrastra para elegir el encuadre en ${viewport.label}`}>
       {src ? <img src={src} alt={`Encuadre para ${viewport.label}`} draggable={false} style={{ objectFit: fit, objectPosition: `${clampNum(posX, 0, 100, 50)}% ${clampNum(posY, 0, 100, 50)}%` }} /> : <span>Sube una imagen para ajustar el encuadre</span>}
     </div>
