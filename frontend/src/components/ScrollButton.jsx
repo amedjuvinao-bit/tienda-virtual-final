@@ -121,7 +121,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
     document.documentElement.classList.toggle("rb-section-dock-enabled", enabled);
     document.documentElement.style.setProperty(
       "--rb-scroll-dock-height",
-      `${Math.max(0, bottomPx + buttonSizePx + 12)}px`
+      `${Math.max(0, bottomPx + buttonSizePx + 48)}px`
     );
     return () => {
       document.documentElement.classList.remove("rb-section-dock-enabled");
