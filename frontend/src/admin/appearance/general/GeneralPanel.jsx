@@ -1,7 +1,7 @@
 // src/admin/appearance/general/GeneralPanel.jsx
 import React, { useMemo, useState } from "react";
-import { CircleOff, Crown, Flower2, Gem, Heart, LoaderCircle, MessageCircle, ShoppingBag, Sparkles, Star, ChevronsUpDown } from "lucide-react";
-import { normalizeGlobalConfig } from "./generalHelpers";
+import { CircleOff, Crown, Flower2, Gem, Heart, LoaderCircle, MessageCircle, ShoppingBag, Sparkles, Star, ChevronsUpDown, ArrowUp, ArrowDown, ChevronUp, ChevronDown } from "lucide-react";
+import { normalizeGlobalConfig, SECTION_CONTROL_STYLES, resolveSectionControlStyle, getSectionControlPresetStyle } from "./generalHelpers";
 import AppearanceToolPreview from "./AppearanceToolPreview";
 import GlassMotionPicker from "./GlassMotionPicker";
 import { safeBannerButtonAnimation } from '../../../lib/bannerTemplates';
@@ -507,9 +507,30 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
 
               {scrollSubTab === "estilo" && (
                 <PanelBlock title="Estilo general">
-                  <GlassMotionPicker label="Efecto de vidrio de las flechas" value={globalConfig.scrollButtons.glassMotion}
+                  <div className="appearance-general__nav-styles xl:col-span-2" role="group" aria-label="Modelo de botones de navegación">
+                    {SECTION_CONTROL_STYLES.map((preset) => {
+                      const selected = resolveSectionControlStyle(globalConfig.scrollButtons.visualStyle) === preset.value;
+                      const ThinUp = preset.value === "editorial" ? ChevronUp : ArrowUp;
+                      const ThinDown = preset.value === "editorial" ? ChevronDown : ArrowDown;
+                      return <button key={preset.value} type="button" className="appearance-general__nav-style-choice"
+                        data-active={selected} aria-pressed={selected}
+                        onClick={() => setPath("global.scrollButtons.visualStyle", preset.value)}>
+                        <span className="appearance-general__nav-style-icons" aria-hidden="true">
+                          {[ThinUp, ThinDown].map((Icon, index) => <span key={index} className="storefront-liquid-icon"
+                            data-scroll-style={preset.value}
+                            style={{ width: 36, height: 36, "--liquid-tint": globalConfig.scrollButtons.bgColor,
+                              ...getSectionControlPresetStyle(preset.value, globalConfig.scrollButtons) }}>
+                            <Icon size={20} color={globalConfig.scrollButtons.iconColor || "#D4AF37"} />
+                          </span>)}
+                        </span>
+                        <strong>{preset.label}</strong><small>{preset.description}</small>
+                      </button>;
+                    })}
+                  </div>
+                  <p className="appearance-general__nav-style-note xl:col-span-2">El modelo elegido se usa en todas las secciones. En la portada los botones se ubican debajo de las tarjetas; al bajar conservan el mismo diseño.</p>
+                  {["crystal", "pearl"].includes(resolveSectionControlStyle(globalConfig.scrollButtons.visualStyle)) && <GlassMotionPicker label="Efecto de vidrio de las flechas" value={globalConfig.scrollButtons.glassMotion}
                     inherited={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)}
-                    onChange={(value) => setPath('global.scrollButtons.glassMotion', value)} />
+                    onChange={(value) => setPath('global.scrollButtons.glassMotion', value)} />}
                   <Input
                     type="number"
                     min={28}
@@ -522,6 +543,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     }
                   />
 
+                  {resolveSectionControlStyle(globalConfig.scrollButtons.visualStyle) === "crystal" && <>
                   <Select
                     label="Sombra"
                     value={globalConfig.scrollButtons.shadow || "soft"}
@@ -543,6 +565,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     />
                   </label>
 
+                  </>}
                   <label className="block min-w-0">
                     <span className="mb-1 block text-sm font-medium text-gray-700">
                       Color del ícono
@@ -553,6 +576,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     />
                   </label>
 
+                  {resolveSectionControlStyle(globalConfig.scrollButtons.visualStyle) === "crystal" && <>
                   <Input
                     type="number"
                     min={0}
@@ -586,6 +610,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                       onChange={(e) => setPath("global.scrollButtons.borderColor", e.target.value)}
                     />
                   </label>
+                  </>}
                 </PanelBlock>
               )}
 
