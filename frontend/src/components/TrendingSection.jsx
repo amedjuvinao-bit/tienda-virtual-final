@@ -315,52 +315,26 @@ export default function TrendingSection({ theme }) {
       try {
         const uniqueIds = Array.from(new Set(refs.map((r) => r.productId)));
 
-        const results = await Promise.all(
-          uniqueIds.map(async (id) => {
-            const url = `${API_BASE}/api/products/${encodeURIComponent(id)}`;
-
-            try {
-              const res = await fetch(url);
-
-              if (!res.ok) {
-                let bodyText = "";
-                try {
-                  bodyText = await res.text();
-                } catch {
-                  bodyText = "";
-                }
-                return { __error: true, id, url, status: res.status, body: bodyText };
-              }
-
-              const data = await res.json();
-              return { __error: false, id, url, data };
-            } catch (err) {
-              return {
-                __error: true,
-                id,
-                url,
-                status: 0,
-                body: err?.message || "Fetch failed",
-              };
-            }
-          })
-        );
-
-        if (cancelled) return;
-
-        const errors = results.filter((r) => r && r.__error);
-        const oks = results.filter((r) => r && !r.__error).map((r) => r.data);
+        const params = new URLSearchParams({
+          productKeys: uniqueIds.join(","),
+          limit: String(Math.max(1, uniqueIds.length)),
+        });
+        const url = `${API_BASE}/api/products?${params.toString()}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`El catálogo respondió ${res.status} al consultar los productos seleccionados.`);
+        }
+        const payload = await res.json();
+        const oks = Array.isArray(payload?.products) ? payload.products : [];
 
         if (oks.length === 0) {
           setRemoteProducts([]);
           setRemoteLoading(false);
 
-          const first = errors[0];
           setRemoteError({
-            message: "No se pudo cargar ningún producto desde /api/products/:id",
-            firstFail: first || null,
-            totalFails: errors.length,
-            totalIds: uniqueIds.length,
+            message: "Ninguno de los productos seleccionados está disponible en el catálogo público. Revisa la selección en Apariencia → Tendencia.",
+            missingIds: uniqueIds.slice(0, 10),
+            totalMissing: uniqueIds.length,
           });
           return;
         }
@@ -433,7 +407,7 @@ export default function TrendingSection({ theme }) {
         if (missing.length > 0) {
           setRemoteError({
             message:
-              "Algunos IDs no devolvieron producto (revisa si existen en MongoDB o si el endpoint retorna otro formato).",
+              "Algunos productos seleccionados ya no están publicados o disponibles. Revísalos en Apariencia → Tendencia.",
             missingIds: missing.slice(0, 10),
             totalMissing: missing.length,
           });
