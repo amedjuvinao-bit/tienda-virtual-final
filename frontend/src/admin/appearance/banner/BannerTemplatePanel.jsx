@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../../../config/apiBaseUrl';
 import { BANNER_BUTTON_ANIMATIONS, getBannerTemplate, moveBannerButtonLight, safeHotspotColor } from '../../../lib/bannerTemplates';
 
 const Field = ({ label, ...props }) => <label className="banner-template-field"><span>{label}</span><input {...props} /></label>;
@@ -15,6 +16,38 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const { id, config, categories } = getBannerTemplate(banner, theme?.sections);
   const [localSelection, setLocalSelection] = useState('copy:title');
   const [error, setError] = useState('');
+  const [productQuery, setProductQuery] = useState('');
+  const [productResults, setProductResults] = useState([]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [productError, setProductError] = useState('');
+  useEffect(() => {
+    const query = productQuery.trim();
+    if (group !== 'categories' || query.length < 2) {
+      setProductResults([]);
+      setProductLoading(false);
+      setProductError('');
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setProductLoading(true);
+      setProductError('');
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/products?q=${encodeURIComponent(query)}&limit=12`, { signal: controller.signal });
+        if (!response.ok) throw new Error('No se pudieron buscar los productos.');
+        const data = await response.json();
+        setProductResults(Array.isArray(data.products) ? data.products : []);
+      } catch (cause) {
+        if (cause.name !== 'AbortError') {
+          setProductResults([]);
+          setProductError('No se pudo consultar el catálogo. Inténtalo de nuevo.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setProductLoading(false);
+      }
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [group, productQuery]);
   const selected = selection || localSelection;
   const choose = onSelectionChange || setLocalSelection;
   const group = selected.startsWith('action:') ? 'actions' : selected.startsWith('card:') ? 'categories' : selected.startsWith('trust:') ? 'trust' : selected === 'style' ? 'style' : 'copy';
@@ -63,6 +96,8 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const index = Math.min(Math.max(Number(selected.split(':')[1]) || 0, 0), Math.max(0, refs.length - 1));
   const card = refs[index];
   const category = categories.find((entry) => entry.id === card?.categoryId);
+  const destinationType = card?.destinationType || (categories.length ? 'category' : 'product');
+  const cardImage = card?.image || (destinationType === 'product' ? card?.featuredProductImage : category?.image);
 
   return <div className="banner-template-editor">
     <div className="banner-template-editor__intro"><strong>Personaliza el diseño</strong><span>Elige una parte o tócala en la vista previa. Se guarda junto con la portada.</span></div>
@@ -116,39 +151,59 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     </div>}
 
     {group === 'categories' && <div className="banner-template-inspector">
-      {categories.length === 0 ? <p className="banner-template-help">Primero configura las categorías en Apariencia → Categorías.</p> : <>
+      {categories.length === 0 && <p className="banner-template-help">No hay categorías para elegir. Puedes enlazar estas tarjetas directamente con productos.</p>}
         <div className="banner-template-parts" role="group" aria-label="Acceso de categoría para editar">
           {refs.map((entry, cardIndex) => {
             const linked = categories.find((item) => item.id === entry.categoryId);
-            return <button key={cardIndex} type="button" aria-pressed={index === cardIndex} onClick={() => choose(`card:${cardIndex}`)}>
-              <small>Acceso {cardIndex + 1}{entry.enabled === false ? ' · oculto' : ''}</small><strong>{entry.text || linked?.title || 'Elige una categoría'}</strong>
+            return <button key={cardIndex} type="button" aria-pressed={index === cardIndex} onClick={() => { setProductQuery(''); choose(`card:${cardIndex}`); }}>
+              <small>Acceso {cardIndex + 1}{entry.enabled === false ? ' · oculto' : ''}</small><strong>{entry.text || (entry.destinationType === 'product' ? entry.featuredProductTitle : linked?.title) || 'Elige un destino'}</strong>
             </button>;
           })}
-          {refs.length < maxCards && categories.length > refs.length && <button type="button" className="banner-template-parts__add" onClick={() => { update({ cards: [...refs, { categoryId: categories.find((item) => !refs.some((ref) => ref.categoryId === item.id))?.id || categories[0].id, enabled: true, x: 75, y: 68 }] }); choose(`card:${refs.length}`); }}>+ Añadir acceso</button>}
+          {refs.length < maxCards && <button type="button" className="banner-template-parts__add" onClick={() => { const nextCategory = categories.find((item) => !refs.some((ref) => ref.categoryId === item.id)) || categories[0]; update({ cards: [...refs, { categoryId: nextCategory?.id || '', destinationType: nextCategory ? 'category' : 'product', enabled: true, x: 75, y: 68 }] }); choose(`card:${refs.length}`); }}>+ Añadir acceso</button>}
         </div>
         {card && <div className="banner-template-inspector__fields">
           <strong>Acceso {index + 1}</strong>
           {id === 'atelier' && <p className="banner-template-help">Arrastra esta tarjeta en la vista previa para ubicarla en cada tamaño de pantalla. La línea une la tarjeta con el punto señalado en la foto.</p>}
           <label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Mostrar en la portada</label>
-          <label className="banner-template-field"><span>Usar esta categoría</span><select value={card.categoryId} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', link: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
-          <Field label="Texto visible" placeholder={category?.title || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
-          <Field label="Al hacer clic, ir a" placeholder={category?.link || '/categoria/...'} value={card.link || ''} onChange={(event) => updateCard(index, { link: event.target.value })} />
-          <p className="banner-template-help">Si dejas el texto o el enlace vacío, se usa el de la categoría elegida.</p>
+          <label className="banner-template-field"><span>Al hacer clic, abrir</span><select value={destinationType} onChange={(event) => { updateCard(index, { destinationType: event.target.value, text: '', label: '', image: '' }); setProductQuery(''); }}>
+            {categories.length > 0 && <option value="category">Una categoría</option>}
+            <option value="product">Un producto</option>
+          </select></label>
+          {destinationType === 'category' ? <>
+            <label className="banner-template-field"><span>Categoría de destino</span><select value={card.categoryId || ''} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
+            <p className="banner-template-help">La tarjeta abrirá el enlace configurado en esa categoría.{!category?.link && ' Esta categoría aún no tiene enlace.'}</p>
+            {!card.destinationType && card.link && <p className="banner-template-help">Esta tarjeta conserva un enlace anterior. Al elegir una categoría se actualizará automáticamente.</p>}
+          </> : <div className="banner-template-product-picker">
+            <label className="banner-template-field"><span>Buscar producto</span><input type="search" placeholder="Escribe el nombre o código" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} /></label>
+            {card.featuredProductId && <p className="banner-template-product-picker__selected">Producto elegido: <strong>{card.featuredProductTitle || card.featuredProductId}</strong></p>}
+            {productLoading && <p role="status">Buscando productos…</p>}
+            {productError && <p role="alert">{productError}</p>}
+            {productQuery.trim().length >= 2 && !productLoading && !productError && <div className="banner-template-product-picker__results">
+              {productResults.length ? productResults.map((product) => {
+                const image = product.images?.cover || product.image || product.images?.[0] || '';
+                return <button key={product._id} type="button" onClick={() => { updateCard(index, { featuredProductId: product._id, featuredProductTitle: product.title, featuredProductImage: image, image: '', text: '', label: '' }); setProductQuery(''); }}>
+                  {image && <img src={image} alt="" />}<span>{product.title}</span><small>Elegir</small>
+                </button>;
+              }) : <p>No se encontraron productos publicados.</p>}
+            </div>}
+            {!card.featuredProductId && <p className="banner-template-help">Busca y elige un producto para crear el enlace de la tarjeta.</p>}
+          </div>}
+          <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
+          <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
           {id === 'atelier' && <div className="banner-template-point-control">
             <button type="button" className="banner-btn banner-btn--primary" aria-pressed={placingCard === index} onClick={() => onStartPlacing?.(placingCard === index ? null : index)}>{placingCard === index ? 'Cancelar ubicación' : 'Señalar lugar en la imagen'}</button>
             {placingCard === index && <p className="banner-template-help" role="status">Ahora haz clic en el objeto que quieres señalar dentro de la vista previa.</p>}
             <div className="banner-template-position"><Field type="number" min="0" max="100" label="Punto horizontal %" value={card.x ?? 45 + index * 29} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Punto vertical %" value={card.y ?? 28 + index * 24} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>
             <Field type="color" label="Color de línea y punto" value={safeHotspotColor(card.lineColor)} onChange={(event) => updateCard(index, { lineColor: event.target.value })} />
           </div>}
-          <div className="banner-template-card-media"><strong>Imagen de esta categoría</strong><p className="banner-template-help">Se muestra la imagen de la categoría; puedes sustituirla por una foto del artículo.</p>
-            <Field label="Etiqueta pequeña" placeholder={category?.title || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
+          <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'acceso de categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
+            <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
-            {(card.image || category?.image) && <img src={card.image || category.image} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
-            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen de la categoría</button>}
+            {cardImage && <img src={cardImage} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
+            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen del {destinationType === 'product' ? 'producto' : 'acceso de categoría'}</button>}
           </div>
           {error && <p role="alert">{error}</p>}
         </div>}
-      </>}
     </div>}
 
     {group === 'trust' && id === 'editorial' && <div className="banner-template-inspector">
