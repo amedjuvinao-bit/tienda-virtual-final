@@ -261,6 +261,6 @@
 
 /* Reserve a separate footer lane for the storefront section controls. */
 @media (min-width: 768px) {
-  html.rb-section-dock-enabled .rb-template:not([data-preview-device]) .rb-template__rail { bottom: calc(5% + var(--rb-scroll-dock-height, 64px)); }
-  html.rb-section-dock-enabled .rb-template--editorial:not([data-preview-device]) .rb-template__rail { bottom: calc(6% + var(--rb-scroll-dock-height, 64px)); }
+  html.rb-section-dock-enabled .rb-template:not([data-preview-device]) .rb-template__rail { bottom: max(5%, var(--rb-scroll-dock-height, 80px)); }
+  html.rb-section-dock-enabled .rb-template--editorial:not([data-preview-device]) .rb-template__rail { bottom: max(6%, var(--rb-scroll-dock-height, 80px)); }
 }
