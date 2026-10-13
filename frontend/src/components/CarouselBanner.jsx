@@ -763,7 +763,9 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   }, [bannerType, instanceRef, autoplayMs, slides.length])
 
   const dotsWrapperClass = isMobile
-    ? "absolute left-1/2 bottom-10 -translate-x-1/2 z-[120] flex flex-row gap-2 pointer-events-auto"
+    ? useTemplate
+      ? "absolute left-1/2 top-[64%] -translate-x-1/2 z-[120] flex flex-row gap-2 pointer-events-auto"
+      : "absolute left-1/2 bottom-10 -translate-x-1/2 z-[120] flex flex-row gap-2 pointer-events-auto"
     : isTablet
     ? "absolute left-1/2 bottom-12 -translate-x-1/2 z-[120] flex flex-row gap-2.5 pointer-events-auto"
     : "absolute right-4 top-1/2 -translate-y-1/2 z-[120] flex flex-col gap-3 pointer-events-auto"
@@ -848,6 +850,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         <BannerTemplateView banner={banner} sections={bannerSections}>
           <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
             {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
+              <img src={slide.image} alt="" aria-hidden="true" className="rb-template__mobile-backdrop" />
               <img src={slide.image} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: `${clamp0_100(slide.posX)}% ${clamp0_100(slide.posY)}%` }} />
             </div>)}
           </div>
@@ -865,7 +868,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   if (useTemplate && bannerType === 'image') {
     return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
       <BannerTemplateView banner={banner} sections={bannerSections}>
-        {banner?.imageUrl && <img src={banner.imageUrl} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: `${clamp0_100(banner.imagePosX)}% ${clamp0_100(banner.imagePosY)}%` }} />}
+        {banner?.imageUrl && <><img src={banner.imageUrl} alt="" aria-hidden="true" className="rb-template__mobile-backdrop" /><img src={banner.imageUrl} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: `${clamp0_100(banner.imagePosX)}% ${clamp0_100(banner.imagePosY)}%` }} /></>}
       </BannerTemplateView>
     </div></div>
   }
