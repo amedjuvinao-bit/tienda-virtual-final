@@ -258,3 +258,9 @@
 .rb-template[data-preview-device="mobile"] .rb-template__card img { width: 28px; height: 28px; }
 .rb-template[data-preview-device="mobile"] .rb-template__card small { font-size: clamp(9px, 2.2cqw, 11px); }
 .rb-template[data-preview-device="mobile"] .rb-template__card strong { font-size: clamp(11px, 2.9cqw, 14px); }
+
+/* Reserve a separate footer lane for the storefront section controls. */
+@media (min-width: 768px) {
+  html.rb-section-dock-enabled .rb-template:not([data-preview-device]) .rb-template__rail { bottom: calc(5% + 64px); }
+  html.rb-section-dock-enabled .rb-template--editorial:not([data-preview-device]) .rb-template__rail { bottom: calc(6% + 64px); }
+}
