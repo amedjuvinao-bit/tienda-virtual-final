@@ -105,6 +105,11 @@ const BannerTemplateCardSchema = new Schema({
   },
 }, { _id: false });
 
+const BannerTemplateTrustSchema = new Schema({
+  text: { type: String, default: "" },
+  image: { type: String, default: "" },
+}, { _id: false });
+
 const BannerTemplateConfigSchema = new Schema({
   eyebrow: String,
   eyebrowLink: String,
@@ -117,6 +122,7 @@ const BannerTemplateConfigSchema = new Schema({
   primary: { type: BannerTemplateActionSchema, default: undefined },
   secondary: { type: BannerTemplateActionSchema, default: undefined },
   cards: { type: [BannerTemplateCardSchema], default: [] },
+  trustItems: { type: [BannerTemplateTrustSchema], default: [] },
   textColor: String,
   accentColor: String,
   glassColor: String,
