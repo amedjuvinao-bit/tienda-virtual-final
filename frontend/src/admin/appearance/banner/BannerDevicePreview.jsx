@@ -27,7 +27,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   const buttons = Array.isArray(many) && many.length ? many : one ? [one] : [];
   // Un marco de 1200 px deja ver alturas personalizadas y el contenido posterior
   // aunque la portada se extienda más allá del alto visible del dispositivo.
-  const frameHeight = 1200;
+  const frameHeight = device === 'desktop' ? 1200 : viewport.height;
   const heightSettings = getBannerHeightSettings(banner, device);
   const heroHeight = heightSettings.mode === 'fullscreen' ? viewport.height : heightSettings.heightPx;
   return {
