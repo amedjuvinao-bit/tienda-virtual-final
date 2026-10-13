@@ -307,6 +307,9 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     return `/${u}`
   }
 
+  const selectDeviceImage = (item, device) => device === "mobile" ? item?.imageMobile || item?.imageTablet || item?.image : device === "tablet" ? item?.imageTablet || item?.image : item?.image
+  const selectSingleImage = (item, device) => device === "mobile" ? item?.imageMobileUrl || item?.imageTabletUrl || item?.imageUrl : device === "tablet" ? item?.imageTabletUrl || item?.imageUrl : item?.imageUrl
+
   const defaultButton = useMemo(
     () => ({
       enabled: true,
@@ -627,6 +630,8 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         const img = resolveSlideImage(s)
         return {
           image: img,
+          imageTablet: resolveSlideImage({ image: s?.imageTablet }),
+          imageMobile: resolveSlideImage({ image: s?.imageMobile }),
           link: String(s?.link || s?.href || "").trim(),
           fit: normalizeFit(s?.fit),
           posX: clamp0_100(s?.posX, 50),
@@ -850,8 +855,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         <BannerTemplateView banner={banner} sections={bannerSections}>
           <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
             {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
-              <img src={slide.image} alt="" aria-hidden="true" className="rb-template__mobile-backdrop" />
-              <img src={slide.image} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: `${clamp0_100(slide.posX)}% ${clamp0_100(slide.posY)}%` }} />
+              <img src={selectDeviceImage(slide, heightDevice)} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: `${clamp0_100(slide.posX)}% ${clamp0_100(slide.posY)}%` }} />
             </div>)}
           </div>
         </BannerTemplateView>
@@ -868,7 +872,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   if (useTemplate && bannerType === 'image') {
     return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
       <BannerTemplateView banner={banner} sections={bannerSections}>
-        {banner?.imageUrl && <><img src={banner.imageUrl} alt="" aria-hidden="true" className="rb-template__mobile-backdrop" /><img src={banner.imageUrl} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: `${clamp0_100(banner.imagePosX)}% ${clamp0_100(banner.imagePosY)}%` }} /></>}
+        {banner?.imageUrl && <img src={selectSingleImage(banner, heightDevice)} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: `${clamp0_100(banner.imagePosX)}% ${clamp0_100(banner.imagePosY)}%` }} />}
       </BannerTemplateView>
     </div></div>
   }
@@ -916,7 +920,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   }
 
   if (bannerType === "image") {
-    const imageUrl = String(banner?.imageUrl || "").trim()
+    const imageUrl = String(selectSingleImage(banner, heightDevice) || "").trim()
     const imageLink = plainMedia ? "" : String(banner?.imageLink || "").trim()
 
     const imageFit = normalizeFit(banner?.imageFit)
@@ -1035,13 +1039,13 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
                 data-active={isActive}
                 onClick={(e) => {
                   if (isClickFromButton(e)) return
-                  setSelectedImage(slide.image)
+                  setSelectedImage(selectDeviceImage(slide, heightDevice))
                 }}
                 role="button"
                 tabIndex={0}
               >
                 <img
-                  src={slide.image}
+                  src={selectDeviceImage(slide, heightDevice)}
                   alt={`Slide ${idx + 1}`}
                   className="absolute inset-0 w-full h-full"
                   style={{
