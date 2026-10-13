@@ -17,7 +17,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   const viewport = BANNER_DEVICES[device] || BANNER_DEVICES.desktop;
   const type = ['slider', 'image', 'video'].includes(banner?.type) ? banner.type : 'slider';
   const slide = slides[selectedIdx] || null;
-  const mediaUrl = type === 'slider' ? slide?.image : type === 'image' ? banner?.imageUrl : banner?.videoUrl;
+  const mediaUrl = type === 'slider' ? (device === 'mobile' ? slide?.imageMobile || slide?.imageTablet || slide?.image : device === 'tablet' ? slide?.imageTablet || slide?.image : slide?.image) : type === 'image' ? (device === 'mobile' ? banner?.imageMobileUrl || banner?.imageTabletUrl || banner?.imageUrl : device === 'tablet' ? banner?.imageTabletUrl || banner?.imageUrl : banner?.imageUrl) : banner?.videoUrl;
   const fit = type === 'slider' ? slide?.fit : banner?.imageFit;
   const x = type === 'slider' ? slide?.posX : banner?.imagePosX;
   const y = type === 'slider' ? slide?.posY : banner?.imagePosY;
