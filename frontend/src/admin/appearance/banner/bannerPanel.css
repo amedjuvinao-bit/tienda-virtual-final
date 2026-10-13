@@ -183,3 +183,8 @@
 .banner-crop-frame__image span { display: grid; place-items: center; height: 100%; padding: 10px; font-size: 12px; text-align: center; }
 .banner-panel .banner-crop-frame p { margin: 0; font-size: 11px; text-align: center; }
 .banner-crop-editor__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; }
+
+/* Vista móvil legible con proporción real, incluso cuando el panel es compacto. */
+.banner-panel--preview .banner-preview-viewport[data-device="mobile"] { width: min(100%, 220px); aspect-ratio: 390 / 844; }
+.banner-panel--preview .banner-preview-viewport[data-device="tablet"] { width: min(100%, 240px); aspect-ratio: 820 / 1180; }
+.banner-panel--preview .banner-preview-viewport[data-device="mobile"] .banner-preview-mini-header { font-size: 9px; }
