@@ -87,10 +87,18 @@ export function getBannerTemplate(banner, sections) {
       trustItems: EDITORIAL_TRUST_DEFAULTS.map((fallback, index) => ({ ...fallback, ...(raw.trustItems?.[index] || {}) })),
       cards: saved.map((item) => {
         const category = existing.find((entry) => entry.id === item.categoryId);
-        return category ? {
-          ...item, label: item.label || category.title, text: item.text || category.title,
-          image: item.image || category.image, link: item.link || category.link,
-        } : null;
+        const productId = String(item.featuredProductId || '').trim();
+        const productCard = item.destinationType === 'product';
+        if (productCard && !/^[a-f\d]{24}$/i.test(productId)) return null;
+        if (!productCard && !category) return null;
+        return {
+          ...item,
+          label: item.label || (productCard ? item.featuredProductTitle : category?.title) || '',
+          text: item.text || (productCard ? item.featuredProductTitle : category?.title) || '',
+          image: item.image || (productCard ? item.featuredProductImage : category?.image) || '',
+          link: productCard ? `/producto/${encodeURIComponent(productId)}`
+            : item.destinationType === 'category' ? category.link : item.link || category.link,
+        };
       }).filter(Boolean),
     },
   };
