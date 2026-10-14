@@ -89,15 +89,27 @@ export function getBannerTemplate(banner, sections) {
         const category = existing.find((entry) => entry.id === item.categoryId);
         const productId = String(item.featuredProductId || '').trim();
         const productCard = item.destinationType === 'product';
+        const catalogCard = item.destinationType === 'catalogCategory';
+        const catalogName = String(item.catalogCategoryName || '').trim();
+        const catalogId = String(item.catalogCategoryId || '').trim();
         if (productCard && !/^[a-f\d]{24}$/i.test(productId)) return null;
-        if (!productCard && !category) return null;
+        if (catalogCard && !catalogName) return null;
+        if (!productCard && !catalogCard && !category) return null;
+        const title = productCard ? item.featuredProductTitle : catalogCard ? catalogName : category?.title;
+        const image = productCard ? item.featuredProductImage : catalogCard ? item.catalogCategoryImage : category?.image;
+        const catalogQuery = new URLSearchParams();
+        if (catalogCard) {
+          catalogQuery.set('category', catalogId.startsWith('legacy:') ? catalogName : catalogId);
+          catalogQuery.set('categoryName', catalogName);
+        }
         return {
           ...item,
-          label: item.label || (productCard ? item.featuredProductTitle : category?.title) || '',
-          text: item.text || (productCard ? item.featuredProductTitle : category?.title) || '',
-          image: item.image || (productCard ? item.featuredProductImage : category?.image) || '',
+          label: item.label || title || '',
+          text: item.text || title || '',
+          image: item.image || image || '',
           link: productCard ? `/producto/${encodeURIComponent(productId)}`
-            : item.destinationType === 'category' ? category.link : item.link || category.link,
+            : catalogCard ? `/buscar?${catalogQuery.toString()}`
+              : item.destinationType === 'category' ? category.link : item.link || category.link,
         };
       }).filter(Boolean),
     },
