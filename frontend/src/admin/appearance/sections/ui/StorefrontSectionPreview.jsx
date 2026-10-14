@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
 import { getSectionOverview } from '../sectionsOverviewModel';
 import './storefrontSectionPreview.css';
 
@@ -30,7 +30,40 @@ class StorefrontPreviewBoundary extends React.Component {
   }
 }
 
+function previewDevice() {
+  if (typeof window === 'undefined') return { width: 1280, label: 'Escritorio' };
+  if (window.innerWidth <= 767) return { width: 390, label: 'Móvil' };
+  if (window.innerWidth <= 1024) return { width: 768, label: 'Tableta' };
+  return { width: 1280, label: 'Escritorio' };
+}
+
 export default function StorefrontSectionPreview({ section, theme }) {
+  const viewportRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [frame, setFrame] = useState(() => ({ ...previewDevice(), scale: 1, height: 320 }));
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const canvas = canvasRef.current;
+    if (!viewport || !canvas) return undefined;
+
+    const measure = () => {
+      const device = previewDevice();
+      const availableWidth = viewport.clientWidth || device.width;
+      const scale = Math.min(1, availableWidth / device.width);
+      const height = Math.ceil(Math.max(260, canvas.scrollHeight) * scale);
+      setFrame((current) => current.width === device.width && current.scale === scale && current.height === height
+        ? current : { ...device, scale, height });
+    };
+
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(viewport);
+    observer?.observe(canvas);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [section?.id]);
+
   const PublicSection = PUBLIC_SECTIONS[section?.id];
   const sections = theme.sections || [];
   const previewSections = sections.map((entry) => entry.id === section.id ? { ...entry, enabled: true } : entry);
@@ -51,7 +84,9 @@ export default function StorefrontSectionPreview({ section, theme }) {
         discountPercent: Number(item.discountPercent) || 0,
         sizes: [], colors: [], features: [], description: '',
       }))
-    : undefined;
+    : section?.id === 'look' && Array.isArray(section.config?.products)
+      ? section.config.products
+      : undefined;
   const previewStyle = {
     '--color-primary': colors.primary || '#111827',
     '--color-secondary': colors.secondary || '#4b5563',
@@ -66,21 +101,25 @@ export default function StorefrontSectionPreview({ section, theme }) {
   return (
     <section className="section-real-preview" aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
-        <div><span className="section-real-preview__eyebrow">Vista previa</span><h3>Así se verá en la tienda</h3></div>
+        <div><span className="section-real-preview__eyebrow">Vista previa · {frame.label} {frame.width} px</span><h3>Así se verá en la tienda</h3></div>
       </header>
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
-      <div className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
+      <div ref={viewportRef} className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
         event.preventDefault();
         event.stopPropagation();
       }}>
         {overview.status === 'needs-content' ? (
           <div className="section-real-preview__empty"><strong>Agrega contenido para verla aquí.</strong><span>{overview.detail}. Completa los datos en Contenido y la vista aparecerá automáticamente.</span></div>
         ) : PublicSection ? (
-          <StorefrontPreviewBoundary key={section.id}>
-            <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>
-              <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} />
-            </Suspense>
-          </StorefrontPreviewBoundary>
+          <div className="section-real-preview__stage" style={{ height: frame.height }}>
+            <div ref={canvasRef} className="section-real-preview__canvas" style={{ width: frame.width, transform: `scale(${frame.scale})` }}>
+              <StorefrontPreviewBoundary key={section.id}>
+                <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>
+                  <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} />
+                </Suspense>
+              </StorefrontPreviewBoundary>
+            </div>
+          </div>
         ) : <p className="section-real-preview__empty">Esta sección no tiene una vista pública disponible.</p>}
       </div>
       <p className="section-real-preview__footnote">Los cambios aparecen aquí al instante. Pulsa Guardar cambios al salir para publicarlos.</p>

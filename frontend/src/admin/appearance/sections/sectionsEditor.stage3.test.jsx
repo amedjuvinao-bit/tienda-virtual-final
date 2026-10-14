@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import SectionsPanel from './SectionsPanel';
+import api from '../../../lib/api';
 
 vi.mock('../../../context/CartContext', () => ({ useCart: () => ({ addToCart: vi.fn() }) }));
 vi.mock('../../../context/FavoritesContext', () => ({ useFavorites: () => ({ toggleFavorite: vi.fn(), isFavorite: () => false }) }));
@@ -66,6 +67,24 @@ describe('editor de secciones, etapa 3', () => {
     await waitFor(() => expect(within(preview).getByText('Comprar ahora')).toBeInTheDocument());
   });
 
+  it('reduce la vista de escritorio a escala sin cambiar el ancho del banner público', async () => {
+    vi.stubGlobal('innerWidth', 1280);
+    const theme = { colors: { primary: '#345678', background: '#fff8f2' }, sections: [{
+      id: 'complementos', type: 'complementos', name: 'Complementos', enabled: true,
+      config: { imageSrc: '/banner-horizontal.jpg', imageAlt: 'Banner horizontal' },
+      style: { imageHeightPx: 500 },
+    }] };
+    render(<SectionsPanel theme={theme} setPath={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Complementos' }));
+    const preview = screen.getByRole('region', { name: 'Vista real de la tienda' });
+    const viewport = preview.querySelector('.section-real-preview__viewport');
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 640 });
+    fireEvent.resize(window);
+    await waitFor(() => expect(preview.querySelector('.section-real-preview__canvas')).toHaveStyle({ width: '1280px', transform: 'scale(0.5)' }));
+    expect(viewport).toHaveStyle('--color-primary: #345678');
+    expect(within(preview).getByAltText('Banner horizontal')).toHaveAttribute('src', '/banner-horizontal.jpg');
+  });
+
   it('muestra la tarjeta guardada en la vista de Tendencia si el catálogo no responde', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Catálogo fuera de línea')));
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -84,5 +103,21 @@ describe('editor de secciones, etapa 3', () => {
     await waitFor(() => expect(within(preview).getByRole('status')).toHaveTextContent('no están disponibles en el catálogo'));
     expect(within(preview).getAllByAltText('Vestido de prueba')[0]).toHaveAttribute('src', '/vestido-prueba.jpg');
     warning.mockRestore();
+  });
+
+  it('muestra el Look guardado e informa si el catálogo no responde, sin ocultar la vista previa', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Catálogo fuera de línea')));
+    const productRequest = vi.spyOn(api, 'get').mockResolvedValue({ data: { _id: 'producto-1', images: {} } });
+    const theme = { sections: [{
+      id: 'look', type: 'look', name: 'Looks', enabled: true,
+      config: { products: [{ productId: 'producto-1', title: 'Vestido rosa', mainImage: '/look-rosa.jpg', price: 98000 }] },
+    }] };
+    render(<SectionsPanel theme={theme} setPath={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Looks' }));
+    const preview = screen.getByRole('region', { name: 'Vista real de la tienda' });
+    await waitFor(() => expect(within(preview).getAllByAltText('Vestido rosa').length).toBeGreaterThan(0));
+    await waitFor(() => expect(within(preview).getByRole('status')).toHaveTextContent('no están disponibles en el catálogo'));
+    expect(within(preview).getAllByAltText('Vestido rosa')[0]).toHaveAttribute('src', '/look-rosa.jpg');
+    productRequest.mockRestore();
   });
 });

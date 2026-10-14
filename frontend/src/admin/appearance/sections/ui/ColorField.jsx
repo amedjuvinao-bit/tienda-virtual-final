@@ -116,7 +116,7 @@ export default function ColorField({
             className={[
               "w-7 h-7 rounded-full border transition",
               safe?.toLowerCase() === c.toLowerCase()
-                ? "border-[#943a70] ring-2 ring-neutral-900/20"
+                ? "section-editor-accent-border ring-2 ring-neutral-900/20"
                 : "border-neutral-200 hover:border-neutral-400",
             ].join(" ")}
             style={{ backgroundColor: c }}

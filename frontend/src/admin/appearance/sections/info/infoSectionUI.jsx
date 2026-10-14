@@ -521,7 +521,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                         className={[
                           "text-left rounded-2xl border px-4 py-3 transition shadow-sm",
                           active
-                            ? "border-[#943a70] bg-[#943a70] text-white"
+                            ? "section-editor-accent-border section-editor-accent text-white"
                             : "border-neutral-200 bg-white hover:border-neutral-400",
                         ].join(" ")}
                       >
@@ -553,7 +553,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                         className={[
                           "h-9 w-9 rounded-xl border text-sm font-semibold transition",
                           openCardIndex === index
-                            ? "bg-[#943a70] border-[#943a70] text-white"
+                            ? "section-editor-accent section-editor-accent-border text-white"
                             : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-400",
                         ].join(" ")}
                       >
@@ -594,7 +594,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                                 onChange={(e) => updateCard(openCardIndex, { iconUrl: e.target.value })}
                                 placeholder="https://..."
                               />
-                              <label className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl bg-[#943a70] text-white text-sm font-medium cursor-pointer hover:bg-[#782953] transition shrink-0">
+                              <label className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl section-editor-accent text-white text-sm font-medium cursor-pointer section-editor-accent-hover transition shrink-0">
                                 <span>{uploading ? "Subiendo..." : "Subir imagen"}</span>
                                 <input
                                   type="file"

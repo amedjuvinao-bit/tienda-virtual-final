@@ -104,7 +104,7 @@ function ColorPresets({ value, onChange }) {
             title={color}
             className={[
               "h-7 w-7 rounded-full border-2 transition",
-              active ? "border-[#943a70] scale-110" : "border-white hover:scale-105",
+              active ? "section-editor-accent-border scale-110" : "border-white hover:scale-105",
             ].join(" ")}
             style={{ backgroundColor: color }}
           />
@@ -704,7 +704,7 @@ export default function TiktokSectionUI({
                   onChange={(e) => updateConfig("titleImage", e.target.value)}
                 />
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen de título"}
                   <input
                     type="file"
@@ -820,7 +820,7 @@ export default function TiktokSectionUI({
                   </div>
                 ) : null}
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir logo"}
                   <input
                     type="file"
@@ -922,7 +922,7 @@ export default function TiktokSectionUI({
                   onChange={(e) => updateConfig("watermarkImage", e.target.value)}
                 />
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen de marca de agua"}
                   <input
                     type="file"
@@ -1225,7 +1225,7 @@ export default function TiktokSectionUI({
                   onChange={(e) => updateConfig("hoverLogoImage", e.target.value)}
                 />
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen hover"}
                   <input
                     type="file"
@@ -1365,7 +1365,7 @@ export default function TiktokSectionUI({
               <button
                 type="button"
                 onClick={addPost}
-                className="px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium hover:bg-[#782953] transition"
+                className="px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium section-editor-accent-hover transition"
               >
                 Agregar post
               </button>
@@ -1399,7 +1399,7 @@ export default function TiktokSectionUI({
                         onChange={(e) => updatePost(index, "image", e.target.value)}
                       />
 
-                      <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                      <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                         {uploading ? "Subiendo..." : "Subir imagen principal"}
                         <input
                           type="file"
@@ -1422,7 +1422,7 @@ export default function TiktokSectionUI({
                         onChange={(e) => updatePost(index, "thumb", e.target.value)}
                       />
 
-                      <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                      <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                         {uploading ? "Subiendo..." : "Subir thumbnail"}
                         <input
                           type="file"
@@ -1454,7 +1454,7 @@ export default function TiktokSectionUI({
                       />
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer hover:bg-[#782953] transition">
+                        <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                           {uploading ? "Subiendo..." : "Subir video hover"}
                           <input
                             type="file"

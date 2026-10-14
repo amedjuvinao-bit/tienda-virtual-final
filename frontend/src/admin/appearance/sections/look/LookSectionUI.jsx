@@ -315,7 +315,7 @@ export default function LookSectionUI({
                   />
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
+                    <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
                       <span className="mr-1">Subir imagen</span>
                       <input
                         type="file"
@@ -407,7 +407,7 @@ export default function LookSectionUI({
                         className={[
                           "rounded-xl border p-3 text-left transition",
                           active
-                            ? "border-[#943a70] bg-[#943a70] text-white"
+                            ? "section-editor-accent-border section-editor-accent text-white"
                             : "border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900",
                         ].join(" ")}
                       >

@@ -158,7 +158,7 @@ export default function TendenciaEditor({
                     "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold",
                     uploading || !uploadToCloudinary
                       ? "bg-neutral-200 text-neutral-500"
-                      : "bg-[#943a70] text-white hover:bg-[#782953]",
+                      : "section-editor-accent text-white section-editor-accent-hover",
                   ].join(" ")}
                 >
                   Subir
@@ -207,7 +207,7 @@ export default function TendenciaEditor({
                     "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold",
                     uploading || !uploadToCloudinary
                       ? "bg-neutral-200 text-neutral-500"
-                      : "bg-[#943a70] text-white hover:bg-[#782953]",
+                      : "section-editor-accent text-white section-editor-accent-hover",
                   ].join(" ")}
                 >
                   Subir
@@ -340,7 +340,7 @@ export default function TendenciaEditor({
                             onClick={() => patchProduct(idx, { discountEnabled: !r.discountEnabled })}
                             className={[
                               "relative inline-flex h-6 w-11 items-center rounded-full border transition",
-                              r.discountEnabled ? "bg-[#943a70] border-[#943a70]" : "bg-neutral-200 border-neutral-200",
+                              r.discountEnabled ? "section-editor-accent section-editor-accent-border" : "bg-neutral-200 border-neutral-200",
                             ].join(" ")}
                           >
                             <span

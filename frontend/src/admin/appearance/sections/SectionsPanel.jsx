@@ -635,7 +635,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
               onChange={(e) => patchConfig({ titleImage: e.target.value })}
               placeholder="https://..."
             />
-            <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
+            <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
               <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
               <input
                 type="file"
@@ -671,7 +671,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
                 onChange={(e) => patchConfig({ watermarkImage: e.target.value })}
                 placeholder="https://..."
               />
-              <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
+              <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
                 <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
                 <input
                   type="file"
@@ -1962,7 +1962,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
         <div className="section-editor-layout__form">
         {isLookSection ? (
           <LookSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -1974,7 +1974,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           />
         ) : isComplementosSection ? (
           <ComplementosSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -1986,7 +1986,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           />
         ) : isCategoriasSection ? (
           <CategoriasSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -1998,7 +1998,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           />
         ) : isInstagramSection ? (
           <InstagramSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2010,7 +2010,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           />
           ) : isTiktokSection ? (
           <TiktokSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2022,7 +2022,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           />
           ) : isInfoSection ? (
           <InfoSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)

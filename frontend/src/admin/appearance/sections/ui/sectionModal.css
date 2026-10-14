@@ -4,7 +4,33 @@
   z-index: 10000;
   isolation: isolate;
   font-family: Inter, system-ui, sans-serif;
-  color: #27202e;
+  color: var(--admin-card-text, #27202e);
+}
+.section-modal .section-editor-accent {
+  background: var(--admin-button-bg, var(--admin-primary, #a83368));
+  color: var(--admin-button-text, #fff);
+}
+.section-modal .section-editor-accent-border { border-color: var(--admin-primary, #a83368); }
+.section-modal .section-editor-accent-hover:hover {
+  background: var(--admin-button-hover, var(--admin-primary, #a83368));
+  color: var(--admin-button-hover-text, var(--admin-button-text, #fff));
+}
+.section-modal .section-editor-layout__form :is(.bg-white, .bg-neutral-50, .bg-neutral-100) {
+  background: var(--admin-card-bg, #fff);
+}
+.section-modal .section-editor-layout__form :is(.border-neutral-200, .border-neutral-300) {
+  border-color: var(--admin-card-border, #e8dbe4);
+}
+.section-modal .section-editor-layout__form :is(.text-neutral-900, .text-neutral-800, .text-neutral-700) {
+  color: var(--admin-card-text, #27202e);
+}
+.section-modal .section-editor-layout__form :is(.text-neutral-600, .text-neutral-500) {
+  color: var(--admin-card-muted-text, #715d6c);
+}
+.section-modal .section-editor-layout__form :is(input, select, textarea) {
+  background: var(--admin-input-bg, var(--admin-card-bg, #fff));
+  border-color: var(--admin-input-border, var(--admin-card-border, #e8dbe4));
+  color: var(--admin-card-text, #27202e);
 }
 .section-modal__backdrop {
   position: absolute;
@@ -32,9 +58,9 @@
   max-height: calc(100dvh - 16px);
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #e8dbe4;
+  border: 1px solid var(--admin-card-border, #e8dbe4);
   border-radius: 20px;
-  background: #fff;
+  background: var(--admin-card-bg, #fff);
   box-shadow: 0 25px 90px rgba(25, 14, 29, .34);
   pointer-events: auto;
 }
@@ -46,8 +72,8 @@
   gap: 12px;
   min-height: 62px;
   padding: 10px clamp(14px, 2vw, 24px);
-  border-bottom: 1px solid #ece5eb;
-  background: #fff;
+  border-bottom: 1px solid var(--admin-card-border, #ece5eb);
+  background: var(--admin-card-bg, #fff);
 }
 .section-modal__title { font-size: clamp(15px, 1.4vw, 19px); font-weight: 750; line-height: 1.25; }
 .section-modal__content {
@@ -61,7 +87,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: clamp(12px, 1.6vw, 24px);
-  background: #fcfafc;
+  background: var(--admin-page-bg, #fcfafc);
   scrollbar-width: thin;
   scrollbar-color: #c9b6c8 transparent;
 }

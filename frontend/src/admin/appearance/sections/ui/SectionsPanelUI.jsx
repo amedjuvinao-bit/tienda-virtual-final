@@ -37,7 +37,7 @@ export function TabButton({ active, children, onClick }) {
       className={[
         "px-3 py-2 rounded-xl text-sm font-bold border transition",
         active
-          ? "bg-[#943a70] text-white border-[#943a70]"
+          ? "section-editor-accent text-white section-editor-accent-border"
           : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
       ].join(" ")}
     >
@@ -468,7 +468,7 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
             className={[
               "px-2 py-1 rounded-lg border text-xs font-semibold",
               mode === "main"
-                ? "bg-[#943a70] text-white border-[#943a70]"
+                ? "section-editor-accent text-white section-editor-accent-border"
                 : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
             ].join(" ")}
           >
@@ -480,7 +480,7 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
             className={[
               "px-2 py-1 rounded-lg border text-xs font-semibold",
               mode === "hover"
-                ? "bg-[#943a70] text-white border-[#943a70]"
+                ? "section-editor-accent text-white section-editor-accent-border"
                 : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
             ].join(" ")}
           >
@@ -494,7 +494,7 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
           {loading ? "Cargando..." : "Recargar"}
         </Button>
 
-        <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
+        <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
           <span className="mr-1">{loading ? "Procesando..." : "Subir imagen"}</span>
           <input
             type="file"
@@ -617,7 +617,7 @@ export function ToggleChip({ active, onClick, children }) {
       className={[
         "px-3 py-2 rounded-xl border text-sm font-semibold transition",
         active
-          ? "bg-[#943a70] text-white border-[#943a70]"
+          ? "section-editor-accent text-white section-editor-accent-border"
           : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
       ].join(" ")}
     >

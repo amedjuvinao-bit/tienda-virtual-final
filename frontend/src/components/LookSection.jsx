@@ -107,7 +107,7 @@ function mapProductFromApi(product, ref) {
   };
 }
 
-export default function LookSection({ theme }) {
+export default function LookSection({ theme, previewProducts }) {
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
   const mobileSliderRef = useRef(null);
@@ -128,7 +128,7 @@ export default function LookSection({ theme }) {
   const config = lookSection.config;
   const style = lookSection.style;
 
-  const [products, setProducts] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [loadedProductsKey, setLoadedProductsKey] = useState('');
   const [selectedId, setSelectedId] = useState(config.selectedProductId || "");
   const [loading, setLoading] = useState(false);
@@ -190,7 +190,7 @@ export default function LookSection({ theme }) {
       const productIds = [...new Set(refs.map((ref) => String(ref?.productId || "").trim()).filter(Boolean))];
 
       if (lookSection.enabled === false || !productIds.length) {
-        setProducts([]);
+        setCatalogProducts([]);
         setLoadedProductsKey(productRefsKey);
         setLoading(false);
         return;
@@ -214,7 +214,7 @@ export default function LookSection({ theme }) {
         );
         if (cancelled) return;
 
-        setProducts(
+        setCatalogProducts(
           refs.map((ref) => mapProductFromApi(
             byId.get(String(ref?.productId || "").trim()),
             ref
@@ -223,7 +223,7 @@ export default function LookSection({ theme }) {
         setLoadedProductsKey(productRefsKey);
       } catch {
         if (!cancelled) {
-          setProducts([]);
+          setCatalogProducts([]);
           setLoadedProductsKey(productRefsKey);
         }
       } finally {
@@ -236,6 +236,24 @@ export default function LookSection({ theme }) {
       cancelled = true;
     };
   }, [productRefsKey, lookSection.enabled]);
+
+  // Saved product details are used only by the admin preview. The storefront
+  // still relies on the live catalog and never receives previewProducts.
+  const draftProducts = useMemo(() => Array.isArray(previewProducts)
+    ? previewProducts.map((ref) => ({
+      id: String(ref?.productId || ''),
+      image: ref?.mainImage || '/placeholder.png',
+      subtitle: ref?.title || ref?.name || 'Producto seleccionado',
+      price: Number(ref?.price) || 0,
+      colors: Array.isArray(ref?.colors) ? ref.colors.map(normalizeColorHex).filter(Boolean) : [],
+    })).filter((product) => product.id)
+    : [], [previewProducts]);
+  const currentCatalogProducts = loadedProductsKey === productRefsKey ? catalogProducts : [];
+  const catalogById = new Map(currentCatalogProducts.map((product) => [product.id, product]));
+  const products = draftProducts.length
+    ? draftProducts.map((product) => catalogById.get(product.id) || product)
+    : currentCatalogProducts;
+  const usingDraft = draftProducts.some((product) => !catalogById.has(product.id));
 
   useEffect(() => {
     if (!products.length) {
@@ -465,10 +483,11 @@ export default function LookSection({ theme }) {
     );
   }
 
-  if (lookSection.enabled === false || loadedProductsKey !== productRefsKey || !products.length) return null;
+  if (lookSection.enabled === false || !products.length) return null;
 
   return (
     <section style={wrapperStyle}>
+      {usingDraft ? <p role="status" className="mx-auto mb-4 max-w-5xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">{loading || loadedProductsKey !== productRefsKey ? 'Cargando productos del catálogo; mientras tanto se muestran los datos guardados.' : 'Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar.'}</p> : null}
       <div className="mx-auto md:hidden w-full mb-5">
         <div
           className={`w-full ${
