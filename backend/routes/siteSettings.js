@@ -776,21 +776,17 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     }
 
     if (Object.keys(requestedCardColors).length) {
-      const persisted = updated.theme?.banner?.templateConfigs || {};
-      const lostColors = Object.entries(requestedCardColors).some(([path, value]) => {
-        const [, , , templateId, , index, key] = path.split('.');
-        return String(persisted[templateId]?.cards?.[Number(index)]?.[key] ?? '').toLowerCase() !== value.toLowerCase();
-      });
-      if (lostColors) {
-        const result = await SiteSettings.collection.updateOne(
-          { _id: id, appearanceRevision: updated.appearanceRevision },
-          { $set: requestedCardColors }
-        );
-        if (result.matchedCount !== 1) {
-          return res.status(409).json({ ok: false, error: 'APPEARANCE_REVISION_CONFLICT', message: 'La Apariencia cambió durante el guardado. Recarga y vuelve a intentarlo.' });
-        }
-        updated = await SiteSettings.findById(id).lean();
+      // The card array is cast by Mongoose during the main update. Persist the
+      // individual colors with the MongoDB driver, then read the stored document.
+      // This also covers a process whose compiled schema has no color fields.
+      const result = await SiteSettings.collection.updateOne(
+        { _id: id, appearanceRevision: updated.appearanceRevision },
+        { $set: requestedCardColors }
+      );
+      if (result.matchedCount !== 1) {
+        return res.status(409).json({ ok: false, error: 'APPEARANCE_REVISION_CONFLICT', message: 'La Apariencia cambió durante el guardado. Recarga y vuelve a intentarlo.' });
       }
+      updated = await SiteSettings.collection.findOne({ _id: id });
       const stillLost = Object.entries(requestedCardColors).some(([path, value]) => {
         const [, , , templateId, , index, key] = path.split('.');
         return String(updated?.theme?.banner?.templateConfigs?.[templateId]?.cards?.[Number(index)]?.[key] ?? '').toLowerCase() !== value.toLowerCase();
