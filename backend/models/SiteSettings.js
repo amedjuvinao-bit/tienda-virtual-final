@@ -102,6 +102,8 @@ const BannerTemplateCardSchema = new Schema({
   text: { type: String, default: "" },
   titleColor: { type: String, default: "", validate: { validator: (value) => !value || /^#[0-9a-f]{6}$/i.test(value), message: "Color de título inválido" } },
   labelColor: { type: String, default: "", validate: { validator: (value) => !value || /^#[0-9a-f]{6}$/i.test(value), message: "Color de etiqueta inválido" } },
+  titleSizePx: { type: Number, min: 10, max: 24, default: undefined },
+  labelSizePx: { type: Number, min: 8, max: 18, default: undefined },
   image: { type: String, default: "" },
   imageSource: { type: String, enum: ["custom", "catalog"], default: "custom" },
   decorationMode: { type: String, enum: ["preset", "custom", "none"], default: "none" },
