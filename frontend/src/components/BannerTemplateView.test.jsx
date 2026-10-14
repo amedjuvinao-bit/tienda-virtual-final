@@ -184,7 +184,7 @@ describe('plantillas sobre contenido existente', () => {
       { destinationType: 'catalogCategory', catalogCategoryId: 'legacy:Zapatos', catalogCategoryName: 'Zapatos', enabled: true },
     ] } } };
     const { container } = render(<BannerTemplateView banner={banner} sections={categories} preview device="mobile" />);
-    const toggle = screen.getByRole('button', { name: /Ver 1 categorías más/ });
+    const toggle = screen.getByRole('button', { name: /Ver 1 categoría más/ });
     const rail = container.querySelector('.rb-template__rail');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(rail).toHaveAttribute('data-mobile-open', 'false');
