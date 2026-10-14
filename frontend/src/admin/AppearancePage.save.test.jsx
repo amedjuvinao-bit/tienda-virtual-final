@@ -44,7 +44,9 @@ vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }
 }}>Ajustar slider ({theme.banner.sliderIntervalMs} ms)</button><button onClick={() => setPath('banner.templateConfigs.atelier', {
   ...theme.banner.templateConfigs?.atelier,
   cards: [{ categoryId: 'hogar', position: { desktop: { x: 45, y: 37 } } }],
-})}>Mover tarjeta</button><button onClick={() => setPath('banner.slides', [{ image: '/portada.jpg', posX: 50, posY: 50, mobilePosX: 73, mobilePosY: 31 }])}>Ajustar encuadre móvil</button></> }));
+})}>Mover tarjeta</button><button onClick={() => setPath('banner.slides', [{ image: '/portada.jpg', posX: 50, posY: 50, mobilePosX: 73, mobilePosY: 31 }])}>Ajustar encuadre móvil</button><button onClick={() => setPath('banner.templateConfigs.editorial.cards', [
+  { categoryId: 'hogar', titleColor: '#332211', labelColor: '#ddaa88' },
+])}>Cambiar colores de tarjeta</button></> }));
 vi.mock('./appearance/sections/SectionsPanel', () => ({
   default: ({ theme, setPath }) => <button onClick={() => setPath('sections', theme.sections.map((section) =>
     section.id === 'look' ? { ...section, title: 'Nuevos looks' } : section
@@ -332,6 +334,37 @@ describe('guardado seguro de Apariencia', () => {
     expect(saveSiteSettings).toHaveBeenCalledTimes(1);
     complete({ theme: initial.theme, menus: initial.menus, appearanceRevision: 4 });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled());
+  });
+
+  it('detecta si el servidor pierde los colores de texto y conserva el cambio en el editor', async () => {
+    const user = userEvent.setup();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      saveSiteSettings.mockImplementation(async (payload) => ({
+        theme: { ...initial.theme, banner: { ...payload.theme.banner, templateConfigs: { editorial: {
+          cards: [{ categoryId: 'hogar' }],
+        } } } },
+        menus: initial.menus,
+        appearanceRevision: 4,
+      }));
+      render(<AppearancePage />);
+      await screen.findByText('Cambiar WhatsApp');
+      await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+      await user.click(screen.getByRole('button', { name: 'Cambiar colores de tarjeta' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('color del título de tarjeta 1 (editorial)');
+      expect(screen.getByRole('alert')).toHaveTextContent('color de la etiqueta de tarjeta 1 (editorial)');
+      expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
+      expect(saveSiteSettings).toHaveBeenCalledWith(expect.objectContaining({
+        theme: expect.objectContaining({ banner: expect.objectContaining({
+          templateConfigs: expect.objectContaining({ editorial: expect.objectContaining({
+            cards: [expect.objectContaining({ titleColor: '#332211', labelColor: '#ddaa88' })],
+          }) }),
+        }) }),
+      }));
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('presenta el conflicto sin sobrescribir y ofrece recargar explícitamente', async () => {

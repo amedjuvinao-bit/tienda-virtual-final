@@ -996,12 +996,18 @@ export default function AppearancePage() {
             if (card?.imageSource && storedCard?.imageSource !== card.imageSource) {
               mismatches.push(`origen de imagen de tarjeta ${index + 1} (${templateId})`);
             }
+            for (const [key, label] of [['titleColor', 'título'], ['labelColor', 'etiqueta']]) {
+              if (card?.[key] === undefined) continue;
+              if (String(storedCard?.[key] || '').toLowerCase() !== String(card[key] || '').toLowerCase()) {
+                mismatches.push(`color del ${label} de tarjeta ${index + 1} (${templateId})`);
+              }
+            }
           });
         }
         if (mismatches.length) {
           setAppearanceRevision(saved.appearanceRevision);
           setServerSnapshot(buildThemeFromServer(saved.theme));
-          throw new Error(`El servidor no conservó el encuadre o las imágenes de ${[...new Set(mismatches)].join(', ')}. El ajuste sigue en el editor. Sincroniza y reinicia el backend con esta versión, luego vuelve a guardar.`);
+          throw new Error(`El servidor no conservó los ajustes de ${[...new Set(mismatches)].join(', ')}. El ajuste sigue en el editor. Sincroniza y reinicia el backend con esta versión, luego vuelve a guardar.`);
         }
       }
 
