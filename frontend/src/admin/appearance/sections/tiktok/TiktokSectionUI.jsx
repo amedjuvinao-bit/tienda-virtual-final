@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { Music2 } from "lucide-react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorPostPicker from "../ui/SectionEditorPostPicker";
 import {
   normalizeTiktokSection,
   TIKTOK_SECTION_ID,
@@ -330,6 +331,9 @@ export default function TiktokSectionUI({
   uploading = false,
 }) {
   const [step, setStep] = useState("content");
+  const [contentGroup, setContentGroup] = useState('profile');
+  const [designGroup, setDesignGroup] = useState(0);
+  const [activePostIndex, setActivePostIndex] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [logoPreviewError, setLogoPreviewError] = useState(false);
   const [previewHoveredId, setPreviewHoveredId] = useState(null);
@@ -391,11 +395,14 @@ export default function TiktokSectionUI({
       },
     ];
     updateConfig("posts", nextPosts);
+    setActivePostIndex(nextPosts.length - 1);
+    setContentGroup('posts');
   }
 
   function removePost(index) {
     const nextPosts = posts.filter((_, i) => i !== index);
     updateConfig("posts", nextPosts);
+    setActivePostIndex((current) => Math.min(current > index ? current - 1 : current, nextPosts.length - 1));
   }
 
   async function handleUploadConfigImage(key, file) {
@@ -621,9 +628,17 @@ export default function TiktokSectionUI({
         { value: "design", label: "Diseño", hint: "Ajusta logo, tarjetas, marca de agua y efectos." },
       ]} />
 
+      <nav className="section-editor-substeps" aria-label={step === 'content' ? 'Contenido de TikTok' : 'Diseño de TikTok'}>
+        {step === 'content'
+          ? [['profile', 'Perfil'], ['title', 'Título'], ['posts', `Publicaciones (${posts.length})`]].map(([id, name]) =>
+            <button key={id} type="button" aria-pressed={contentGroup === id} onClick={() => setContentGroup(id)}>{name}</button>)
+          : ['Logo y perfil', 'Fondo', 'Galería', 'Logo al pasar', 'Efectos'].map((name, index) =>
+            <button key={name} type="button" aria-pressed={designGroup === index} onClick={() => setDesignGroup(index)}>{name}</button>)}
+      </nav>
+
       <div className="section-social-editor__grid grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content" hidden={contentGroup !== 'profile'}>
             <div className="text-sm font-semibold text-neutral-900">Perfil</div>
 
             <Field label="Link del perfil de TikTok">
@@ -693,7 +708,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content" hidden={contentGroup !== 'title'}>
             <div className="text-sm font-semibold text-neutral-900">Título</div>
 
             <Field label="Imagen del título">
@@ -786,7 +801,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 0}>
             <div className="text-sm font-semibold text-neutral-900">Logo principal</div>
 
             <Field label="Imagen del logo">
@@ -904,7 +919,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 1}>
             <div className="text-sm font-semibold text-neutral-900">Marca de agua de fondo</div>
 
             <Field label="Mostrar marca de agua">
@@ -1037,7 +1052,7 @@ export default function TiktokSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 2}>
             <div className="text-sm font-semibold text-neutral-900">Grid y apariencia</div>
 
             <Field label="Modo de galería">
@@ -1155,7 +1170,7 @@ export default function TiktokSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 3}>
             <div className="text-sm font-semibold text-neutral-900">Logo hover marca de agua</div>
 
             <Field label="Mostrar logo al pasar mouse">
@@ -1276,7 +1291,7 @@ export default function TiktokSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 4}>
             <div className="text-sm font-semibold text-neutral-900">Overlay, hover y animación</div>
 
             <Field label="Activar overlay">
@@ -1359,27 +1374,29 @@ export default function TiktokSectionUI({
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content" hidden={contentGroup !== 'posts'}>
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-neutral-900">Posts de TikTok</div>
+              <div className="text-sm font-semibold text-neutral-900">Publicaciones de TikTok</div>
               <button
                 type="button"
                 onClick={addPost}
                 className="px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium section-editor-accent-hover transition"
               >
-                Agregar post
+                Agregar publicación
               </button>
             </div>
 
+            <SectionEditorPostPicker posts={posts} activeIndex={Math.max(0, Math.min(activePostIndex, posts.length - 1))} onSelect={setActivePostIndex} label="TikTok" />
             <div className="space-y-4">
               {posts.map((post, index) => (
                 <div
                   key={post.id}
                   className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 space-y-4"
+                  hidden={index !== Math.max(0, Math.min(activePostIndex, posts.length - 1))}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs font-semibold text-neutral-800">
-                      Post {index + 1}
+                      Publicación {index + 1}
                     </div>
 
                     <button
@@ -1391,7 +1408,7 @@ export default function TiktokSectionUI({
                     </button>
                   </div>
 
-                  <Field label="Imagen principal del post">
+                  <Field label="Imagen principal de la publicación">
                     <div className="space-y-3">
                       <Input
                         value={post.image || ""}
@@ -1414,7 +1431,7 @@ export default function TiktokSectionUI({
                     </div>
                   </Field>
 
-                  <Field label="Miniatura / thumbnail">
+                  <Field label="Miniatura de la publicación">
                     <div className="space-y-3">
                       <Input
                         value={post.thumb || ""}
@@ -1437,7 +1454,7 @@ export default function TiktokSectionUI({
                     </div>
                   </Field>
 
-                  <Field label="Link del post">
+                  <Field label="Enlace de la publicación">
                     <Input
                       value={post.link || ""}
                       placeholder="https://www.tiktok.com/@usuario/video/123"
@@ -1445,7 +1462,7 @@ export default function TiktokSectionUI({
                     />
                   </Field>
 
-                  <Field label="Video hover (subido desde tu equipo)">
+                  <Field label="Video al pasar el cursor (subido desde tu equipo)">
                     <div className="space-y-3">
                       <Input
                         value={post.videoUrl || ""}
@@ -1484,7 +1501,7 @@ export default function TiktokSectionUI({
                     </div>
                   </Field>
 
-                  <Field label="Mostrar post">
+                  <Field label="Mostrar publicación">
                     <Toggle
                       checked={post.enabled !== false}
                       onChange={(v) => updatePost(index, "enabled", !!v)}

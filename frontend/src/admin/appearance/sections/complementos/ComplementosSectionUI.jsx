@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button, Field, Input } from "../ui/UiComponents";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
 import {
   ColorField,
   RangeNumberField,
@@ -339,7 +340,7 @@ export default function ComplementosSectionUI({
         )}
 
         {tab === "estilos" && (
-          <>
+          <SectionEditorCardTabs label="Diseño de Complementos" labels={['Espacio', 'Imagen', 'Botón y efectos']}>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">
                 Layout general
@@ -704,7 +705,7 @@ export default function ComplementosSectionUI({
                 </Field>
               </div>
             </div>
-          </>
+          </SectionEditorCardTabs>
         )}
       </div>
 

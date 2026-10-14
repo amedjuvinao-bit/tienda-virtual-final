@@ -10,6 +10,7 @@ import {
 } from "../ui/SectionsPanelUI";
 import LookProductPicker from "./LookProductPicker";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
 import {
   LOOK_MAX_PRODUCTS,
   LOOK_SECTION_DEFAULTS,
@@ -445,6 +446,7 @@ export default function LookSectionUI({
                 <div className="text-sm font-extrabold text-neutral-900 mb-3">
                   Imágenes por producto
                 </div>
+                <p className="mb-3 text-xs text-neutral-600">Selecciona un producto arriba para editar sus imágenes aquí.</p>
 
                 <div className="space-y-4">
                   {selectedItems.map((item, index) => {
@@ -454,6 +456,7 @@ export default function LookSectionUI({
                       <div
                         key={`${pid}_${index}`}
                         className="rounded-xl border border-neutral-200 bg-neutral-50 p-3"
+                        hidden={pid !== selectedProductId}
                       >
                         <div className="text-sm font-bold text-neutral-900 mb-2">
                           {item?.title || "Producto"} · {pid}
@@ -475,7 +478,7 @@ export default function LookSectionUI({
         )}
 
         {tab === "estilos" && (
-          <>
+          <SectionEditorCardTabs label="Diseño de Looks" labels={['Espacio', 'Textos', 'Imagen principal', 'Miniaturas']}>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">Layout general</div>
 
@@ -794,7 +797,7 @@ export default function LookSectionUI({
                 />
               </div>
             </div>
-          </>
+          </SectionEditorCardTabs>
         )}
 
         {tab === "slider-movil" && (

@@ -120,4 +120,57 @@ describe('editor de secciones, etapa 3', () => {
     expect(within(preview).getAllByAltText('Vestido rosa')[0]).toHaveAttribute('src', '/look-rosa.jpg');
     productRequest.mockRestore();
   });
+
+  it.each([['instagram', 'Instagram'], ['tiktok', 'TikTok']])(
+    'permite editar una publicación a la vez en %s sin perder el resto', (id, label) => {
+      render(<Harness id={id} onSave={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: `Editar ${label}` }));
+      fireEvent.click(within(screen.getByRole('navigation', { name: `Contenido de ${label}` })).getByRole('button', { name: /Publicaciones/ }));
+      const picker = screen.getByRole('navigation', { name: `Elegir publicación de ${label}` });
+      const first = within(picker).getByRole('button', { name: 'Editar publicación 1' });
+      const second = within(picker).getByRole('button', { name: 'Editar publicación 2' });
+      expect(first).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(second);
+      expect(second).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Publicación 2')).toBeVisible();
+      expect(screen.getByText('Publicación 1')).not.toBeVisible();
+    },
+  );
+
+  it('conserva el enlace editado al cambiar de publicación y lo entrega al guardado', () => {
+    const onSave = vi.fn();
+    render(<Harness id="instagram" onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Instagram' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Instagram' })).getByRole('button', { name: /Publicaciones/ }));
+    const picker = screen.getByRole('navigation', { name: 'Elegir publicación de Instagram' });
+    const firstCard = screen.getByText('Publicación 1').closest('.rounded-2xl.bg-neutral-50');
+    const link = within(firstCard).getByPlaceholderText('https://instagram.com/p/xxxx');
+    fireEvent.change(link, { target: { value: 'https://instagram.com/p/nuevo' } });
+    fireEvent.click(within(picker).getByRole('button', { name: 'Editar publicación 2' }));
+    fireEvent.click(within(picker).getByRole('button', { name: 'Editar publicación 1' }));
+    expect(link).toHaveValue('https://instagram.com/p/nuevo');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
+    expect(onSave.mock.calls[0][0].config.posts[0].link).toBe('https://instagram.com/p/nuevo');
+  });
+
+  it.each([
+    ['tendencia', 'En tendencia', 'Diseño de Tendencia', 'Tarjetas y espacio'],
+    ['look', 'Looks', 'Diseño de Looks', 'Miniaturas'],
+    ['complementos', 'Complementos', 'Diseño de Complementos', 'Botón y efectos'],
+    ['categorias', 'Categorías', 'Diseño de Categorías', 'Navegación'],
+    ['informacion', 'Información', 'Diseño de Información', 'Animación'],
+  ])('agrupa los controles de diseño de %s y deja seleccionar el último grupo', (id, name, navLabel, lastGroup) => {
+    render(<Harness id={id} onSave={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: `Editar ${name}` }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
+    const tabs = screen.getByRole('navigation', { name: navLabel });
+    expect(tabs.closest('.section-card-tabs').querySelectorAll('.section-card-tabs__panels > div'))
+      .toHaveLength(within(tabs).getAllByRole('button').length);
+    const last = within(tabs).getByRole('button', { name: lastGroup });
+    fireEvent.click(last);
+    expect(last).toHaveAttribute('aria-pressed', 'true');
+    expect(tabs.closest('.section-card-tabs').querySelectorAll('.section-card-tabs__panels > div:not([hidden])'))
+      .toHaveLength(1);
+    expect(screen.getByRole('region', { name: 'Vista real de la tienda' })).toBeInTheDocument();
+  });
 });

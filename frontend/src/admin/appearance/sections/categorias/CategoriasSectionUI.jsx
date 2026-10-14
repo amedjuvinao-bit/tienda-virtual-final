@@ -2,6 +2,8 @@
 import React, { useMemo, useState } from "react";
 import { Button, Field, Input } from "../ui/UiComponents";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
+import SectionEditorPostPicker from "../ui/SectionEditorPostPicker";
 import {
   ColorField,
   RangeNumberField,
@@ -134,6 +136,7 @@ export default function CategoriasSectionUI({
 }) {
   const section = useMemo(() => getCategoriasSectionFromTheme(theme), [theme]);
   const [tab, setTab] = useState("contenido");
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
   const config = section?.config || CATEGORIAS_SECTION_DEFAULTS.config;
   const style = section?.style || CATEGORIAS_SECTION_DEFAULTS.style;
@@ -190,6 +193,7 @@ export default function CategoriasSectionUI({
     const nextSlides = [...(config.slides || [])];
     nextSlides.splice(index, 1);
     patchSlides(nextSlides);
+    setActiveSlideIndex((current) => Math.min(current > index ? current - 1 : current, nextSlides.length - 1));
   };
 
   const addSlide = () => {
@@ -207,6 +211,7 @@ export default function CategoriasSectionUI({
       enabled: true,
     });
     patchSlides(nextSlides);
+    setActiveSlideIndex(nextSlides.length - 1);
   };
 
   const resetCategoriasDesign = () => {
@@ -371,28 +376,30 @@ export default function CategoriasSectionUI({
             <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-extrabold text-neutral-900">
-                  Slides / hero items
+                  Categorías del carrusel
                 </div>
 
                 <Button type="button" onClick={addSlide}>
-                  Agregar slide
+                  Agregar categoría
                 </Button>
               </div>
 
               {(config.slides || []).length === 0 ? (
                 <div className="text-xs text-neutral-500">
-                  Aún no hay slides configurados.
+                  Aún no hay categorías configuradas.
                 </div>
               ) : null}
 
+              <SectionEditorPostPicker posts={config.slides || []} activeIndex={Math.max(0, Math.min(activeSlideIndex, (config.slides || []).length - 1))} onSelect={setActiveSlideIndex} label="Categorías" itemName="diapositiva" />
               {(config.slides || []).map((slide, index) => (
                 <div
                   key={slide.id || index}
                   className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 space-y-4"
+                  hidden={index !== Math.max(0, Math.min(activeSlideIndex, (config.slides || []).length - 1))}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-neutral-900">
-                      Slide {index + 1}
+                      Categoría {index + 1}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -557,7 +564,7 @@ export default function CategoriasSectionUI({
         )}
 
         {tab === "estilos" && (
-          <>
+          <SectionEditorCardTabs label="Diseño de Categorías" labels={['Espacio', 'Imagen principal', 'Miniaturas', 'Textos', 'Botones', 'Navegación']}>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">
                 Layout general
@@ -1298,7 +1305,7 @@ export default function CategoriasSectionUI({
                 </Field>
               </div>
             </div>
-          </>
+          </SectionEditorCardTabs>
         )}
       </div>
 

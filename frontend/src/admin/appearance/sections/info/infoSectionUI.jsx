@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
 import { ColorField } from "../ui/SectionsPanelUI";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
 import {
   normalizeInfoSection,
   INFO_SECTION_ID,
@@ -303,7 +304,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
 
         <div className="space-y-6">
           {activeTab === "general" ? (
-            <>
+            <SectionEditorCardTabs label="Diseño de Información" labels={['Contenedor', 'Fondo', 'Animación']}>
               <PanelCard
                 title="Contenedor"
                 subtitle="Medidas, borde, sombra y estructura general"
@@ -450,7 +451,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                   </div>
                 </div>
               </PanelCard>
-            </>
+            </SectionEditorCardTabs>
           ) : null}
 
           {activeTab === "contenido" ? (

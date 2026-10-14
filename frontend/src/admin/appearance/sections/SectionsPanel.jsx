@@ -11,6 +11,8 @@ import InfoSectionUI from "./info/infoSectionUI";
 import { getSectionOverview } from './sectionsOverviewModel';
 import './sectionsOverview.css';
 import SectionEditorSteps from './ui/SectionEditorSteps';
+import SectionEditorCardTabs from './ui/SectionEditorCardTabs';
+import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
@@ -1026,9 +1028,9 @@ function StylesTab({ section, onChange }) {
   };
 
   return (
-    <div className="space-y-6">
+    <SectionEditorCardTabs label="Diseño de Tendencia" labels={['Texto general', 'Campos de la tarjeta', 'Datos visibles', 'Tarjetas y espacio']}>
       <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-        <div className="text-sm font-semibold text-neutral-900 mb-2">Texto dentro de Cards (general)</div>
+        <div className="text-sm font-semibold text-neutral-900 mb-2">Texto de todas las tarjetas</div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Fuente (texto cards)" name="style.cardTextFontFamily">
@@ -1113,16 +1115,18 @@ function StylesTab({ section, onChange }) {
         </div>
       </div>
 
-      <FieldStyleEditor title="Título del producto (cardTitle*)" prefix="cardTitle" defaultSize={12} sizeMin={10} sizeMax={20} weightDefault={800} />
-      <FieldStyleEditor title="Precio (cardPrice*)" prefix="cardPrice" defaultSize={14} sizeMin={10} sizeMax={22} weightDefault={800} />
-      <FieldStyleEditor title="Atributos: Tallas / Colores (cardMeta*)" prefix="cardMeta" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={700} />
-      <FieldStyleEditor title="Descripción / Features (cardDesc*)" prefix="cardDesc" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={600} />
+      <div className="grid gap-3">
+        <FieldStyleEditor title="Título del producto" prefix="cardTitle" defaultSize={12} sizeMin={10} sizeMax={20} weightDefault={800} />
+        <FieldStyleEditor title="Precio" prefix="cardPrice" defaultSize={14} sizeMin={10} sizeMax={22} weightDefault={800} />
+        <FieldStyleEditor title="Tallas y colores" prefix="cardMeta" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={700} />
+        <FieldStyleEditor title="Descripción y características" prefix="cardDesc" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={600} />
+      </div>
 
       {section.type === "tendencia" ? (
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-3">
           <div className="text-sm font-semibold text-neutral-900">Qué mostrar en el card (Tendencia)</div>
           <div className="text-xs text-neutral-500">
-            Esto se guarda en <code>config.cardFields</code> y lo lee el frontend para mostrar/ocultar bloques.
+            Elige qué información verá el cliente en cada tarjeta.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1266,7 +1270,7 @@ function StylesTab({ section, onChange }) {
           </Field>
         </div>
       </div>
-    </div>
+    </SectionEditorCardTabs>
   );
 }
 
@@ -1279,6 +1283,7 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
   }, [cfgRaw]);
 
   const [search, setSearch] = useState("");
+  const [activeProductId, setActiveProductId] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [error, setError] = useState("");
@@ -1341,12 +1346,14 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
     patchConfig({
       products: [...existing, normalized].slice(0, cfg.maxItems || 4),
     });
+    setActiveProductId(normalized.productId);
   };
 
   const handleRemoveProduct = (productId) => {
     patchConfig({
       products: (cfg.products || []).filter((p) => p.productId !== productId),
     });
+    if (activeProductId === productId) setActiveProductId('');
   };
 
   const handleChangeImages = (productId, imagesPatch) => {
@@ -1373,6 +1380,9 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
       }),
     });
   };
+
+  const activeId = cfg.products?.some((item) => item.productId === activeProductId)
+    ? activeProductId : cfg.products?.[0]?.productId;
 
   return (
     <div className="section-product-editor space-y-4">
@@ -1457,11 +1467,16 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
 
         {!cfg.products?.length ? <div className="text-xs text-neutral-500">Aún no has seleccionado productos para esta sección.</div> : null}
 
+        <SectionEditorPostPicker posts={(cfg.products || []).map((item) => ({ id: item.productId, image: item.mainImage }))}
+          activeIndex={Math.max(0, (cfg.products || []).findIndex((item) => item.productId === activeId))}
+          onSelect={(index) => setActiveProductId(cfg.products[index]?.productId || '')}
+          label="Tendencia" itemName="tarjeta" />
+
         {cfg.products?.map((itemRaw) => {
           const item = normalizeDiscountFields(itemRaw);
 
           return (
-            <div key={item.productId} className="section-product-editor__card border border-neutral-200 rounded-xl p-3 bg-neutral-50">
+            <div key={item.productId} hidden={item.productId !== activeId} className="section-product-editor__card border border-neutral-200 rounded-xl p-3 bg-neutral-50">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-neutral-900 line-clamp-2">
