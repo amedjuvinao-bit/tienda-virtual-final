@@ -375,3 +375,108 @@
   .rb-template--editorial .rb-template__trust-item { font-size: clamp(8px,2.1cqw,10px); }
   .rb-template--editorial .rb-template__trust-icon { width: 19px; height: 19px; }
 }
+
+
+/* On narrow banners, keep the editorial photo clear until categories are requested. */
+.rb-template__rail-panel { display: contents; }
+.rb-template__mobile-categories-toggle { display: none; }
+@container (max-width: 680px) {
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail {
+    z-index: 4;
+    left: 6%;
+    right: 6%;
+    bottom: 3%;
+    width: auto;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__mobile-categories-toggle {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 48px;
+    gap: 9px;
+    padding: 7px 13px;
+    border: 1px solid rgba(255,255,255,.78);
+    border-radius: 17px;
+    background: color-mix(in srgb, var(--rb-template-glass) 48%, rgba(45,20,35,.45));
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.8), 0 10px 28px rgba(36,12,25,.22);
+    backdrop-filter: blur(18px) saturate(145%);
+    -webkit-backdrop-filter: blur(18px) saturate(145%);
+    color: var(--rb-template-text);
+    font: 700 clamp(11px,3.4cqw,14px)/1.2 system-ui,sans-serif;
+    text-align: left;
+    cursor: pointer;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__mobile-categories-toggle:focus-visible {
+    outline: 3px solid var(--rb-template-accent);
+    outline-offset: 3px;
+  }
+  .rb-template--editorial .rb-template__mobile-categories-icon {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    place-items: center;
+    border-radius: 9px;
+    background: rgba(255,255,255,.23);
+    color: var(--rb-template-accent);
+    font-size: 18px;
+  }
+  .rb-template--editorial .rb-template__mobile-categories-count {
+    margin-left: auto;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.2);
+    font-size: 11px;
+  }
+  .rb-template--editorial .rb-template__mobile-categories-chevron {
+    font-size: 19px;
+    transition: transform .2s ease;
+  }
+  .rb-template--editorial[data-mobile-open='false'] .rb-template__mobile-categories-chevron { transform: rotate(180deg); }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    display: block;
+    max-height: min(46vh, 310px);
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.78);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--rb-template-glass) 67%, rgba(48,22,36,.66));
+    box-shadow: inset 0 1px 2px rgba(255,255,255,.65), 0 18px 38px rgba(28,10,23,.32);
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+    scrollbar-width: thin;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile'])[data-mobile-open='false'] .rb-template__rail-panel { display: none; }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail-heading { margin: 0 0 8px; }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__cards {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-flow: row;
+    grid-template-rows: none;
+    gap: 6px;
+    overflow: visible;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    min-height: 45px;
+    height: auto;
+    padding: 5px 8px;
+    gap: 9px;
+    text-align: left;
+    background: rgba(255,246,245,.8);
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card img {
+    width: 34px;
+    height: 34px;
+    flex: none;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card-copy { flex: 1; text-align: left; }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card > span:last-child { display: block; margin: 0; }
+}
