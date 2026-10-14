@@ -616,10 +616,10 @@ export default function TiktokSectionUI({
         </div>
       ) : null}
 
-      <SectionEditorSteps value={step} onChange={setStep} items={[
-        { value: "content", label: "Contenido" },
-        { value: "design", label: "Diseño" },
-        { value: "preview", label: "Vista previa" },
+      <SectionEditorSteps value={step} onChange={setStep} sectionName="TikTok" items={[
+        { value: "content", label: "Contenido", hint: "Añade el perfil, el título y los videos o imágenes." },
+        { value: "design", label: "Diseño", hint: "Ajusta logo, tarjetas, marca de agua y efectos." },
+        { value: "preview", label: "Vista previa", hint: "Comprueba las publicaciones con el diseño público." },
       ]} />
 
       <div className="section-social-editor__grid grid grid-cols-1 xl:grid-cols-2 gap-4">

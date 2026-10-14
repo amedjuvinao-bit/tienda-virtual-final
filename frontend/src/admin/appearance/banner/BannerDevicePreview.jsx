@@ -69,7 +69,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
 
   return (
     <div className="banner-preview-shell" data-device={device}>
-      <div ref={viewportRef} className="banner-preview-viewport" data-device={device} style={{ aspectRatio: `${viewport.width} / ${frameHeight}` }} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
+      <div ref={viewportRef} className="banner-preview-viewport" data-admin-storefront-preview="true" data-device={device} style={{ aspectRatio: `${viewport.width} / ${frameHeight}` }} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
         <div className="banner-preview-stage" style={{ width: viewport.width, height: frameHeight, transform: `scale(${previewWidth ? previewWidth / viewport.width : 0})` }}>
         <div className="banner-preview-mini-header"><span>ROSA BOUTIQUE</span><span>⌕ · ≡</span></div>
         <div className="banner-preview-hero" style={{ height: `${heightPercent}%` }}>

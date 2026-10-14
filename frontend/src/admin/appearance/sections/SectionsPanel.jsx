@@ -10,7 +10,8 @@ import TiktokSectionUI from "./tiktok/TiktokSectionUI";
 import InfoSectionUI from "./info/infoSectionUI";
 import { getSectionOverview } from './sectionsOverviewModel';
 import './sectionsOverview.css';
-import SectionEditorSteps from './ui/SectionEditorSteps';
+import SectionEditorSteps, { SectionEditorStepContext } from './ui/SectionEditorSteps';
+import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -1796,6 +1797,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
   const [sections, setSections] = useState(() => cloneSections(initialSections));
   const [editingId, setEditingId] = useState(null);
   const [activeTab, setActiveTab] = useState("basic");
+  const [editorStep, setEditorStep] = useState("basic");
   const [overviewFilter, setOverviewFilter] = useState('all');
 
   const lastIncomingFromThemeRef = useRef(JSON.stringify(initialSections));
@@ -1919,6 +1921,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
   const openEditor = (id) => {
     setEditingId(id);
     setActiveTab("basic");
+    setEditorStep("basic");
   };
 
   const closeEditor = () => {
@@ -1989,6 +1992,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
 
       {selected ? (
       <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
+        <SectionEditorStepContext.Provider value={setEditorStep}>
         {isLookSection ? (
           <LookSectionUI
             theme={{ sections }}
@@ -2068,13 +2072,18 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
               <p className="text-sm text-neutral-600">Edita el contenido y el diseño; comprueba el resultado antes de guardar.</p>
               <SectionBadge enabled={selected.enabled} supported />
             </div>
-            <SectionEditorSteps value={activeTab} onChange={setActiveTab} items={[
-              { value: "basic", label: "Contenido" },
-              { value: "image", label: "Imagen" },
-              { value: "products", label: "Productos" },
-              { value: "styles", label: "Diseño" },
-              { value: "preview", label: "Vista previa" },
+            <SectionEditorSteps value={["image", "products"].includes(activeTab) ? "basic" : activeTab} onChange={setActiveTab} sectionName="En tendencia" items={[
+              { value: "basic", label: "Contenido", hint: "Define el título, las imágenes y los productos de la sección." },
+              { value: "styles", label: "Diseño", hint: "Ajusta colores, tarjetas, tipografía y efectos." },
+              { value: "preview", label: "Vista previa", hint: "Comprueba los productos con el diseño real de la tienda." },
             ]} />
+            {["basic", "image", "products"].includes(activeTab) && (
+              <nav className="section-editor-substeps mt-3" aria-label="Opciones de contenido">
+                {[{ value: "basic", label: "Textos" }, { value: "image", label: "Imágenes" }, { value: "products", label: "Productos" }].map((item) => (
+                  <button key={item.value} type="button" aria-pressed={activeTab === item.value} onClick={() => setActiveTab(item.value)}>{item.label}</button>
+                ))}
+              </nav>
+            )}
 
             <div className="pt-4">
               {activeTab === "basic" ? <BasicTab section={selected} onChange={handleChangeSelected} /> : null}
@@ -2094,10 +2103,11 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
                 <ProductsTab section={selected} onChange={handleChangeSelected} uploadToCloudinary={uploadToCloudinary} />
               ) : null}
 
-              {activeTab === "preview" ? <PreviewTab section={selected} /> : null}
             </div>
           </>
         )}
+        {editorStep === "preview" && <StorefrontSectionPreview section={selected} theme={{ ...theme, sections }} />}
+        </SectionEditorStepContext.Provider>
       </ModalShell>
       ) : null}
     </div>

@@ -26,6 +26,8 @@ describe('editor de secciones, etapa 3', () => {
       expect(within(steps).getByRole('button', { name: /Diseño/ })).toHaveAttribute('aria-current', 'step');
       fireEvent.click(within(steps).getByRole('button', { name: /Vista previa/ }));
       expect(within(steps).getByRole('button', { name: /Vista previa/ })).toHaveAttribute('aria-current', 'step');
+      expect(within(steps).getAllByRole('button')).toHaveLength(3);
+      expect(screen.getByRole('region', { name: 'Vista real de la tienda' })).toBeInTheDocument();
     },
   );
 
@@ -44,5 +46,19 @@ describe('editor de secciones, etapa 3', () => {
     await waitFor(() => expect(screen.getByPlaceholderText('https://instagram.com/tuusuario')).toHaveValue('https://instagram.com/rosa'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ profileLink: 'https://instagram.com/rosa' }) }));
+  });
+
+  it('muestra el componente público de Complementos con los cambios de imagen y texto', async () => {
+    const theme = { sections: [{
+      id: 'complementos', type: 'complementos', name: 'Complementos', enabled: true,
+      config: { imageSrc: '/mi-banner.jpg', imageAlt: 'Mi banner', buttonText: 'Descubrir' },
+    }] };
+    render(<SectionsPanel theme={theme} setPath={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Complementos' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Vista previa/ }));
+    const preview = screen.getByRole('region', { name: 'Vista real de la tienda' });
+    await waitFor(() => expect(within(preview).getByAltText('Mi banner')).toHaveAttribute('src', '/mi-banner.jpg'));
+    expect(within(preview).getByText('Descubrir')).toBeInTheDocument();
+    expect(within(preview).getByText('Descubrir').closest('.complementos-look-section')).toBeInTheDocument();
   });
 });

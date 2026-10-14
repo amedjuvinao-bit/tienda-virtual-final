@@ -178,17 +178,6 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <SectionEditorSteps
-                value={activeTab}
-                onChange={setActiveTab}
-                items={[
-                  { value: "contenido", label: "Contenido" },
-                  { value: "bloques", label: "Bloques" },
-                  { value: "general", label: "Diseño" },
-                  { value: "preview", label: "Vista previa" },
-                ]}
-              />
-
               <div className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2 min-w-[140px]">
                 <span className="text-sm font-medium text-neutral-700">Activa</span>
                 <Toggle
@@ -197,6 +186,24 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                 />
               </div>
             </div>
+          </div>
+          <div className="mt-3">
+            <SectionEditorSteps
+              value={activeTab === "bloques" ? "contenido" : activeTab}
+              onChange={setActiveTab}
+              sectionName="Información"
+              items={[
+                { value: "contenido", label: "Contenido", hint: "Escribe el título y configura los bloques de información." },
+                { value: "general", label: "Diseño", hint: "Ajusta dimensiones, tipografía, fondos e iconos." },
+                { value: "preview", label: "Vista previa", hint: "Revisa los bloques con el diseño de la tienda." },
+              ]}
+            />
+            {["contenido", "bloques"].includes(activeTab) && (
+              <nav className="section-editor-substeps mt-2" aria-label="Opciones de contenido">
+                <button type="button" aria-pressed={activeTab === "contenido"} onClick={() => setActiveTab("contenido")}>Textos</button>
+                <button type="button" aria-pressed={activeTab === "bloques"} onClick={() => setActiveTab("bloques")}>Bloques</button>
+              </nav>
+            )}
           </div>
         </div>
       </div>

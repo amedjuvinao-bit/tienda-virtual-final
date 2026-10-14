@@ -6,10 +6,11 @@ import { applyAdminGlobalStyles } from './adminGlobalStyles';
 
 const embeddedPreviewEditors = import.meta.glob(
   [
-    '../appearance/banner/BannerPanel.jsx',
+    '../appearance/banner/BannerDevicePreview.jsx',
     '../appearance/footer/FooterPanel.jsx',
     '../appearance/header/HeaderPanel.jsx',
     '../appearance/sections/SectionsPanel.jsx',
+    '../appearance/sections/ui/StorefrontSectionPreview.jsx',
     '../appearance/sections/categorias/CategoriasSectionUI.jsx',
     '../appearance/sections/complementos/ComplementosSectionUI.jsx',
     '../appearance/sections/editor/CardsEditor.jsx',

@@ -1,7 +1,19 @@
-.section-editor-steps {
+.section-editor-guide {
   position: sticky;
   top: 0;
   z-index: 20;
+  padding: .65rem;
+  border: 1px solid #eadce6;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 8px 26px #311c3010;
+}
+.section-editor-guide__intro { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .65rem; margin: 0 .2rem .55rem; }
+.section-editor-guide__intro strong { color: #332139; font-size: .88rem; }
+.section-editor-guide__intro span { color: #715d6c; font-size: .78rem; }
+.section-editor-guide__hint { margin: .55rem .25rem 0; color: #655466; font-size: .78rem; line-height: 1.4; }
+.section-editor-guide__hint b { color: #8f315d; }
+.section-editor-steps {
   display: flex;
   flex-wrap: wrap;
   gap: .4rem;
@@ -11,6 +23,11 @@
   background: #f8fafc;
 }
 .section-editor-workspace__controls > :first-child { position: sticky; top: 0; z-index: 20; }
+.section-editor-workspace__controls > :first-child .section-editor-guide { position: static; box-shadow: none; }
+.section-editor-workspace__controls > :first-child > .flex { align-items: stretch; flex-direction: column; }
+.section-editor-workspace__controls > :first-child > .flex > .flex { width: 100%; align-items: stretch; flex-wrap: wrap; }
+.section-editor-workspace__controls .section-editor-guide { flex: 1 1 440px; min-width: 0; }
+.section-editor-workspace__controls > :first-child > .flex > .section-editor-guide { flex: initial; width: 100%; }
 .section-editor-steps__item {
   display: inline-flex;
   align-items: center;
@@ -40,15 +57,18 @@
   border-radius: 50%;
   font-size: .68rem;
 }
+.section-editor-substeps { display: flex; flex-wrap: wrap; gap: .4rem; padding: .3rem; border: 1px solid #eadce6; border-radius: .9rem; background: #faf5f8; }
+.section-editor-substeps button { padding: .45rem .75rem; border-radius: .65rem; color: #72596d; font-size: .78rem; font-weight: 700; }
+.section-editor-substeps button:hover { background: #f1e5ed; }
+.section-editor-substeps button[aria-pressed="true"] { background: #9e3767; color: #fff; }
+.section-modal .section-editor-workspace { display: block; }
+.section-modal .section-editor-workspace > .section-editor-workspace__preview { display: none; }
 .section-editor-workspace[data-tab="preview"] { display: block; }
 .section-editor-workspace[data-tab="preview"] > .section-editor-workspace__controls > :not(:first-child) { display: none; }
-.section-editor-workspace[data-tab="preview"] > .section-editor-workspace__preview { max-width: 100%; margin: 0; }
-.section-editor-workspace[data-tab="preview"] .section-editor-workspace__preview > :first-child { position: static; }
-@media (max-width: 1279px) {
-  .section-editor-workspace:not([data-tab="preview"]) > .section-editor-workspace__preview { display: none; }
-  .section-social-editor:not([data-step="preview"]) [data-editor-step="preview"] { display: none; }
-  .section-info-editor:not([data-tab="preview"]) > :first-child { display: none; }
-}
+.section-social-editor [data-editor-step="preview"] { display: none; }
+.section-social-editor[data-step="design"] .section-social-editor__grid { grid-template-columns: minmax(0, 1fr); }
+.section-modal .section-info-editor { display: block; }
+.section-info-editor > :first-child { display: none; }
 @media (max-width: 767px) {
   .section-editor-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .section-editor-steps__item { min-width: 0; padding: .5rem .25rem; white-space: normal; text-align: center; }
@@ -57,10 +77,6 @@
 .section-social-editor[data-step="design"] [data-editor-step="content"],
 .section-social-editor[data-step="preview"] [data-editor-step="content"],
 .section-social-editor[data-step="preview"] [data-editor-step="design"] { display: none; }
-.section-social-editor[data-step="preview"] .section-social-editor__grid { display: block; }
+.section-social-editor[data-step="preview"] .section-social-editor__grid { display: none; }
 .section-social-editor[data-step="preview"] .section-social-editor__grid > :first-child { display: none; }
-.section-social-editor[data-step="preview"] [data-editor-step="preview"] { max-width: 900px; margin: auto; }
-.section-info-editor[data-tab="preview"] { display: block; }
-.section-info-editor[data-tab="preview"] > :last-child { display: none; }
-.section-info-editor[data-tab="preview"] > :first-child { max-width: 900px; margin: auto; }
-.section-info-editor[data-tab="preview"] > :first-child > :not(:last-child) { display: none; }
+.section-info-editor[data-tab="preview"] { display: none; }

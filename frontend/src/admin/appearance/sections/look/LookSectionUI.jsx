@@ -266,15 +266,21 @@ export default function LookSectionUI({
               </div>
             </div>
 
-            <SectionEditorSteps value={tab} onChange={setTab} items={[
-              { value: "contenido", label: "Contenido" },
-              { value: "estilos", label: "Diseño" },
-              { value: "slider-movil", label: "Móvil" },
-              { value: "acciones", label: "Acciones" },
-              { value: "preview", label: "Vista previa" },
+            <SectionEditorSteps value={["slider-movil", "acciones"].includes(tab) ? "estilos" : tab} onChange={setTab} sectionName="LOOK" items={[
+              { value: "contenido", label: "Contenido", hint: "Elige productos y define los textos e imágenes que mostrarás." },
+              { value: "estilos", label: "Diseño", hint: "Ajusta la apariencia, el slider móvil y los botones." },
+              { value: "preview", label: "Vista previa", hint: "Comprueba la sección tal como se dibuja en la tienda." },
             ]} />
           </div>
         </div>
+
+        {["estilos", "slider-movil", "acciones"].includes(tab) && (
+          <nav className="section-editor-substeps" aria-label="Opciones de diseño">
+            {[{ value: "estilos", label: "Apariencia" }, { value: "slider-movil", label: "En móviles" }, { value: "acciones", label: "Botones" }].map((item) => (
+              <button key={item.value} type="button" aria-pressed={tab === item.value} onClick={() => setTab(item.value)}>{item.label}</button>
+            ))}
+          </nav>
+        )}
 
         {tab === "contenido" && (
           <>

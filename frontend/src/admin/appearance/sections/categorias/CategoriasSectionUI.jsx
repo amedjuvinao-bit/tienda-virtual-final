@@ -269,10 +269,10 @@ export default function CategoriasSectionUI({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <SectionEditorSteps value={tab} onChange={setTab} items={[
-                { value: "contenido", label: "Contenido" },
-                { value: "estilos", label: "Diseño" },
-                { value: "preview", label: "Vista previa" },
+              <SectionEditorSteps value={tab} onChange={setTab} sectionName="Categorías" items={[
+                { value: "contenido", label: "Contenido", hint: "Añade categorías y sus imágenes para el carrusel." },
+                { value: "estilos", label: "Diseño", hint: "Ajusta tarjetas, flechas, textos y movimiento." },
+                { value: "preview", label: "Vista previa", hint: "Comprueba el carrusel con el diseño real de la tienda." },
               ]} />
 
               <Button

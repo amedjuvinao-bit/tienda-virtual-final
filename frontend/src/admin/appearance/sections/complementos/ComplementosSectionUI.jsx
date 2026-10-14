@@ -188,10 +188,10 @@ export default function ComplementosSectionUI({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <SectionEditorSteps value={tab} onChange={setTab} items={[
-                { value: "contenido", label: "Contenido" },
-                { value: "estilos", label: "Diseño" },
-                { value: "preview", label: "Vista previa" },
+              <SectionEditorSteps value={tab} onChange={setTab} sectionName="Complementos" items={[
+                { value: "contenido", label: "Contenido", hint: "Carga la imagen, escribe el botón y define su destino." },
+                { value: "estilos", label: "Diseño", hint: "Ajusta posición, medidas, colores y efectos." },
+                { value: "preview", label: "Vista previa", hint: "Revisa el banner real antes de guardar." },
               ]} />
 
               <Button
