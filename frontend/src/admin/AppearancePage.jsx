@@ -940,9 +940,16 @@ export default function AppearancePage() {
         }
       }
 
-      const saved = await saveSiteSettings(payload);
-      if (!Number.isSafeInteger(saved?.appearanceRevision)) {
+      const writeResponse = await saveSiteSettings(payload);
+      if (!Number.isSafeInteger(writeResponse?.appearanceRevision)) {
         throw new Error('La respuesta de guardado no incluyó la revisión de Apariencia. Recarga antes de guardar de nuevo.');
+      }
+      // Verify against a fresh read: a successful PUT response may omit nested
+      // card fields even when they were stored. Do not replace the editor draft
+      // until the saved revision has been read back.
+      const saved = await fetchAppearanceSettings();
+      if (saved?.appearanceRevision !== writeResponse.appearanceRevision) {
+        throw new Error('La Apariencia cambió durante la comprobación del guardado. Recarga para revisar la versión actual.');
       }
 
       // El backend puede seguir ejecutando un modelo antiguo y descartar campos
@@ -1007,7 +1014,7 @@ export default function AppearancePage() {
         if (mismatches.length) {
           setAppearanceRevision(saved.appearanceRevision);
           setServerSnapshot(buildThemeFromServer(saved.theme));
-          throw new Error(`El servidor no conservó los ajustes de ${[...new Set(mismatches)].join(', ')}. El ajuste sigue en el editor. Sincroniza y reinicia el backend con esta versión, luego vuelve a guardar.`);
+          throw new Error(`El servidor no conservó los ajustes de ${[...new Set(mismatches)].join(', ')}. El ajuste sigue en el editor. El cambio sigue en el editor; revisa la configuración del servidor antes de volver a guardar.`);
         }
       }
 
