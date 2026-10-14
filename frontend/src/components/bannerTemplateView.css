@@ -620,20 +620,19 @@
   .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img { transform: none; }
 }
 
-/* Warm lens behind the cutout, visible across both pale and saturated banners. */
+/* Single pearl light behind the cutout, with no colored halo. */
 .rb-template--editorial .rb-template__card-visual::before {
   content: '';
   position: absolute;
   z-index: 0;
-  inset: -14px -12px;
+  inset: -5px 0;
   border-radius: 50%;
-  background: radial-gradient(ellipse 59% 61% at 49% 48%,
-    rgba(255,251,226,.88) 0%,
-    rgba(255,221,188,.76) 30%,
-    rgba(255,171,197,.52) 51%,
-    rgba(158,53,91,.16) 71%,
-    transparent 86%);
-  filter: blur(3px);
+  background: radial-gradient(ellipse 48% 53% at 49% 48%,
+    rgba(255,255,255,.62) 0%,
+    rgba(255,255,255,.32) 43%,
+    rgba(255,255,255,.09) 65%,
+    transparent 83%);
+  filter: blur(4px);
   pointer-events: none;
 }
 .rb-template--editorial .rb-template__card-visual::after { z-index: 0; }
