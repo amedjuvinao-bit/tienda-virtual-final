@@ -1,0 +1,28 @@
+.rb-metallic-text {
+  /* Mix the selected text color with highlights and shadows inside the glyphs. */
+  background: linear-gradient(163deg,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 28%, #fffdf2) 0%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 70%, #fbe1ac) 21%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 58%, #2d1714) 40%,
+    #fff6d8 49%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 56%, #fff3ce) 57%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 67%, #382019) 78%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 40%, #fff9e9) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: .24px color-mix(in srgb, var(--rb-metal-ink, #b78853) 72%, #36221c);
+  text-shadow: none;
+  filter: drop-shadow(0 1px 1px rgba(35, 18, 19, .5));
+}
+
+.header-menu .rb-metallic-text,
+.appearance-header__store-header nav .rb-metallic-text {
+  --rb-metal-ink: var(--header-menu-text, #713651);
+}
+
+.header-menu .rb-metallic-text:hover,
+.header-menu .rb-metallic-text:focus-visible {
+  --rb-metal-ink: var(--header-menu-hover, #a54e62);
+  filter: drop-shadow(0 1px 1px rgba(35, 18, 19, .48));
+}
