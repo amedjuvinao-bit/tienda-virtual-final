@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BannerTemplatePanel from './BannerTemplatePanel';
 import { getBannerTemplate } from '../../../lib/bannerTemplates';
 
+beforeEach(() => vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ categories: [
+  { id: '68a4a78a59706e44cade0316', name: 'Vestidos', path: 'Ropa / Vestidos', image: '/vestidos.png' },
+  { id: 'legacy:Zapatos', name: 'Zapatos', path: 'Zapatos', image: '' },
+] }) })));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function Editor() {
@@ -27,7 +31,7 @@ describe('editor de plantillas', () => {
   it('abre el editor y permite cambiar a categorías sin error de inicialización', () => {
     render(<Editor />);
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
-    expect(screen.getByLabelText('Categoría de destino')).toBeInTheDocument();
+    expect(screen.getByLabelText('Acceso anterior')).toBeInTheDocument();
   });
 
   it('conserva el texto de cada diseño al cambiar y solo ofrece categorías existentes', () => {
@@ -38,9 +42,9 @@ describe('editor de plantillas', () => {
     fireEvent.click(screen.getByRole('button', { name: /Descubrimiento/ }));
     expect(screen.getByLabelText('Título').value).toBe('Mi portada');
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
-    const select = screen.getByLabelText('Categoría de destino');
+    const select = screen.getByLabelText('Acceso anterior');
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['Hogar', 'Regalos']);
-    expect(screen.getAllByLabelText('Categoría de destino')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Acceso anterior')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: /Acceso 2/ }));
     fireEvent.change(screen.getByLabelText('Texto visible (opcional)'), { target: { value: 'Un regalo' } });
     fireEvent.click(screen.getByRole('button', { name: '② Botones' }));
@@ -110,6 +114,22 @@ describe('editor de plantillas', () => {
     const updated = JSON.parse(screen.getByTestId('state').textContent);
     card = getBannerTemplate({ templateId: 'editorial', templateConfigs: updated.templateConfigs }, sections).config.cards[0];
     expect(card.link).toBe('/categoria/hogar');
+  });
+
+  it('elige una categoría real del catálogo y genera el enlace filtrado con su imagen', async () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: /Editorial/ }));
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.change(screen.getByLabelText('Al hacer clic, abrir'), { target: { value: 'catalogCategory' } });
+    await screen.findByRole('option', { name: 'Ropa / Vestidos' });
+    const select = screen.getByLabelText('Categoría del catálogo');
+    expect(Array.from(select.options).map((option) => option.textContent)).toContain('Ropa / Vestidos');
+    fireEvent.change(select, { target: { value: '68a4a78a59706e44cade0316' } });
+    const saved = JSON.parse(screen.getByTestId('state').textContent);
+    const card = getBannerTemplate({ templateId: 'editorial', templateConfigs: saved.templateConfigs }, []).config.cards[0];
+    expect(card.text).toBe('Vestidos');
+    expect(card.image).toBe('/vestidos.png');
+    expect(card.link).toBe('/buscar?category=68a4a78a59706e44cade0316&categoryName=Vestidos');
   });
 
 });
