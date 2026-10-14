@@ -31,9 +31,14 @@ function Header() {
   const [searchTarget, setSearchTarget] = useState('desktop');
   const searchTriggerRef = useRef(null);
   const searchCloseTimerRef = useRef(null);
+  const menuPressTimerRef = useRef(null);
   const desktopSearchAnchorRef = useRef(null);
   const mobileSearchAnchorRef = useRef(null);
-  useEffect(() => () => window.clearTimeout(searchCloseTimerRef.current), []);
+  const [pressedMenuIndex, setPressedMenuIndex] = useState(null);
+  useEffect(() => () => {
+    window.clearTimeout(searchCloseTimerRef.current);
+    window.clearTimeout(menuPressTimerRef.current);
+  }, []);
   const { cart } = useCart();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
@@ -138,6 +143,8 @@ function Header() {
   }, [menuOpen, cartOpen]);
 
   useEffect(() => {
+    window.clearTimeout(menuPressTimerRef.current);
+    setPressedMenuIndex(null);
     setShowHeader(true);
     setMenuOpen(false);
     setSearchOpen(false);
@@ -393,6 +400,17 @@ function Header() {
     { label: 'Instagram', href: footerConfig.instagram, Icon: Instagram },
   ].filter((link) => headerMenuDestination(link.href)?.isExternal);
   const whatsappHref = resolveWhatsAppHref(whatsappConfig);
+  const pressMenuLink = (event, item, index) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (headerConfig.menuAnimation === 'none' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (!item.isExternal) event.preventDefault();
+    window.clearTimeout(menuPressTimerRef.current);
+    setPressedMenuIndex(index);
+    menuPressTimerRef.current = window.setTimeout(() => {
+      setPressedMenuIndex(null);
+      if (!item.isExternal) navigate(item.to);
+    }, 240);
+  };
 
   return createPortal(
     <>
@@ -424,7 +442,8 @@ function Header() {
                       href={item.to}
                       target="_blank"
                       rel="noreferrer"
-                      className={`${headerConfig.metallicMenuText === true ? 'rb-metallic-text ' : ''}transition duration-300`}
+                      onClick={(event) => pressMenuLink(event, item, idx)}
+                      className={`${headerConfig.metallicMenuText === true ? 'rb-metallic-text ' : ''}${pressedMenuIndex === idx ? 'rb-header-menu-link--pressed ' : ''}transition duration-300`}
                     >
                       {item.name}
                     </a>
@@ -435,8 +454,9 @@ function Header() {
                   <NavLink
                     key={idx}
                     to={item.to}
+                    onClick={(event) => pressMenuLink(event, item, idx)}
                     className={({ isActive }) =>
-                      `${headerConfig.metallicMenuText === true ? 'rb-metallic-text ' : ''}transition duration-300 ${isActive ? "font-bold" : ""}`
+                      `${headerConfig.metallicMenuText === true ? 'rb-metallic-text ' : ''}${pressedMenuIndex === idx ? 'rb-header-menu-link--pressed ' : ''}transition duration-300 ${isActive ? "font-bold" : ""}`
                     }
                   >
                     {item.name}

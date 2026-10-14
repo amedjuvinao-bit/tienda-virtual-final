@@ -20,6 +20,25 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
+  it('muestra la presión antes de navegar con el menú animado', async () => {
+    function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
+    const link = await within(navigation).findByRole('link', { name: 'Lo Nuevo' });
+    fireEvent.click(link);
+    expect(link).toHaveClass('rb-header-menu-link--pressed');
+    expect(screen.getByTestId('location')).toHaveTextContent('/');
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/lo-nuevo'));
+  });
+  it('navega de inmediato si el menú está configurado sin animación', async () => {
+    fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: { menuAnimation: 'none' } } });
+    function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
+    render(<MemoryRouter><Header /><Location /></MemoryRouter>);
+    const link = await within(screen.getByRole('navigation', { name: 'Navegación principal' })).findByRole('link', { name: 'Lo Nuevo' });
+    fireEvent.click(link);
+    expect(link).not.toHaveClass('rb-header-menu-link--pressed');
+    expect(screen.getByTestId('location')).toHaveTextContent('/lo-nuevo');
+  });
   it('aplica el acabado metalizado a los enlaces internos y externos del menú de escritorio', async () => {
     fetchSiteSettings.mockResolvedValue({
       theme: { header: { textColor: '#b78a53', linkColor: '#e46288', metallicMenuText: true }, footer: {} },

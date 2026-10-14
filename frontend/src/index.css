@@ -230,6 +230,19 @@ video {
   transform: translateY(var(--header-menu-hover-ty)) scale(var(--header-menu-hover-scale)) rotate(var(--header-menu-hover-rot));
 }
 
+.rb-header-menu-link--pressed {
+  animation: rb-header-menu-press 240ms ease-out both;
+}
+
+@keyframes rb-header-menu-press {
+  0%, 100% { scale: 1; translate: 0 0; }
+  45% { scale: .9; translate: 0 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-header-menu-link--pressed { animation: none; }
+}
+
 /* ✅ ICONOS: color independiente */
 .header-icons {
   color: var(--header-icon-color);

@@ -22,6 +22,8 @@
 .appearance-header__store-header[data-glass="true"] { box-shadow: inset 0 2px 1px rgba(255,255,255,.86), inset 0 -12px 24px rgba(120,45,99,.14), 0 18px 38px rgba(92,30,73,.26), 0 3px 9px rgba(102,35,80,.14); }
 .appearance-header__store-header img { flex: none; max-width: min(180px, 28%); object-fit: contain; }
 .appearance-header__store-header nav { display: flex; flex: 1; align-items: center; justify-content: center; gap: clamp(10px, 2vw, 30px); overflow: auto; white-space: nowrap; scrollbar-width: thin; font-size: 1em; }
+.appearance-header__store-header nav button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.appearance-header__store-header nav button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .appearance-header__store-header .header-brand-text { flex: none; max-width: min(180px, 28%); font-size: 25px; color: inherit; }
 .appearance-header__store-header nav em { color: inherit; opacity: .65; }
 .appearance-header__actions { display: flex; flex: none; gap: 0; }

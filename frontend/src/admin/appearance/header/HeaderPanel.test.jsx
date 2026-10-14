@@ -31,6 +31,13 @@ function Editor({ upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' 
 }
 
 describe('edición del encabezado', () => {
+  it('permite comprobar la presión de los enlaces en la vista previa', async () => {
+    render(<Editor />);
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    const link = within(preview).getByRole('button', { name: 'Inicio' });
+    await userEvent.click(link);
+    expect(link).toHaveClass('rb-header-menu-link--pressed');
+  });
   it('mantiene el vidrio sin destello de seguimiento en la vista previa', async () => {
     const user = userEvent.setup();
     render(<Editor />);

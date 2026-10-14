@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Facebook, Instagram, Monitor, Smartphone, X } from 'lucide-react';
 import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, resolveHeaderTypography } from '../../../components/headerPresentation';
 import HeaderBrand from '../../../components/HeaderBrand';
@@ -15,7 +15,16 @@ export default function HeaderPreview({ theme, menus }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [failedLogo, setFailedLogo] = useState('');
   const [searchPreviewOpen, setSearchPreviewOpen] = useState(false);
+  const [pressedMenuIndex, setPressedMenuIndex] = useState(null);
+  const menuPressTimerRef = useRef(null);
+  useEffect(() => () => window.clearTimeout(menuPressTimerRef.current), []);
   const header = theme?.header || {};
+  const previewMenuPress = (index) => {
+    if (header.menuAnimation === 'none' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    window.clearTimeout(menuPressTimerRef.current);
+    setPressedMenuIndex(index);
+    menuPressTimerRef.current = window.setTimeout(() => setPressedMenuIndex(null), 240);
+  };
   const links = useMemo(() => normalizeHeaderMenu(menus?.header), [menus?.header]);
   const logoLight = header.logoLight || theme?.logo?.light || '';
   const logoDark = header.logoDark || theme?.logo?.dark || '';
@@ -54,7 +63,7 @@ export default function HeaderPreview({ theme, menus }) {
           {mobile && <MobileMenuTrigger config={header} expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}
             aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} />}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
-          {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <span className={header.metallicMenuText === true ? 'rb-metallic-text' : undefined} key={`${link.to}-${index}`}>{link.name}</span>) : <em>Tu menú aparecerá aquí</em>}</nav>}
+          {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <button type="button" className={`${header.metallicMenuText === true ? 'rb-metallic-text ' : ''}${pressedMenuIndex === index ? 'rb-header-menu-link--pressed' : ''}`} onClick={() => previewMenuPress(index)} key={`${link.to}-${index}`}>{link.name}</button>) : <em>Tu menú aparecerá aquí</em>}</nav>}
           <div className="appearance-header__actions">
             <div className="header-search-anchor">
               <button type="button" className="storefront-action-button" aria-label="Buscar (vista previa)" aria-expanded={searchPreviewOpen} onClick={() => setSearchPreviewOpen((open) => !open)}><HeaderActionGlyph kind="search" iconSet={icons} iconImages={header.iconImages} iconOverrides={header.iconOverrides} /></button>
