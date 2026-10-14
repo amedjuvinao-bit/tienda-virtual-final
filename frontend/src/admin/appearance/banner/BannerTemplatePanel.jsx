@@ -88,7 +88,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     setUploading(true);
     try {
       const url = await uploadToCloudinaryViaBackend(file, 'image');
-      updateCard(index, { image: url });
+      updateCard(index, { image: url, imageSource: 'custom' });
     } catch (cause) {
       setError(cause?.message || 'No se pudo subir la imagen.');
     } finally {
@@ -120,7 +120,8 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const card = refs[index];
   const category = categories.find((entry) => entry.id === card?.categoryId);
   const destinationType = card?.destinationType || (categories.length ? 'category' : 'catalogCategory');
-  const cardImage = card?.image || (destinationType === 'product' ? card?.featuredProductImage : destinationType === 'catalogCategory' ? card?.catalogCategoryImage : category?.image);
+  const categoryImage = destinationType === 'product' ? card?.featuredProductImage : destinationType === 'catalogCategory' ? card?.catalogCategoryImage : category?.image;
+  const cardImage = card?.image && card?.imageSource !== 'catalog' ? card.image : categoryImage;
 
   return <div className="banner-template-editor">
     <div className="banner-template-editor__intro"><strong>Personaliza el diseño</strong><span>Elige una parte o tócala en la vista previa. Se guarda junto con la portada.</span></div>
@@ -237,7 +238,11 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
             {cardImage && <img src={cardImage} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
-            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen de la {destinationType === 'product' ? 'ficha del producto' : 'categoría'}</button>}
+            {card.image && <div className="banner-template-image-choice" role="group" aria-label="Imagen visible de la tarjeta">
+              <button type="button" className="banner-btn" aria-pressed={card.imageSource !== 'catalog'} onClick={() => updateCard(index, { imageSource: 'custom' })}>Imagen que subí</button>
+              <button type="button" className="banner-btn" aria-pressed={card.imageSource === 'catalog'} onClick={() => updateCard(index, { imageSource: 'catalog' })}>Imagen de la {destinationType === 'product' ? 'ficha del producto' : 'categoría'}</button>
+              <p className="banner-template-help">Puedes cambiar de opción sin perder la imagen que subiste.</p>
+            </div>}
           </div></details>
           {id === 'atelier' && <details className="banner-template-card-details"><summary>Ubicación y señalador</summary><div className="banner-template-point-control">
             <p className="banner-template-help">Arrastra la tarjeta en la vista previa. La línea señala un punto en la imagen.</p>
