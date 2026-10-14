@@ -739,27 +739,7 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
 
     const protectedSet = stripProtectedWriteFields($set);
 
-    // Persist and verify the two optional text colors on each template card.
-    // A nested array cast must never turn a successful save into a silent loss.
-    const requestedCardColors = {};
-    const requestedTemplates = theme?.banner?.templateConfigs || {};
-    for (const templateId of ['discovery', 'editorial', 'atelier']) {
-      const cards = requestedTemplates[templateId]?.cards;
-      if (!Array.isArray(cards)) continue;
-      for (const [index, card] of cards.entries()) {
-        if (!card || typeof card !== 'object') continue;
-        for (const key of ['titleColor', 'labelColor']) {
-          if (!Object.prototype.hasOwnProperty.call(card, key)) continue;
-          const value = String(card[key] ?? '');
-          if (value && !/^#[0-9a-f]{6}$/i.test(value)) {
-            return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_COLOR', message: 'El color de texto de una tarjeta no es válido.' });
-          }
-          requestedCardColors[`theme.banner.templateConfigs.${templateId}.cards.${index}.${key}`] = value;
-        }
-      }
-    }
-
-    let updated = appearanceWrite
+    const updated = appearanceWrite
       ? await updateAppearanceWithRevision({ id, revision: appearanceRevision, changes: protectedSet })
       : await SiteSettings.findByIdAndUpdate(
         id,
@@ -773,27 +753,6 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
         error: 'APPEARANCE_REVISION_CONFLICT',
         message: 'La Apariencia guardada cambió. Recarga los datos y revisa tus cambios antes de guardar.',
       });
-    }
-
-    if (Object.keys(requestedCardColors).length) {
-      // The card array is cast by Mongoose during the main update. Persist the
-      // individual colors with the MongoDB driver, then read the stored document.
-      // This also covers a process whose compiled schema has no color fields.
-      const result = await SiteSettings.collection.updateOne(
-        { _id: id, appearanceRevision: updated.appearanceRevision },
-        { $set: requestedCardColors }
-      );
-      if (result.matchedCount !== 1) {
-        return res.status(409).json({ ok: false, error: 'APPEARANCE_REVISION_CONFLICT', message: 'La Apariencia cambió durante el guardado. Recarga y vuelve a intentarlo.' });
-      }
-      updated = await SiteSettings.collection.findOne({ _id: id });
-      const stillLost = Object.entries(requestedCardColors).some(([path, value]) => {
-        const [, , , templateId, , index, key] = path.split('.');
-        return String(updated?.theme?.banner?.templateConfigs?.[templateId]?.cards?.[Number(index)]?.[key] ?? '').toLowerCase() !== value.toLowerCase();
-      });
-      if (stillLost) {
-        return res.status(500).json({ ok: false, error: 'BANNER_CARD_COLOR_NOT_PERSISTED', message: 'No se pudieron guardar los colores de las tarjetas.' });
-      }
     }
 
     const safe = buildAdminSiteSettings(updated);
