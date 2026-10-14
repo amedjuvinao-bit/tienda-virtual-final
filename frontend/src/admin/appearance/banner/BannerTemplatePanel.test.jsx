@@ -164,4 +164,28 @@ describe('editor de plantillas', () => {
     );
   });
 
+  it('cambia a la imagen del catálogo sin borrar la miniatura propia', async () => {
+    const uploadImage = vi.fn().mockResolvedValue('https://example.test/propia.png');
+    render(<Editor uploadImage={uploadImage} />);
+    fireEvent.click(screen.getByRole('button', { name: /Editorial/ }));
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.change(screen.getByLabelText('Al hacer clic, abrir'), { target: { value: 'catalogCategory' } });
+    await screen.findByRole('option', { name: 'Ropa / Vestidos' });
+    fireEvent.change(screen.getByLabelText('Categoría del catálogo'), { target: { value: '68a4a78a59706e44cade0316' } });
+    fireEvent.click(screen.getByText(/Texto e imagen/));
+    fireEvent.change(screen.getByLabelText('Imagen propia'), {
+      target: { files: [new File(['foto'], 'propia.png', { type: 'image/png' })] },
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Imagen que subí' })).toHaveAttribute('aria-pressed', 'true'));
+    fireEvent.click(screen.getByRole('button', { name: 'Imagen de la categoría' }));
+    let saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({
+      image: 'https://example.test/propia.png', imageSource: 'catalog',
+    }));
+    expect(getBannerTemplate({ templateId: 'editorial', templateConfigs: saved.templateConfigs }, []).config.cards[0].image).toBe('/vestidos.png');
+    fireEvent.click(screen.getByRole('button', { name: 'Imagen que subí' }));
+    saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(getBannerTemplate({ templateId: 'editorial', templateConfigs: saved.templateConfigs }, []).config.cards[0].image).toBe('https://example.test/propia.png');
+  });
+
 });
