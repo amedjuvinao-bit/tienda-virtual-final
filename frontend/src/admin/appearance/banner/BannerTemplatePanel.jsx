@@ -99,8 +99,8 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const uploadCardDecoration = async (index, file) => {
     if (!file) return;
     setError('');
-    if (!['image/png', 'image/webp'].includes(file.type)) {
-      setError('La flor debe ser PNG o WebP con fondo transparente.');
+    if (!['image/png', 'image/webp', 'image/jpeg'].includes(file.type)) {
+      setError('Usa una imagen PNG, WebP o JPG.');
       return;
     }
     setUploading(true);
@@ -108,7 +108,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
       const url = await uploadToCloudinaryViaBackend(file, 'image');
       updateCard(index, { decorationImage: url, decorationMode: 'custom' });
     } catch (cause) {
-      setError(cause?.message || 'No se pudo subir la flor.');
+      setError(cause?.message || 'No se pudo subir la imagen decorativa.');
     } finally {
       setUploading(false);
     }
@@ -249,7 +249,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             {!card.featuredProductId && <p className="banner-template-help">Busca y elige un producto para crear el enlace de la tarjeta.</p>}
           </div>}
           </div>
-          <details className="banner-template-card-details"><summary>Texto, foto y flores <span>opcional</span></summary>
+          <details className="banner-template-card-details"><summary>Texto e imágenes <span>opcional</span></summary>
           <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
           <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
@@ -263,17 +263,17 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             </div>}
           </div>
           {id === 'editorial' && <div className="banner-template-florals">
-            <strong>Flores de esta tarjeta</strong>
-            <p className="banner-template-help">Sube un PNG o WebP transparente. Solo se verá en esta tarjeta, detrás de la foto del producto.</p>
-            <label className="banner-template-field"><span>Cargar o cambiar flores</span><input type="file" accept="image/png,image/webp" disabled={uploading} onChange={(event) => { uploadCardDecoration(index, event.target.files?.[0]); event.target.value = ''; }} /></label>
+            <strong>Imagen decorativa de esta tarjeta</strong>
+            <p className="banner-template-help">Sube un PNG, WebP o JPG. Se verá únicamente en esta tarjeta, detrás del producto. Puedes usar flores u otra imagen que combine con tu tienda.</p>
+            <label className="banner-template-field"><span>Cargar o cambiar imagen decorativa</span><input type="file" accept="image/png,image/webp,image/jpeg" disabled={uploading} onChange={(event) => { uploadCardDecoration(index, event.target.files?.[0]); event.target.value = ''; }} /></label>
             {card.decorationImage && <>
               <div className="banner-template-florals__actions">
-                <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'custom'} onClick={() => updateCard(index, { decorationMode: 'custom' })}>Mostrar flores</button>
-                <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'none'} onClick={() => updateCard(index, { decorationMode: 'none' })}>Ocultar flores</button>
+                <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'custom'} onClick={() => updateCard(index, { decorationMode: 'custom' })}>Mostrar imagen</button>
+                <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'none'} onClick={() => updateCard(index, { decorationMode: 'none' })}>Ocultar imagen</button>
               </div>
               {card.decorationMode === 'custom' && <>
-                <p className="banner-template-help">Haz clic o arrastra sobre la muestra para ubicarlas. El cambio también aparece en la vista previa grande.</p>
-                <div className="banner-template-florals__stage" role="img" aria-label="Ubicación de las flores respecto al producto" onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }} onPointerMove={(event) => { if (!(event.buttons & 1)) return; const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }}>
+                <p className="banner-template-help">Haz clic o arrastra sobre la muestra para ubicar la imagen. El cambio también aparece en la vista previa grande.</p>
+                <div className="banner-template-florals__stage" role="img" aria-label="Ubicación de la imagen decorativa respecto al producto" onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }} onPointerMove={(event) => { if (!(event.buttons & 1)) return; const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }}>
                   <span className="banner-template-florals__art" style={{ backgroundImage: `url(${JSON.stringify(card.decorationImage)})`, left: `${card.decorationX ?? 50}%`, top: `${card.decorationY ?? 50}%`, width: `${card.decorationSize ?? 100}%`, height: `${card.decorationSize ?? 100}%`, opacity: (card.decorationOpacity ?? 75) / 100 }} />
                   {cardImage && <img src={cardImage} alt="" />}
                 </div>
