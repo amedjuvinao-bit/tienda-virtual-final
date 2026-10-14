@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../../../config/apiBaseUrl';
-import { BANNER_BUTTON_ANIMATIONS, getBannerTemplate, moveBannerButtonLight, safeHotspotColor } from '../../../lib/bannerTemplates';
+import { BANNER_BUTTON_ANIMATIONS, EDITORIAL_CARD_FLORALS, getBannerTemplate, moveBannerButtonLight, safeHotspotColor } from '../../../lib/bannerTemplates';
 
 const Field = ({ label, ...props }) => <label className="banner-template-field"><span>{label}</span><input {...props} /></label>;
 
@@ -91,6 +91,24 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
       updateCard(index, { image: url, imageSource: 'custom' });
     } catch (cause) {
       setError(cause?.message || 'No se pudo subir la imagen.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadCardDecoration = async (index, file) => {
+    if (!file) return;
+    setError('');
+    if (!['image/png', 'image/webp'].includes(file.type)) {
+      setError('La flor debe ser PNG o WebP con fondo transparente.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadToCloudinaryViaBackend(file, 'image');
+      updateCard(index, { decorationImage: url, decorationMode: 'custom' });
+    } catch (cause) {
+      setError(cause?.message || 'No se pudo subir la flor.');
     } finally {
       setUploading(false);
     }
@@ -231,7 +249,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             {!card.featuredProductId && <p className="banner-template-help">Busca y elige un producto para crear el enlace de la tarjeta.</p>}
           </div>}
           </div>
-          <details className="banner-template-card-details"><summary>Texto e imagen <span>opcional</span></summary>
+          <details className="banner-template-card-details"><summary>Texto, foto y flores <span>opcional</span></summary>
           <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
           <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
@@ -243,7 +261,18 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
               <button type="button" className="banner-btn" aria-pressed={card.imageSource === 'catalog'} disabled={!categoryImage} onClick={() => updateCard(index, { imageSource: 'catalog' })}>Imagen de la {destinationType === 'product' ? 'ficha del producto' : 'categoría'}</button>
               <p className="banner-template-help">Puedes cambiar de opción sin perder la imagen que subiste.</p>
             </div>}
-          </div></details>
+          </div>
+          {id === 'editorial' && <div className="banner-template-florals">
+            <strong>Flores junto al producto</strong>
+            <p className="banner-template-help">Cada tarjeta tiene su propio adorno. Elige un modelo, sube una imagen transparente o déjala sin flores.</p>
+            <div className="banner-template-florals__choices" role="group" aria-label="Flores de esta tarjeta">
+              {EDITORIAL_CARD_FLORALS.map((src, floralIndex) => <button key={src} type="button" aria-label={`Flor ${floralIndex + 1}`} aria-pressed={(card.decorationMode || 'preset') === 'preset' && (card.decorationPreset ?? index % EDITORIAL_CARD_FLORALS.length) === floralIndex} onClick={() => updateCard(index, { decorationMode: 'preset', decorationPreset: floralIndex })}><img src={src} alt="" /></button>)}
+            </div>
+            <label className="banner-template-field"><span>Subir mi propia flor (PNG o WebP transparente)</span><input type="file" accept="image/png,image/webp" disabled={uploading} onChange={(event) => { uploadCardDecoration(index, event.target.files?.[0]); event.target.value = ''; }} /></label>
+            {card.decorationImage && <button type="button" className="banner-template-florals__custom" aria-pressed={card.decorationMode === 'custom'} onClick={() => updateCard(index, { decorationMode: 'custom' })}><img src={card.decorationImage} alt="" /><span>Usar flor que subí</span></button>}
+            <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'none'} onClick={() => updateCard(index, { decorationMode: 'none' })}>Sin flores en esta tarjeta</button>
+          </div>}
+          </details>
           {id === 'atelier' && <details className="banner-template-card-details"><summary>Ubicación y señalador</summary><div className="banner-template-point-control">
             <p className="banner-template-help">Arrastra la tarjeta en la vista previa. La línea señala un punto en la imagen.</p>
             <button type="button" className="banner-btn banner-btn--primary" aria-pressed={placingCard === index} onClick={() => onStartPlacing?.(placingCard === index ? null : index)}>{placingCard === index ? 'Cancelar ubicación' : 'Señalar lugar en la imagen'}</button>

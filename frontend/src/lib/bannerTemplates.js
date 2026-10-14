@@ -30,6 +30,8 @@ export const BANNER_TEMPLATE_META = {
 
 const action = (text) => ({ enabled: true, text, link: '' });
 
+export const EDITORIAL_CARD_FLORALS = [1, 2, 3, 4, 5].map((number) => `/images/editorial-floral-${number}.webp`);
+
 export const EDITORIAL_TRUST_DEFAULTS = [
   { text: 'Envíos a todo el país', image: '' },
   { text: 'Empaque especial', image: '' },
@@ -85,7 +87,7 @@ export function getBannerTemplate(banner, sections) {
       primary: { ...defaults.primary, ...raw.primary },
       secondary: { ...defaults.secondary, ...raw.secondary },
       trustItems: EDITORIAL_TRUST_DEFAULTS.map((fallback, index) => ({ ...fallback, ...(raw.trustItems?.[index] || {}) })),
-      cards: saved.map((item) => {
+      cards: saved.map((item, index) => {
         const category = existing.find((entry) => entry.id === item.categoryId);
         const productId = String(item.featuredProductId || '').trim();
         const productCard = item.destinationType === 'product';
@@ -107,6 +109,7 @@ export function getBannerTemplate(banner, sections) {
           label: item.label || title || '',
           text: item.text || title || '',
           image: item.image && item.imageSource !== 'catalog' ? item.image : image || '',
+          decorationImage: id === 'editorial' ? (item.decorationMode === 'none' ? '' : item.decorationMode === 'custom' ? item.decorationImage || '' : EDITORIAL_CARD_FLORALS[Number.isInteger(item.decorationPreset) && item.decorationPreset >= 0 && item.decorationPreset < EDITORIAL_CARD_FLORALS.length ? item.decorationPreset : index % EDITORIAL_CARD_FLORALS.length]) : '',
           link: productCard ? `/producto/${encodeURIComponent(productId)}`
             : catalogCard ? `/buscar?${catalogQuery.toString()}`
               : item.destinationType === 'category' ? category.link : item.link || category.link,

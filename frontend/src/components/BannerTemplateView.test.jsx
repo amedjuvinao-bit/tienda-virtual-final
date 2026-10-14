@@ -198,4 +198,16 @@ describe('plantillas sobre contenido existente', () => {
     expect(rail).toHaveAttribute('data-mobile-open', 'false');
   });
 
+  it('muestra un adorno independiente por tarjeta y respeta la opción sin flores', () => {
+    const banner = { templateId: 'editorial', templateConfigs: { editorial: { cards: [
+      { categoryId: 'actual-a', decorationMode: 'custom', decorationImage: 'https://example.test/mi-flor.webp' },
+      { categoryId: 'actual-b', decorationMode: 'none' },
+    ] } } };
+    const { container } = render(<BannerTemplateView banner={banner} sections={categories} />);
+    const cards = container.querySelectorAll('.rb-template__card');
+    expect(cards[0].querySelector('.rb-template__card-decoration').style.backgroundImage).toContain('mi-flor.webp');
+    expect(cards[1].querySelector('.rb-template__card-decoration')).toBeNull();
+    expect(cards[0].querySelector('.rb-template__card-visual img')).toHaveAttribute('src', '/hogar.jpg');
+  });
+
 });

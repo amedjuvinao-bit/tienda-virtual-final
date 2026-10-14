@@ -641,3 +641,16 @@
   position: relative;
   z-index: 1;
 }
+
+/* Each editorial card may carry its own transparent floral asset behind the product. */
+.rb-template--editorial .rb-template__card-decoration {
+  position: absolute;
+  z-index: 0;
+  inset: -5% 0 -6%;
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  opacity: .74;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(55,21,39,.12));
+}
