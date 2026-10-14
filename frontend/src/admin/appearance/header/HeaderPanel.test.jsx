@@ -82,6 +82,7 @@ describe('edición del encabezado', () => {
     await user.clear(screen.getByPlaceholderText('Ej: Lo Nuevo'));
     await user.type(screen.getByPlaceholderText('Ej: Lo Nuevo'), 'Colección');
     expect(within(preview).getByText('Colección')).toBeInTheDocument();
+    expect(within(preview).getByText('Colección')).toHaveClass('rb-metallic-text');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
     expect(within(preview).getByRole('navigation', { name: 'Vista previa del menú móvil' })).toHaveTextContent('Colección');
