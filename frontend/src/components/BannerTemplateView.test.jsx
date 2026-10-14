@@ -242,6 +242,7 @@ describe('plantillas sobre contenido existente', () => {
       expect(card.querySelector('strong')).toHaveStyle({ color: '#b78853', fontSize: 'clamp(10px, 4.4cqw, 22px)' });
       expect(card.querySelector('small')).toHaveStyle({ color: '#383433', fontSize: 'clamp(8px, 3.2cqw, 16px)' });
       expect(card.querySelector('strong')).toHaveAttribute('data-metallic', 'true');
+      expect(card.querySelector('strong')).toHaveClass('rb-metallic-text');
     }
     rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { editorial: { ...config, cardTextStyle: { ...config.cardTextStyle, metallicTitle: false } } } }} sections={categories} />);
     expect(container.querySelector('strong[data-metallic]')).toBeNull();
