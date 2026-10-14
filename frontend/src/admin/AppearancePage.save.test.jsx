@@ -336,14 +336,12 @@ describe('guardado seguro de Apariencia', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled());
   });
 
-  it('detecta si el servidor pierde los colores de texto y conserva el cambio en el editor', async () => {
+  it('envía y conserva los colores de texto de las tarjetas al guardar', async () => {
     const user = userEvent.setup();
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       saveSiteSettings.mockImplementation(async (payload) => ({
-        theme: { ...initial.theme, banner: { ...payload.theme.banner, templateConfigs: { editorial: {
-          cards: [{ categoryId: 'hogar' }],
-        } } } },
+        theme: { ...initial.theme, banner: payload.theme.banner },
         menus: initial.menus,
         appearanceRevision: 4,
       }));
@@ -352,9 +350,8 @@ describe('guardado seguro de Apariencia', () => {
       await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
       await user.click(screen.getByRole('button', { name: 'Cambiar colores de tarjeta' }));
       await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-      expect(await screen.findByRole('alert')).toHaveTextContent('color del título de tarjeta 1 (editorial)');
-      expect(screen.getByRole('alert')).toHaveTextContent('color de la etiqueta de tarjeta 1 (editorial)');
-      expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
+      expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
+      expect(screen.queryByText('1 área pendiente por guardar')).not.toBeInTheDocument();
       expect(saveSiteSettings).toHaveBeenCalledWith(expect.objectContaining({
         theme: expect.objectContaining({ banner: expect.objectContaining({
           templateConfigs: expect.objectContaining({ editorial: expect.objectContaining({
