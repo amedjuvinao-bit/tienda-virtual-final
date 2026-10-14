@@ -244,4 +244,17 @@ describe('editor de plantillas', () => {
     expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleColor: '', labelColor: '' }));
   });
 
+  it('ajusta y restablece el tamaño de los textos de cada tarjeta', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.click(screen.getByText(/Texto e imágenes/));
+    fireEvent.change(screen.getByLabelText(/Tamaño del título/), { target: { value: '22' } });
+    fireEvent.change(screen.getByLabelText(/Tamaño de la etiqueta/), { target: { value: '16' } });
+    let saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleSizePx: 22, labelSizePx: 16 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Usar tamaños originales' }));
+    saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleSizePx: null, labelSizePx: null }));
+  });
+
 });
