@@ -240,7 +240,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             {cardImage && <img src={cardImage} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
             {card.image && <div className="banner-template-image-choice" role="group" aria-label="Imagen visible de la tarjeta">
               <button type="button" className="banner-btn" aria-pressed={card.imageSource !== 'catalog'} onClick={() => updateCard(index, { imageSource: 'custom' })}>Imagen que subí</button>
-              <button type="button" className="banner-btn" aria-pressed={card.imageSource === 'catalog'} onClick={() => updateCard(index, { imageSource: 'catalog' })}>Imagen de la {destinationType === 'product' ? 'ficha del producto' : 'categoría'}</button>
+              <button type="button" className="banner-btn" aria-pressed={card.imageSource === 'catalog'} disabled={!categoryImage} onClick={() => updateCard(index, { imageSource: 'catalog' })}>Imagen de la {destinationType === 'product' ? 'ficha del producto' : 'categoría'}</button>
               <p className="banner-template-help">Puedes cambiar de opción sin perder la imagen que subiste.</p>
             </div>}
           </div></details>
