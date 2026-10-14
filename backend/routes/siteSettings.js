@@ -744,12 +744,13 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     // Appearance. Mongoose can cast an entire cards array using an older
     // compiled nested schema and silently omit recently added card fields.
     const hasCardTextOverrides = Object.values(theme?.banner?.templateConfigs || {}).some(
-      (template) => Array.isArray(template?.cards) && template.cards.some((card) =>
-        card && ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx'].some((key) => Object.hasOwn(card, key)))
+      (template) => (template?.cardTextStyle && Object.keys(template.cardTextStyle).length > 0)
+        || (Array.isArray(template?.cards) && template.cards.some((card) =>
+          card && ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx'].some((key) => Object.hasOwn(card, key))))
     );
     if (hasCardTextOverrides) {
       for (const template of Object.values(theme.banner.templateConfigs)) {
-        for (const card of template?.cards || []) {
+        for (const card of [template?.cardTextStyle, ...(template?.cards || [])]) {
           for (const key of ['titleColor', 'labelColor']) {
             if (card?.[key] !== undefined && card[key] !== '' && !/^#[0-9a-f]{6}$/i.test(card[key])) {
               return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_COLOR', message: 'El color de texto de una tarjeta no es válido.' });
@@ -761,6 +762,9 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
               return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_TEXT_SIZE', message: 'El tamaño de texto de una tarjeta no es válido.' });
             }
           }
+        }
+        if (template?.cardTextStyle?.metallicTitle !== undefined && typeof template.cardTextStyle.metallicTitle !== 'boolean') {
+          return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_METALLIC_TITLE', message: 'El efecto metalizado debe estar activado o desactivado.' });
         }
       }
     }
