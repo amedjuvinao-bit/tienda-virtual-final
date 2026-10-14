@@ -229,6 +229,24 @@ describe('plantillas sobre contenido existente', () => {
     expect(card.querySelector('.rb-template__card-copy small')).toHaveStyle({ fontSize: 'clamp(8px, 3.2cqw, 16px)' });
   });
 
+  it('usa estilo global en todas las tarjetas y lo retira al desactivar metalizado', () => {
+    const config = { cards: [
+      { categoryId: 'actual-a', titleColor: '#332211', titleSizePx: 12, label: 'Especial' },
+      { categoryId: 'actual-b', titleColor: '#446688', titleSizePx: 14, label: 'Nuevo' },
+    ], cardTextStyle: { titleColor: '#b78853', labelColor: '#383433', titleSizePx: 22, labelSizePx: 16, metallicTitle: true } };
+    const banner = { templateId: 'editorial', templateConfigs: { editorial: config } };
+    const { container, rerender } = render(<BannerTemplateView banner={banner} sections={categories} />);
+    const cards = container.querySelectorAll('.rb-template__card');
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      expect(card.querySelector('strong')).toHaveStyle({ color: '#b78853', fontSize: 'clamp(10px, 4.4cqw, 22px)' });
+      expect(card.querySelector('small')).toHaveStyle({ color: '#383433', fontSize: 'clamp(8px, 3.2cqw, 16px)' });
+      expect(card.querySelector('strong')).toHaveAttribute('data-metallic', 'true');
+    }
+    rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { editorial: { ...config, cardTextStyle: { ...config.cardTextStyle, metallicTitle: false } } } }} sections={categories} />);
+    expect(container.querySelector('strong[data-metallic]')).toBeNull();
+  });
+
   it('encadena tarjetas al entrar y salir sin reiniciarse al cambiar la foto del slider', () => {
     let notify;
     const disconnect = vi.fn();
