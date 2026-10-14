@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const express = require('express');
+const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const SiteSettings = require('../models/SiteSettings');
 const siteSettingsRouter = require('../routes/siteSettings');
@@ -12,6 +14,17 @@ async function main() {
   }
 
   await mongoose.connect(uri);
+  const previousSecret = process.env.JWT_SECRET;
+  const previousLegacyAuth = process.env.ALLOW_LEGACY_ADMIN_AUTH;
+  process.env.JWT_SECRET = 'local-test-secret-for-appearance-card-colors';
+  process.env.ALLOW_LEGACY_ADMIN_AUTH = 'true';
+  const app = express();
+  app.use(express.json());
+  app.use('/api/site-settings', siteSettingsRouter);
+  app.use((error, _req, res, _next) => res.status(500).json({ message: error.message }));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+  });
   try {
     await SiteSettings.deleteMany({});
     const doc = await SiteSettings.create({
@@ -19,41 +32,40 @@ async function main() {
         editorial: { cards: [{ text: 'Vestidos', label: 'Elegante' }] },
       } } },
     });
-    const putHandler = siteSettingsRouter.stack.find(
-      (layer) => layer.route?.path === '/' && layer.route.methods.put
-    ).route.stack.at(-1).handle;
-    const result = { status: 200, body: null };
-    const res = {
-      status(code) { result.status = code; return this; },
-      json(value) { result.body = value; return this; },
-    };
-    await putHandler({ body: { appearanceRevision: doc.appearanceRevision, theme: {
+    const base = `http://127.0.0.1:${server.address().port}/api/site-settings`;
+    const token = jwt.sign({ role: 'admin', adminRole: 'owner', username: 'ci-owner' }, process.env.JWT_SECRET);
+    const response = await fetch(base, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ appearanceRevision: doc.appearanceRevision, theme: {
       banner: { templateConfigs: { editorial: { cards: [{
         text: 'Vestidos', label: 'Elegante', labelColor: '#ed246b', titleColor: '#ffffff',
       }] } } },
-    } } }, res, (error) => { throw error; });
+      } }),
+    });
+    const result = await response.json();
 
-    assert.equal(result.status, 200, JSON.stringify(result.body));
-    assert.equal(result.body.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
-    assert.equal(result.body.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
+    assert.equal(response.status, 200, JSON.stringify(result));
+    assert.equal(result.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
+    assert.equal(result.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     const raw = await SiteSettings.collection.findOne({ _id: doc._id });
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     assert.equal(raw.appearanceRevision, doc.appearanceRevision + 1);
-    const getHandler = siteSettingsRouter.stack.find(
-      (layer) => layer.route?.path === '/' && layer.route.methods.get
-    ).route.stack.at(-1).handle;
-    const publicResult = { body: null };
-    await getHandler({}, {
-      set() { return this; },
-      json(value) { publicResult.body = value; return this; },
-    }, (error) => { throw error; });
-    assert.equal(publicResult.body.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
-    assert.equal(publicResult.body.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
-    console.log('Guardado y lectura pública de colores de tarjetas: OK');
+    const publicResponse = await fetch(base);
+    assert.equal(publicResponse.status, 200);
+    const publicSettings = await publicResponse.json();
+    assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
+    assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
+    console.log('PUT HTTP, MongoDB y GET HTTP público de colores de tarjetas: OK');
   } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     await SiteSettings.deleteMany({});
     await mongoose.disconnect();
+    if (previousSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousSecret;
+    if (previousLegacyAuth === undefined) delete process.env.ALLOW_LEGACY_ADMIN_AUTH;
+    else process.env.ALLOW_LEGACY_ADMIN_AUTH = previousLegacyAuth;
   }
 }
 
