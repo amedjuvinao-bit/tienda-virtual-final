@@ -2,6 +2,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from 'react-dom';
 import BannerDevicePreview, { BANNER_DEVICES } from './BannerDevicePreview';
+import { sliderArrowPath } from '../../../components/SliderControls';
 import BannerTemplatePanel from './BannerTemplatePanel';
 import { BANNER_TEMPLATE_IDS, BANNER_TEMPLATE_META, getBannerTemplate, safeBannerLink } from '../../../lib/bannerTemplates';
 import { getBannerHeightSettings } from '../../../lib/bannerHeight';
@@ -41,10 +42,10 @@ const clampNum = (n, min, max, fallback) => {
 
 const IMAGE_SIZES = { desktop: { label: 'Escritorio', size: '1920 × 1080 px' }, tablet: { label: 'Tableta', size: '1200 × 1600 px' }, mobile: { label: 'Móvil', size: '1080 × 1920 px' } };
 const SLIDER_CONTROL_THEMES = [
-  { id: 'minimal', name: 'Trazo fino', sample: '‹  ━  ─  ─  ›' },
-  { id: 'petal', name: 'Pétalos de vidrio', sample: '❮  ◇  ◆  ◇  ❯' },
-  { id: 'orbit', name: 'Órbita luminosa', sample: '〈  ○  ◉  ○  〉' },
-  { id: 'editorial', name: 'Editorial', sample: '←  01  02  03  →' },
+  { id: 'minimal', name: 'Trazo fino' },
+  { id: 'petal', name: 'Curva de seda' },
+  { id: 'orbit', name: 'Órbita luminosa' },
+  { id: 'editorial', name: 'Editorial' },
 ];
 const imageFieldForDevice = (device, single = false) => single ? ({ desktop: 'imageUrl', tablet: 'imageTabletUrl', mobile: 'imageMobileUrl' })[device] : ({ desktop: 'image', tablet: 'imageTablet', mobile: 'imageMobile' })[device];
 
@@ -748,9 +749,9 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
             <Input type="number" min="1.2" max="15" step="0.1" label="Segundos por imagen" value={Number(effectiveInterval) / 1000} onChange={(e) => setPath('banner.sliderIntervalMs', Math.round(Number(e.target.value) * 1000))} />
             <label className="banner-check"><input type="checkbox" checked={b.sliderShowControls !== false} onChange={(e) => setPath('banner.sliderShowControls', e.target.checked)} /> Mostrar controles del slider</label>
             {b.sliderShowControls !== false && <div className="banner-slider-control-options">
-              <div className="banner-slider-theme-grid" role="group" aria-label="Estilo de controles del slider">{SLIDER_CONTROL_THEMES.map((option) => <button type="button" key={option.id} data-theme={option.id} aria-pressed={(b.sliderControlTheme || 'minimal') === option.id} onClick={() => setPath('banner.sliderControlTheme', option.id)}><span className="banner-slider-theme-sample" aria-hidden="true">{option.sample}</span><strong>{option.name}</strong></button>)}</div>
+              <div className="banner-slider-theme-grid" role="group" aria-label="Estilo de controles del slider">{SLIDER_CONTROL_THEMES.map((option) => <button type="button" key={option.id} data-theme={option.id} aria-pressed={(b.sliderControlTheme || 'minimal') === option.id} onClick={() => setPath('banner.sliderControlTheme', option.id)}><span className="banner-slider-theme-sample" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d={sliderArrowPath(option.id, true)} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="banner-slider-theme-marks">{[0, 1, 2].map((i) => <i key={i}>{option.id === 'editorial' ? `0${i + 1}` : ''}</i>)}</span><svg viewBox="0 0 24 24" fill="none"><path d={sliderArrowPath(option.id, false)} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></span><strong>{option.name}</strong></button>)}</div>
               <label>Color de flechas e indicadores <input type="color" aria-label="Color de controles del slider" value={/^#[0-9a-fA-F]{6}$/.test(b.sliderControlColor || '') ? b.sliderControlColor : '#ffffff'} onChange={(e) => setPath('banner.sliderControlColor', e.target.value)} /></label>
-              <label>Ubicación en escritorio <select aria-label="Ubicación de controles del slider" value={b.sliderControlPosition || 'right'} onChange={(e) => setPath('banner.sliderControlPosition', e.target.value)}><option value="right">Derecha</option><option value="left">Izquierda</option><option value="bottom">Abajo, centrados</option></select></label>
+              <label>Ubicación de los indicadores <select aria-label="Ubicación de controles del slider" value={b.sliderControlPosition || 'right'} onChange={(e) => setPath('banner.sliderControlPosition', e.target.value)}><option value="right">Derecha</option><option value="left">Izquierda</option><option value="bottom">Centro</option></select></label>
               <label>Tamaño · {b.sliderControlSize || 100}% <input type="range" min="80" max="140" step="5" aria-label="Tamaño de controles del slider" value={b.sliderControlSize || 100} onChange={(e) => setPath('banner.sliderControlSize', Number(e.target.value))} /></label>
               <label className="banner-check"><input type="checkbox" checked={b.sliderShowProgress !== false} onChange={(e) => setPath('banner.sliderShowProgress', e.target.checked)} /> Mostrar progreso entre imágenes</label>
             </div>}

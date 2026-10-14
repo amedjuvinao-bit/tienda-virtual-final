@@ -145,10 +145,20 @@
 .banner-slider-theme-grid button { display: grid; gap: 6px; min-width: 0; padding: 10px 8px; border: 1px solid var(--admin-card-border); border-radius: 12px; background: var(--admin-card-bg); color: var(--admin-card-text); text-align: center; cursor: pointer; }
 .banner-slider-theme-grid button[aria-pressed="true"] { border: 2px solid var(--admin-primary); padding: 9px 7px; box-shadow: 0 4px 13px color-mix(in srgb, var(--admin-primary) 15%, transparent); }
 .banner-slider-theme-grid button strong { font-size: 11px; }
-.banner-slider-theme-sample { display: grid; min-height: 34px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--admin-primary) 32%, var(--admin-card-bg)); color: var(--admin-card-text); font-size: 16px; letter-spacing: .1em; white-space: nowrap; }
-.banner-slider-theme-grid button[data-theme="petal"] .banner-slider-theme-sample { font-size: 20px; color: var(--admin-primary); }
-.banner-slider-theme-grid button[data-theme="orbit"] .banner-slider-theme-sample { font-size: 20px; text-shadow: 0 0 7px var(--admin-primary); }
-.banner-slider-theme-grid button[data-theme="editorial"] .banner-slider-theme-sample { font: italic 15px Georgia,serif; letter-spacing: .03em; }
+.banner-slider-theme-sample { display: flex; align-items: center; justify-content: space-around; gap: 3px; min-height: 48px; padding: 4px 6px; border-radius: 9px; background: color-mix(in srgb, var(--admin-primary) 14%, var(--admin-card-bg)); color: var(--admin-card-text); }
+.banner-slider-theme-sample svg { width: 22px; height: 26px; flex: none; }
+.banner-slider-theme-marks { display: flex; align-items: center; gap: 6px; }
+.banner-slider-theme-marks i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .6; }
+.banner-slider-theme-marks i:nth-child(2) { width: 9px; height: 9px; opacity: 1; }
+.banner-slider-theme-grid button[data-theme="minimal"] .banner-slider-theme-marks i { width: 9px; height: 2px; border-radius: 0; }
+.banner-slider-theme-grid button[data-theme="minimal"] .banner-slider-theme-marks i:nth-child(2) { width: 14px; height: 3px; }
+.banner-slider-theme-grid button[data-theme="petal"] .banner-slider-theme-sample { color: var(--admin-primary); }
+.banner-slider-theme-grid button[data-theme="petal"] .banner-slider-theme-marks i { width: 6px; height: 11px; border-radius: 65% 20% 65% 20%; transform: rotate(-22deg); }
+.banner-slider-theme-grid button[data-theme="petal"] .banner-slider-theme-marks i:nth-child(2) { width: 9px; height: 15px; }
+.banner-slider-theme-grid button[data-theme="orbit"] .banner-slider-theme-marks i { width: 7px; height: 7px; border: 1px solid currentColor; background: none; }
+.banner-slider-theme-grid button[data-theme="orbit"] .banner-slider-theme-marks i:nth-child(2) { width: 11px; height: 11px; }
+.banner-slider-theme-grid button[data-theme="editorial"] .banner-slider-theme-marks i { width: auto; height: auto; border-radius: 0; background: none; font: italic 11px Georgia,serif; }
+.banner-slider-theme-grid button[data-theme="editorial"] .banner-slider-theme-marks i:nth-child(2) { font-size: 14px; text-decoration: underline; }
 .banner-preview-fold { position: absolute; left: 0; right: 0; z-index: 4; border-top: 1px dashed var(--admin-primary); pointer-events: none; }
 .banner-preview-fold span { position: absolute; right: 5px; bottom: 2px; padding: 2px 4px; border-radius: 4px; background: var(--admin-card-bg); color: var(--admin-card-text); font-size: 8px; font-weight: 700; }
 .banner-preview-below { position: absolute; left: 0; right: 0; padding: 9px 5px; color: var(--admin-card-muted-text); text-align: center; font-size: 9px; }
