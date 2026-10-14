@@ -38,7 +38,9 @@ async function main() {
       method: 'PUT',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       body: JSON.stringify({ appearanceRevision: doc.appearanceRevision, theme: {
-      banner: { templateConfigs: { editorial: { cards: [{
+      banner: { templateConfigs: { editorial: { cardTextStyle: {
+        titleColor: '#b78853', labelColor: '#383433', titleSizePx: 22, labelSizePx: 16, metallicTitle: true,
+      }, cards: [{
         text: 'Vestidos', label: 'Elegante', labelColor: '#ed246b', titleColor: '#ffffff', titleSizePx: 22, labelSizePx: 16,
       }] } } },
       } }),
@@ -50,11 +52,15 @@ async function main() {
     assert.equal(result.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     assert.equal(result.theme.banner.templateConfigs.editorial.cards[0].titleSizePx, 22);
     assert.equal(result.theme.banner.templateConfigs.editorial.cards[0].labelSizePx, 16);
+    assert.deepEqual(result.theme.banner.templateConfigs.editorial.cardTextStyle, {
+      titleColor: '#b78853', labelColor: '#383433', titleSizePx: 22, labelSizePx: 16, metallicTitle: true,
+    });
     const raw = await SiteSettings.collection.findOne({ _id: doc._id });
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleSizePx, 22);
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelSizePx, 16);
+    assert.equal(raw.theme.banner.templateConfigs.editorial.cardTextStyle.metallicTitle, true);
     assert.equal(raw.appearanceRevision, doc.appearanceRevision + 1);
     const publicResponse = await fetch(base);
     assert.equal(publicResponse.status, 200);
@@ -63,6 +69,8 @@ async function main() {
     assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cards[0].titleSizePx, 22);
     assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cards[0].labelSizePx, 16);
+    assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cardTextStyle.titleColor, '#b78853');
+    assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cardTextStyle.metallicTitle, true);
     const sizeOnlyResponse = await fetch(base, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
