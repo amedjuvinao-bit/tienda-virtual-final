@@ -259,6 +259,7 @@ function buildThemeFromServer(themeRaw) {
 
     sliderIntervalMs: 3500,
     sliderShowProgress: true,
+    sliderShowCounter: false,
     sliderShowControls: true,
     sliderControlColor: "#ffffff",
     sliderControlTheme: "minimal",
@@ -405,6 +406,7 @@ function buildThemeFromServer(themeRaw) {
           ? Number(bannerRaw.autoplayMs)
           : bannerDefaults.sliderIntervalMs,
       sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
+      sliderShowCounter: bannerRaw?.sliderShowCounter === true,
       sliderShowControls: bannerRaw?.sliderShowControls !== false,
       sliderControlColor: /^#[0-9a-fA-F]{6}$/.test(bannerRaw?.sliderControlColor || '') ? bannerRaw.sliderControlColor : '#ffffff',
       sliderControlTheme: ['minimal', 'petal', 'orbit', 'editorial'].includes(bannerRaw?.sliderControlTheme) ? bannerRaw.sliderControlTheme : 'minimal',

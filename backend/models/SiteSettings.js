@@ -175,6 +175,7 @@ const BannerSchema = new Schema(
 
     autoplayMs: { type: Number, default: 4500 },
     sliderShowProgress: { type: Boolean, default: true },
+    sliderShowCounter: { type: Boolean, default: false },
     sliderShowControls: { type: Boolean, default: true },
     sliderControlColor: { type: String, default: "#ffffff", match: /^#[0-9a-fA-F]{6}$/ },
     sliderControlTheme: { type: String, enum: ["minimal", "petal", "orbit", "editorial"], default: "minimal" },

@@ -750,10 +750,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     theme={banner?.sliderControlTheme}
     position={banner?.sliderControlPosition}
     size={banner?.sliderControlSize}
+    showCounter={banner?.sliderShowCounter === true}
     showProgress={banner?.sliderShowProgress !== false}
     onPrevious={() => instanceRef.current?.prev()}
     onNext={() => instanceRef.current?.next()}
-    onChoose={(index) => instanceRef.current?.moveToIdx(index)}
   />
 
   const sharedStyleTag = (

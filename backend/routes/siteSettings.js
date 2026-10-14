@@ -110,6 +110,7 @@ function buildDefaultSettings() {
       banner: {
         type: "slider",
         sliderShowProgress: true,
+        sliderShowCounter: false,
         sliderShowControls: true,
         sliderControlColor: "#ffffff",
         sliderControlTheme: "minimal",

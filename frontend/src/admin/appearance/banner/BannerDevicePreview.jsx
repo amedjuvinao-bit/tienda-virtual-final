@@ -45,7 +45,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   };
 }
 
-export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard, onPreviousSlide, onNextSlide, onChooseSlide }) {
+export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard, onPreviousSlide, onNextSlide }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
   const { viewport, frameHeight, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
   const viewportRef = useRef(null);
@@ -87,7 +87,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
               </button>
             );
           })}
-          {type === 'slider' && slides.length > 1 && banner?.sliderShowControls !== false && <SliderControls count={slides.length} current={selectedIdx} progress={.48} color={banner?.sliderControlColor} theme={banner?.sliderControlTheme} position={banner?.sliderControlPosition} size={banner?.sliderControlSize} device={device} showProgress={banner?.sliderShowProgress !== false} onPrevious={onPreviousSlide} onNext={onNextSlide} onChoose={onChooseSlide} />}
+          {type === 'slider' && slides.length > 1 && banner?.sliderShowControls !== false && <SliderControls count={slides.length} current={selectedIdx} progress={.48} color={banner?.sliderControlColor} theme={banner?.sliderControlTheme} position={banner?.sliderControlPosition} size={banner?.sliderControlSize} device={device} showCounter={banner?.sliderShowCounter === true} showProgress={banner?.sliderShowProgress !== false} onPrevious={onPreviousSlide} onNext={onNextSlide} />}
         </div>
         {foldPercent < 100 && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>{viewport.height} px visibles</span></div>}
         {heightPercent < 100 && <div className="banner-preview-below" style={{ top: `${heightPercent}%` }}>Contenido debajo de la portada</div>}

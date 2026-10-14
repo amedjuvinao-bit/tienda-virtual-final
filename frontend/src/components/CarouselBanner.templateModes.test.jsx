@@ -21,6 +21,7 @@ describe('portada pública con diseño opcional', () => {
     await waitFor(() => expect(container.querySelector('.rb-template__picture .keen-slider')).toBeInTheDocument());
     expect(Array.from(container.querySelectorAll('.rb-template__picture .keen-slider__slide img')).map((img) => img.getAttribute('src'))).toEqual(['/uno.jpg', '/dos.jpg']);
     expect(container.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#ffffff' });
+    expect(container.querySelector('.rb-slider-controls__counter')).not.toBeInTheDocument();
 
     rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'plain', slides }} />);
     await waitFor(() => expect(container.querySelector('.rb-template')).not.toBeInTheDocument());

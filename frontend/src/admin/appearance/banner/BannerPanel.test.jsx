@@ -123,6 +123,7 @@ describe('editor de Portada', () => {
     const interval = screen.getByRole('spinbutton', { name: 'Segundos por imagen' });
     expect(interval).toHaveValue(4.5);
     fireEvent.change(interval, { target: { value: '6.2' } });
+    await user.click(screen.getByRole('checkbox', { name: /Mostrar contador discreto/ }));
     await user.click(screen.getByRole('checkbox', { name: 'Mostrar progreso entre imágenes' }));
     const values = JSON.parse(screen.getByTestId('banner-values').textContent);
     expect(values.sliderIntervalMs).toBe(6200);
@@ -139,6 +140,9 @@ describe('editor de Portada', () => {
     expect(preview.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#db9fc2' });
     await user.click(screen.getByRole('button', { name: 'Editorial' }));
     expect(preview.querySelector('.rb-slider-controls')).toHaveAttribute('data-theme', 'editorial');
+    expect(preview.querySelector('.rb-slider-controls__counter')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: /Mostrar contador discreto/ }));
+    expect(preview.querySelector('.rb-slider-controls__counter')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('combobox', { name: 'Ubicación de controles del slider' }), { target: { value: 'bottom' } });
     fireEvent.change(screen.getByRole('slider', { name: 'Tamaño de controles del slider' }), { target: { value: '120' } });
     expect(preview.querySelector('.rb-slider-controls')).toHaveAttribute('data-position', 'bottom');
@@ -150,6 +154,7 @@ describe('editor de Portada', () => {
     expect(values.sliderControlTheme).toBe('editorial');
     expect(values.sliderControlPosition).toBe('bottom');
     expect(values.sliderControlSize).toBe(120);
+    expect(values.sliderShowCounter).toBe(true);
   });
 
   it('previsualiza un video y avisa cuando el autoplay con sonido puede fallar', async () => {

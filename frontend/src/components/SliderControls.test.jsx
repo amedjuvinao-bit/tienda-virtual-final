@@ -9,18 +9,17 @@ describe('SliderControls', () => {
   it('muestra navegación accesible, usa el color configurado y ejecuta las acciones', () => {
     const onPrevious = vi.fn();
     const onNext = vi.fn();
-    const onChoose = vi.fn();
-    const { container, unmount } = render(<SliderControls count={3} current={1} progress={.5} color="#e9b7cc" theme="orbit" showProgress onPrevious={onPrevious} onNext={onNext} onChoose={onChoose} />);
+    const { rerender, unmount } = render(<SliderControls count={3} current={1} progress={.5} color="#e9b7cc" theme="orbit" showProgress onPrevious={onPrevious} onNext={onNext} />);
     expect(screen.getByRole('navigation', { name: 'Controles del slider' })).toHaveStyle({ '--rb-slider-color': '#e9b7cc' });
     expect(screen.getByRole('navigation', { name: 'Controles del slider' })).toHaveAttribute('data-theme', 'orbit');
-    expect(screen.getByRole('button', { name: 'Ir a la imagen 2' })).toHaveAttribute('aria-current', 'true');
-    expect(container.querySelector('.rb-slider-controls__page[aria-current="true"] .rb-slider-controls__dot').style.backgroundImage).toContain('180deg');
+    expect(screen.queryByText('02')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ir a la imagen/ })).not.toBeInTheDocument();
+    rerender(<SliderControls count={3} current={1} progress={.5} color="#e9b7cc" theme="orbit" showCounter showProgress onPrevious={onPrevious} onNext={onNext} />);
+    expect(screen.getByLabelText('Imagen 2 de 3')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Imagen anterior' }));
     fireEvent.click(screen.getByRole('button', { name: 'Imagen siguiente' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Ir a la imagen 3' }));
     expect(onPrevious).toHaveBeenCalledOnce();
     expect(onNext).toHaveBeenCalledOnce();
-    expect(onChoose).toHaveBeenCalledWith(2);
     unmount();
   });
 
@@ -43,6 +42,6 @@ describe('SliderControls', () => {
     expect(controls).toHaveAttribute('data-theme', 'editorial');
     expect(controls).toHaveAttribute('data-position', 'bottom');
     expect(controls).toHaveStyle({ '--rb-slider-scale': '1.4' });
-    expect(screen.getByText('01')).toBeInTheDocument();
+    expect(screen.queryByText('01')).not.toBeInTheDocument();
   });
 });
