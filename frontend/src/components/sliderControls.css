@@ -1,0 +1,11 @@
+.rb-slider-controls { position: absolute; z-index: 120; right: max(16px, 2%); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 5px; border: 1px solid rgba(255,255,255,.38); border-radius: 28px; background: rgba(20,18,24,.38); box-shadow: 0 9px 27px rgba(0,0,0,.17), inset 0 1px rgba(255,255,255,.25); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: var(--rb-slider-color); }
+.rb-slider-controls__arrow, .rb-slider-controls__page { display: grid; flex: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; color: inherit; background: transparent; cursor: pointer; transition: background .2s ease, transform .2s ease; }
+.rb-slider-controls__arrow svg { width: 21px; height: 21px; filter: drop-shadow(0 1px 2px #0008); }
+.rb-slider-controls__arrow:hover, .rb-slider-controls__page:hover { background: rgba(255,255,255,.16); transform: scale(1.08); }
+.rb-slider-controls :is(button:focus-visible) { outline: 2px solid var(--rb-slider-color); outline-offset: 2px; }
+.rb-slider-controls__pages { display: flex; flex-direction: column; align-items: center; max-height: min(32vh, 250px); overflow-y: auto; scrollbar-width: thin; }
+.rb-slider-controls__page { width: 30px; height: 30px; }
+.rb-slider-controls__dot { display: block; width: 11px; height: 11px; border: 1px solid currentColor; border-radius: 50%; background: color-mix(in srgb, var(--rb-slider-color) 35%, transparent); box-shadow: 0 1px 4px #0007; }
+.rb-slider-controls__page[aria-current="true"] .rb-slider-controls__dot { width: 16px; height: 16px; border-width: 2px; background-color: color-mix(in srgb, var(--rb-slider-color) 55%, transparent); }
+@media (max-width: 639px) { .rb-slider-controls { top: 64%; left: 50%; right: auto; transform: translate(-50%, -50%); flex-direction: row; gap: 2px; max-width: calc(100% - 20px); padding: 4px 8px; } .rb-slider-controls__pages { flex-direction: row; max-width: min(52vw, 215px); max-height: none; overflow-x: auto; overflow-y: hidden; } .rb-slider-controls__arrow { width: 38px; height: 38px; } }
+@media (prefers-reduced-motion: reduce) { .rb-slider-controls button { transition: none; } }

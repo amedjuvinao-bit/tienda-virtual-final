@@ -6,11 +6,11 @@ import { X } from "lucide-react"
 import { fetchSiteSettings } from "../lib/siteSettingsApi" // ✅ MISMA RUTA QUE APPEARANCEPAGE
 import { getBannerHeightStyle } from "../lib/bannerHeight"
 import BannerTemplateView from './BannerTemplateView'
+import SliderControls from './SliderControls'
 
 export default function CarouselBanner({ bannerOverride = null, sectionsOverride = null }) {
   const overrideRef = useRef({ banner: bannerOverride, sections: sectionsOverride })
   overrideRef.current = { banner: bannerOverride, sections: sectionsOverride }
-  const [loaded, setLoaded] = useState(false)
   const intervalRef = useRef(null)
   const rafRef = useRef(null)
   const startTsRef = useRef(0)
@@ -678,7 +678,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
           defaultAnimation: { duration: 700 },
 
           created(s) {
-            setLoaded(true)
             setShowButtons(true)
             setSlideAnimTick((t) => t + 1)
 
@@ -743,16 +742,16 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     }
   }, [bannerType, instanceRef, autoplayMs, slides.length])
 
-  const dotsWrapperClass = isMobile
-    ? useTemplate
-      ? "absolute left-1/2 top-[64%] -translate-x-1/2 z-[120] flex flex-row gap-2 pointer-events-auto"
-      : "absolute left-1/2 bottom-10 -translate-x-1/2 z-[120] flex flex-row gap-2 pointer-events-auto"
-    : isTablet
-    ? "absolute left-1/2 bottom-12 -translate-x-1/2 z-[120] flex flex-row gap-2.5 pointer-events-auto"
-    : "absolute right-4 top-1/2 -translate-y-1/2 z-[120] flex flex-col gap-3 pointer-events-auto"
-
-  const ringSize = isMobile ? 16 : isTablet ? 17 : 18
-  const ringInnerSize = isMobile ? 10 : isTablet ? 11 : 12
+  const renderSliderControls = () => banner?.sliderShowControls !== false && slides.length > 1 && <SliderControls
+    count={slides.length}
+    current={currentSlide}
+    progress={progress}
+    color={banner?.sliderControlColor}
+    showProgress={banner?.sliderShowProgress !== false}
+    onPrevious={() => instanceRef.current?.prev()}
+    onNext={() => instanceRef.current?.next()}
+    onChoose={(index) => instanceRef.current?.moveToIdx(index)}
+  />
 
   const sharedStyleTag = (
     <style>{`
@@ -783,25 +782,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         0% { opacity: 0; transform: translate3d(0, 14px, 0) scale(.92); filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
         70% { opacity: 1; transform: translate3d(0, -2px, 0) scale(1.03); filter: drop-shadow(0 0 14px rgba(255,255,255,.65)); }
         100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: drop-shadow(0 0 8px rgba(255,255,255,.25)); }
-      }
-
-      .rb-ring{
-        border-radius:9999px;
-        display:grid;place-items:center;
-        background:rgba(255,255,255,.32);
-        backdrop-filter: blur(8px);
-        border:1px solid rgba(255,255,255,.42);
-        box-shadow: 0 8px 22px rgba(0,0,0,.22);
-        transition: transform .2s ease;
-      }
-      .rb-ring:hover{ transform: scale(1.08); }
-      .rb-ring__inner{
-        border-radius:9999px;
-        background:rgba(255,255,255,.65);
-        border:1px solid rgba(212,175,55,.78);
-      }
-      .rb-ring__inner--active{
-        background:rgba(212,175,55,.98);
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -835,12 +815,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
             </div>)}
           </div>
         </BannerTemplateView>
-        {loaded && slides.length > 1 && <div className={dotsWrapperClass}>
-          {slides.map((_, index) => <button key={index} type="button" className="rb-ring" aria-label={`Ir al slide ${index + 1}`} onClick={() => { instanceRef.current?.moveToIdx(index); startTsRef.current = performance.now(); setProgress(0) }}
-            style={{ width: `${ringSize}px`, height: `${ringSize}px`, backgroundImage: index === currentSlide && banner?.sliderShowProgress !== false ? `conic-gradient(rgba(255,255,255,.95) ${Math.round(progress * 360)}deg, rgba(255,255,255,.18) 0deg)` : 'none' }}>
-            <span className="rb-ring__inner" style={{ width: `${ringInnerSize}px`, height: `${ringInnerSize}px` }} />
-          </button>)}
-        </div>}
+        {renderSliderControls()}
       </div>
     </div>
   }
@@ -1034,45 +1009,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
           })}
         </div>
 
-        {loaded && slides.length > 1 && (
-          <div className={dotsWrapperClass}>
-            {slides.map((_, i) => {
-              const active = i === currentSlide
-              const deg = Math.max(0, Math.min(1, active ? progress : 0)) * 360
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => {
-                    instanceRef.current?.moveToIdx(i)
-                    startTsRef.current = performance.now()
-                    setProgress(0)
-                    setShowButtons(false)
-                    if (btnTimerRef.current) clearTimeout(btnTimerRef.current)
-                  }}
-                  className="rb-ring"
-                  aria-label={`Ir al slide ${i + 1}`}
-                  style={{
-                    width: `${ringSize}px`,
-                    height: `${ringSize}px`,
-                    backgroundImage: active && banner?.sliderShowProgress !== false
-                      ? `conic-gradient(rgba(212,175,55,.95) ${deg}deg, rgba(255,255,255,.15) 0deg)`
-                      : "none",
-                  }}
-                  title={active ? "Reproduciendo" : "Ir al slide"}
-                >
-                  <span
-                    className={"rb-ring__inner " + (active ? "rb-ring__inner--active" : "")}
-                    style={{
-                      width: `${ringInnerSize}px`,
-                      height: `${ringInnerSize}px`,
-                    }}
-                  />
-                </button>
-              )
-            })}
-          </div>
-        )}
+        {renderSliderControls()}
       </div>
 
       {selectedImage && (

@@ -175,6 +175,8 @@ const BannerSchema = new Schema(
 
     autoplayMs: { type: Number, default: 4500 },
     sliderShowProgress: { type: Boolean, default: true },
+    sliderShowControls: { type: Boolean, default: true },
+    sliderControlColor: { type: String, default: "#ffffff", match: /^#[0-9a-fA-F]{6}$/ },
 
     imageUrl: { type: String, default: "" },
     imageTabletUrl: { type: String, default: "" },

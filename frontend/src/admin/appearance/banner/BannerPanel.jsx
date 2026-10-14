@@ -740,7 +740,11 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
           </div>
           {bannerType === 'slider' && <>
             <Input type="number" min="1.2" max="15" step="0.1" label="Segundos por imagen" value={Number(effectiveInterval) / 1000} onChange={(e) => setPath('banner.sliderIntervalMs', Math.round(Number(e.target.value) * 1000))} />
-            <label className="banner-check"><input type="checkbox" checked={b.sliderShowProgress !== false} onChange={(e) => setPath('banner.sliderShowProgress', e.target.checked)} /> Mostrar progreso entre imágenes</label>
+            <label className="banner-check"><input type="checkbox" checked={b.sliderShowControls !== false} onChange={(e) => setPath('banner.sliderShowControls', e.target.checked)} /> Mostrar controles del slider</label>
+            {b.sliderShowControls !== false && <div className="banner-slider-control-options">
+              <label>Color de flechas e indicadores <input type="color" aria-label="Color de controles del slider" value={/^#[0-9a-fA-F]{6}$/.test(b.sliderControlColor || '') ? b.sliderControlColor : '#ffffff'} onChange={(e) => setPath('banner.sliderControlColor', e.target.value)} /></label>
+              <label className="banner-check"><input type="checkbox" checked={b.sliderShowProgress !== false} onChange={(e) => setPath('banner.sliderShowProgress', e.target.checked)} /> Mostrar progreso entre imágenes</label>
+            </div>}
           </>}
           {bannerType === 'video' && <div className="banner-checks">
             <label className="banner-check"><input type="checkbox" checked={!!b.videoAutoplay} onChange={(e) => setPath('banner.videoAutoplay', e.target.checked)} /> Reproducir automáticamente</label>

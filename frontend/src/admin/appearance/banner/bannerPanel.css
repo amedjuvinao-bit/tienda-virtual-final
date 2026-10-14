@@ -136,9 +136,14 @@
 .banner-preview-cta { position: absolute; z-index: 2; min-width: 24px; transform: translate(-50%, -50%); border-radius: 30px; background: color-mix(in srgb, var(--admin-primary) 85%, transparent); color: var(--admin-primary-text); box-shadow: 0 2px 6px #0003; }
 .banner-preview-cta img { display: block; width: 100%; height: auto; }
 .banner-preview-cta span { display: block; overflow: hidden; padding: 3px; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.banner-preview-dots { position: absolute; right: 5px; bottom: 5px; z-index: 2; display: flex; gap: 3px; }
-.banner-preview-dots i { width: 4px; height: 4px; border-radius: 50%; background: #fff9; }
-.banner-preview-dots i[data-active="true"] { background: var(--admin-primary); }
+.banner-preview-dots { position: absolute; right: 12px; top: 50%; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px 6px; border-radius: 15px; background: #15121d70; color: var(--banner-preview-control-color); }
+.banner-preview-dots span { font-size: 20px; line-height: 14px; }
+.banner-preview-dots i { width: 9px; height: 9px; border: 1px solid currentColor; border-radius: 50%; background: transparent; }
+.banner-preview-dots i[data-active="true"] { background: currentColor; }
+.banner-preview-viewport[data-device="mobile"] .banner-preview-dots { top: 62%; right: auto; left: 50%; transform: translateX(-50%); flex-direction: row; }
+.banner-slider-control-options { display: grid; gap: 10px; padding: 10px 12px; border: 1px solid var(--admin-card-border); border-radius: 12px; }
+.banner-slider-control-options > label:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.banner-slider-control-options input[type="color"] { width: 52px; height: 34px; padding: 2px; border: 1px solid var(--admin-card-border); border-radius: 8px; background: var(--admin-card-bg); cursor: pointer; }
 .banner-preview-fold { position: absolute; left: 0; right: 0; z-index: 4; border-top: 1px dashed var(--admin-primary); pointer-events: none; }
 .banner-preview-fold span { position: absolute; right: 5px; bottom: 2px; padding: 2px 4px; border-radius: 4px; background: var(--admin-card-bg); color: var(--admin-card-text); font-size: 8px; font-weight: 700; }
 .banner-preview-below { position: absolute; left: 0; right: 0; padding: 9px 5px; color: var(--admin-card-muted-text); text-align: center; font-size: 9px; }

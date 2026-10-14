@@ -259,6 +259,8 @@ function buildThemeFromServer(themeRaw) {
 
     sliderIntervalMs: 3500,
     sliderShowProgress: true,
+    sliderShowControls: true,
+    sliderControlColor: "#ffffff",
   };
 
   return {
@@ -400,6 +402,8 @@ function buildThemeFromServer(themeRaw) {
           ? Number(bannerRaw.autoplayMs)
           : bannerDefaults.sliderIntervalMs,
       sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
+      sliderShowControls: bannerRaw?.sliderShowControls !== false,
+      sliderControlColor: /^#[0-9a-fA-F]{6}$/.test(bannerRaw?.sliderControlColor || '') ? bannerRaw.sliderControlColor : '#ffffff',
     },
   };
 }

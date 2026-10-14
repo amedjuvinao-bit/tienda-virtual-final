@@ -129,6 +129,21 @@ describe('editor de Portada', () => {
     expect(values.sliderShowProgress).toBe(false);
   });
 
+  it('permite ocultar y colorear los controles en la vista previa y en los datos guardados', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    expect(preview.querySelector('.banner-preview-dots')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Comportamiento' }));
+    fireEvent.change(screen.getByLabelText('Color de controles del slider'), { target: { value: '#db9fc2' } });
+    expect(preview.querySelector('.banner-preview-dots')).toHaveStyle({ '--banner-preview-control-color': '#db9fc2' });
+    await user.click(screen.getByRole('checkbox', { name: 'Mostrar controles del slider' }));
+    expect(preview.querySelector('.banner-preview-dots')).not.toBeInTheDocument();
+    const values = JSON.parse(screen.getByTestId('banner-values').textContent);
+    expect(values.sliderShowControls).toBe(false);
+    expect(values.sliderControlColor).toBe('#db9fc2');
+  });
+
   it('previsualiza un video y avisa cuando el autoplay con sonido puede fallar', async () => {
     const user = userEvent.setup();
     render(<Editor initial={{ type: 'video', videoUrl: '/hero.mp4', videoAutoplay: true, videoMuted: false, videoLoop: true }} />);

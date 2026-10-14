@@ -20,11 +20,19 @@ describe('portada pública con diseño opcional', () => {
     const { container, rerender } = render(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'discovery', slides }} />);
     await waitFor(() => expect(container.querySelector('.rb-template__picture .keen-slider')).toBeInTheDocument());
     expect(Array.from(container.querySelectorAll('.rb-template__picture .keen-slider__slide img')).map((img) => img.getAttribute('src'))).toEqual(['/uno.jpg', '/dos.jpg']);
+    expect(container.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#ffffff' });
 
     rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'plain', slides }} />);
     await waitFor(() => expect(container.querySelector('.rb-template')).not.toBeInTheDocument());
     expect(Array.from(container.querySelectorAll('.keen-slider__slide img')).map((img) => img.getAttribute('src'))).toEqual(['/uno.jpg', '/dos.jpg']);
     expect(container.querySelector('[data-rb-btn]')).not.toBeInTheDocument();
+    expect(container.querySelector('.rb-slider-controls')).toBeInTheDocument();
+
+    rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'discovery', slides, sliderControlColor: '#bd8db5', sliderShowControls: false }} />);
+    await waitFor(() => expect(container.querySelector('.rb-slider-controls')).not.toBeInTheDocument());
+
+    rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'discovery', slides, sliderControlColor: '#bd8db5', sliderShowControls: true }} />);
+    await waitFor(() => expect(container.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#bd8db5' }));
   });
 
   it('mantiene el mismo video con o sin plantilla y oculta el botón antiguo en modo solo archivo', async () => {

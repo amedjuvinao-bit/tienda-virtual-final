@@ -86,7 +86,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
               </button>
             );
           })}
-          {type === 'slider' && slides.length > 1 && <div className="banner-preview-dots" aria-hidden="true">{slides.map((_, index) => <i key={index} data-active={index === selectedIdx} />)}</div>}
+          {type === 'slider' && slides.length > 1 && banner?.sliderShowControls !== false && <div className="banner-preview-dots" aria-hidden="true" style={{ '--banner-preview-control-color': /^#[0-9a-fA-F]{6}$/.test(banner?.sliderControlColor || '') ? banner.sliderControlColor : '#ffffff' }}><span>‹</span>{slides.map((_, index) => <i key={index} data-active={index === selectedIdx} />)}<span>›</span></div>}
         </div>
         {foldPercent < 100 && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>{viewport.height} px visibles</span></div>}
         {heightPercent < 100 && <div className="banner-preview-below" style={{ top: `${heightPercent}%` }}>Contenido debajo de la portada</div>}
