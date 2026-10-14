@@ -37,7 +37,7 @@ export function TabButton({ active, children, onClick }) {
       className={[
         "px-3 py-2 rounded-xl text-sm font-bold border transition",
         active
-          ? "bg-neutral-900 text-white border-neutral-900"
+          ? "bg-[#943a70] text-white border-[#943a70]"
           : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
       ].join(" ")}
     >
@@ -389,8 +389,8 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
       if (nextMain) onChangeImages?.({ mainImage: nextMain, hoverImage: nextHover });
     } catch (e) {
       console.error("CardImageMover: error consultando producto:", e);
-      setImgs([]);
-      setError("No pude cargar las imágenes de este producto.");
+      setImgs([...new Set([item?.mainImage, item?.hoverImage].filter(Boolean))]);
+      setError("No se pudieron consultar otras fotos del catálogo. Puedes seguir usando las fotos guardadas o subir una nueva.");
     } finally {
       setLoading(false);
     }
@@ -446,17 +446,17 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
   };
 
   const selectedHint = useMemo(() => {
-    if (!main && !hover) return "Sin selección";
-    return `Principal: ${main ? "OK" : "—"} · Hover: ${hover ? "OK" : "—"}`;
-  }, [main, hover]);
+    if (!main && !hover) return "Elige una foto para empezar";
+    return `Editando foto ${mode === "main" ? "principal" : "al pasar el cursor"}`;
+  }, [main, hover, mode]);
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-3">
+    <div className="section-product-editor__image-picker rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-extrabold text-neutral-900">Imágenes del producto</div>
+          <div className="text-sm font-extrabold text-neutral-900">Fotos de la tarjeta</div>
           <div className="text-xs text-neutral-500">
-            Elige una miniatura como <b>Principal</b> o <b>Hover</b>.
+            Selecciona qué foto quieres cambiar y elige una miniatura.
           </div>
           <div className="mt-1 text-[11px] text-neutral-500">{selectedHint}</div>
         </div>
@@ -468,11 +468,11 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
             className={[
               "px-2 py-1 rounded-lg border text-xs font-semibold",
               mode === "main"
-                ? "bg-neutral-900 text-white border-neutral-900"
+                ? "bg-[#943a70] text-white border-[#943a70]"
                 : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
             ].join(" ")}
           >
-            Elegir Principal
+            Principal
           </button>
           <button
             type="button"
@@ -480,11 +480,11 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
             className={[
               "px-2 py-1 rounded-lg border text-xs font-semibold",
               mode === "hover"
-                ? "bg-neutral-900 text-white border-neutral-900"
+                ? "bg-[#943a70] text-white border-[#943a70]"
                 : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
             ].join(" ")}
           >
-            Elegir Hover
+            Al pasar el cursor
           </button>
         </div>
       </div>
@@ -494,7 +494,7 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
           {loading ? "Cargando..." : "Recargar"}
         </Button>
 
-        <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+        <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
           <span className="mr-1">{loading ? "Procesando..." : "Subir imagen"}</span>
           <input
             type="file"
@@ -505,17 +505,15 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
           />
         </label>
 
-        {!uploadToCloudinary ? (
-          <span className="text-[11px] text-neutral-400">(uploadToCloudinary no está disponible)</span>
-        ) : null}
+        {!uploadToCloudinary ? <span className="text-[11px] text-neutral-500">La carga de imágenes no está disponible.</span> : null}
       </div>
 
-      {error ? <div className="mt-2 text-xs text-rose-700">{error}</div> : null}
+      {error ? <div className="mt-2 text-xs text-amber-800" role="status">{error}</div> : null}
 
       <div className="mt-3 grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
         {!imgs.length && !loading ? (
           <div className="col-span-full text-xs text-neutral-500">
-            No hay imágenes disponibles para este producto (o no pude cargarlas).
+            Aún no hay fotos para elegir. Sube una imagen para esta tarjeta.
           </div>
         ) : null}
 
@@ -619,7 +617,7 @@ export function ToggleChip({ active, onClick, children }) {
       className={[
         "px-3 py-2 rounded-xl border text-sm font-semibold transition",
         active
-          ? "bg-neutral-900 text-white border-neutral-900"
+          ? "bg-[#943a70] text-white border-[#943a70]"
           : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
       ].join(" ")}
     >

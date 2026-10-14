@@ -39,6 +39,19 @@ export default function StorefrontSectionPreview({ section, theme }) {
   const colors = theme.colors || {};
   const fonts = theme.fonts || {};
   const previewTheme = { ...theme, sections: previewSections };
+  const previewProducts = section?.id === 'tendencia' && Array.isArray(section.config?.products)
+    ? section.config.products.filter((item) => item && typeof item === 'object' && item.productId).map((item) => ({
+        id: String(item.productId),
+        name: item.name || 'Producto seleccionado',
+        image1: item.mainImage || item.images?.[0] || '/placeholder.png',
+        image2: item.hoverImage || item.mainImage || item.images?.[0] || '/placeholder.png',
+        price: Number(item.price) || 0,
+        finalPrice: Number(item.finalPrice) || Number(item.price) || 0,
+        hasDiscount: Boolean(item.hasDiscount),
+        discountPercent: Number(item.discountPercent) || 0,
+        sizes: [], colors: [], features: [], description: '',
+      }))
+    : undefined;
   const previewStyle = {
     '--color-primary': colors.primary || '#111827',
     '--color-secondary': colors.secondary || '#4b5563',
@@ -53,8 +66,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
   return (
     <section className="section-real-preview" aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
-        <div><span className="section-real-preview__eyebrow">Se actualiza al editar</span><h3>Vista en vivo de la tienda</h3></div>
-        <p>Estás viendo los cambios de esta sección. Para publicarlos, cierra el editor y pulsa Guardar cambios.</p>
+        <div><span className="section-real-preview__eyebrow">Vista previa</span><h3>Así se verá en la tienda</h3></div>
       </header>
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
       <div className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
@@ -66,12 +78,12 @@ export default function StorefrontSectionPreview({ section, theme }) {
         ) : PublicSection ? (
           <StorefrontPreviewBoundary key={section.id}>
             <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>
-              <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" />
+              <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} />
             </Suspense>
           </StorefrontPreviewBoundary>
         ) : <p className="section-real-preview__empty">Esta sección no tiene una vista pública disponible.</p>}
       </div>
-      <p className="section-real-preview__footnote">La vista usa el mismo componente de la página pública. Los botones de compra y los enlaces están desactivados dentro del editor.</p>
+      <p className="section-real-preview__footnote">Los cambios aparecen aquí al instante. Pulsa Guardar cambios al salir para publicarlos.</p>
     </section>
   );
 }

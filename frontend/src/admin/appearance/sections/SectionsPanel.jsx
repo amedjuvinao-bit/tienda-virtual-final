@@ -635,7 +635,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
               onChange={(e) => patchConfig({ titleImage: e.target.value })}
               placeholder="https://..."
             />
-            <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+            <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
               <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
               <input
                 type="file"
@@ -671,7 +671,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
                 onChange={(e) => patchConfig({ watermarkImage: e.target.value })}
                 placeholder="https://..."
               />
-              <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+              <label className="inline-flex items-center px-3 py-2 rounded-xl bg-[#943a70] text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-[#782953] transition">
                 <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
                 <input
                   type="file"
@@ -1375,17 +1375,15 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="section-product-editor space-y-4">
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-        <div className="text-sm font-semibold text-neutral-900">Productos en tendencia (desde BD)</div>
-        <div className="text-xs text-neutral-500">
-          Escribe las iniciales del producto y te aparecen resultados con vista previa. Luego eliges foto Principal y Hover.
-          <br />
-          ✅ Ahora también puedes <b>activar descuento</b> y poner el <b>%</b> por cada producto.
+        <div className="section-product-editor__heading">
+          <div><h3>Elige los productos</h3><p>Busca en el catálogo y personaliza las imágenes y el descuento de cada tarjeta.</p></div>
+          <span>{cfg.products?.length || 0} de {cfg.maxItems || 4}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Máximo de productos" hint="Ej: 4" name="config.maxItems">
+          <Field label="Cantidad máxima de tarjetas">
             <Input
               type="number"
               min={1}
@@ -1399,7 +1397,7 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
             />
           </Field>
 
-          <Field label="Buscar producto" hint="Escribe: vestido, zapato, etc." name="productSearch">
+          <Field label="Buscar en el catálogo" hint="Escribe el nombre de un producto.">
             <div className="flex gap-2">
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ej: vestido..." />
               <Button
@@ -1437,10 +1435,6 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-neutral-900 line-clamp-2">{p.name || "Producto sin nombre"}</div>
                   <div className="text-[11px] text-neutral-500 mt-1">
-                    ID: <span className="font-mono">{p.productId}</span>
-                  </div>
-
-                  <div className="text-[11px] text-neutral-500 mt-1">
                     {p.hasDiscount ? (
                       <>
                         <span className="font-mono">{moneyCOP(p.finalPrice)}</span>{" "}
@@ -1459,12 +1453,7 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
       )}
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-        <div className="text-xs font-semibold text-neutral-900">Productos seleccionados</div>
-        <div className="text-[11px] text-neutral-500">
-          Selecciona foto Principal y Hover. Se guarda en: <b> config.products[i].mainImage</b> y <b>config.products[i].hoverImage</b>
-          <br />
-          ✅ Descuento por producto: <b>config.products[i].hasDiscount</b> y <b>config.products[i].discountPercent</b> (y se calcula <b>finalPrice</b>).
-        </div>
+        <div className="section-product-editor__heading"><div><h3>Tarjetas seleccionadas</h3><p>Elige cuál foto aparece primero y cuál al pasar el cursor.</p></div></div>
 
         {!cfg.products?.length ? <div className="text-xs text-neutral-500">Aún no has seleccionado productos para esta sección.</div> : null}
 
@@ -1472,35 +1461,28 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
           const item = normalizeDiscountFields(itemRaw);
 
           return (
-            <div key={item.productId} className="border border-neutral-200 rounded-xl p-3 bg-neutral-50">
+            <div key={item.productId} className="section-product-editor__card border border-neutral-200 rounded-xl p-3 bg-neutral-50">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-neutral-900 line-clamp-2">
-                    {item.name || "Producto"} <span className="text-[11px] text-neutral-500 font-mono">({item.productId})</span>
+                    {item.name || "Producto"}
                   </div>
 
                   <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[11px] text-neutral-600">
-                        <b>Precio base:</b> <span className="font-mono">{moneyCOP(item.price)}</span>
-                        {item.hasDiscount ? (
-                          <>
-                            {" "}
-                            — <b>Final:</b> <span className="font-mono">{moneyCOP(item.finalPrice)}</span>{" "}
-                            <span className="text-rose-700 font-semibold">(-{Number(item.discountPercent || 0)}%)</span>
-                          </>
-                        ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-xs text-neutral-700">
+                        <b>Precio:</b> {moneyCOP(item.price)}
+                        {item.hasDiscount ? <span className="ml-2 font-semibold text-rose-700">→ {moneyCOP(item.finalPrice)}</span> : null}
                       </div>
-
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-neutral-600">Descuento</span>
+                        <span className="text-xs text-neutral-600">Aplicar descuento</span>
                         <Toggle checked={!!item.hasDiscount} onChange={(v) => handleChangeDiscount(item.productId, { hasDiscount: !!v })} />
                       </div>
                     </div>
 
                     {item.hasDiscount ? (
-                      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <Field label="Descuento (%)" hint="1–95" name={`products.${item.productId}.discountPercent`}>
+                      <div className="mt-3 max-w-[180px]">
+                        <Field label="Porcentaje de descuento" hint="Entre 1 y 95 %">
                           <Input
                             type="number"
                             min={1}
@@ -1513,33 +1495,19 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
                             }
                           />
                         </Field>
-
-                        <Field label="Precio final (auto)" hint="Se calcula" name={`products.${item.productId}.finalPrice`}>
-                          <Input value={moneyCOP(item.finalPrice)} readOnly />
-                        </Field>
-
-                        <Field label="Precio tachado (auto)" hint="Es el precio base" name={`products.${item.productId}.price`}>
-                          <Input value={moneyCOP(item.price)} readOnly />
-                        </Field>
                       </div>
-                    ) : (
-                      <div className="mt-2 text-[11px] text-neutral-500">Descuento apagado: se mostrará solo el precio normal.</div>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-[auto,1fr] gap-3">
-                    <div className="flex flex-col gap-2">
-                      <div className="text-[11px] text-neutral-500">Principal (mainImage)</div>
-                      <div className="rounded-lg border border-neutral-300 overflow-hidden h-24 w-24 bg-white flex items-center justify-center">
-                        {item.mainImage ? <img src={item.mainImage} alt="Principal" className="h-full w-full object-cover" /> : <span className="text-[11px] text-neutral-400">Sin imagen</span>}
-                      </div>
-
-                      <div className="text-[11px] text-neutral-500">Hover (hoverImage)</div>
-                      <div className="rounded-lg border border-neutral-300 overflow-hidden h-24 w-24 bg-white flex items-center justify-center">
-                        {item.hoverImage ? <img src={item.hoverImage} alt="Hover" className="h-full w-full object-cover" /> : <span className="text-[11px] text-neutral-400">Sin imagen</span>}
-                      </div>
+                  <div className="mt-3 space-y-3">
+                    <div className="section-product-editor__photos">
+                      {[{ label: 'Foto principal', src: item.mainImage }, { label: 'Al pasar el cursor', src: item.hoverImage }].map(({ label, src }) => (
+                        <div className="section-product-editor__photo" key={label}>
+                          {src ? <img src={src} alt={label} /> : <span>Sin imagen</span>}
+                          <strong>{label}</strong>
+                        </div>
+                      ))}
                     </div>
-
                     <CardImageMover
                       item={item}
                       uploadToCloudinary={uploadToCloudinary}
@@ -2067,10 +2035,6 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           />
         ) : (
           <>
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <p className="text-sm text-neutral-600">Edita el contenido y el diseño; comprueba el resultado antes de guardar.</p>
-              <SectionBadge enabled={selected.enabled} supported />
-            </div>
             <SectionEditorSteps value={["image", "products"].includes(activeTab) ? "basic" : activeTab} onChange={setActiveTab} sectionName="En tendencia" items={[
               { value: "basic", label: "Contenido", hint: "Define el título, las imágenes y los productos de la sección." },
               { value: "styles", label: "Diseño", hint: "Ajusta colores, tarjetas, tipografía y efectos." },

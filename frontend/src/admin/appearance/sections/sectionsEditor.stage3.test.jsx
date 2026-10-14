@@ -1,9 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import SectionsPanel from './SectionsPanel';
 
-afterEach(cleanup);
+vi.mock('../../../context/CartContext', () => ({ useCart: () => ({ addToCart: vi.fn() }) }));
+vi.mock('../../../context/FavoritesContext', () => ({ useFavorites: () => ({ toggleFavorite: vi.fn(), isFavorite: () => false }) }));
+
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function Harness({ id, onSave }) {
   const [theme, setTheme] = useState({ sections: [{ id, type: id, name: id, enabled: true, config: {} }] });
@@ -60,5 +64,25 @@ describe('editor de secciones, etapa 3', () => {
     expect(within(preview).getByText('Descubrir').closest('.complementos-look-section')).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText('Conócelos'), { target: { value: 'Comprar ahora' } });
     await waitFor(() => expect(within(preview).getByText('Comprar ahora')).toBeInTheDocument());
+  });
+
+  it('muestra la tarjeta guardada en la vista de Tendencia si el catálogo no responde', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Catálogo fuera de línea')));
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const theme = { sections: [{
+      id: 'tendencia', type: 'tendencia', name: 'En tendencia', enabled: true,
+      config: { maxItems: 4, products: [{
+        productId: '68a62e6e2705a006a538fff2', name: 'Vestido de prueba',
+        mainImage: '/vestido-prueba.jpg', hoverImage: '/vestido-hover.jpg', price: 111111,
+        finalPrice: 66667, hasDiscount: true, discountPercent: 40,
+      }] },
+    }] };
+    render(<MemoryRouter><SectionsPanel theme={theme} setPath={vi.fn()} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar En tendencia' }));
+    const preview = screen.getByRole('region', { name: 'Vista real de la tienda' });
+    await waitFor(() => expect(within(preview).getByText('Vestido de prueba')).toBeInTheDocument());
+    await waitFor(() => expect(within(preview).getByRole('status')).toHaveTextContent('no están disponibles en el catálogo'));
+    expect(within(preview).getAllByAltText('Vestido de prueba')[0]).toHaveAttribute('src', '/vestido-prueba.jpg');
+    warning.mockRestore();
   });
 });

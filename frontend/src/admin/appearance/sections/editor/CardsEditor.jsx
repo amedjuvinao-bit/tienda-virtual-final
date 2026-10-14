@@ -233,7 +233,7 @@ export default function CardsEditor({
                 onClick={() => setOpenIdx(idx)}
                 className={[
                   "text-left rounded-xl border p-3 transition flex items-center gap-3",
-                  active ? "border-neutral-900 bg-neutral-50" : "border-neutral-200 hover:bg-neutral-50",
+                  active ? "border-[#943a70] bg-neutral-50" : "border-neutral-200 hover:bg-neutral-50",
                 ].join(" ")}
               >
                 <div className="w-[64px] h-[48px] rounded-lg overflow-hidden border border-neutral-200 bg-neutral-100 flex items-center justify-center shrink-0">
@@ -324,7 +324,7 @@ export default function CardsEditor({
                   <span
                     className={[
                       "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold",
-                      uploading || !uploadToCloudinary ? "bg-neutral-200 text-neutral-500" : "bg-neutral-900 text-white hover:bg-neutral-800",
+                      uploading || !uploadToCloudinary ? "bg-neutral-200 text-neutral-500" : "bg-[#943a70] text-white hover:bg-[#782953]",
                     ].join(" ")}
                   >
                     Subir
@@ -357,7 +357,7 @@ export default function CardsEditor({
                   <span
                     className={[
                       "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold",
-                      uploading || !uploadToCloudinary ? "bg-neutral-200 text-neutral-500" : "bg-neutral-900 text-white hover:bg-neutral-800",
+                      uploading || !uploadToCloudinary ? "bg-neutral-200 text-neutral-500" : "bg-[#943a70] text-white hover:bg-[#782953]",
                     ].join(" ")}
                   >
                     Subir

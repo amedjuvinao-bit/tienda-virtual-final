@@ -73,7 +73,7 @@ function uniqueStrings(arr) {
   return out;
 }
 
-export default function TrendingSection({ theme }) {
+export default function TrendingSection({ theme, previewProducts }) {
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
 
@@ -247,7 +247,7 @@ export default function TrendingSection({ theme }) {
 
   const shouldUseConfig = tendenciaSection?.enabled !== false && refs.length > 0 && maxItems > 0;
 
-  const [remoteResult, setRemoteResult] = useState({ key: "", products: [] });
+  const [remoteResult, setRemoteResult] = useState({ key: "", products: [], status: "loading" });
   const requestKey = `${productRefsKey}:${maxItems}`;
 
   useEffect(() => {
@@ -255,9 +255,11 @@ export default function TrendingSection({ theme }) {
 
     async function load() {
       if (!shouldUseConfig) {
-        setRemoteResult({ key: requestKey, products: [] });
+        setRemoteResult({ key: requestKey, products: [], status: "ready" });
         return;
       }
+
+      setRemoteResult({ key: requestKey, products: [], status: "loading" });
 
       try {
         const uniqueIds = Array.from(new Set(refs.map((r) => r.productId)));
@@ -336,10 +338,10 @@ export default function TrendingSection({ theme }) {
           .filter(Boolean);
 
         if (cancelled) return;
-        setRemoteResult({ key: requestKey, products: normalized });
+        setRemoteResult({ key: requestKey, products: normalized, status: "ready" });
       } catch (err) {
         if (cancelled) return;
-        setRemoteResult({ key: requestKey, products: [] });
+        setRemoteResult({ key: requestKey, products: [], status: "error" });
         console.warn("No se pudieron cargar los productos de Tendencia:", err);
       }
     }
@@ -350,9 +352,17 @@ export default function TrendingSection({ theme }) {
     };
   }, [refs, shouldUseConfig, requestKey]);
 
-  const productsToRender = shouldUseConfig && remoteResult.key === requestKey
+  const catalogProducts = shouldUseConfig && remoteResult.key === requestKey
     ? remoteResult.products.slice(0, maxItems)
     : [];
+  // The editor can still show the saved draft when a product has disappeared
+  // from the catalog. The public storefront never receives previewProducts.
+  const draftProducts = Array.isArray(previewProducts) ? previewProducts.slice(0, maxItems) : [];
+  const catalogById = new Map(catalogProducts.map((product) => [product.id, product]));
+  const usingDraft = shouldUseConfig && draftProducts.some((product) => !catalogById.has(product.id));
+  const productsToRender = shouldUseConfig && draftProducts.length
+    ? draftProducts.map((product) => catalogById.get(product.id) || product)
+    : catalogProducts;
 
   function buildCartPayload(product) {
     return {
@@ -382,6 +392,7 @@ export default function TrendingSection({ theme }) {
   return (
     <section className="pb-24 pt-5 relative overflow-hidden">
       <div className="max-w-6xl mx-auto px-4">
+        {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
         <div className="text-center mb-5">
           <div className="flex items-center justify-center">
             <img
