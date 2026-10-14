@@ -252,6 +252,11 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
           <details className="banner-template-card-details"><summary>Texto e imágenes <span>opcional</span></summary>
           <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
+          <div className="banner-template-color-grid">
+            <Field type="color" label="Color del título de esta tarjeta" value={card.titleColor || config.textColor || '#ffffff'} onChange={(event) => updateCard(index, { titleColor: event.target.value })} />
+            <Field type="color" label="Color de la etiqueta de esta tarjeta" value={card.labelColor || config.accentColor || '#ffffff'} onChange={(event) => updateCard(index, { labelColor: event.target.value })} />
+          </div>
+          {(card.titleColor || card.labelColor) && <button type="button" className="banner-btn" onClick={() => updateCard(index, { titleColor: '', labelColor: '' })}>Usar colores generales</button>}
           <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
             <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>

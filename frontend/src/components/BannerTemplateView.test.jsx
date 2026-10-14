@@ -214,6 +214,19 @@ describe('plantillas sobre contenido existente', () => {
     expect(cards[0].querySelector('.rb-template__card-visual img')).toHaveAttribute('src', '/hogar.jpg');
   });
 
+  it('aplica los colores de título y etiqueta guardados para cada tarjeta', () => {
+    const banner = {
+      templateId: 'editorial',
+      templateConfigs: { editorial: { cards: [
+        { categoryId: 'actual-a', text: 'Hogar destacado', label: 'Recomendado', titleColor: '#332211', labelColor: '#ddaa88' },
+      ] } },
+    };
+    const { container } = render(<BannerTemplateView banner={banner} sections={categories} />);
+    const card = container.querySelector('.rb-template__card');
+    expect(card.querySelector('.rb-template__card-copy strong')).toHaveStyle({ color: '#332211' });
+    expect(card.querySelector('.rb-template__card-copy small')).toHaveStyle({ color: '#ddaa88' });
+  });
+
   it('encadena tarjetas al entrar y salir sin reiniciarse al cambiar la foto del slider', () => {
     let notify;
     const disconnect = vi.fn();

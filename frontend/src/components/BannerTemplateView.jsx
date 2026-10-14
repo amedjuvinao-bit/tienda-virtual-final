@@ -28,6 +28,7 @@ function CopyLink({ href, preview, onSelect, selected, children }) {
 }
 
 const percent = (value, fallback) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : fallback;
+const cardTextColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : undefined;
 
 export default function BannerTemplateView({ banner, sections, preview = false, device, onSelect, selectedPart, placingCard = null, onPlaceCard, onMoveCard, children }) {
   const { id, config: c } = getBannerTemplate(banner, sections);
@@ -85,7 +86,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   const playCardPress = (index) => {
     window.clearTimeout(pressTimerRef.current);
     setPressedCard(index);
-    pressTimerRef.current = window.setTimeout(() => setPressedCard(null), 430);
+    pressTimerRef.current = window.setTimeout(() => setPressedCard(null), 600);
   };
   const handleCardClick = (event, item, index, href) => {
     if (preview) {
@@ -99,7 +100,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
     event.preventDefault();
     playCardPress(index);
     window.clearTimeout(navigateTimerRef.current);
-    navigateTimerRef.current = window.setTimeout(() => window.location.assign(href), 410);
+    navigateTimerRef.current = window.setTimeout(() => window.location.assign(href), 580);
   };
 
   const css = {
@@ -183,7 +184,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
       <div className="rb-template__cards">
         {cards.map((item, index) => {
           const href = safeBannerLink(item.link);
-          const content = <>{id === 'editorial' && item.decorationImage && <span className="rb-template__card-decoration-viewport" aria-hidden="true"><span className="rb-template__card-decoration" style={{ backgroundImage: `url(${JSON.stringify(item.decorationImage)})`, backgroundPosition: `${item.decorationX}% ${item.decorationY}%`, transform: `scale(${Math.max(1, item.decorationSize / 100)})`, opacity: item.decorationOpacity / 100 }} /></span>}{item.image && <span className="rb-template__card-visual"><img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} /></span>}<span className="rb-template__card-copy">{item.label && item.label !== item.text && <small>{item.label}</small>}<strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
+          const content = <>{id === 'editorial' && item.decorationImage && <span className="rb-template__card-decoration-viewport" aria-hidden="true"><span className="rb-template__card-decoration" style={{ backgroundImage: `url(${JSON.stringify(item.decorationImage)})`, backgroundPosition: `${item.decorationX}% ${item.decorationY}%`, transform: `scale(${Math.max(1, item.decorationSize / 100)})`, opacity: item.decorationOpacity / 100 }} /></span>}{item.image && <span className="rb-template__card-visual"><img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} /></span>}<span className="rb-template__card-copy">{item.label && item.label !== item.text && <small style={{ color: cardTextColor(item.labelColor) }}>{item.label}</small>}<strong style={{ color: cardTextColor(item.titleColor) }}>{item.text}</strong></span><span className="rb-template__card-impact" aria-hidden="true" /><span aria-hidden="true">↗</span></>;
           return href ? <a key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} data-pressed={pressedCard === index ? 'true' : undefined} onClick={(event) => handleCardClick(event, item, index, href)}>{content}</a>
             : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} data-pressed={pressedCard === index ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? (event) => handleCardClick(event, item, index, null) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); playCardPress(index); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}

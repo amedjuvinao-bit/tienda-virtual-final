@@ -602,7 +602,7 @@
 }
 .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) {
   z-index: 5;
-  transform: none !important;
+  transform: none;
 }
 .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img {
   transform: translate3d(-7px,-11px,38px) rotateY(-9deg) rotateZ(-2deg) scale(1.17);
@@ -668,55 +668,87 @@
 .rb-template--editorial .rb-template__card-copy { position: relative; z-index: 1; }
 .rb-template--editorial .rb-template__card > span:last-child { z-index: 1; }
 
-/* Cards reveal in sequence; their actual photos animate separately from the glass. */
+/* Each card opens like a glass panel; photo and caption arrive after the shell. */
 @keyframes rb-card-enter {
-  from { opacity: 0; transform: translate3d(0,18px,0) scale(.965); filter: blur(5px); }
-  to { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0); }
+  0% { opacity: 0; transform: perspective(750px) translate3d(32px,28px,-55px) rotateY(-12deg) scale(.86); clip-path: inset(0 100% 0 0 round 16px); filter: blur(7px); }
+  52% { opacity: 1; clip-path: inset(0 0 0 0 round 16px); filter: blur(0); }
+  78% { transform: perspective(750px) translate3d(-3px,-4px,0) rotateY(2deg) scale(1.018); }
+  100% { opacity: 1; transform: none; clip-path: inset(0 0 0 0 round 16px); filter: none; }
 }
 @keyframes rb-card-exit {
-  from { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0); }
-  to { opacity: 0; transform: translate3d(0,-12px,0) scale(.97); filter: blur(4px); }
+  0% { opacity: 1; transform: none; clip-path: inset(0 0 0 0 round 16px); }
+  100% { opacity: 0; transform: perspective(750px) translate3d(-24px,-16px,-35px) rotateY(10deg) scale(.9); clip-path: inset(0 0 0 100% round 16px); filter: blur(5px); }
 }
 @keyframes rb-card-photo-enter {
-  from { opacity: 0; transform: translate3d(-12px,18px,0) rotateY(-18deg) scale(.72); filter: blur(5px) brightness(.72); }
-  to { opacity: 1; transform: translate3d(0,0,0) rotateY(0) scale(1); filter: blur(0) brightness(1); }
+  0% { opacity: 0; transform: translate3d(-27px,36px,-35px) rotateY(-22deg) rotateZ(-8deg) scale(.58); filter: blur(8px) brightness(.7); }
+  57% { opacity: 1; transform: translate3d(4px,-16px,25px) rotateY(8deg) rotateZ(2deg) scale(1.15); filter: blur(0) brightness(1.17); }
+  82% { transform: translate3d(-2px,3px,0) rotateY(-2deg) scale(.98); filter: drop-shadow(0 8px 8px rgba(27,11,26,.32)); }
+  100% { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: none; }
 }
 @keyframes rb-card-photo-exit {
   from { opacity: 1; transform: translate3d(0,0,0) scale(1); }
-  to { opacity: 0; transform: translate3d(9px,-10px,0) scale(.82); }
+  to { opacity: 0; transform: translate3d(20px,-20px,-25px) rotateY(14deg) scale(.6); filter: blur(5px); }
+}
+@keyframes rb-card-copy-enter {
+  from { opacity: 0; transform: translateX(15px); filter: blur(5px); }
+  to { opacity: 1; transform: translateX(0); filter: blur(0); }
 }
 @keyframes rb-card-click {
-  0%,100% { transform: scale(1); }
-  40% { transform: scale(.955); }
-  75% { transform: scale(1.025); }
+  0%,100% { transform: none; }
+  34% { transform: perspective(750px) rotateX(5deg) rotateY(-5deg) scale(.94); }
+  72% { transform: perspective(750px) rotateX(-2deg) rotateY(2deg) scale(1.035); }
 }
 @keyframes rb-card-photo-click {
   0%,100% { transform: translate3d(0,0,0) scale(1); filter: none; }
-  45% { transform: translate3d(0,-9px,24px) rotateY(-8deg) scale(1.18); filter: drop-shadow(0 10px 12px rgba(33,12,31,.42)) brightness(1.15); }
+  45% { transform: translate3d(1px,-16px,28px) rotateY(-15deg) rotateZ(-3deg) scale(1.28); filter: drop-shadow(8px 16px 10px rgba(33,12,31,.44)) brightness(1.17); }
+  72% { transform: translate3d(0,-5px,8px) rotateY(4deg) scale(1.09); filter: drop-shadow(2px 8px 7px rgba(33,12,31,.29)); }
+}
+@keyframes rb-card-impact {
+  0% { opacity: 0; transform: scale(.25); }
+  42% { opacity: .9; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.85); }
 }
 .rb-template:not([data-preview-device])[data-card-motion='enter'] .rb-template__card {
-  animation: rb-card-enter .62s cubic-bezier(.2,.78,.18,1) var(--rb-card-enter-delay) backwards;
+  animation: rb-card-enter .86s cubic-bezier(.16,.84,.2,1) var(--rb-card-enter-delay) backwards;
 }
 .rb-template:not([data-preview-device])[data-card-motion='enter'] .rb-template__card-visual img {
-  animation: rb-card-photo-enter .7s cubic-bezier(.17,.83,.25,1) calc(var(--rb-card-enter-delay) + 145ms) backwards;
+  animation: rb-card-photo-enter .88s cubic-bezier(.16,.8,.24,1) calc(var(--rb-card-enter-delay) + 170ms) backwards;
+}
+.rb-template:not([data-preview-device])[data-card-motion='enter'] .rb-template__card-copy {
+  animation: rb-card-copy-enter .53s ease-out calc(var(--rb-card-enter-delay) + 390ms) backwards;
 }
 .rb-template:not([data-preview-device])[data-card-motion='exit'] .rb-template__card {
-  animation: rb-card-exit .38s ease-in var(--rb-card-exit-delay) forwards;
+  animation: rb-card-exit .52s ease-in var(--rb-card-exit-delay) forwards;
 }
 .rb-template:not([data-preview-device])[data-card-motion='exit'] .rb-template__card-visual img {
-  animation: rb-card-photo-exit .25s ease-in var(--rb-card-exit-delay) forwards;
+  animation: rb-card-photo-exit .36s ease-in var(--rb-card-exit-delay) forwards;
+}
+.rb-template__card-impact {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at var(--rb-light-x,50%) var(--rb-light-y,50%),
+    rgba(255,255,255,.75),color-mix(in srgb,var(--rb-template-accent) 35%,transparent) 35%,transparent 68%);
 }
 .rb-template .rb-template__card[data-pressed='true'] {
-  animation: rb-card-click .39s cubic-bezier(.25,.8,.2,1) both;
+  animation: rb-card-click .55s cubic-bezier(.22,.8,.2,1) both;
 }
 .rb-template .rb-template__card[data-pressed='true'] .rb-template__card-visual img {
-  animation: rb-card-photo-click .39s cubic-bezier(.22,.8,.22,1) both;
+  animation: rb-card-photo-click .55s cubic-bezier(.16,.83,.2,1) both;
+}
+.rb-template .rb-template__card[data-pressed='true'] .rb-template__card-impact {
+  animation: rb-card-impact .55s ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
   .rb-template[data-card-motion] .rb-template__card,
   .rb-template[data-card-motion] .rb-template__card-visual img,
+  .rb-template[data-card-motion] .rb-template__card-copy,
   .rb-template .rb-template__card[data-pressed='true'],
-  .rb-template .rb-template__card[data-pressed='true'] .rb-template__card-visual img {
+  .rb-template .rb-template__card[data-pressed='true'] .rb-template__card-visual img,
+  .rb-template .rb-template__card[data-pressed='true'] .rb-template__card-impact {
     animation: none !important;
   }
 }

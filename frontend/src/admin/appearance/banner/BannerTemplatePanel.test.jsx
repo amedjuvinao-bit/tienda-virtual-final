@@ -231,4 +231,17 @@ describe('editor de plantillas', () => {
     ));
   });
 
+  it('guarda colores propios para título y etiqueta de cada tarjeta y permite restaurar los generales', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.click(screen.getByText(/Texto e imágenes/));
+    fireEvent.change(screen.getByLabelText('Color del título de esta tarjeta'), { target: { value: '#332211' } });
+    fireEvent.change(screen.getByLabelText('Color de la etiqueta de esta tarjeta'), { target: { value: '#ddaa88' } });
+    let saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleColor: '#332211', labelColor: '#ddaa88' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Usar colores generales' }));
+    saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleColor: '', labelColor: '' }));
+  });
+
 });
