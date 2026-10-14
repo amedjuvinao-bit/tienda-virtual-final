@@ -10,6 +10,7 @@ import TiktokSectionUI from "./tiktok/TiktokSectionUI";
 import InfoSectionUI from "./info/infoSectionUI";
 import { getSectionOverview } from './sectionsOverviewModel';
 import './sectionsOverview.css';
+import SectionEditorSteps from './ui/SectionEditorSteps';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -22,7 +23,6 @@ import {
 
 import {
   SectionBadge,
-  TabButton,
   ModalShell,
   ColorField,
   CardImageMover,
@@ -2064,41 +2064,19 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
         ) : (
           <>
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <div className="text-sm font-semibold text-neutral-900">Editar sección: {selected.name}</div>
-                <div className="text-xs text-neutral-500">
-                  Editando: <b>{selected.id}</b> — Cambios se guardan en <code>theme.sections</code>
-                </div>
-              </div>
-              <button type="button" onClick={closeEditor} className="text-xs text-neutral-500 hover:text-neutral-800">
-                Cerrar
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div className="flex flex-wrap gap-2">
-                <TabButton active={activeTab === "basic"} onClick={() => setActiveTab("basic")}>
-                  Básico
-                </TabButton>
-                <TabButton active={activeTab === "image"} onClick={() => setActiveTab("image")}>
-                  Imagen
-                </TabButton>
-                <TabButton active={activeTab === "styles"} onClick={() => setActiveTab("styles")}>
-                  Estilos
-                </TabButton>
-                <TabButton active={activeTab === "products"} onClick={() => setActiveTab("products")}>
-                  Productos
-                </TabButton>
-                <TabButton active={activeTab === "preview"} onClick={() => setActiveTab("preview")}>
-                  Preview
-                </TabButton>
-              </div>
-
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <p className="text-sm text-neutral-600">Edita el contenido y el diseño; comprueba el resultado antes de guardar.</p>
               <SectionBadge enabled={selected.enabled} supported />
             </div>
+            <SectionEditorSteps value={activeTab} onChange={setActiveTab} items={[
+              { value: "basic", label: "Contenido" },
+              { value: "image", label: "Imagen" },
+              { value: "products", label: "Productos" },
+              { value: "styles", label: "Diseño" },
+              { value: "preview", label: "Vista previa" },
+            ]} />
 
-            <div className="border-t border-neutral-200 pt-4">
+            <div className="pt-4">
               {activeTab === "basic" ? <BasicTab section={selected} onChange={handleChangeSelected} /> : null}
 
               {activeTab === "image" && selected.type === "tendencia" ? (

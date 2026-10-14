@@ -1,6 +1,6 @@
 // src/admin/appearance/sections/look/LookSectionUI.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Field, Input } from "../ui/UiComponents";
+import { Field, Input } from "../ui/UiComponents";
 import {
   ColorField,
   CardImageMover,
@@ -9,6 +9,7 @@ import {
   ToggleChip,
 } from "../ui/SectionsPanelUI";
 import LookProductPicker from "./LookProductPicker";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
 import {
   LOOK_MAX_PRODUCTS,
   LOOK_SECTION_DEFAULTS,
@@ -254,8 +255,8 @@ export default function LookSectionUI({
   }, [selectedItems, config.selectedProductId]);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.45fr)] gap-4">
-      <div className="space-y-4 min-w-0">
+    <div className="section-editor-workspace grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.45fr)] gap-4" data-tab={tab}>
+      <div className="section-editor-workspace__controls space-y-4 min-w-0">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -265,39 +266,13 @@ export default function LookSectionUI({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                kind={tab === "contenido" ? "primary" : "ghost"}
-                onClick={() => setTab("contenido")}
-              >
-                Contenido
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "estilos" ? "primary" : "ghost"}
-                onClick={() => setTab("estilos")}
-              >
-                Estilos
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "slider-movil" ? "primary" : "ghost"}
-                onClick={() => setTab("slider-movil")}
-              >
-                Slider móvil
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "acciones" ? "primary" : "ghost"}
-                onClick={() => setTab("acciones")}
-              >
-                Acciones
-              </Button>
-            </div>
+            <SectionEditorSteps value={tab} onChange={setTab} items={[
+              { value: "contenido", label: "Contenido" },
+              { value: "estilos", label: "Diseño" },
+              { value: "slider-movil", label: "Móvil" },
+              { value: "acciones", label: "Acciones" },
+              { value: "preview", label: "Vista previa" },
+            ]} />
           </div>
         </div>
 
@@ -1022,7 +997,7 @@ export default function LookSectionUI({
         )}
       </div>
 
-      <div className="space-y-4 w-full xl:max-w-[560px] xl:ml-auto">
+      <div className="section-editor-workspace__preview space-y-4 w-full xl:max-w-[560px] xl:ml-auto">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 sticky top-4">
           <div className="text-base font-extrabold text-neutral-900 mb-3">Vista previa LOOK</div>
 

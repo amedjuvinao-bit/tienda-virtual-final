@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
 import { ColorField } from "../ui/SectionsPanelUI";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
 import {
   normalizeInfoSection,
   INFO_SECTION_ID,
@@ -34,31 +35,6 @@ function MiniStat({ label, value }) {
     <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
       <div className="text-[11px] uppercase tracking-wide text-neutral-500">{label}</div>
       <div className="text-sm font-semibold text-neutral-900 mt-1">{value}</div>
-    </div>
-  );
-}
-
-function SegmentedTabs({ value, onChange, items }) {
-  return (
-    <div className="inline-flex rounded-2xl border border-neutral-200 bg-white p-1 shadow-sm">
-      {items.map((item) => {
-        const active = value === item.value;
-        return (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => onChange(item.value)}
-            className={[
-              "px-4 py-2 rounded-xl text-sm font-medium transition",
-              active
-                ? "bg-neutral-900 text-white shadow-sm"
-                : "text-neutral-600 hover:bg-neutral-100",
-            ].join(" ")}
-          >
-            {item.label}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -110,7 +86,7 @@ function TextAreaField({ value, onChange, rows = 4, placeholder = "" }) {
 export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uploading }) {
   const sections = Array.isArray(theme?.sections) ? theme.sections : [];
 
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("contenido");
   const [openCardIndex, setOpenCardIndex] = useState(0);
 
   const selectedIndex = useMemo(() => {
@@ -198,20 +174,18 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
               <div className="text-lg font-semibold text-neutral-900 mt-1">
                 Información
               </div>
-              <div className="text-xs text-neutral-500 mt-1">
-                Editando: <b>{safeSection.id || INFO_SECTION_ID}</b> · Los cambios se guardan en{" "}
-                <code>theme.sections</code>
-              </div>
+              <div className="text-xs text-neutral-500 mt-1">Organiza textos, bloques y apariencia; revisa el resultado antes de guardar.</div>
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <SegmentedTabs
+              <SectionEditorSteps
                 value={activeTab}
                 onChange={setActiveTab}
                 items={[
-                  { value: "general", label: "General" },
                   { value: "contenido", label: "Contenido" },
                   { value: "bloques", label: "Bloques" },
+                  { value: "general", label: "Diseño" },
+                  { value: "preview", label: "Vista previa" },
                 ]}
               />
 
@@ -227,7 +201,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px,minmax(0,1fr)] gap-6 items-start">
+      <div className="section-info-editor grid grid-cols-1 xl:grid-cols-[320px,minmax(0,1fr)] gap-4 items-start" data-tab={activeTab}>
         <div className="space-y-4 xl:sticky xl:top-28">
           <MiniStat label="Bloques" value={`${cards.length} configurados`} />
           <MiniStat label="Ancho" value={`${config.containerMaxWidth || 1200}px`} />
@@ -764,10 +738,6 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
             </>
           ) : null}
 
-          <div className="rounded-3xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-xs text-neutral-600">
-            Esta sección guarda sobre <code>theme.sections</code> usando el identificador real{" "}
-            <b>{INFO_SECTION_ID}</b>.
-          </div>
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Instagram } from "lucide-react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
 import {
   normalizeInstagramSection,
   INSTAGRAM_SECTION_ID,
@@ -251,6 +252,7 @@ export default function InstagramSectionUI({
   uploadToCloudinary,
   uploading = false,
 }) {
+  const [step, setStep] = useState("content");
   const [uploadError, setUploadError] = useState("");
   const [logoPreviewError, setLogoPreviewError] = useState(false);
   const [previewHoveredId, setPreviewHoveredId] = useState(null);
@@ -450,13 +452,11 @@ export default function InstagramSectionUI({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="section-social-editor space-y-4" data-step={step}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-neutral-900">Configuración de Instagram</div>
-          <div className="text-xs text-neutral-500">
-            Esta sección se guarda dentro de <code>theme.sections</code>
-          </div>
+          <div className="text-xs text-neutral-500">Edita el perfil, las publicaciones y su apariencia.</div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -478,9 +478,15 @@ export default function InstagramSectionUI({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <SectionEditorSteps value={step} onChange={setStep} items={[
+        { value: "content", label: "Contenido" },
+        { value: "design", label: "Diseño" },
+        { value: "preview", label: "Vista previa" },
+      ]} />
+
+      <div className="section-social-editor__grid grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content">
             <div className="text-sm font-semibold text-neutral-900">Perfil</div>
 
             <Field label="Link del perfil de Instagram">
@@ -550,7 +556,7 @@ export default function InstagramSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
             <div className="text-sm font-semibold text-neutral-900">Logo y badge del perfil</div>
 
             <Field label="Imagen del logo">
@@ -656,7 +662,7 @@ export default function InstagramSectionUI({
             <GradientPreview value={config.profileBadgeGradient || "none"} />
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
             <div className="text-sm font-semibold text-neutral-900">Marca de agua de fondo</div>
 
             <Field label="Mostrar marca de agua">
@@ -789,7 +795,7 @@ export default function InstagramSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
             <div className="text-sm font-semibold text-neutral-900">Grid y apariencia</div>
 
             <Field label="Modo de galería">
@@ -897,7 +903,7 @@ export default function InstagramSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
             <div className="text-sm font-semibold text-neutral-900">Logo hover marca de agua</div>
 
             <Field label="Mostrar logo al pasar mouse">
@@ -980,7 +986,7 @@ export default function InstagramSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design">
             <div className="text-sm font-semibold text-neutral-900">Overlay, hover y animación</div>
 
             <Field label="Activar overlay">
@@ -1063,7 +1069,7 @@ export default function InstagramSectionUI({
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-neutral-900">Posts de Instagram</div>
               <button
@@ -1137,7 +1143,7 @@ export default function InstagramSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="preview">
             <div className="text-sm font-semibold text-neutral-900">Vista previa</div>
 
             <div

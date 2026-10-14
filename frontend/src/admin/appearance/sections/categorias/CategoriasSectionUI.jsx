@@ -1,6 +1,7 @@
 // src/admin/appearance/sections/categorias/CategoriasSectionUI.jsx
 import React, { useMemo, useState } from "react";
 import { Button, Field, Input } from "../ui/UiComponents";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
 import {
   ColorField,
   RangeNumberField,
@@ -246,7 +247,7 @@ export default function CategoriasSectionUI({
   const activeOverlayPreset = detectOverlayPreset(style);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-4">
+    <div className="section-editor-workspace grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-4" data-tab={tab}>
       <style>{`
         @keyframes floatY {
           0% { transform: translateY(0px); }
@@ -255,7 +256,7 @@ export default function CategoriasSectionUI({
         }
       `}</style>
 
-      <div className="space-y-4">
+      <div className="section-editor-workspace__controls space-y-4">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -267,22 +268,12 @@ export default function CategoriasSectionUI({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                kind={tab === "contenido" ? "primary" : "ghost"}
-                onClick={() => setTab("contenido")}
-              >
-                Contenido
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "estilos" ? "primary" : "ghost"}
-                onClick={() => setTab("estilos")}
-              >
-                Estilos
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <SectionEditorSteps value={tab} onChange={setTab} items={[
+                { value: "contenido", label: "Contenido" },
+                { value: "estilos", label: "Diseño" },
+                { value: "preview", label: "Vista previa" },
+              ]} />
 
               <Button
                 type="button"
@@ -1312,7 +1303,7 @@ export default function CategoriasSectionUI({
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="section-editor-workspace__preview space-y-4">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 sticky top-4">
           <div className="text-base font-extrabold text-neutral-900 mb-3">
             Vista previa Categorías
