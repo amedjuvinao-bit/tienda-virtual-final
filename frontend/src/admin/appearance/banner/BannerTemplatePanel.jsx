@@ -72,13 +72,16 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     return () => { clearTimeout(timer); controller.abort(); };
   }, [group, productQuery]);
   const current = banner.templateConfigs?.[id] || {};
-  const update = (patch) => setPath(`banner.templateConfigs.${id}`, { ...current, ...patch });
+  const update = (patch) => setPath(`banner.templateConfigs.${id}`, (latest = {}) => ({ ...latest, ...patch }));
   const updateAction = (key, patch) => update({ [key]: { ...config[key], ...patch } });
   const maxCards = id === 'atelier' ? 2 : id === 'editorial' ? 8 : 3;
   const refs = Array.isArray(current.cards) && current.cards.length
     ? current.cards
     : categories.slice(0, maxCards).map((category, index) => ({ categoryId: category.id, enabled: true, x: id === 'atelier' ? 45 + index * 29 : 68 + index * 13, y: id === 'atelier' ? 28 + index * 24 : 42 + index * 26 }));
-  const updateCard = (index, patch) => update({ cards: refs.map((card, i) => i === index ? { ...card, ...patch } : card) });
+  const updateCard = (index, patch) => setPath(`banner.templateConfigs.${id}.cards`, (latest) => {
+    const cards = Array.isArray(latest) && latest.length ? latest : refs;
+    return cards.map((card, i) => i === index ? { ...card, ...patch } : card);
+  });
   const uploadCardImage = async (index, file) => {
     if (!file) return;
     setError('');
