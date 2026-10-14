@@ -128,6 +128,14 @@ const BannerTemplateTrustSchema = new Schema({
   image: { type: String, default: "" },
 }, { _id: false });
 
+const BannerCardTextStyleSchema = new Schema({
+  titleColor: { type: String, match: /^#[0-9a-f]{6}$/i },
+  labelColor: { type: String, match: /^#[0-9a-f]{6}$/i },
+  titleSizePx: { type: Number, min: 10, max: 24 },
+  labelSizePx: { type: Number, min: 8, max: 18 },
+  metallicTitle: { type: Boolean, default: false },
+}, { _id: false });
+
 const BannerTemplateConfigSchema = new Schema({
   eyebrow: String,
   eyebrowLink: String,
@@ -140,6 +148,7 @@ const BannerTemplateConfigSchema = new Schema({
   primary: { type: BannerTemplateActionSchema, default: undefined },
   secondary: { type: BannerTemplateActionSchema, default: undefined },
   cards: { type: [BannerTemplateCardSchema], default: [] },
+  cardTextStyle: { type: BannerCardTextStyleSchema, default: undefined },
   trustItems: { type: [BannerTemplateTrustSchema], default: [] },
   textColor: String,
   accentColor: String,
