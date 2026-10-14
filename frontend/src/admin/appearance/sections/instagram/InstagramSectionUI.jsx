@@ -5,6 +5,7 @@ import { Instagram } from "lucide-react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
 import SectionEditorPostPicker from "../ui/SectionEditorPostPicker";
+import SectionColorPicker from "../ui/SectionColorPicker";
 import {
   normalizeInstagramSection,
   INSTAGRAM_SECTION_ID,
@@ -25,29 +26,6 @@ const FONT_OPTIONS = [
   { label: "Cormorant Garamond", value: '"Cormorant Garamond", Georgia, serif' },
   { label: "Lora", value: '"Lora", Georgia, serif' },
   { label: "DM Serif Display", value: '"DM Serif Display", Georgia, serif' },
-];
-
-const COLOR_PRESETS = [
-  "#111111",
-  "#ffffff",
-  "#f72585",
-  "#b5179e",
-  "#7209b7",
-  "#560bad",
-  "#480ca8",
-  "#3a0ca3",
-  "#4361ee",
-  "#4895ef",
-  "#4cc9f0",
-  "#ff4d6d",
-  "#ff758f",
-  "#ff8fa3",
-  "#c9184a",
-  "#a4133c",
-  "#d4a373",
-  "#e9c46a",
-  "#2a9d8f",
-  "#84a59d",
 ];
 
 function clampNumber(value, min, max) {
@@ -116,29 +94,6 @@ function GradientPreview({ value }) {
         background,
       }}
     />
-  );
-}
-
-function ColorPresets({ value, onChange }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {COLOR_PRESETS.map((color) => {
-        const active = value === color;
-        return (
-          <button
-            key={color}
-            type="button"
-            onClick={() => onChange(color)}
-            title={color}
-            className={[
-              "h-7 w-7 rounded-full border-2 transition",
-              active ? "section-editor-accent-border scale-110" : "border-white hover:scale-105",
-            ].join(" ")}
-            style={{ backgroundColor: color }}
-          />
-        );
-      })}
-    </div>
   );
 }
 
@@ -520,17 +475,11 @@ export default function InstagramSectionUI({
             </Field>
 
             <Field label="Color del texto del usuario">
-              <div className="space-y-3">
-                <Input
-                  value={config.userTextColor || "#111111"}
-                  onChange={(e) => updateConfig("userTextColor", e.target.value)}
-                  placeholder="#111111"
-                />
-                <ColorPresets
-                  value={config.userTextColor || "#111111"}
-                  onChange={(value) => updateConfig("userTextColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del texto del usuario"
+                value={config.userTextColor || "#111111"}
+                onChange={(value) => updateConfig("userTextColor", value)}
+              />
             </Field>
 
             <Field label="Fuente del usuario">
@@ -632,31 +581,19 @@ export default function InstagramSectionUI({
             </Field>
 
             <Field label="Color del texto del badge">
-              <div className="space-y-3">
-                <Input
-                  value={config.profileBadgeTextColor || "#111111"}
-                  onChange={(e) => updateConfig("profileBadgeTextColor", e.target.value)}
-                  placeholder="#111111"
-                />
-                <ColorPresets
-                  value={config.profileBadgeTextColor || "#111111"}
-                  onChange={(value) => updateConfig("profileBadgeTextColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del texto del distintivo"
+                value={config.profileBadgeTextColor || "#111111"}
+                onChange={(value) => updateConfig("profileBadgeTextColor", value)}
+              />
             </Field>
 
             <Field label="Color base del badge">
-              <div className="space-y-3">
-                <Input
-                  value={config.profileBadgeBgColor || "#ffffff"}
-                  onChange={(e) => updateConfig("profileBadgeBgColor", e.target.value)}
-                  placeholder="#ffffff"
-                />
-                <ColorPresets
-                  value={config.profileBadgeBgColor || "#ffffff"}
-                  onChange={(value) => updateConfig("profileBadgeBgColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del fondo del distintivo"
+                value={config.profileBadgeBgColor || "#ffffff"}
+                onChange={(value) => updateConfig("profileBadgeBgColor", value)}
+              />
             </Field>
 
             <Field label="Degradado preestablecido del badge">
@@ -853,17 +790,11 @@ export default function InstagramSectionUI({
             </Field>
 
             <Field label="Color del marco de las fotos">
-              <div className="space-y-3">
-                <Input
-                  value={config.cardBorderColor || "#d4af379f"}
-                  onChange={(e) => updateConfig("cardBorderColor", e.target.value)}
-                  placeholder="#d4af379f"
-                />
-                <ColorPresets
-                  value={config.cardBorderColor || "#d4af379f"}
-                  onChange={(value) => updateConfig("cardBorderColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del marco de las fotos"
+                value={config.cardBorderColor || "#d4af379f"}
+                onChange={(value) => updateConfig("cardBorderColor", value)}
+              />
             </Field>
 
             <Field label="Grosor del marco (px)">
@@ -965,17 +896,11 @@ export default function InstagramSectionUI({
             </Field>
 
             <Field label="Color del logo hover">
-              <div className="space-y-3">
-                <Input
-                  value={config.hoverLogoColor || "#ffffff"}
-                  onChange={(e) => updateConfig("hoverLogoColor", e.target.value)}
-                  placeholder="#ffffff"
-                />
-                <ColorPresets
-                  value={config.hoverLogoColor || "#ffffff"}
-                  onChange={(value) => updateConfig("hoverLogoColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del logo al pasar el cursor"
+                value={config.hoverLogoColor || "#ffffff"}
+                onChange={(value) => updateConfig("hoverLogoColor", value)}
+              />
             </Field>
 
             <Field label="Opacidad del logo hover">
@@ -1011,17 +936,11 @@ export default function InstagramSectionUI({
             </Field>
 
             <Field label="Color del overlay">
-              <div className="space-y-3">
-                <Input
-                  value={config.overlayColor || "#000000"}
-                  onChange={(e) => updateConfig("overlayColor", e.target.value)}
-                  placeholder="#000000"
-                />
-                <ColorPresets
-                  value={config.overlayColor || "#000000"}
-                  onChange={(value) => updateConfig("overlayColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color de la superposición"
+                value={config.overlayColor || "#000000"}
+                onChange={(value) => updateConfig("overlayColor", value)}
+              />
             </Field>
 
             <Field label="Opacidad del overlay">

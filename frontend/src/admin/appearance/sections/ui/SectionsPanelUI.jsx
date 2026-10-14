@@ -3,7 +3,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, Field, Input } from "./UiComponents";
 import "./sectionModal.css";
-import { isHexColor, clampNumber } from "./sectionHelpers";
+import { clampNumber } from "./sectionHelpers";
+import SectionColorPicker from "./SectionColorPicker";
 
 // ✅ IMPORTANTE: se mantiene porque CardImageMover sí consulta imágenes del producto por productId
 import api from "../../../../lib/api";
@@ -189,38 +190,16 @@ export function ColorField({
   value,
   onChange,
   onHelp,
-  palettes = ["rosa", "neutros", "dorados"],
+  palettes,
 }) {
-  const safe = typeof value === "string" ? value : "";
-  const valid = isHexColor(safe);
-
-  const setColor = (v) => onChange?.(v);
-
   return (
     <Field label={label} hint={hint}>
-      <div className="grid grid-cols-[minmax(0,1fr)_44px_32px] gap-2 items-center">
-        <Input
-          value={safe}
-          onChange={(e) => setColor(e.target.value)}
-          placeholder="#ffffff"
-        />
-
-        <input
-          type="color"
-          value={valid ? safe : "#000000"}
-          onChange={(e) => setColor(e.target.value)}
-          className="w-11 h-10 p-0 border border-neutral-200 rounded-lg bg-white cursor-pointer"
-          title="Elegir color"
-        />
-
-        <HelpButton onClick={onHelp} />
-      </div>
-
-      {!valid && safe ? (
-        <div className="mt-2 text-xs text-rose-700">
-          Color inválido. Usa formato <b>#RGB</b> o <b>#RRGGBB</b>.
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="flex-1 min-w-0">
+          <SectionColorPicker label={label} value={value} onChange={onChange} palettes={palettes} />
         </div>
-      ) : null}
+        {onHelp ? <HelpButton onClick={onHelp} /> : null}
+      </div>
     </Field>
   );
 }

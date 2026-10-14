@@ -52,6 +52,21 @@ describe('editor de secciones, etapa 3', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ profileLink: 'https://instagram.com/rosa' }) }));
   });
 
+  it('guarda un color elegido del espectro en Instagram', () => {
+    const onSave = vi.fn();
+    render(<Harness id="instagram" onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Instagram' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir paleta de Color del texto del distintivo' }));
+    fireEvent.change(screen.getByLabelText('Elegir Color del texto del distintivo del espectro completo'), {
+      target: { value: '#7182a4' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({ profileBadgeTextColor: '#7182a4' }),
+    }));
+  });
+
   it('muestra el componente público de Complementos con los cambios de imagen y texto', async () => {
     const theme = { sections: [{
       id: 'complementos', type: 'complementos', name: 'Complementos', enabled: true,
