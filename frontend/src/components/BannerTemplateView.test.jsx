@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import BannerTemplateView from './BannerTemplateView';
 import BannerDevicePreview from '../admin/appearance/banner/BannerDevicePreview';
@@ -212,6 +212,38 @@ describe('plantillas sobre contenido existente', () => {
     expect(cards[1].querySelector('.rb-template__card-decoration')).toBeNull();
     expect(getBannerTemplate({ templateId: 'editorial' }, categories).config.cards[0].decorationImage).toBe('');
     expect(cards[0].querySelector('.rb-template__card-visual img')).toHaveAttribute('src', '/hogar.jpg');
+  });
+
+  it('encadena tarjetas al entrar y salir sin reiniciarse al cambiar la foto del slider', () => {
+    let notify;
+    const disconnect = vi.fn();
+    const observe = vi.fn();
+    const observer = vi.fn().mockImplementation((callback) => {
+      notify = callback;
+      return { observe, disconnect };
+    });
+    vi.stubGlobal('IntersectionObserver', observer);
+    try {
+      const banner = { templateId: 'editorial' };
+      const { container, rerender, unmount } = render(<BannerTemplateView banner={banner} sections={categories}><span>Foto 1</span></BannerTemplateView>);
+      const root = container.querySelector('.rb-template');
+      const cards = container.querySelectorAll('.rb-template__card');
+      expect(observe).toHaveBeenCalledWith(root);
+      expect(cards[0].style.getPropertyValue('--rb-card-enter-delay')).toBe('0ms');
+      expect(cards[1].style.getPropertyValue('--rb-card-enter-delay')).toBe('110ms');
+      expect(cards[0].style.getPropertyValue('--rb-card-exit-delay')).toBe('85ms');
+      act(() => notify([{ isIntersecting: true }]));
+      expect(root).toHaveAttribute('data-card-motion', 'enter');
+      rerender(<BannerTemplateView banner={banner} sections={categories}><span>Foto 2</span></BannerTemplateView>);
+      expect(root).toHaveAttribute('data-card-motion', 'enter');
+      expect(observer).toHaveBeenCalledTimes(1);
+      act(() => notify([{ isIntersecting: false }]));
+      expect(root).toHaveAttribute('data-card-motion', 'exit');
+      unmount();
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
 });

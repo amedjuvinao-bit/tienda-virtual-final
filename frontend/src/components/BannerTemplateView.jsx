@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Truck, Gift, Heart } from 'lucide-react';
 import { getBannerTemplate, moveBannerButtonLight, safeBannerLink, safeHotspotColor } from '../lib/bannerTemplates';
 import './bannerTemplateView.css';
@@ -33,6 +33,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   const { id, config: c } = getBannerTemplate(banner, sections);
   const [activeCard, setActiveCard] = useState(null);
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
+  const [cardMotion, setCardMotion] = useState('steady');
   const [dragged, setDragged] = useState(null);
   const dragRef = useRef(null);
   const suppressClick = useRef(false);
@@ -63,6 +64,17 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
       window.setTimeout(() => { suppressClick.current = false; }, 0);
     }
   };
+  useEffect(() => {
+    if (preview || typeof IntersectionObserver === 'undefined') return undefined;
+    const node = rootRef.current;
+    if (!node) return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      setCardMotion(entry.isIntersecting ? 'enter' : 'exit');
+    }, { threshold: 0.12 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [preview]);
+
   const css = {
     '--rb-template-text': c.textColor,
     '--rb-template-accent': c.accentColor,
@@ -72,7 +84,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   const cards = c.cards.map((item, index) => ({ ...item, sourceIndex: index })).filter((item) => item.enabled !== false);
   const categoriesOpen = mobileCategoriesOpen || (preview && selectedPart?.startsWith('card:'));
 
-  return <div ref={rootRef} className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-card-count={cards.length} data-button-animation={c.buttonAnimation} data-preview-device={preview ? device : undefined}>
+  return <div ref={rootRef} className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-card-count={cards.length} data-button-animation={c.buttonAnimation} data-card-motion={preview ? undefined : cardMotion} data-preview-device={preview ? device : undefined}>
     <div className="rb-template__picture">{children}</div>
     <div className="rb-template__wash" aria-hidden="true" />
     <div className="rb-template__content">
@@ -145,8 +157,8 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
         {cards.map((item, index) => {
           const href = safeBannerLink(item.link);
           const content = <>{id === 'editorial' && item.decorationImage && <span className="rb-template__card-decoration-viewport" aria-hidden="true"><span className="rb-template__card-decoration" style={{ backgroundImage: `url(${JSON.stringify(item.decorationImage)})`, backgroundPosition: `${item.decorationX}% ${item.decorationY}%`, transform: `scale(${Math.max(1, item.decorationSize / 100)})`, opacity: item.decorationOpacity / 100 }} /></span>}{item.image && <span className="rb-template__card-visual"><img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} /></span>}<span className="rb-template__card-copy">{item.label && item.label !== item.text && <small>{item.label}</small>}<strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
-          return href ? <a key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
-            : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
+          return href ? <a key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
+            : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}
       </div>
       {id === 'editorial' && cards.length > 2 && <button type="button" className="rb-template__more-categories" aria-expanded={categoriesOpen} onClick={() => setMobileCategoriesOpen((open) => !open)}>{categoriesOpen ? 'Ver menos' : `Ver ${cards.length - 2} ${cards.length === 3 ? 'categoría' : 'categorías'} más`} <span aria-hidden="true">{categoriesOpen ? '−' : '+'}</span></button>}
