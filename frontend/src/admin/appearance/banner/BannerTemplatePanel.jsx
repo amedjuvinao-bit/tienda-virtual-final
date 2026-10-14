@@ -257,6 +257,11 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             <Field type="color" label="Color de la etiqueta de esta tarjeta" value={card.labelColor || config.accentColor || '#ffffff'} onChange={(event) => updateCard(index, { labelColor: event.target.value })} />
           </div>
           {(card.titleColor || card.labelColor) && <button type="button" className="banner-btn" onClick={() => updateCard(index, { titleColor: '', labelColor: '' })}>Usar colores generales</button>}
+          <div className="banner-template-color-grid">
+            <label className="banner-template-field"><span>Tamaño del título · {card.titleSizePx ?? 'original'}{card.titleSizePx ? ' px' : ''}</span><input type="range" min="10" max="24" value={card.titleSizePx ?? 14} onChange={(event) => updateCard(index, { titleSizePx: Number(event.target.value) })} /></label>
+            <label className="banner-template-field"><span>Tamaño de la etiqueta · {card.labelSizePx ?? 'original'}{card.labelSizePx ? ' px' : ''}</span><input type="range" min="8" max="18" value={card.labelSizePx ?? 10} onChange={(event) => updateCard(index, { labelSizePx: Number(event.target.value) })} /></label>
+          </div>
+          {(card.titleSizePx != null || card.labelSizePx != null) && <button type="button" className="banner-btn" onClick={() => updateCard(index, { titleSizePx: null, labelSizePx: null })}>Usar tamaños originales</button>}
           <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
             <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
