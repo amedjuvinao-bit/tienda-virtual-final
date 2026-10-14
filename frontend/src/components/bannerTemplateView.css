@@ -451,3 +451,99 @@
     font-size: 16px;
   }
 }
+
+
+/* Quiet editorial display: the product sits in the glass, with a soft grounded shadow. */
+.rb-template--editorial .rb-template__card {
+  min-height: clamp(126px, 14cqw, 174px);
+  gap: 0;
+  padding: clamp(7px, .85cqw, 13px) clamp(7px, .8cqw, 12px) clamp(8px, .9cqw, 14px);
+  border-radius: 17px;
+  background: linear-gradient(160deg,
+    rgba(255,255,255,.13) 0%,
+    color-mix(in srgb,var(--rb-template-glass) 13%,transparent) 48%,
+    rgba(43,20,35,.21) 100%);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.65),
+    inset 0 -1px 1px rgba(255,255,255,.13),
+    0 8px 22px rgba(32,11,26,.17);
+}
+.rb-template--editorial .rb-template__card-visual {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  flex: none;
+  width: 100%;
+  height: clamp(67px, 8.3cqw, 108px);
+  place-items: center;
+  isolation: isolate;
+}
+.rb-template--editorial .rb-template__card-visual::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 22%;
+  right: 22%;
+  bottom: 3%;
+  height: 9%;
+  border-radius: 50%;
+  background: rgba(35,15,31,.25);
+  filter: blur(7px);
+  pointer-events: none;
+}
+.rb-template--editorial .rb-template__card-visual img,
+.rb-template--editorial[data-preview-device] .rb-template__card-visual img {
+  display: block;
+  width: 80%;
+  max-width: 116px;
+  height: 100%;
+  border-radius: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 5px rgba(30,13,27,.28));
+  transform: translateY(0) scale(1);
+  transition: transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease;
+}
+.rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img {
+  transform: translateY(-4px) scale(1.045);
+  filter: drop-shadow(0 10px 8px rgba(30,13,27,.32));
+}
+.rb-template--editorial .rb-template__card-copy {
+  gap: 3px;
+  margin-top: 4px;
+}
+.rb-template--editorial .rb-template__card small {
+  font: 600 clamp(8px,.7cqw,10px)/1.2 system-ui,sans-serif;
+  letter-spacing: .045em;
+  opacity: .87;
+}
+.rb-template--editorial .rb-template__card strong,
+.rb-template--editorial[data-preview-device] .rb-template__card strong {
+  font: 500 clamp(10px,1.1cqw,15px)/1.18 Georgia,serif;
+  text-wrap: balance;
+}
+.rb-template--editorial .rb-template__card > span:last-child {
+  margin-top: 5px;
+  font-size: 13px;
+  opacity: .85;
+}
+@container (max-width: 680px) {
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card {
+    min-height: 78px;
+    height: 78px;
+    padding: 4px 6px;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card-visual {
+    height: 39px;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card-visual img {
+    width: 70%;
+    max-width: 52px;
+    height: 100%;
+  }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card-copy { margin-top: 1px; gap: 1px; }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card small { font-size: clamp(7px,1.9cqw,9px); }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card strong { font-size: clamp(9px,2.5cqw,12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-template--editorial .rb-template__card-visual img { transition: none; }
+  .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img { transform: none; }
+}
