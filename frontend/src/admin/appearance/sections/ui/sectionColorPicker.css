@@ -8,16 +8,19 @@
 .section-color-picker__row :focus-visible, .section-color-picker__panel :focus-visible { outline: 2px solid var(--admin-primary, #a16207); outline-offset: 2px; }
 .section-color-picker__error { margin: 5px 0 0; color: #be123c; font-size: 11px; }
 .section-color-picker__panel { margin-top: 8px; padding: 12px; border: 1px solid #e7e5e4; border-radius: 14px; background: #fff; box-shadow: 0 8px 25px #21140c12; }
-.section-color-picker__spectrum { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #eeeae5; }
-.section-color-picker__spectrum div { display: grid; gap: 2px; min-width: 0; }
-.section-color-picker__spectrum strong { color: #292524; font-size: 12px; }
-.section-color-picker__spectrum span { color: #78716c; font-size: 11px; line-height: 1.3; }
-.section-color-picker__spectrum input { flex: 0 0 46px; width: 46px; height: 38px; padding: 2px; border: 1px solid #d6d3d1; border-radius: 10px; background: #fff; cursor: pointer; }
-.section-color-picker__groups { display: grid; gap: 7px; margin-top: 10px; }
-.section-color-picker__group { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.section-color-picker__group > span { flex: 0 0 56px; color: #57534e; font-size: 11px; text-transform: capitalize; }
-.section-color-picker__group > div { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
-.section-color-picker__group button { width: 24px; height: 24px; border: 1px solid #0002; border-radius: 8px; cursor: pointer; box-shadow: inset 0 1px #fff5; }
-.section-color-picker__group button:hover { transform: translateY(-2px); }
-.section-color-picker__group button.is-selected { outline: 2px solid var(--admin-primary, #a16207); outline-offset: 2px; }
-@media (max-width: 480px) { .section-color-picker__group { align-items: flex-start; } .section-color-picker__group > div { gap: 5px; } }
+.section-color-picker__heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 10px; }
+.section-color-picker__heading strong { color: #292524; font-size: 12px; }
+.section-color-picker__heading span { color: #78716c; font-size: 11px; }
+.section-color-picker__area { position: relative; width: 100%; height: 148px; border-radius: 10px; border: 1px solid #0002; background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); cursor: crosshair; touch-action: none; overflow: hidden; }
+.section-color-picker__cursor { position: absolute; width: 15px; height: 15px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #0008, 0 2px 8px #0005; pointer-events: none; transform: translate(-50%, -50%); }
+.section-color-picker__hue-label { display: flex; justify-content: space-between; margin: 10px 1px 3px; color: #57534e; font-size: 11px; }
+.section-color-picker__hue { display: block; width: 100%; height: 18px; margin: 0; appearance: none; border: 1px solid #0002; border-radius: 99px; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); cursor: pointer; }
+.section-color-picker__hue::-webkit-slider-thumb { appearance: none; width: 17px; height: 17px; border: 2px solid #fff; border-radius: 50%; background: var(--admin-primary, #a16207); box-shadow: 0 0 0 1px #0007, 0 2px 5px #0004; }
+.section-color-picker__hue::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #fff; border-radius: 50%; background: var(--admin-primary, #a16207); box-shadow: 0 0 0 1px #0007, 0 2px 5px #0004; }
+.section-color-picker__suggestions { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 11px; padding-top: 10px; border-top: 1px solid #eeeae5; }
+.section-color-picker__suggestions > span { flex: 0 0 auto; color: #57534e; font-size: 11px; }
+.section-color-picker__suggestions > div { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 5px; }
+.section-color-picker__suggestions button { width: 23px; height: 23px; border: 1px solid #0002; border-radius: 7px; cursor: pointer; box-shadow: inset 0 1px #fff5; }
+.section-color-picker__suggestions button:hover { transform: translateY(-2px); }
+.section-color-picker__suggestions button.is-selected { outline: 2px solid var(--admin-primary, #a16207); outline-offset: 2px; }
+@media (max-width: 480px) { .section-color-picker__suggestions { align-items: flex-start; } .section-color-picker__suggestions > div { gap: 4px; } }

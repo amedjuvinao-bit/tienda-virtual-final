@@ -58,12 +58,10 @@ describe('editor de secciones, etapa 3', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar Instagram' }));
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Abrir paleta de Color del texto del distintivo' }));
-    fireEvent.change(screen.getByLabelText('Elegir Color del texto del distintivo del espectro completo'), {
-      target: { value: '#7182a4' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Usar color #3b82f6' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      config: expect.objectContaining({ profileBadgeTextColor: '#7182a4' }),
+      config: expect.objectContaining({ profileBadgeTextColor: '#3b82f6' }),
     }));
   });
 
