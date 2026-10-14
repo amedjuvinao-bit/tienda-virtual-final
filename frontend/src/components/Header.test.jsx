@@ -20,6 +20,16 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
+  it('aplica el acabado metalizado a los enlaces internos y externos del menú de escritorio', async () => {
+    fetchSiteSettings.mockResolvedValue({
+      theme: { header: { textColor: '#b78a53', linkColor: '#e46288' }, footer: {} },
+      menus: { header: [{ title: 'Inicio', ref: '/' }, { title: 'Revista', ref: 'https://example.com' }] },
+    });
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
+    await waitFor(() => expect(within(navigation).getAllByRole('link')).toHaveLength(2));
+    expect(within(navigation).getAllByRole('link').every((link) => link.classList.contains('rb-metallic-text'))).toBe(true);
+  });
   it('muestra el icono de moda y el color guardados en el menú móvil público', async () => {
     fetchSiteSettings.mockResolvedValue({
       theme: { header: { mobileMenuLayout: 'atelier-sheet' }, footer: {} },
