@@ -246,4 +246,23 @@ describe('plantillas sobre contenido existente', () => {
     }
   });
 
+  it('anima el clic de una categoría y conserva el clic con Ctrl para abrir otra pestaña', () => {
+    vi.useFakeTimers();
+    try {
+      const banner = { templateId: 'editorial' };
+      const { container, unmount } = render(<BannerTemplateView banner={banner} sections={categories} />);
+      const card = container.querySelector('.rb-template__card[href="/categoria/hogar"]');
+      const ordinaryClick = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+      act(() => card.dispatchEvent(ordinaryClick));
+      expect(ordinaryClick.defaultPrevented).toBe(true);
+      expect(card).toHaveAttribute('data-pressed', 'true');
+      const modifiedClick = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ctrlKey: true });
+      act(() => card.dispatchEvent(modifiedClick));
+      expect(modifiedClick.defaultPrevented).toBe(false);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
 });

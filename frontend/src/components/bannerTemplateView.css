@@ -668,7 +668,7 @@
 .rb-template--editorial .rb-template__card-copy { position: relative; z-index: 1; }
 .rb-template--editorial .rb-template__card > span:last-child { z-index: 1; }
 
-/* Editorial cards unfold in sequence when the banner enters or leaves the viewport. */
+/* Cards reveal in sequence; their actual photos animate separately from the glass. */
 @keyframes rb-card-enter {
   from { opacity: 0; transform: translate3d(0,18px,0) scale(.965); filter: blur(5px); }
   to { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0); }
@@ -677,27 +677,46 @@
   from { opacity: 1; transform: translate3d(0,0,0) scale(1); filter: blur(0); }
   to { opacity: 0; transform: translate3d(0,-12px,0) scale(.97); filter: blur(4px); }
 }
-@keyframes rb-card-image-enter {
-  from { opacity: 0; transform: translate3d(-9px,12px,0) rotate(-4deg) scale(.86); }
-  to { opacity: 1; transform: translate3d(0,0,0) rotate(0) scale(1); }
+@keyframes rb-card-photo-enter {
+  from { opacity: 0; transform: translate3d(-12px,18px,0) rotateY(-18deg) scale(.72); filter: blur(5px) brightness(.72); }
+  to { opacity: 1; transform: translate3d(0,0,0) rotateY(0) scale(1); filter: blur(0) brightness(1); }
 }
-@keyframes rb-card-image-exit {
+@keyframes rb-card-photo-exit {
   from { opacity: 1; transform: translate3d(0,0,0) scale(1); }
-  to { opacity: 0; transform: translate3d(8px,-7px,0) scale(.9); }
+  to { opacity: 0; transform: translate3d(9px,-10px,0) scale(.82); }
+}
+@keyframes rb-card-click {
+  0%,100% { transform: scale(1); }
+  40% { transform: scale(.955); }
+  75% { transform: scale(1.025); }
+}
+@keyframes rb-card-photo-click {
+  0%,100% { transform: translate3d(0,0,0) scale(1); filter: none; }
+  45% { transform: translate3d(0,-9px,24px) rotateY(-8deg) scale(1.18); filter: drop-shadow(0 10px 12px rgba(33,12,31,.42)) brightness(1.15); }
 }
 .rb-template:not([data-preview-device])[data-card-motion='enter'] .rb-template__card {
   animation: rb-card-enter .62s cubic-bezier(.2,.78,.18,1) var(--rb-card-enter-delay) backwards;
 }
-.rb-template:not([data-preview-device])[data-card-motion='enter'] .rb-template__card-visual {
-  animation: rb-card-image-enter .57s cubic-bezier(.17,.83,.25,1) calc(var(--rb-card-enter-delay) + 140ms) backwards;
+.rb-template:not([data-preview-device])[data-card-motion='enter'] .rb-template__card-visual img {
+  animation: rb-card-photo-enter .7s cubic-bezier(.17,.83,.25,1) calc(var(--rb-card-enter-delay) + 145ms) backwards;
 }
 .rb-template:not([data-preview-device])[data-card-motion='exit'] .rb-template__card {
   animation: rb-card-exit .38s ease-in var(--rb-card-exit-delay) forwards;
 }
-.rb-template:not([data-preview-device])[data-card-motion='exit'] .rb-template__card-visual {
-  animation: rb-card-image-exit .25s ease-in var(--rb-card-exit-delay) forwards;
+.rb-template:not([data-preview-device])[data-card-motion='exit'] .rb-template__card-visual img {
+  animation: rb-card-photo-exit .25s ease-in var(--rb-card-exit-delay) forwards;
+}
+.rb-template .rb-template__card[data-pressed='true'] {
+  animation: rb-card-click .39s cubic-bezier(.25,.8,.2,1) both;
+}
+.rb-template .rb-template__card[data-pressed='true'] .rb-template__card-visual img {
+  animation: rb-card-photo-click .39s cubic-bezier(.22,.8,.22,1) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .rb-template[data-card-motion] .rb-template__card,
-  .rb-template[data-card-motion] .rb-template__card-visual { animation: none !important; }
+  .rb-template[data-card-motion] .rb-template__card-visual img,
+  .rb-template .rb-template__card[data-pressed='true'],
+  .rb-template .rb-template__card[data-pressed='true'] .rb-template__card-visual img {
+    animation: none !important;
+  }
 }

@@ -34,6 +34,9 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
   const [activeCard, setActiveCard] = useState(null);
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [cardMotion, setCardMotion] = useState('steady');
+  const [pressedCard, setPressedCard] = useState(null);
+  const pressTimerRef = useRef(null);
+  const navigateTimerRef = useRef(null);
   const [dragged, setDragged] = useState(null);
   const dragRef = useRef(null);
   const suppressClick = useRef(false);
@@ -74,6 +77,30 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
     observer.observe(node);
     return () => observer.disconnect();
   }, [preview]);
+
+  useEffect(() => () => {
+    window.clearTimeout(pressTimerRef.current);
+    window.clearTimeout(navigateTimerRef.current);
+  }, []);
+  const playCardPress = (index) => {
+    window.clearTimeout(pressTimerRef.current);
+    setPressedCard(index);
+    pressTimerRef.current = window.setTimeout(() => setPressedCard(null), 430);
+  };
+  const handleCardClick = (event, item, index, href) => {
+    if (preview) {
+      event.preventDefault();
+      playCardPress(index);
+      onSelect?.(`card:${item.sourceIndex}`);
+      return;
+    }
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    event.preventDefault();
+    playCardPress(index);
+    window.clearTimeout(navigateTimerRef.current);
+    navigateTimerRef.current = window.setTimeout(() => window.location.assign(href), 410);
+  };
 
   const css = {
     '--rb-template-text': c.textColor,
@@ -157,8 +184,8 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
         {cards.map((item, index) => {
           const href = safeBannerLink(item.link);
           const content = <>{id === 'editorial' && item.decorationImage && <span className="rb-template__card-decoration-viewport" aria-hidden="true"><span className="rb-template__card-decoration" style={{ backgroundImage: `url(${JSON.stringify(item.decorationImage)})`, backgroundPosition: `${item.decorationX}% ${item.decorationY}%`, transform: `scale(${Math.max(1, item.decorationSize / 100)})`, opacity: item.decorationOpacity / 100 }} /></span>}{item.image && <span className="rb-template__card-visual"><img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} /></span>}<span className="rb-template__card-copy">{item.label && item.label !== item.text && <small>{item.label}</small>}<strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
-          return href ? <a key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
-            : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
+          return href ? <a key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} data-pressed={pressedCard === index ? 'true' : undefined} onClick={(event) => handleCardClick(event, item, index, href)}>{content}</a>
+            : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} style={{ '--rb-card-enter-delay': `${index * 110}ms`, '--rb-card-exit-delay': `${(cards.length - 1 - index) * 85}ms` }} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} data-pressed={pressedCard === index ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? (event) => handleCardClick(event, item, index, null) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); playCardPress(index); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}
       </div>
       {id === 'editorial' && cards.length > 2 && <button type="button" className="rb-template__more-categories" aria-expanded={categoriesOpen} onClick={() => setMobileCategoriesOpen((open) => !open)}>{categoriesOpen ? 'Ver menos' : `Ver ${cards.length - 2} ${cards.length === 3 ? 'categoría' : 'categorías'} más`} <span aria-hidden="true">{categoriesOpen ? '−' : '+'}</span></button>}
