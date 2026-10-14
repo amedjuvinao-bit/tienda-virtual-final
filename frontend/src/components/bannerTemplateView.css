@@ -620,19 +620,23 @@
   .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img { transform: none; }
 }
 
-/* Single pearl light behind the cutout, with no colored halo. */
+/* Sparse transparent florals and pearl light remain behind the uploaded product. */
 .rb-template--editorial .rb-template__card-visual::before {
   content: '';
   position: absolute;
   z-index: 0;
   inset: -5px 0;
-  border-radius: 50%;
-  background: radial-gradient(ellipse 48% 53% at 49% 48%,
-    rgba(255,255,255,.62) 0%,
-    rgba(255,255,255,.32) 43%,
-    rgba(255,255,255,.09) 65%,
-    transparent 83%);
-  filter: blur(4px);
+  background-image:
+    url('/images/editorial-card-florals.png'),
+    radial-gradient(ellipse 48% 53% at 49% 48%,
+      rgba(255,255,255,.62) 0%,
+      rgba(255,255,255,.32) 43%,
+      rgba(255,255,255,.09) 65%,
+      transparent 83%);
+  background-position: center bottom, center;
+  background-size: 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  filter: none;
   pointer-events: none;
 }
 .rb-template--editorial .rb-template__card-visual::after { z-index: 0; }
