@@ -40,7 +40,17 @@ async function main() {
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     assert.equal(raw.appearanceRevision, doc.appearanceRevision + 1);
-    console.log('Guardado de Apariencia y lectura directa en MongoDB: OK');
+    const getHandler = siteSettingsRouter.stack.find(
+      (layer) => layer.route?.path === '/' && layer.route.methods.get
+    ).route.stack.at(-1).handle;
+    const publicResult = { body: null };
+    await getHandler({}, {
+      set() { return this; },
+      json(value) { publicResult.body = value; return this; },
+    }, (error) => { throw error; });
+    assert.equal(publicResult.body.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
+    assert.equal(publicResult.body.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
+    console.log('Guardado y lectura pública de colores de tarjetas: OK');
   } finally {
     await SiteSettings.deleteMany({});
     await mongoose.disconnect();
