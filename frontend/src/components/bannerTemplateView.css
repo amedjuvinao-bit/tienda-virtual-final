@@ -432,7 +432,7 @@
     font-size: 19px;
     transition: transform .2s ease;
   }
-  .rb-template--editorial[data-mobile-open='false'] .rb-template__mobile-categories-chevron { transform: rotate(180deg); }
+  .rb-template--editorial .rb-template__rail[data-mobile-open='false'] .rb-template__mobile-categories-chevron { transform: rotate(180deg); }
   :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail-panel {
     position: absolute;
     left: 0;
@@ -450,7 +450,7 @@
     -webkit-backdrop-filter: blur(22px) saturate(145%);
     scrollbar-width: thin;
   }
-  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile'])[data-mobile-open='false'] .rb-template__rail-panel { display: none; }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail[data-mobile-open='false'] .rb-template__rail-panel { display: none; }
   :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail-heading { margin: 0 0 8px; }
   :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__cards {
     display: grid;
