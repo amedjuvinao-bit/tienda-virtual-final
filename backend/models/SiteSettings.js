@@ -91,7 +91,10 @@ const BannerCardPositionSchema = new Schema({
 const BannerTemplateCardSchema = new Schema({
   enabled: { type: Boolean, default: true },
   categoryId: { type: String, default: "" },
-  destinationType: { type: String, enum: ["category", "product"], default: undefined },
+  destinationType: { type: String, enum: ["category", "catalogCategory", "product"], default: undefined },
+  catalogCategoryId: { type: String, default: "" },
+  catalogCategoryName: { type: String, default: "" },
+  catalogCategoryImage: { type: String, default: "" },
   featuredProductId: { type: String, default: "" },
   featuredProductTitle: { type: String, default: "" },
   featuredProductImage: { type: String, default: "" },
