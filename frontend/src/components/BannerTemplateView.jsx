@@ -140,18 +140,16 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
         onPlaceCard?.(placingCard, Math.round(percent((event.clientX - rect.left) / rect.width * 100, 50)), Math.round(percent((event.clientY - rect.top) / rect.height * 100, 50)));
       }}><span>Haz clic sobre el lugar que quieres señalar</span></button>}
     </div> : <div className="rb-template__rail" data-mobile-open={categoriesOpen ? 'true' : 'false'}>
-      {id === 'editorial' && cards.length > 0 && <button type="button" className="rb-template__mobile-categories-toggle" aria-expanded={categoriesOpen} onClick={() => setMobileCategoriesOpen((open) => !open)}><span className="rb-template__mobile-categories-icon" aria-hidden="true">✦</span><span>Explorar categorías</span><span className="rb-template__mobile-categories-count">{cards.length}</span><span className="rb-template__mobile-categories-chevron" aria-hidden="true">⌃</span></button>}
-      <div className="rb-template__rail-panel">
       {c.footerText && <span className="rb-template__rail-heading"><CopyLink href={c.footerTextLink} preview={preview} selected={selectedPart === 'copy:footerText'} onSelect={() => onSelect?.('copy:footerText')}>{c.footerText}</CopyLink></span>}
       <div className="rb-template__cards">
         {cards.map((item, index) => {
           const href = safeBannerLink(item.link);
           const content = <>{item.image && <img src={item.image} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}<span className="rb-template__card-copy">{item.label && item.label !== item.text && <small>{item.label}</small>}<strong>{item.text}</strong></span><span aria-hidden="true">↗</span></>;
-          return href ? <a key={index} className="rb-template__card" href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
-            : <div key={index} className="rb-template__card" onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
+          return href ? <a key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} href={href} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} onClick={preview ? (event) => { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } : undefined}>{content}</a>
+            : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}
       </div>
-      </div>
+      {id === 'editorial' && cards.length > 2 && <button type="button" className="rb-template__more-categories" aria-expanded={categoriesOpen} onClick={() => setMobileCategoriesOpen((open) => !open)}>{categoriesOpen ? 'Ver menos' : `Ver ${cards.length - 2} categorías más`} <span aria-hidden="true">{categoriesOpen ? '−' : '+'}</span></button>}
     </div>}
   </div>;
 }
