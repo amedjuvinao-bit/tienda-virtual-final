@@ -42,4 +42,13 @@ describe('resultados de búsqueda pública', () => {
     expect(await screen.findByText('Bolso')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
+  it('abre una categoría del catálogo y filtra sus productos aunque no haya texto de búsqueda', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ products: [{ _id: 'p3', title: 'Vestido' }], pagination: { page: 1, limit: 24, totalProducts: 1, totalPages: 1 } }) });
+    mount('/buscar?category=68a4a78a59706e44cade0316&categoryName=Vestidos');
+    expect(await screen.findByText('Vestido')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Vestidos' })).toBeInTheDocument();
+    const url = new URL(global.fetch.mock.calls[0][0]);
+    expect(url.searchParams.getAll('categoryScope')).toEqual(['68a4a78a59706e44cade0316', 'Vestidos']);
+  });
+
 });
