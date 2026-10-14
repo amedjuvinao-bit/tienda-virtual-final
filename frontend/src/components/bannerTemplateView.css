@@ -398,6 +398,7 @@
     width: 100%;
     flex: none;
   }
+  :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__card:first-child:nth-last-child(3) { grid-column: auto; }
   :is(.rb-template--editorial:not([data-preview-device]), .rb-template--editorial[data-preview-device='mobile']) .rb-template__rail[data-mobile-open='false'] .rb-template__card--extra {
     display: none;
   }
