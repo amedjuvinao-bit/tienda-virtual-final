@@ -24,6 +24,12 @@ function Editor() {
 }
 
 describe('editor de plantillas', () => {
+  it('abre el editor y permite cambiar a categorías sin error de inicialización', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    expect(screen.getByLabelText('Categoría de destino')).toBeInTheDocument();
+  });
+
   it('conserva el texto de cada diseño al cambiar y solo ofrece categorías existentes', () => {
     render(<Editor />);
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi portada' } });
