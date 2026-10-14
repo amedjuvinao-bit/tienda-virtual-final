@@ -584,3 +584,38 @@
   .rb-template--editorial .rb-template__card-visual img { transition: none; }
   .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img { transform: none; }
 }
+
+/* Depth belongs to the product alone; the glass and caption stay anchored. */
+.rb-template--editorial .rb-template__card,
+.rb-template--editorial .rb-template__card-visual { overflow: visible; }
+.rb-template--editorial .rb-template__card-visual {
+  z-index: 3;
+  perspective: 520px;
+  transform-style: preserve-3d;
+}
+.rb-template--editorial .rb-template__card-visual img,
+.rb-template--editorial[data-preview-device] .rb-template__card-visual img {
+  max-width: 84px;
+  transform-origin: 38% 85%;
+  backface-visibility: hidden;
+  transition: transform .42s cubic-bezier(.18,.8,.23,1.15),filter .42s ease;
+}
+.rb-template--editorial .rb-template__card:is(:hover,:focus-visible) {
+  z-index: 5;
+  transform: none !important;
+}
+.rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img {
+  transform: translate3d(-7px,-11px,38px) rotateY(-9deg) rotateZ(-2deg) scale(1.17);
+  filter: drop-shadow(8px 15px 8px rgba(26,11,26,.43));
+}
+@container (max-width: 680px) {
+  :is(.rb-template--editorial:not([data-preview-device]),.rb-template--editorial[data-preview-device='mobile']) .rb-template__card-visual img { max-width: 48px; }
+  :is(.rb-template--editorial:not([data-preview-device]),.rb-template--editorial[data-preview-device='mobile']) .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img {
+    transform: translate3d(-3px,-5px,16px) rotateY(-6deg) scale(1.1);
+    filter: drop-shadow(3px 7px 5px rgba(26,11,26,.35));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-template--editorial .rb-template__card-visual img { transition: none; }
+  .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img { transform: none; }
+}
