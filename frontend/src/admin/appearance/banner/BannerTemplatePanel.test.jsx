@@ -199,14 +199,14 @@ describe('editor de plantillas', () => {
       target: { files: [new File(['flor'], 'flor.webp', { type: 'image/webp' })] },
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Mostrar imagen' })).toHaveAttribute('aria-pressed', 'true'));
-    const stage = screen.getByRole('img', { name: 'Ubicación de la imagen decorativa respecto al producto' });
+    const stage = screen.getByRole('img', { name: 'Encuadre del fondo de la tarjeta' });
     stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 });
     fireEvent.pointerDown(stage, { pointerId: 1, clientX: 150, clientY: 40 });
-    fireEvent.change(screen.getByLabelText(/Tamaño/), { target: { value: '85' } });
+    fireEvent.change(screen.getByLabelText(/Acercamiento/), { target: { value: '125' } });
     let saved = JSON.parse(screen.getByTestId('state').textContent);
     expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({
       decorationMode: 'custom', decorationImage: 'https://example.test/flor-propia.webp',
-      decorationX: 75, decorationY: 40, decorationSize: 85,
+      decorationX: 75, decorationY: 40, decorationSize: 125,
     }));
     fireEvent.click(screen.getByRole('button', { name: 'Ocultar imagen' }));
     saved = JSON.parse(screen.getByTestId('state').textContent);

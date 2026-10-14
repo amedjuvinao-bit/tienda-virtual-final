@@ -642,20 +642,28 @@
   z-index: 1;
 }
 
-/* Uploaded florals remain inside the product area and behind the product itself. */
+/* The uploaded scene fills the entire card; product and copy remain separate layers. */
 .rb-template--editorial .rb-template__card-decoration-viewport {
   position: absolute;
   z-index: 0;
   inset: 0;
   overflow: hidden;
+  border-radius: inherit;
   pointer-events: none;
+}
+.rb-template--editorial .rb-template__card-decoration-viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,transparent 24%,color-mix(in srgb,var(--rb-template-glass) 72%,transparent) 100%);
 }
 .rb-template--editorial .rb-template__card-decoration {
   position: absolute;
-  transform: translate(-50%,-50%);
-  background-size: contain;
-  background-position: center;
+  inset: 0;
+  background-size: cover;
   background-repeat: no-repeat;
+  transform-origin: center;
   pointer-events: none;
-  filter: drop-shadow(0 2px 3px rgba(55,21,39,.12));
 }
+.rb-template--editorial .rb-template__card-copy { position: relative; z-index: 1; }
+.rb-template--editorial .rb-template__card > span:last-child { z-index: 1; }

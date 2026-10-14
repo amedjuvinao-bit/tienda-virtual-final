@@ -264,7 +264,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
           </div>
           {id === 'editorial' && <div className="banner-template-florals">
             <strong>Imagen decorativa de esta tarjeta</strong>
-            <p className="banner-template-help">Sube un PNG, WebP o JPG. Se verá únicamente en esta tarjeta, detrás del producto. Puedes usar flores u otra imagen que combine con tu tienda.</p>
+            <p className="banner-template-help">Sube una imagen de ambiente que cubra toda la tarjeta. Una foto JPG o WebP sin bordes transparentes evita huecos; la foto del producto y los textos quedan independientes por encima.</p>
             <label className="banner-template-field"><span>Cargar o cambiar imagen decorativa</span><input type="file" accept="image/png,image/webp,image/jpeg" disabled={uploading} onChange={(event) => { uploadCardDecoration(index, event.target.files?.[0]); event.target.value = ''; }} /></label>
             {card.decorationImage && <>
               <div className="banner-template-florals__actions">
@@ -272,13 +272,13 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
                 <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'none'} onClick={() => updateCard(index, { decorationMode: 'none' })}>Ocultar imagen</button>
               </div>
               {card.decorationMode === 'custom' && <>
-                <p className="banner-template-help">Haz clic o arrastra sobre la muestra para ubicar la imagen. El cambio también aparece en la vista previa grande.</p>
-                <div className="banner-template-florals__stage" role="img" aria-label="Ubicación de la imagen decorativa respecto al producto" onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }} onPointerMove={(event) => { if (!(event.buttons & 1)) return; const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }}>
-                  <span className="banner-template-florals__art" style={{ backgroundImage: `url(${JSON.stringify(card.decorationImage)})`, left: `${card.decorationX ?? 50}%`, top: `${card.decorationY ?? 50}%`, width: `${card.decorationSize ?? 100}%`, height: `${card.decorationSize ?? 100}%`, opacity: (card.decorationOpacity ?? 75) / 100 }} />
+                <p className="banner-template-help">Haz clic o arrastra para elegir qué parte del fondo se verá en la tarjeta. Comprueba el resultado en la vista previa grande.</p>
+                <div className="banner-template-florals__stage" role="img" aria-label="Encuadre del fondo de la tarjeta" onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }} onPointerMove={(event) => { if (!(event.buttons & 1)) return; const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }}>
+                  <span className="banner-template-florals__art" style={{ backgroundImage: `url(${JSON.stringify(card.decorationImage)})`, backgroundPosition: `${card.decorationX ?? 50}% ${card.decorationY ?? 50}%`, transform: `scale(${Math.max(1, (card.decorationSize ?? 100) / 100)})`, opacity: (card.decorationOpacity ?? 75) / 100 }} />
                   {cardImage && <img src={cardImage} alt="" />}
                 </div>
                 <div className="banner-template-florals__controls">
-                  <label>Tamaño: {card.decorationSize ?? 100}%<input type="range" min="30" max="180" value={card.decorationSize ?? 100} onChange={(event) => updateCard(index, { decorationSize: Number(event.target.value) })} /></label>
+                  <label>Acercamiento: {Math.max(100, card.decorationSize ?? 100)}%<input type="range" min="100" max="180" value={Math.max(100, card.decorationSize ?? 100)} onChange={(event) => updateCard(index, { decorationSize: Number(event.target.value) })} /></label>
                   <label>Transparencia: {100 - (card.decorationOpacity ?? 75)}%<input type="range" min="0" max="100" value={card.decorationOpacity ?? 75} onChange={(event) => updateCard(index, { decorationOpacity: Number(event.target.value) })} /></label>
                 </div>
               </>}
