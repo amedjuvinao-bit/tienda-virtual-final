@@ -20,6 +20,9 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const [productResults, setProductResults] = useState([]);
   const [productLoading, setProductLoading] = useState(false);
   const [productError, setProductError] = useState('');
+  const selected = selection || localSelection;
+  const choose = onSelectionChange || setLocalSelection;
+  const group = selected.startsWith('action:') ? 'actions' : selected.startsWith('card:') ? 'categories' : selected.startsWith('trust:') ? 'trust' : selected === 'style' ? 'style' : 'copy';
   useEffect(() => {
     const query = productQuery.trim();
     if (group !== 'categories' || query.length < 2) {
@@ -48,9 +51,6 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [group, productQuery]);
-  const selected = selection || localSelection;
-  const choose = onSelectionChange || setLocalSelection;
-  const group = selected.startsWith('action:') ? 'actions' : selected.startsWith('card:') ? 'categories' : selected.startsWith('trust:') ? 'trust' : selected === 'style' ? 'style' : 'copy';
   const current = banner.templateConfigs?.[id] || {};
   const update = (patch) => setPath(`banner.templateConfigs.${id}`, { ...current, ...patch });
   const updateAction = (key, patch) => update({ [key]: { ...config[key], ...patch } });
