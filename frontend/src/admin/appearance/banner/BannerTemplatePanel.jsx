@@ -20,6 +20,26 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const [productResults, setProductResults] = useState([]);
   const [productLoading, setProductLoading] = useState(false);
   const [productError, setProductError] = useState('');
+  const [catalogCategories, setCatalogCategories] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/products/catalog-categories`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('No se pudieron cargar las categorías.');
+        return response.json();
+      })
+      .then((data) => {
+        setCatalogCategories(Array.isArray(data.categories) ? data.categories : []);
+        setCatalogError('');
+      })
+      .catch((cause) => {
+        if (cause.name !== 'AbortError') setCatalogError('No se pudieron cargar las categorías del catálogo. Recarga la página.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setCatalogLoading(false); });
+    return () => controller.abort();
+  }, []);
   const selected = selection || localSelection;
   const choose = onSelectionChange || setLocalSelection;
   const group = selected.startsWith('action:') ? 'actions' : selected.startsWith('card:') ? 'categories' : selected.startsWith('trust:') ? 'trust' : selected === 'style' ? 'style' : 'copy';
@@ -96,8 +116,8 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   const index = Math.min(Math.max(Number(selected.split(':')[1]) || 0, 0), Math.max(0, refs.length - 1));
   const card = refs[index];
   const category = categories.find((entry) => entry.id === card?.categoryId);
-  const destinationType = card?.destinationType || (categories.length ? 'category' : 'product');
-  const cardImage = card?.image || (destinationType === 'product' ? card?.featuredProductImage : category?.image);
+  const destinationType = card?.destinationType || (categories.length ? 'category' : 'catalogCategory');
+  const cardImage = card?.image || (destinationType === 'product' ? card?.featuredProductImage : destinationType === 'catalogCategory' ? card?.catalogCategoryImage : category?.image);
 
   return <div className="banner-template-editor">
     <div className="banner-template-editor__intro"><strong>Personaliza el diseño</strong><span>Elige una parte o tócala en la vista previa. Se guarda junto con la portada.</span></div>
@@ -151,29 +171,49 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
     </div>}
 
     {group === 'categories' && <div className="banner-template-inspector">
-      {categories.length === 0 && <p className="banner-template-help">No hay categorías para elegir. Puedes enlazar estas tarjetas directamente con productos.</p>}
+      <p className="banner-template-help">Elige una categoría creada en Productos o un artículo. Los accesos anteriores se conservan hasta que los cambies.</p>
         <div className="banner-template-parts" role="group" aria-label="Acceso de categoría para editar">
           {refs.map((entry, cardIndex) => {
             const linked = categories.find((item) => item.id === entry.categoryId);
             return <button key={cardIndex} type="button" aria-pressed={index === cardIndex} onClick={() => { setProductQuery(''); choose(`card:${cardIndex}`); }}>
-              <small>Acceso {cardIndex + 1}{entry.enabled === false ? ' · oculto' : ''}</small><strong>{entry.text || (entry.destinationType === 'product' ? entry.featuredProductTitle : linked?.title) || 'Elige un destino'}</strong>
+              <small>Acceso {cardIndex + 1}{entry.enabled === false ? ' · oculto' : ''}</small><strong>{entry.text || (entry.destinationType === 'product' ? entry.featuredProductTitle : entry.destinationType === 'catalogCategory' ? entry.catalogCategoryName : linked?.title) || 'Elige un destino'}</strong>
             </button>;
           })}
-          {refs.length < maxCards && <button type="button" className="banner-template-parts__add" onClick={() => { const nextCategory = categories.find((item) => !refs.some((ref) => ref.categoryId === item.id)) || categories[0]; update({ cards: [...refs, { categoryId: nextCategory?.id || '', destinationType: nextCategory ? 'category' : 'product', enabled: true, x: 75, y: 68 }] }); choose(`card:${refs.length}`); }}>+ Añadir acceso</button>}
+          {refs.length < maxCards && <button type="button" className="banner-template-parts__add" onClick={() => { const nextCategory = catalogCategories.find((item) => !refs.some((ref) => ref.catalogCategoryId === item.id)); update({ cards: [...refs, { destinationType: 'catalogCategory', catalogCategoryId: nextCategory?.id || '', catalogCategoryName: nextCategory?.name || '', catalogCategoryImage: nextCategory?.image || '', enabled: true, x: 75, y: 68 }] }); choose(`card:${refs.length}`); }}>+ Añadir acceso</button>}
         </div>
         {card && <div className="banner-template-inspector__fields">
           <strong>Acceso {index + 1}</strong>
           {id === 'atelier' && <p className="banner-template-help">Arrastra esta tarjeta en la vista previa para ubicarla en cada tamaño de pantalla. La línea une la tarjeta con el punto señalado en la foto.</p>}
           <label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Mostrar en la portada</label>
-          <label className="banner-template-field"><span>Al hacer clic, abrir</span><select value={destinationType} onChange={(event) => { updateCard(index, { destinationType: event.target.value, text: '', label: '', image: '' }); setProductQuery(''); }}>
-            {categories.length > 0 && <option value="category">Una categoría</option>}
+          <label className="banner-template-field"><span>Al hacer clic, abrir</span><select value={destinationType} onChange={(event) => {
+            const nextType = event.target.value;
+            const first = catalogCategories[0];
+            updateCard(index, { destinationType: nextType, text: '', label: '', image: '',
+              ...(nextType === 'catalogCategory' ? { catalogCategoryId: first?.id || '', catalogCategoryName: first?.name || '', catalogCategoryImage: first?.image || '' } : {}) });
+            setProductQuery('');
+          }}>
+            <option value="catalogCategory">Una categoría del catálogo</option>
             <option value="product">Un producto</option>
+            {categories.length > 0 && (card.categoryId || destinationType === 'category') && <option value="category">Acceso de Apariencia (anterior)</option>}
           </select></label>
-          {destinationType === 'category' ? <>
-            <label className="banner-template-field"><span>Categoría de destino</span><select value={card.categoryId || ''} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
-            <p className="banner-template-help">La tarjeta abrirá el enlace configurado en esa categoría.{!category?.link && ' Esta categoría aún no tiene enlace.'}</p>
-            {!card.destinationType && card.link && <p className="banner-template-help">Esta tarjeta conserva un enlace anterior. Al elegir una categoría se actualizará automáticamente.</p>}
-          </> : <div className="banner-template-product-picker">
+          {destinationType === 'catalogCategory' && <>
+            {catalogLoading && <p role="status">Cargando categorías del catálogo…</p>}
+            {catalogError && <p role="alert">{catalogError}</p>}
+            {!catalogLoading && !catalogError && <label className="banner-template-field"><span>Categoría del catálogo</span><select value={card.catalogCategoryId || ''} onChange={(event) => {
+              const selectedCategory = catalogCategories.find((entry) => entry.id === event.target.value);
+              updateCard(index, { catalogCategoryId: selectedCategory?.id || '', catalogCategoryName: selectedCategory?.name || '', catalogCategoryImage: selectedCategory?.image || '', label: '', text: '', image: '' });
+            }}>
+              {(!card.catalogCategoryId || !catalogCategories.some((entry) => entry.id === card.catalogCategoryId)) && <option value={card.catalogCategoryId || ''}>{card.catalogCategoryId ? 'Categoría anterior no disponible' : 'Selecciona una categoría'}</option>}
+              {catalogCategories.map((entry) => <option key={entry.id} value={entry.id}>{entry.path || entry.name}</option>)}
+            </select></label>}
+            {!catalogLoading && !catalogError && catalogCategories.length === 0 && <p className="banner-template-help">No hay categorías en Productos. Créalas en el catálogo para usarlas aquí.</p>}
+            {card.catalogCategoryName && <p className="banner-template-help">Esta tarjeta abrirá los productos de “{card.catalogCategoryName}”.</p>}
+          </>}
+          {destinationType === 'category' && <>
+            <label className="banner-template-field"><span>Acceso anterior</span><select value={card.categoryId || ''} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
+            <p className="banner-template-help">Este acceso se conserva. Elige «Una categoría del catálogo» para enlazarlo con productos reales.</p>
+          </>}
+          {destinationType === 'product' && <div className="banner-template-product-picker">
             <label className="banner-template-field"><span>Buscar producto</span><input type="search" placeholder="Escribe el nombre o código" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} /></label>
             {card.featuredProductId && <p className="banner-template-product-picker__selected">Producto elegido: <strong>{card.featuredProductTitle || card.featuredProductId}</strong></p>}
             {productLoading && <p role="status">Buscando productos…</p>}
@@ -188,7 +228,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             </div>}
             {!card.featuredProductId && <p className="banner-template-help">Busca y elige un producto para crear el enlace de la tarjeta.</p>}
           </div>}
-          <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
+          <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
           {id === 'atelier' && <div className="banner-template-point-control">
             <button type="button" className="banner-btn banner-btn--primary" aria-pressed={placingCard === index} onClick={() => onStartPlacing?.(placingCard === index ? null : index)}>{placingCard === index ? 'Cancelar ubicación' : 'Señalar lugar en la imagen'}</button>
@@ -196,11 +236,11 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             <div className="banner-template-position"><Field type="number" min="0" max="100" label="Punto horizontal %" value={card.x ?? 45 + index * 29} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Punto vertical %" value={card.y ?? 28 + index * 24} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>
             <Field type="color" label="Color de línea y punto" value={safeHotspotColor(card.lineColor)} onChange={(event) => updateCard(index, { lineColor: event.target.value })} />
           </div>}
-          <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'acceso de categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
-            <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
+          <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
+            <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
             {cardImage && <img src={cardImage} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
-            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen del {destinationType === 'product' ? 'producto' : 'acceso de categoría'}</button>}
+            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen del {destinationType === 'product' ? 'producto' : 'categoría'}</button>}
           </div>
           {error && <p role="alert">{error}</p>}
         </div>}
