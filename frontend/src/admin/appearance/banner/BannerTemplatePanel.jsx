@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../../../config/apiBaseUrl';
-import { BANNER_BUTTON_ANIMATIONS, EDITORIAL_CARD_FLORALS, getBannerTemplate, moveBannerButtonLight, safeHotspotColor } from '../../../lib/bannerTemplates';
+import { BANNER_BUTTON_ANIMATIONS, getBannerTemplate, moveBannerButtonLight, safeHotspotColor } from '../../../lib/bannerTemplates';
 
 const Field = ({ label, ...props }) => <label className="banner-template-field"><span>{label}</span><input {...props} /></label>;
 
@@ -263,14 +263,26 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             </div>}
           </div>
           {id === 'editorial' && <div className="banner-template-florals">
-            <strong>Flores junto al producto</strong>
-            <p className="banner-template-help">Cada tarjeta tiene su propio adorno. Elige un modelo, sube una imagen transparente o déjala sin flores.</p>
-            <div className="banner-template-florals__choices" role="group" aria-label="Flores de esta tarjeta">
-              {EDITORIAL_CARD_FLORALS.map((src, floralIndex) => <button key={src} type="button" aria-label={`Flor ${floralIndex + 1}`} aria-pressed={(card.decorationMode || 'preset') === 'preset' && (card.decorationPreset ?? index % EDITORIAL_CARD_FLORALS.length) === floralIndex} onClick={() => updateCard(index, { decorationMode: 'preset', decorationPreset: floralIndex })}><img src={src} alt="" /></button>)}
-            </div>
-            <label className="banner-template-field"><span>Subir mi propia flor (PNG o WebP transparente)</span><input type="file" accept="image/png,image/webp" disabled={uploading} onChange={(event) => { uploadCardDecoration(index, event.target.files?.[0]); event.target.value = ''; }} /></label>
-            {card.decorationImage && <button type="button" className="banner-template-florals__custom" aria-pressed={card.decorationMode === 'custom'} onClick={() => updateCard(index, { decorationMode: 'custom' })}><img src={card.decorationImage} alt="" /><span>Usar flor que subí</span></button>}
-            <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'none'} onClick={() => updateCard(index, { decorationMode: 'none' })}>Sin flores en esta tarjeta</button>
+            <strong>Flores de esta tarjeta</strong>
+            <p className="banner-template-help">Sube un PNG o WebP transparente. Solo se verá en esta tarjeta, detrás de la foto del producto.</p>
+            <label className="banner-template-field"><span>Cargar o cambiar flores</span><input type="file" accept="image/png,image/webp" disabled={uploading} onChange={(event) => { uploadCardDecoration(index, event.target.files?.[0]); event.target.value = ''; }} /></label>
+            {card.decorationImage && <>
+              <div className="banner-template-florals__actions">
+                <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'custom'} onClick={() => updateCard(index, { decorationMode: 'custom' })}>Mostrar flores</button>
+                <button type="button" className="banner-btn" aria-pressed={card.decorationMode === 'none'} onClick={() => updateCard(index, { decorationMode: 'none' })}>Ocultar flores</button>
+              </div>
+              {card.decorationMode === 'custom' && <>
+                <p className="banner-template-help">Haz clic o arrastra sobre la muestra para ubicarlas. El cambio también aparece en la vista previa grande.</p>
+                <div className="banner-template-florals__stage" role="img" aria-label="Ubicación de las flores respecto al producto" onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }} onPointerMove={(event) => { if (!(event.buttons & 1)) return; const rect = event.currentTarget.getBoundingClientRect(); if (rect.width && rect.height) updateCard(index, { decorationX: Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))), decorationY: Math.round(Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))) }); }}>
+                  <span className="banner-template-florals__art" style={{ backgroundImage: `url(${JSON.stringify(card.decorationImage)})`, left: `${card.decorationX ?? 50}%`, top: `${card.decorationY ?? 50}%`, width: `${card.decorationSize ?? 100}%`, height: `${card.decorationSize ?? 100}%`, opacity: (card.decorationOpacity ?? 75) / 100 }} />
+                  {cardImage && <img src={cardImage} alt="" />}
+                </div>
+                <div className="banner-template-florals__controls">
+                  <label>Tamaño: {card.decorationSize ?? 100}%<input type="range" min="30" max="180" value={card.decorationSize ?? 100} onChange={(event) => updateCard(index, { decorationSize: Number(event.target.value) })} /></label>
+                  <label>Transparencia: {100 - (card.decorationOpacity ?? 75)}%<input type="range" min="0" max="100" value={card.decorationOpacity ?? 75} onChange={(event) => updateCard(index, { decorationOpacity: Number(event.target.value) })} /></label>
+                </div>
+              </>}
+            </>}
           </div>}
           </details>
           {id === 'atelier' && <details className="banner-template-card-details"><summary>Ubicación y señalador</summary><div className="banner-template-point-control">

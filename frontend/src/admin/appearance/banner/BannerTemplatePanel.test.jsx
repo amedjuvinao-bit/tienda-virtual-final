@@ -188,25 +188,33 @@ describe('editor de plantillas', () => {
     expect(getBannerTemplate({ templateId: 'editorial', templateConfigs: saved.templateConfigs }, []).config.cards[0].image).toBe('https://example.test/propia.png');
   });
 
-  it('guarda una flor diferente por tarjeta y permite ocultarla sin borrar la subida', async () => {
+  it('guarda las flores propias, su ubicación y permite ocultarlas', async () => {
     const uploadImage = vi.fn().mockResolvedValue('https://example.test/flor-propia.webp');
     render(<Editor uploadImage={uploadImage} />);
     fireEvent.click(screen.getByRole('button', { name: /Editorial/ }));
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
     fireEvent.click(screen.getByText(/Texto, foto y flores/));
-    fireEvent.click(screen.getByRole('button', { name: 'Flor 2' }));
-    let saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({ decorationMode: 'preset', decorationPreset: 1 }));
-    fireEvent.change(screen.getByLabelText(/Subir mi propia flor/), {
+    expect(screen.queryByRole('button', { name: 'Flor 2' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Cargar o cambiar flores'), {
       target: { files: [new File(['flor'], 'flor.webp', { type: 'image/webp' })] },
     });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Usar flor que subí' })).toHaveAttribute('aria-pressed', 'true'));
-    fireEvent.click(screen.getByRole('button', { name: 'Sin flores en esta tarjeta' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mostrar flores' })).toHaveAttribute('aria-pressed', 'true'));
+    const stage = screen.getByRole('img', { name: 'Ubicación de las flores respecto al producto' });
+    stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 });
+    fireEvent.pointerDown(stage, { pointerId: 1, clientX: 150, clientY: 40 });
+    fireEvent.change(screen.getByLabelText(/Tamaño/), { target: { value: '85' } });
+    let saved = JSON.parse(screen.getByTestId('state').textContent);
+    expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({
+      decorationMode: 'custom', decorationImage: 'https://example.test/flor-propia.webp',
+      decorationX: 75, decorationY: 40, decorationSize: 85,
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar flores' }));
     saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({ decorationMode: 'none', decorationImage: 'https://example.test/flor-propia.webp' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Usar flor que subí' }));
-    saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.editorial.cards[0].decorationMode).toBe('custom');
+    expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({
+      decorationMode: 'none', decorationImage: 'https://example.test/flor-propia.webp',
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar flores' }));
+    expect(JSON.parse(screen.getByTestId('state').textContent).templateConfigs.editorial.cards[0].decorationMode).toBe('custom');
   });
 
 });
