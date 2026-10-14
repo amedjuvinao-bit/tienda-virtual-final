@@ -149,7 +149,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
             : <div key={index} className={`rb-template__card${id === 'editorial' && index >= 2 ? ' rb-template__card--extra' : ''}`} onPointerMove={moveBannerButtonLight} data-selected={preview && selectedPart === `card:${item.sourceIndex}` ? 'true' : undefined} role={preview ? 'button' : undefined} tabIndex={preview ? 0 : undefined} onClick={preview ? () => onSelect?.(`card:${item.sourceIndex}`) : undefined} onKeyDown={preview ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(`card:${item.sourceIndex}`); } } : undefined}>{content}</div>;
         })}
       </div>
-      {id === 'editorial' && cards.length > 2 && <button type="button" className="rb-template__more-categories" aria-expanded={categoriesOpen} onClick={() => setMobileCategoriesOpen((open) => !open)}>{categoriesOpen ? 'Ver menos' : `Ver ${cards.length - 2} categorías más`} <span aria-hidden="true">{categoriesOpen ? '−' : '+'}</span></button>}
+      {id === 'editorial' && cards.length > 2 && <button type="button" className="rb-template__more-categories" aria-expanded={categoriesOpen} onClick={() => setMobileCategoriesOpen((open) => !open)}>{categoriesOpen ? 'Ver menos' : `Ver ${cards.length - 2} ${cards.length === 3 ? 'categoría' : 'categorías'} más`} <span aria-hidden="true">{categoriesOpen ? '−' : '+'}</span></button>}
     </div>}
   </div>;
 }
