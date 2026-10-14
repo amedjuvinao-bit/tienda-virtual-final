@@ -466,6 +466,11 @@ export default function HeaderPanel({
                     />
                   </label>
 
+                  <label className="xl:col-span-2 flex items-center gap-3 text-sm font-medium text-gray-700">
+                    <input type="checkbox" checked={theme.header?.metallicMenuText === true} onChange={(e) => setPath('header.metallicMenuText', e.target.checked)} />
+                    Activar acabado metalizado en los enlaces del menú
+                  </label>
+
                   <div className="xl:col-span-2">
                     <Select
                       label="Animación del menú"

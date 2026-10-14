@@ -433,7 +433,7 @@ function Header() {
                       href={item.to}
                       target="_blank"
                       rel="noreferrer"
-                      className="rb-metallic-text transition duration-300"
+                      className={`${headerConfig.metallicMenuText === true ? 'rb-metallic-text ' : ''}transition duration-300`}
                     >
                       {item.name}
                     </a>
@@ -445,7 +445,7 @@ function Header() {
                     key={idx}
                     to={item.to}
                     className={({ isActive }) =>
-                      `rb-metallic-text transition duration-300 ${isActive ? "font-bold underline" : ""}`
+                      `${headerConfig.metallicMenuText === true ? 'rb-metallic-text ' : ''}transition duration-300 ${isActive ? "font-bold underline" : ""}`
                     }
                   >
                     {item.name}

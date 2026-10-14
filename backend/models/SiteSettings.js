@@ -389,6 +389,7 @@ const ThemeSchema = new Schema(
       bgOpacity: Number,
       textColor: String,
       linkColor: String,
+      metallicMenuText: { type: Boolean, default: false },
       searchBgColor: String,
       searchTextColor: String,
       searchAccentColor: String,

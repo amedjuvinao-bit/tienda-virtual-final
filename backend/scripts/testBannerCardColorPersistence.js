@@ -38,6 +38,7 @@ async function main() {
       method: 'PUT',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       body: JSON.stringify({ appearanceRevision: doc.appearanceRevision, theme: {
+      header: { metallicMenuText: true },
       banner: { templateConfigs: { editorial: { cardTextStyle: {
         titleColor: '#b78853', labelColor: '#383433', titleSizePx: 22, labelSizePx: 16, metallicTitle: true,
       }, cards: [{
@@ -55,12 +56,14 @@ async function main() {
     assert.deepEqual(result.theme.banner.templateConfigs.editorial.cardTextStyle, {
       titleColor: '#b78853', labelColor: '#383433', titleSizePx: 22, labelSizePx: 16, metallicTitle: true,
     });
+    assert.equal(result.theme.header.metallicMenuText, true);
     const raw = await SiteSettings.collection.findOne({ _id: doc._id });
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleSizePx, 22);
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelSizePx, 16);
     assert.equal(raw.theme.banner.templateConfigs.editorial.cardTextStyle.metallicTitle, true);
+    assert.equal(raw.theme.header.metallicMenuText, true);
     assert.equal(raw.appearanceRevision, doc.appearanceRevision + 1);
     const publicResponse = await fetch(base);
     assert.equal(publicResponse.status, 200);
@@ -71,10 +74,12 @@ async function main() {
     assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cards[0].labelSizePx, 16);
     assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cardTextStyle.titleColor, '#b78853');
     assert.equal(publicSettings.theme.banner.templateConfigs.editorial.cardTextStyle.metallicTitle, true);
+    assert.equal(publicSettings.theme.header.metallicMenuText, true);
     const sizeOnlyResponse = await fetch(base, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       body: JSON.stringify({ appearanceRevision: result.appearanceRevision, theme: {
+        header: { metallicMenuText: false },
         banner: { templateConfigs: { editorial: { cards: [{ text: 'Vestidos', label: 'Elegante', titleSizePx: 24, labelSizePx: 18 }] } } },
       } }),
     });
@@ -82,6 +87,7 @@ async function main() {
     const sizeOnlyPublic = await (await fetch(base)).json();
     assert.equal(sizeOnlyPublic.theme.banner.templateConfigs.editorial.cards[0].titleSizePx, 24);
     assert.equal(sizeOnlyPublic.theme.banner.templateConfigs.editorial.cards[0].labelSizePx, 18);
+    assert.equal(sizeOnlyPublic.theme.header.metallicMenuText, false);
     console.log('PUT HTTP, MongoDB y GET HTTP público de colores y tamaños de tarjetas: OK');
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

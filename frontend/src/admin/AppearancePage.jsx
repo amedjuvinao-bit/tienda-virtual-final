@@ -301,6 +301,7 @@ function buildThemeFromServer(themeRaw) {
 
       textColor: "",
       linkColor: "",
+      metallicMenuText: false,
       searchBgColor: "",
       searchTextColor: "",
       searchAccentColor: "",
@@ -981,6 +982,25 @@ export default function AppearancePage() {
         if (!matches(publicSettings)) {
           setAppearanceRevision(saved.appearanceRevision);
           throw new Error(`La tienda pública no conserva los ${detail} de las tarjetas. Tus cambios siguen en el editor y no se marcaron como guardados.`);
+        }
+      }
+
+      if (changedTheme.header && normalizedTheme.header.metallicMenuText !== originalTheme.header.metallicMenuText) {
+        const wanted = normalizedTheme.header.metallicMenuText;
+        if (saved?.theme?.header?.metallicMenuText !== wanted) {
+          setAppearanceRevision(saved.appearanceRevision);
+          throw new Error('El servidor omitió el acabado metalizado del menú. El cambio sigue pendiente en el editor.');
+        }
+        let publicSettings;
+        try {
+          publicSettings = await fetchSiteSettings();
+        } catch {
+          setAppearanceRevision(saved.appearanceRevision);
+          throw new Error('No se pudo comprobar el acabado del menú en la tienda pública. El cambio sigue pendiente.');
+        }
+        if (publicSettings?.theme?.header?.metallicMenuText !== wanted) {
+          setAppearanceRevision(saved.appearanceRevision);
+          throw new Error('La tienda pública no conserva el acabado metalizado del menú. El cambio sigue pendiente.');
         }
       }
 

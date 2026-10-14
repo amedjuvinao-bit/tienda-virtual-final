@@ -1,17 +1,16 @@
 .rb-metallic-text {
   /* Mix the selected text color with highlights and shadows inside the glyphs. */
-  background: linear-gradient(163deg,
-    color-mix(in srgb, var(--rb-metal-ink, #b78853) 28%, #fffdf2) 0%,
-    color-mix(in srgb, var(--rb-metal-ink, #b78853) 70%, #fbe1ac) 21%,
-    color-mix(in srgb, var(--rb-metal-ink, #b78853) 58%, #2d1714) 40%,
-    #fff6d8 49%,
-    color-mix(in srgb, var(--rb-metal-ink, #b78853) 56%, #fff3ce) 57%,
-    color-mix(in srgb, var(--rb-metal-ink, #b78853) 67%, #382019) 78%,
-    color-mix(in srgb, var(--rb-metal-ink, #b78853) 40%, #fff9e9) 100%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 48%, white) 0%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 83%, white) 26%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 68%, black) 47%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 38%, white) 52%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 90%, white) 72%,
+    color-mix(in srgb, var(--rb-metal-ink, #b78853) 70%, black) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  -webkit-text-stroke: .24px color-mix(in srgb, var(--rb-metal-ink, #b78853) 72%, #36221c);
+  -webkit-text-stroke: .2px color-mix(in srgb, var(--rb-metal-ink, #b78853) 68%, black);
   text-shadow: none;
   filter: drop-shadow(0 1px 1px rgba(35, 18, 19, .5));
 }

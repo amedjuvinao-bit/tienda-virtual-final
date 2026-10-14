@@ -22,13 +22,19 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe('encabezado de la tienda', () => {
   it('aplica el acabado metalizado a los enlaces internos y externos del menú de escritorio', async () => {
     fetchSiteSettings.mockResolvedValue({
-      theme: { header: { textColor: '#b78a53', linkColor: '#e46288' }, footer: {} },
+      theme: { header: { textColor: '#b78a53', linkColor: '#e46288', metallicMenuText: true }, footer: {} },
       menus: { header: [{ title: 'Inicio', ref: '/' }, { title: 'Revista', ref: 'https://example.com' }] },
     });
     render(<MemoryRouter><Header /></MemoryRouter>);
     const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
     await waitFor(() => expect(within(navigation).getAllByRole('link')).toHaveLength(2));
     expect(within(navigation).getAllByRole('link').every((link) => link.classList.contains('rb-metallic-text'))).toBe(true);
+  });
+  it('deja el menú sin efecto cuando la opción no está activada', async () => {
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
+    await waitFor(() => expect(within(navigation).getByRole('link', { name: 'Lo Nuevo' })).toBeInTheDocument());
+    expect(navigation.querySelector('.rb-metallic-text')).toBeNull();
   });
   it('muestra el icono de moda y el color guardados en el menú móvil público', async () => {
     fetchSiteSettings.mockResolvedValue({

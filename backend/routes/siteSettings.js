@@ -69,6 +69,7 @@ function buildDefaultSettings() {
         bgOpacity: 1,
         textColor: "",
         linkColor: "",
+        metallicMenuText: false,
         searchBgColor: "",
         searchTextColor: "",
         searchAccentColor: "",

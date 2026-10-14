@@ -82,10 +82,25 @@ describe('edición del encabezado', () => {
     await user.clear(screen.getByPlaceholderText('Ej: Lo Nuevo'));
     await user.type(screen.getByPlaceholderText('Ej: Lo Nuevo'), 'Colección');
     expect(within(preview).getByText('Colección')).toBeInTheDocument();
-    expect(within(preview).getByText('Colección')).toHaveClass('rb-metallic-text');
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     await user.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
     expect(within(preview).getByRole('navigation', { name: 'Vista previa del menú móvil' })).toHaveTextContent('Colección');
+  });
+
+  it('activa y apaga el metal del menú desde el panel con vista previa inmediata', async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    const text = within(preview).getByText('Inicio');
+    expect(text).not.toHaveClass('rb-metallic-text');
+    await user.click(screen.getByRole('button', { name: /Estilo Fuente/ }));
+    await user.click(screen.getByRole('button', { name: 'Menú' }));
+    const toggle = screen.getByRole('checkbox', { name: 'Activar acabado metalizado en los enlaces del menú' });
+    await user.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(text).toHaveClass('rb-metallic-text');
+    await user.click(toggle);
+    expect(text).not.toHaveClass('rb-metallic-text');
   });
 
   it('permite seleccionar Atelier y elegir el ícono de cualquier enlace en la vista previa', async () => {

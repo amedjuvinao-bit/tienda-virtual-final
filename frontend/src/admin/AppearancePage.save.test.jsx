@@ -37,6 +37,7 @@ vi.mock('./appearance/header/HeaderPanel', () => ({
       setPath('header.iconOverrides.satin.favorites', 'https://res.cloudinary.com/tienda/image/upload/v1/corazon.webp');
     }}>Guardar icono propio</button>
     <button onClick={() => setPath('header.searchBgColor', '#254254')}>Cambiar fondo del buscador</button>
+    <button onClick={() => setPath('header.metallicMenuText', true)}>Activar metal del menú</button>
   </>,
 }));
 vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }) => <><button onClick={() => {
@@ -403,6 +404,35 @@ describe('guardado seguro de Apariencia', () => {
     expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
     expect(saveSiteSettings.mock.calls[0][0].theme.banner.templateConfigs.editorial.cardTextStyle).toMatchObject({ metallicTitle: true, titleSizePx: 22 });
     expect(fetchSiteSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('guarda el interruptor metalizado del encabezado y lo confirma en la lectura pública', async () => {
+    const user = userEvent.setup();
+    saveSiteSettings.mockImplementation(async (payload) => ({ theme: { header: payload.theme.header }, menus: initial.menus, appearanceRevision: 4 }));
+    fetchSiteSettings.mockImplementation(async () => ({ theme: { header: saveSiteSettings.mock.calls[0][0].theme.header } }));
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Encabezado/ }));
+    await user.click(screen.getByRole('button', { name: 'Activar metal del menú' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
+    expect(saveSiteSettings.mock.calls[0][0].theme.header.metallicMenuText).toBe(true);
+    expect(fetchSiteSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('no anuncia éxito si el backend descarta la opción de metal del menú', async () => {
+    const user = userEvent.setup();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      saveSiteSettings.mockResolvedValue({ theme: { header: {} }, menus: initial.menus, appearanceRevision: 4 });
+      render(<AppearancePage />);
+      await screen.findByText('Cambiar WhatsApp');
+      await user.click(screen.getByRole('button', { name: /Encabezado/ }));
+      await user.click(screen.getByRole('button', { name: 'Activar metal del menú' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('El servidor omitió el acabado metalizado del menú');
+      expect(fetchSiteSettings).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
   });
 
   it('mantiene pendiente el estilo global si la respuesta pública lo omite', async () => {
