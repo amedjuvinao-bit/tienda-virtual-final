@@ -113,7 +113,7 @@ export default function BannerTemplateView({ banner, sections, preview = false, 
     '--rb-template-overlay': Math.min(70, Math.max(0, Number(c.overlayOpacity) || 0)) / 100,
   };
   const cards = c.cards.map((item, index) => ({ ...item, sourceIndex: index })).filter((item) => item.enabled !== false);
-  const categoriesOpen = mobileCategoriesOpen || (preview && selectedPart?.startsWith('card:'));
+  const categoriesOpen = Boolean(mobileCategoriesOpen || (preview && selectedPart?.startsWith('card:')));
 
   return <div ref={rootRef} className={`rb-template rb-template--${id}`} style={css} data-banner-template={id} data-card-count={cards.length} data-button-animation={c.buttonAnimation} data-card-motion={preview ? undefined : cardMotion} data-preview-device={preview ? device : undefined}>
     <div className="rb-template__picture">{children}</div>

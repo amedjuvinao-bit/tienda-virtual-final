@@ -652,6 +652,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       text: s.text || "",
     }))
   }, [bannerType, banner?.slides, fallbackSlides, useTemplate, plainMedia])
+  const trackSliderProgress = banner?.sliderShowControls !== false && banner?.sliderShowCounter === true && banner?.sliderShowProgress !== false && slides.length > 1
 
   const sliderMountKey = useMemo(() => {
     if (bannerType !== "slider") return "noslider"
@@ -734,13 +735,13 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       rafRef.current = requestAnimationFrame(tick)
     }
 
-    rafRef.current = requestAnimationFrame(tick)
+    if (trackSliderProgress) rafRef.current = requestAnimationFrame(tick)
 
     return () => {
       clearInterval(intervalRef.current)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [bannerType, instanceRef, autoplayMs, slides.length])
+  }, [bannerType, instanceRef, autoplayMs, slides.length, trackSliderProgress])
 
   const renderSliderControls = () => banner?.sliderShowControls !== false && slides.length > 1 && <SliderControls
     count={slides.length}

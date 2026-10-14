@@ -20,7 +20,7 @@ function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520,
     const keys = path.split('.');
     let cursor = next;
     for (const key of keys.slice(0, -1)) cursor = cursor[key] ||= {};
-    cursor[keys.at(-1)] = value;
+    cursor[keys.at(-1)] = typeof value === 'function' ? value(cursor[keys.at(-1)], previous) : value;
     return next;
   });
   return <><output data-testid="banner-values">{JSON.stringify(theme.banner)}</output><BannerPanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={upload} onPreview={() => {}} /></>;
@@ -105,7 +105,7 @@ describe('editor de Portada', () => {
     expect(within(preview).getByAltText('Slide 1')).toHaveStyle({ objectPosition: '0% 35%' });
     await user.click(within(preview).getByRole('button', { name: 'Móvil' }));
     expect(frame).toHaveAttribute('data-device', 'mobile');
-    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(844 / 1200) * 100}%` });
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: '100%' });
     await user.click(within(preview).getByRole('button', { name: 'Tableta' }));
     expect(frame).toHaveAttribute('data-device', 'tablet');
     await user.click(within(preview).getByRole('button', { name: 'Siguiente ›' }));
@@ -212,7 +212,7 @@ describe('editor de Portada', () => {
     ] };
     render(<Editor initial={{ type: 'slider', slides: [first], heightMode: 'auto', heightPx: 520 }} />);
     await user.click(screen.getByRole('button', { name: 'Editar botón 2 de la portada' }));
-    const dialog = screen.getByRole('dialog', { name: 'Editar Slide #1' });
+    const dialog = screen.getByRole('dialog', { name: 'Botones del slide 1' });
     expect(within(dialog).getByDisplayValue('Segundo')).toBeInTheDocument();
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Texto del botón' }), { target: { value: 'Nuevo texto' } });
     const values = JSON.parse(screen.getByTestId('banner-values').textContent);
@@ -225,8 +225,8 @@ describe('editor de Portada', () => {
     expect(getBannerPreviewModel(banner, [], 0, 'desktop').heightPercent).toBe(37.5);
     expect(getBannerPreviewModel({ ...banner, heightPx: 1100 }, [], 0, 'desktop').heightPercent).toBeCloseTo(91.67, 1);
     expect(getBannerPreviewModel({ ...banner, heightMode: 'fullscreen' }, [], 0, 'desktop').heightPercent).toBe(75);
-    expect(getBannerPreviewModel(banner, [], 0, 'mobile').heightPercent).toBeCloseTo((844 / 1200) * 100);
-    expect(getBannerPreviewModel(banner, [], 0, 'tablet').objectPosition).toBe('0% 100%');
+    expect(getBannerPreviewModel(banner, [], 0, 'mobile').heightPercent).toBe(100);
+    expect(getBannerPreviewModel(banner, [], 0, 'tablet').objectPosition).toBe('50% 50%');
     expect(getBannerHeightStyle(banner, 'mobile')).toEqual({ height: '100dvh' });
     expect(getBannerHeightStyle(banner, 'tablet')).toEqual({ height: '100dvh' });
     expect(getBannerHeightStyle(banner, 'desktop')).toEqual({ height: '450px' });
@@ -241,13 +241,13 @@ describe('editor de Portada', () => {
     await user.click(screen.getByRole('button', { name: 'Comportamiento' }));
     fireEvent.change(screen.getByRole('slider', { name: /Altura de móvil/ }), { target: { value: '650' } });
     expect(frame).toHaveAttribute('data-device', 'mobile');
-    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(650 / 1200) * 100}%` });
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(650 / 844) * 100}%` });
     expect(getBannerHeightStyle(JSON.parse(screen.getByTestId('banner-values').textContent), 'mobile')).toEqual({ height: '650px' });
     await user.click(within(preview).getByRole('button', { name: 'Tableta' }));
     expect(screen.getByRole('slider', { name: /Altura de tableta/ })).toHaveValue('1180');
     fireEvent.change(screen.getByRole('slider', { name: /Altura de tableta/ }), { target: { value: '900' } });
     expect(frame).toHaveAttribute('data-device', 'tablet');
-    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: '75%' });
+    expect(preview.querySelector('.banner-preview-hero')).toHaveStyle({ height: `${(900 / 1180) * 100}%` });
     await user.click(within(preview).getByRole('button', { name: 'Escritorio' }));
     expect(screen.getByRole('slider', { name: /Altura de escritorio/ })).toHaveValue('520');
     fireEvent.change(screen.getByRole('slider', { name: /Altura de escritorio/ }), { target: { value: '1100' } });

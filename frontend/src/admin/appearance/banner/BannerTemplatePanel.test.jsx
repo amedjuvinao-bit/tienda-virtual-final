@@ -201,7 +201,9 @@ describe('editor de plantillas', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Mostrar imagen' })).toHaveAttribute('aria-pressed', 'true'));
     const stage = screen.getByRole('img', { name: 'Encuadre del fondo de la tarjeta' });
     stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 });
-    fireEvent.pointerDown(stage, { pointerId: 1, clientX: 150, clientY: 40 });
+    const pointerDown = new Event('pointerdown', { bubbles: true });
+    Object.defineProperties(pointerDown, { pointerId: { value: 1 }, clientX: { value: 150 }, clientY: { value: 40 } });
+    fireEvent(stage, pointerDown);
     fireEvent.change(screen.getByLabelText(/Acercamiento/), { target: { value: '125' } });
     let saved = JSON.parse(screen.getByTestId('state').textContent);
     expect(saved.templateConfigs.editorial.cards[0]).toEqual(expect.objectContaining({
