@@ -24,6 +24,7 @@ import { MobileMenuLinkIcon } from './mobileMenuIcons';
 import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
 import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import './storefrontChromeGlassHover.css';
+import './metallicText.css';
 
 function Header() {
   const [showHeader, setShowHeader] = useState(true);
@@ -432,7 +433,7 @@ function Header() {
                       href={item.to}
                       target="_blank"
                       rel="noreferrer"
-                      className="transition duration-300"
+                      className="rb-metallic-text transition duration-300"
                     >
                       {item.name}
                     </a>
@@ -444,7 +445,7 @@ function Header() {
                     key={idx}
                     to={item.to}
                     className={({ isActive }) =>
-                      `transition duration-300 ${isActive ? "font-bold underline" : ""}`
+                      `rb-metallic-text transition duration-300 ${isActive ? "font-bold underline" : ""}`
                     }
                   >
                     {item.name}
