@@ -170,22 +170,20 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
       </div>
     </div>}
 
-    {group === 'categories' && <div className="banner-template-inspector">
-      <p className="banner-template-help">Elige una categoría creada en Productos o un artículo. Los accesos anteriores se conservan hasta que los cambies.</p>
+    {group === 'categories' && <div className="banner-template-inspector banner-template-inspector--cards">
+      <div className="banner-template-cards-heading"><strong>Accesos del banner</strong><span>Elige una tarjeta y asígnale una categoría del catálogo o un producto.</span></div>
         <div className="banner-template-parts" role="group" aria-label="Acceso de categoría para editar">
           {refs.map((entry, cardIndex) => {
             const linked = categories.find((item) => item.id === entry.categoryId);
             return <button key={cardIndex} type="button" aria-pressed={index === cardIndex} onClick={() => { setProductQuery(''); choose(`card:${cardIndex}`); }}>
-              <small>Acceso {cardIndex + 1}{entry.enabled === false ? ' · oculto' : ''}</small><strong>{entry.text || (entry.destinationType === 'product' ? entry.featuredProductTitle : entry.destinationType === 'catalogCategory' ? entry.catalogCategoryName : linked?.title) || 'Elige un destino'}</strong>
+              <small>{String(cardIndex + 1).padStart(2, '0')} {entry.enabled === false ? '· Oculto' : '· Visible'}</small><strong>{entry.text || (entry.destinationType === 'product' ? entry.featuredProductTitle : entry.destinationType === 'catalogCategory' ? entry.catalogCategoryName : linked?.title) || 'Elige un destino'}</strong>
             </button>;
           })}
           {refs.length < maxCards && <button type="button" className="banner-template-parts__add" onClick={() => { const nextCategory = catalogCategories.find((item) => !refs.some((ref) => ref.catalogCategoryId === item.id)); update({ cards: [...refs, { destinationType: 'catalogCategory', catalogCategoryId: nextCategory?.id || '', catalogCategoryName: nextCategory?.name || '', catalogCategoryImage: nextCategory?.image || '', enabled: true, x: 75, y: 68 }] }); choose(`card:${refs.length}`); }}>+ Añadir acceso</button>}
         </div>
         {card && <div className="banner-template-inspector__fields">
-          <strong>Acceso {index + 1}</strong>
-          {id === 'atelier' && <p className="banner-template-help">Arrastra esta tarjeta en la vista previa para ubicarla en cada tamaño de pantalla. La línea une la tarjeta con el punto señalado en la foto.</p>}
-          <label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Mostrar en la portada</label>
-          <label className="banner-template-field"><span>Al hacer clic, abrir</span><select value={destinationType} onChange={(event) => {
+          <div className="banner-template-card-heading"><strong>Tarjeta {index + 1}</strong><label className="banner-template-toggle"><input type="checkbox" checked={card.enabled !== false} onChange={(event) => updateCard(index, { enabled: event.target.checked })} /> Visible en la portada</label></div>
+          <div className="banner-template-card-route"><label className="banner-template-field"><span>Al hacer clic, abrir</span><select value={destinationType} onChange={(event) => {
             const nextType = event.target.value;
             const first = catalogCategories[0];
             updateCard(index, { destinationType: nextType, text: '', label: '', image: '',
@@ -211,7 +209,7 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
           </>}
           {destinationType === 'category' && <>
             <label className="banner-template-field"><span>Acceso anterior</span><select value={card.categoryId || ''} onChange={(event) => updateCard(index, { categoryId: event.target.value, label: '', text: '', image: '' })}>{categories.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
-            <p className="banner-template-help">Este acceso se conserva. Elige «Una categoría del catálogo» para enlazarlo con productos reales.</p>
+            <p className="banner-template-help">Para mostrar productos reales, cambia el destino a categoría del catálogo.</p>
           </>}
           {destinationType === 'product' && <div className="banner-template-product-picker">
             <label className="banner-template-field"><span>Buscar producto</span><input type="search" placeholder="Escribe el nombre o código" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} /></label>
@@ -228,20 +226,24 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
             </div>}
             {!card.featuredProductId && <p className="banner-template-help">Busca y elige un producto para crear el enlace de la tarjeta.</p>}
           </div>}
+          </div>
+          <details className="banner-template-card-details"><summary>Texto e imagen <span>opcional</span></summary>
           <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
-          {id === 'atelier' && <div className="banner-template-point-control">
-            <button type="button" className="banner-btn banner-btn--primary" aria-pressed={placingCard === index} onClick={() => onStartPlacing?.(placingCard === index ? null : index)}>{placingCard === index ? 'Cancelar ubicación' : 'Señalar lugar en la imagen'}</button>
-            {placingCard === index && <p className="banner-template-help" role="status">Ahora haz clic en el objeto que quieres señalar dentro de la vista previa.</p>}
-            <div className="banner-template-position"><Field type="number" min="0" max="100" label="Punto horizontal %" value={card.x ?? 45 + index * 29} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Punto vertical %" value={card.y ?? 28 + index * 24} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>
-            <Field type="color" label="Color de línea y punto" value={safeHotspotColor(card.lineColor)} onChange={(event) => updateCard(index, { lineColor: event.target.value })} />
-          </div>}
           <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
             <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
             {cardImage && <img src={cardImage} alt="Vista previa de la tarjeta" className="banner-template-card-media__preview" />}
-            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen del {destinationType === 'product' ? 'producto' : 'categoría'}</button>}
-          </div>
+            {card.image && <button type="button" className="banner-btn" onClick={() => updateCard(index, { image: '' })}>Usar imagen de la {destinationType === 'product' ? 'ficha del producto' : 'categoría'}</button>}
+          </div></details>
+          {id === 'atelier' && <details className="banner-template-card-details"><summary>Ubicación y señalador</summary><div className="banner-template-point-control">
+            <p className="banner-template-help">Arrastra la tarjeta en la vista previa. La línea señala un punto en la imagen.</p>
+            <button type="button" className="banner-btn banner-btn--primary" aria-pressed={placingCard === index} onClick={() => onStartPlacing?.(placingCard === index ? null : index)}>{placingCard === index ? 'Cancelar ubicación' : 'Señalar lugar en la imagen'}</button>
+            {placingCard === index && <p className="banner-template-help" role="status">Ahora haz clic en el objeto que quieres señalar dentro de la vista previa.</p>}
+            <div className="banner-template-position"><Field type="number" min="0" max="100" label="Punto horizontal %" value={card.x ?? 45 + index * 29} onChange={(event) => updateCard(index, { x: Number(event.target.value) })} /><Field type="number" min="0" max="100" label="Punto vertical %" value={card.y ?? 28 + index * 24} onChange={(event) => updateCard(index, { y: Number(event.target.value) })} /></div>
+            <Field type="color" label="Color de línea y punto" value={safeHotspotColor(card.lineColor)} onChange={(event) => updateCard(index, { lineColor: event.target.value })} />
+          </div></details>}
+
           {error && <p role="alert">{error}</p>}
         </div>}
     </div>}
