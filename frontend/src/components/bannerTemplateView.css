@@ -326,8 +326,25 @@
 .rb-template--editorial .rb-template__card {
   flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-start;
   min-width: 0; min-height: 116px; gap: 3px; padding: clamp(6px,.75cqw,12px);
-  border-radius: 15px; background: rgba(255,246,245,.68);
-  color: #713844; text-align: center;
+  border: 1px solid rgba(255,255,255,.62);
+  border-radius: 16px;
+  background: linear-gradient(155deg,
+    color-mix(in srgb,var(--rb-template-glass) 18%,transparent),
+    rgba(255,255,255,.035) 48%,
+    rgba(31,11,28,.18));
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.82),
+    inset 0 -1px 2px rgba(255,255,255,.2),
+    0 9px 24px rgba(32,11,26,.22);
+  backdrop-filter: blur(4px) saturate(155%);
+  -webkit-backdrop-filter: blur(4px) saturate(155%);
+  color: var(--rb-template-text); text-align: center;
+}
+.rb-template--editorial .rb-template__card:is(:hover,:focus-visible) {
+  background: linear-gradient(155deg,
+    color-mix(in srgb,var(--rb-template-glass) 25%,transparent),
+    rgba(255,255,255,.07) 45%,
+    rgba(31,11,28,.23));
+  border-color: color-mix(in srgb,var(--rb-template-accent) 48%,rgba(255,255,255,.78));
 }
 .rb-template--editorial .rb-template__card img,
 .rb-template--editorial[data-preview-device] .rb-template__card img {
@@ -337,11 +354,11 @@
 .rb-template--editorial .rb-template__card-copy { display: grid; flex: none; width: 100%; gap: 2px; }
 .rb-template--editorial .rb-template__card strong,
 .rb-template--editorial[data-preview-device] .rb-template__card strong {
-  font: 600 clamp(9px,1cqw,14px)/1.1 Georgia,serif; color: #713844;
+  font: 600 clamp(9px,1cqw,14px)/1.1 Georgia,serif; color: inherit;
   white-space: normal; overflow-wrap: anywhere;
 }
-.rb-template--editorial .rb-template__card small { color: #ad6975; font-size: clamp(8px,.7cqw,10px); }
-.rb-template--editorial .rb-template__card > span:last-child { margin: auto 0 0; font-size: 13px; color: #b78156; }
+.rb-template--editorial .rb-template__card small { color: var(--rb-template-accent); font-size: clamp(8px,.7cqw,10px); }
+.rb-template--editorial .rb-template__card > span:last-child { margin: auto 0 0; font-size: 13px; color: var(--rb-template-accent); }
 .rb-template__trust { display: flex; align-items: center; flex-wrap: wrap; gap: clamp(8px,1.5cqw,22px); margin-top: clamp(10px,1.4cqw,20px); }
 .rb-template__trust-item { display: inline-flex; align-items: center; gap: 6px; font: 500 clamp(9px,.82cqw,12px)/1.2 system-ui,sans-serif; }
 .rb-template__trust-icon { position: relative; display: grid; width: 24px; height: 24px; flex: none; place-items: center; border: 1px solid rgba(255,255,255,.6); border-radius: 8px; background: rgba(255,255,255,.22); box-shadow: inset 0 1px 2px rgba(255,255,255,.7); backdrop-filter: blur(8px); }
