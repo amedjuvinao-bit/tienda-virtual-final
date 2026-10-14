@@ -101,6 +101,7 @@ const BannerTemplateCardSchema = new Schema({
   label: { type: String, default: "" },
   text: { type: String, default: "" },
   image: { type: String, default: "" },
+  imageSource: { type: String, enum: ["custom", "catalog"], default: "custom" },
   link: { type: String, default: "" },
   x: { type: Number, min: 0, max: 100, default: 70 },
   y: { type: Number, min: 0, max: 100, default: 55 },
