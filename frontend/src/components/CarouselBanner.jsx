@@ -747,6 +747,9 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     current={currentSlide}
     progress={progress}
     color={banner?.sliderControlColor}
+    theme={banner?.sliderControlTheme}
+    position={banner?.sliderControlPosition}
+    size={banner?.sliderControlSize}
     showProgress={banner?.sliderShowProgress !== false}
     onPrevious={() => instanceRef.current?.prev()}
     onNext={() => instanceRef.current?.next()}

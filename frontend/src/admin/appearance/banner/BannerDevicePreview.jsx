@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { getBannerHeightSettings } from '../../../lib/bannerHeight';
 import BannerTemplateView from '../../../components/BannerTemplateView';
+import SliderControls from '../../../components/SliderControls';
 
 export const BANNER_DEVICES = Object.freeze({
   mobile: { label: 'Móvil', width: 390, height: 844 },
@@ -44,7 +45,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   };
 }
 
-export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard }) {
+export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard, onPreviousSlide, onNextSlide, onChooseSlide }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
   const { viewport, frameHeight, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
   const viewportRef = useRef(null);
@@ -86,7 +87,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
               </button>
             );
           })}
-          {type === 'slider' && slides.length > 1 && banner?.sliderShowControls !== false && <div className="banner-preview-dots" aria-hidden="true" style={{ '--banner-preview-control-color': /^#[0-9a-fA-F]{6}$/.test(banner?.sliderControlColor || '') ? banner.sliderControlColor : '#ffffff' }}><span>‹</span>{slides.map((_, index) => <i key={index} data-active={index === selectedIdx} />)}<span>›</span></div>}
+          {type === 'slider' && slides.length > 1 && banner?.sliderShowControls !== false && <SliderControls count={slides.length} current={selectedIdx} progress={.48} color={banner?.sliderControlColor} theme={banner?.sliderControlTheme} position={banner?.sliderControlPosition} size={banner?.sliderControlSize} device={device} showProgress={banner?.sliderShowProgress !== false} onPrevious={onPreviousSlide} onNext={onNextSlide} onChoose={onChooseSlide} />}
         </div>
         {foldPercent < 100 && <div className="banner-preview-fold" style={{ top: `${foldPercent}%` }}><span>{viewport.height} px visibles</span></div>}
         {heightPercent < 100 && <div className="banner-preview-below" style={{ top: `${heightPercent}%` }}>Contenido debajo de la portada</div>}

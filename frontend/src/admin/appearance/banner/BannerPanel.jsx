@@ -40,6 +40,12 @@ const clampNum = (n, min, max, fallback) => {
 };
 
 const IMAGE_SIZES = { desktop: { label: 'Escritorio', size: '1920 × 1080 px' }, tablet: { label: 'Tableta', size: '1200 × 1600 px' }, mobile: { label: 'Móvil', size: '1080 × 1920 px' } };
+const SLIDER_CONTROL_THEMES = [
+  { id: 'minimal', name: 'Trazo fino', sample: '‹  ━  ─  ─  ›' },
+  { id: 'petal', name: 'Pétalos de vidrio', sample: '❮  ◇  ◆  ◇  ❯' },
+  { id: 'orbit', name: 'Órbita luminosa', sample: '〈  ○  ◉  ○  〉' },
+  { id: 'editorial', name: 'Editorial', sample: '←  01  02  03  →' },
+];
 const imageFieldForDevice = (device, single = false) => single ? ({ desktop: 'imageUrl', tablet: 'imageTabletUrl', mobile: 'imageMobileUrl' })[device] : ({ desktop: 'image', tablet: 'imageTablet', mobile: 'imageMobile' })[device];
 
 const buildDefaultButton = () => ({
@@ -618,7 +624,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const previewCard = (
     <div className="banner-preview-pin" ref={previewCardRef}>
       <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un elemento para editarlo. Arrastra las tarjetas de categoría para ubicarlas.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-      <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} onMoveCard={moveCard} />
+      <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} onMoveCard={moveCard} onPreviousSlide={() => chooseSlide(-1)} onNextSlide={() => chooseSlide(1)} onChooseSlide={setSelectedIdx} />
       {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
       <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
       {compactPreview && <details className="banner-preview-compact-meta"><summary>{issues.length ? `${issues.length} ${issues.length === 1 ? 'aviso' : 'avisos'} antes de publicar` : 'Datos técnicos'}</summary>{issues.length > 0 && <ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul>}<pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
@@ -742,7 +748,10 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
             <Input type="number" min="1.2" max="15" step="0.1" label="Segundos por imagen" value={Number(effectiveInterval) / 1000} onChange={(e) => setPath('banner.sliderIntervalMs', Math.round(Number(e.target.value) * 1000))} />
             <label className="banner-check"><input type="checkbox" checked={b.sliderShowControls !== false} onChange={(e) => setPath('banner.sliderShowControls', e.target.checked)} /> Mostrar controles del slider</label>
             {b.sliderShowControls !== false && <div className="banner-slider-control-options">
+              <div className="banner-slider-theme-grid" role="group" aria-label="Estilo de controles del slider">{SLIDER_CONTROL_THEMES.map((option) => <button type="button" key={option.id} data-theme={option.id} aria-pressed={(b.sliderControlTheme || 'minimal') === option.id} onClick={() => setPath('banner.sliderControlTheme', option.id)}><span className="banner-slider-theme-sample" aria-hidden="true">{option.sample}</span><strong>{option.name}</strong></button>)}</div>
               <label>Color de flechas e indicadores <input type="color" aria-label="Color de controles del slider" value={/^#[0-9a-fA-F]{6}$/.test(b.sliderControlColor || '') ? b.sliderControlColor : '#ffffff'} onChange={(e) => setPath('banner.sliderControlColor', e.target.value)} /></label>
+              <label>Ubicación en escritorio <select aria-label="Ubicación de controles del slider" value={b.sliderControlPosition || 'right'} onChange={(e) => setPath('banner.sliderControlPosition', e.target.value)}><option value="right">Derecha</option><option value="left">Izquierda</option><option value="bottom">Abajo, centrados</option></select></label>
+              <label>Tamaño · {b.sliderControlSize || 100}% <input type="range" min="80" max="140" step="5" aria-label="Tamaño de controles del slider" value={b.sliderControlSize || 100} onChange={(e) => setPath('banner.sliderControlSize', Number(e.target.value))} /></label>
               <label className="banner-check"><input type="checkbox" checked={b.sliderShowProgress !== false} onChange={(e) => setPath('banner.sliderShowProgress', e.target.checked)} /> Mostrar progreso entre imágenes</label>
             </div>}
           </>}

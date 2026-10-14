@@ -31,8 +31,10 @@ describe('portada pública con diseño opcional', () => {
     rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'discovery', slides, sliderControlColor: '#bd8db5', sliderShowControls: false }} />);
     await waitFor(() => expect(container.querySelector('.rb-slider-controls')).not.toBeInTheDocument());
 
-    rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'discovery', slides, sliderControlColor: '#bd8db5', sliderShowControls: true }} />);
-    await waitFor(() => expect(container.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#bd8db5' }));
+    rerender(<CarouselBanner bannerOverride={{ type: 'slider', templateId: 'discovery', slides, sliderControlColor: '#bd8db5', sliderControlTheme: 'editorial', sliderControlPosition: 'bottom', sliderControlSize: 120, sliderShowControls: true }} />);
+    await waitFor(() => expect(container.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#bd8db5', '--rb-slider-scale': '1.2' }));
+    expect(container.querySelector('.rb-slider-controls')).toHaveAttribute('data-theme', 'editorial');
+    expect(container.querySelector('.rb-slider-controls')).toHaveAttribute('data-position', 'bottom');
   });
 
   it('mantiene el mismo video con o sin plantilla y oculta el botón antiguo en modo solo archivo', async () => {

@@ -177,6 +177,9 @@ const BannerSchema = new Schema(
     sliderShowProgress: { type: Boolean, default: true },
     sliderShowControls: { type: Boolean, default: true },
     sliderControlColor: { type: String, default: "#ffffff", match: /^#[0-9a-fA-F]{6}$/ },
+    sliderControlTheme: { type: String, enum: ["minimal", "petal", "orbit", "editorial"], default: "minimal" },
+    sliderControlPosition: { type: String, enum: ["right", "left", "bottom"], default: "right" },
+    sliderControlSize: { type: Number, min: 80, max: 140, default: 100 },
 
     imageUrl: { type: String, default: "" },
     imageTabletUrl: { type: String, default: "" },

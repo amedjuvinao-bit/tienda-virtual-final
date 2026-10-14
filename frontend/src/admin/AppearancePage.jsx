@@ -261,6 +261,9 @@ function buildThemeFromServer(themeRaw) {
     sliderShowProgress: true,
     sliderShowControls: true,
     sliderControlColor: "#ffffff",
+    sliderControlTheme: "minimal",
+    sliderControlPosition: "right",
+    sliderControlSize: 100,
   };
 
   return {
@@ -404,6 +407,9 @@ function buildThemeFromServer(themeRaw) {
       sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
       sliderShowControls: bannerRaw?.sliderShowControls !== false,
       sliderControlColor: /^#[0-9a-fA-F]{6}$/.test(bannerRaw?.sliderControlColor || '') ? bannerRaw.sliderControlColor : '#ffffff',
+      sliderControlTheme: ['minimal', 'petal', 'orbit', 'editorial'].includes(bannerRaw?.sliderControlTheme) ? bannerRaw.sliderControlTheme : 'minimal',
+      sliderControlPosition: ['right', 'left', 'bottom'].includes(bannerRaw?.sliderControlPosition) ? bannerRaw.sliderControlPosition : 'right',
+      sliderControlSize: Number.isFinite(Number(bannerRaw?.sliderControlSize)) ? Math.max(80, Math.min(140, Number(bannerRaw.sliderControlSize))) : 100,
     },
   };
 }

@@ -133,15 +133,23 @@ describe('editor de Portada', () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
-    expect(preview.querySelector('.banner-preview-dots')).toBeInTheDocument();
+    expect(preview.querySelector('.rb-slider-controls')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Comportamiento' }));
     fireEvent.change(screen.getByLabelText('Color de controles del slider'), { target: { value: '#db9fc2' } });
-    expect(preview.querySelector('.banner-preview-dots')).toHaveStyle({ '--banner-preview-control-color': '#db9fc2' });
+    expect(preview.querySelector('.rb-slider-controls')).toHaveStyle({ '--rb-slider-color': '#db9fc2' });
+    await user.click(screen.getByRole('button', { name: 'Editorial' }));
+    expect(preview.querySelector('.rb-slider-controls')).toHaveAttribute('data-theme', 'editorial');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Ubicación de controles del slider' }), { target: { value: 'bottom' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Tamaño de controles del slider' }), { target: { value: '120' } });
+    expect(preview.querySelector('.rb-slider-controls')).toHaveAttribute('data-position', 'bottom');
     await user.click(screen.getByRole('checkbox', { name: 'Mostrar controles del slider' }));
-    expect(preview.querySelector('.banner-preview-dots')).not.toBeInTheDocument();
+    expect(preview.querySelector('.rb-slider-controls')).not.toBeInTheDocument();
     const values = JSON.parse(screen.getByTestId('banner-values').textContent);
     expect(values.sliderShowControls).toBe(false);
     expect(values.sliderControlColor).toBe('#db9fc2');
+    expect(values.sliderControlTheme).toBe('editorial');
+    expect(values.sliderControlPosition).toBe('bottom');
+    expect(values.sliderControlSize).toBe(120);
   });
 
   it('previsualiza un video y avisa cuando el autoplay con sonido puede fallar', async () => {
