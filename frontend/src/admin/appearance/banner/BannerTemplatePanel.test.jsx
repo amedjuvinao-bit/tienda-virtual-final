@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BannerTemplatePanel from './BannerTemplatePanel';
 import { getBannerTemplate } from '../../../lib/bannerTemplates';
@@ -10,7 +10,7 @@ beforeEach(() => vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, js
 ] }) })));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-function Editor() {
+function Editor({ uploadImage = vi.fn() }) {
   const [theme, setTheme] = useState({ banner: { templateId: 'discovery' }, sections: [{ id: 'categorias', config: { slides: [
     { id: 'hogar', title: 'Hogar', href: '/categoria/hogar', enabled: true },
     { id: 'regalos', title: 'Regalos', href: '/categoria/regalos', enabled: true },
@@ -20,11 +20,11 @@ function Editor() {
     const keys = path.split('.');
     let cursor = draft;
     for (const key of keys.slice(0, -1)) cursor = cursor[key] ||= {};
-    cursor[keys.at(-1)] = value;
+    cursor[keys.at(-1)] = typeof value === 'function' ? value(cursor[keys.at(-1)], previous) : value;
     return draft;
   });
   const [placingCard, setPlacingCard] = useState(null);
-  return <><output data-testid="state">{JSON.stringify(theme.banner)}</output><button onClick={() => setPath('banner.templateId', 'editorial')}>Editorial</button><button onClick={() => setPath('banner.templateId', 'discovery')}>Descubrimiento</button><button onClick={() => setPath('banner.templateId', 'atelier')}>Vitrina</button><BannerTemplatePanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={vi.fn()} placingCard={placingCard} onStartPlacing={setPlacingCard} /></>;
+  return <><output data-testid="state">{JSON.stringify(theme.banner)}</output><button onClick={() => setPath('banner.templateId', 'editorial')}>Editorial</button><button onClick={() => setPath('banner.templateId', 'discovery')}>Descubrimiento</button><button onClick={() => setPath('banner.templateId', 'atelier')}>Vitrina</button><BannerTemplatePanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={uploadImage} placingCard={placingCard} onStartPlacing={setPlacingCard} /></>;
 }
 
 describe('editor de plantillas', () => {
@@ -141,6 +141,27 @@ describe('editor de plantillas', () => {
     expect(grid).toHaveClass('banner-template-parts');
     expect(screen.getByText('Texto e imagen', { exact: false }).closest('details')).not.toHaveAttribute('open');
     expect(screen.getByLabelText('Al hacer clic, abrir')).toBeInTheDocument();
+  });
+
+  it('conserva una miniatura subida mientras se edita texto durante la carga', async () => {
+    let finishUpload;
+    const uploadImage = vi.fn(() => new Promise((resolve) => { finishUpload = resolve; }));
+    render(<Editor uploadImage={uploadImage} />);
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.click(screen.getByText(/Texto e imagen/));
+    fireEvent.change(screen.getByLabelText('Imagen propia'), {
+      target: { files: [new File(['foto'], 'miniatura.png', { type: 'image/png' })] },
+    });
+    expect(uploadImage).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText('Texto visible (opcional)'), { target: { value: 'Colección nueva' } });
+    finishUpload('https://example.test/miniatura.png');
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('state').textContent).templateConfigs.discovery.cards[0]).toEqual(
+      expect.objectContaining({ text: 'Colección nueva', image: 'https://example.test/miniatura.png' })
+    ));
+    fireEvent.change(screen.getByLabelText('Etiqueta pequeña'), { target: { value: 'Destacado' } });
+    expect(JSON.parse(screen.getByTestId('state').textContent).templateConfigs.discovery.cards[0]).toEqual(
+      expect.objectContaining({ text: 'Colección nueva', label: 'Destacado', image: 'https://example.test/miniatura.png' })
+    );
   });
 
 });
