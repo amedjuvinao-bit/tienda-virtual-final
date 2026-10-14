@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AppearancePage from './AppearancePage';
-import { fetchAppearanceSettings, saveSiteSettings } from '../lib/siteSettingsApi';
+import { fetchAppearanceSettings, fetchSiteSettings, saveSiteSettings } from '../lib/siteSettingsApi';
 
 const permissions = vi.hoisted(() => ({ allowed: [] }));
 
 vi.mock('../lib/siteSettingsApi', () => ({
   fetchAppearanceSettings: vi.fn(),
+  fetchSiteSettings: vi.fn(),
   saveSiteSettings: vi.fn(),
 }));
 vi.mock('../lib/api', () => ({ adminFetch: vi.fn().mockResolvedValue({ ok: true, json: async () => [] }) }));
@@ -345,6 +346,9 @@ describe('guardado seguro de Apariencia', () => {
         menus: initial.menus,
         appearanceRevision: 4,
       }));
+      fetchSiteSettings.mockImplementation(async () => ({ theme: {
+        banner: saveSiteSettings.mock.calls[0][0].theme.banner,
+      } }));
       render(<AppearancePage />);
       await screen.findByText('Cambiar WhatsApp');
       await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
@@ -359,6 +363,54 @@ describe('guardado seguro de Apariencia', () => {
           }) }),
         }) }),
       }));
+      expect(fetchSiteSettings).toHaveBeenCalledTimes(1);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('conserva el color editado si el PUT responde 200 pero la tienda pública no lo lee', async () => {
+    const user = userEvent.setup();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      saveSiteSettings.mockImplementation(async (payload) => ({
+        theme: { banner: payload.theme.banner }, menus: initial.menus, appearanceRevision: 4,
+      }));
+      fetchSiteSettings.mockResolvedValue({
+        theme: { banner: { templateConfigs: { editorial: { cards: [{ categoryId: 'hogar' }] } } } },
+      });
+      render(<AppearancePage />);
+      await screen.findByText('Cambiar WhatsApp');
+      await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+      await user.click(screen.getByRole('button', { name: 'Cambiar colores de tarjeta' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('La tienda pública no conserva los colores');
+      expect(screen.queryByText('Cambios guardados. La tienda pública ya usa esta configuración.')).not.toBeInTheDocument();
+      expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('no anuncia éxito ni borra el ajuste cuando el backend omite los colores en el PUT', async () => {
+    const user = userEvent.setup();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      saveSiteSettings.mockResolvedValue({
+        theme: { banner: { templateConfigs: { editorial: { cards: [{ categoryId: 'hogar' }] } } } },
+        menus: initial.menus,
+        appearanceRevision: 4,
+      });
+      render(<AppearancePage />);
+      await screen.findByText('Cambiar WhatsApp');
+      await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+      await user.click(screen.getByRole('button', { name: 'Cambiar colores de tarjeta' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('El servidor omitió los colores');
+      expect(fetchSiteSettings).not.toHaveBeenCalled();
+      expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
     } finally {
       log.mockRestore();
     }
