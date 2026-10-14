@@ -25,7 +25,7 @@ function EditorHarness() {
 describe('edición de secciones', () => {
   it('pasa el último cambio al formulario antes de guardar inmediatamente', () => {
     render(<EditorHarness />);
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Editar En tendencia' }));
     fireEvent.change(screen.getByPlaceholderText('Ej: En tendencia'), { target: { value: 'Nueva tendencia' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
     expect(screen.getByTestId('saved-name')).toHaveTextContent('Nueva tendencia');

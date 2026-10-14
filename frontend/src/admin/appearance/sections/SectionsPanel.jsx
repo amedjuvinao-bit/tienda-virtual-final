@@ -1,5 +1,6 @@
 // src/admin/appearance/sections/SectionsPanel.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { CircleAlert, CircleCheck, CircleHelp, Eye, EyeOff, Heart, Images, Info, Music2, Pencil, Shirt, Sparkles } from 'lucide-react';
 import api from "../../../lib/api";
 import LookSectionUI from "./look/LookSectionUI";
 import ComplementosSectionUI from "./complementos/ComplementosSectionUI";
@@ -7,6 +8,8 @@ import CategoriasSectionUI from "./categorias/CategoriasSectionUI";
 import InstagramSectionUI from "./instagram/InstagramSectionUI";
 import TiktokSectionUI from "./tiktok/TiktokSectionUI";
 import InfoSectionUI from "./info/infoSectionUI";
+import { getSectionOverview } from './sectionsOverviewModel';
+import './sectionsOverview.css';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -85,6 +88,30 @@ const SECTION_CATALOG = [
   { id: "instagram", label: "Instagram — instagram" },
   { id: "tiktok", label: "TikTok — tiktok" },
   { id: "informacion", label: "Información — informacion" },
+];
+
+const OVERVIEW_ICONS = {
+  tendencia: Sparkles,
+  look: Shirt,
+  complementos: Heart,
+  categorias: Images,
+  instagram: Images,
+  tiktok: Music2,
+  informacion: Info,
+};
+
+const OVERVIEW_STATUS = {
+  ready: { label: 'Configurada', icon: CircleCheck },
+  'needs-content': { label: 'Falta contenido', icon: CircleAlert },
+  hidden: { label: 'Oculta', icon: EyeOff },
+  unsupported: { label: 'Sin editor', icon: CircleHelp },
+};
+
+const OVERVIEW_FILTERS = [
+  { id: 'all', label: 'Todas' },
+  { id: 'ready', label: 'Configuradas' },
+  { id: 'needs-content', label: 'Por completar' },
+  { id: 'hidden', label: 'Ocultas' },
 ];
 
 // -----------------------------------------------------------------------------
@@ -1769,6 +1796,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
   const [sections, setSections] = useState(() => cloneSections(initialSections));
   const [editingId, setEditingId] = useState(null);
   const [activeTab, setActiveTab] = useState("basic");
+  const [overviewFilter, setOverviewFilter] = useState('all');
 
   const lastIncomingFromThemeRef = useRef(JSON.stringify(initialSections));
   const lastPushedToParentRef = useRef(JSON.stringify(initialSections));
@@ -1806,6 +1834,13 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
   }, [sections, setPath]);
 
   const selected = useMemo(() => sections.find((s) => s.id === editingId) || null, [sections, editingId]);
+  const overview = useMemo(() => sections.map((section) => ({
+    section,
+    ...getSectionOverview(section, sections),
+  })), [sections]);
+  const visibleOverview = overviewFilter === 'all'
+    ? overview
+    : overview.filter((item) => item.status === overviewFilter);
 
   const isLookSection = useMemo(() => {
     if (!selected) return false;
@@ -1892,66 +1927,65 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-        <div className="flex items-center justify-between gap-4 mb-3">
+      <section className="sections-overview" aria-label="Vista general de secciones">
+        <div className="sections-overview__head">
           <div>
-            <div className="text-sm font-semibold text-neutral-900">Secciones de la página</div>
-            <div className="text-xs text-neutral-500">
-              Aquí configuras cada bloque. Se guarda en <code>theme.sections</code>.
-            </div>
+            <h2>Secciones de la tienda</h2>
+            <p>Elige un bloque para editarlo. Guarda los cambios con el botón lateral.</p>
+          </div>
+          <div className="sections-overview__stats" role="group" aria-label="Resumen de secciones">
+            <span className="sections-overview__stat"><strong>{overview.filter((item) => item.status === 'ready').length}</strong> configuradas</span>
+            <span className="sections-overview__stat"><strong>{overview.filter((item) => item.status === 'needs-content').length}</strong> por completar</span>
+            <span className="sections-overview__stat"><strong>{overview.filter((item) => item.status === 'hidden').length}</strong> ocultas</span>
           </div>
         </div>
-
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="border-b border-neutral-200 text-neutral-500">
-                <th className="py-2 px-4 text-left font-medium">ID</th>
-                <th className="py-2 px-4 text-left font-medium">Nombre interno</th>
-                <th className="py-2 px-4 text-left font-medium">Tipo</th>
-                <th className="py-2 px-4 text-left font-medium">Link</th>
-                <th className="py-2 px-4 text-left font-medium">Estado</th>
-                <th className="py-2 px-4 text-right font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sections.map((sec) => {
-                const isSupported =
-                  sec.type === "tendencia" ||
-                  sec.type === "look" ||
-                  sec.id === "look" ||
-                  sec.type === "complementos" ||
-                  sec.id === "complementos" ||
-                  sec.type === "categorias" ||
-                  sec.id === "categorias"||
-                  sec.type === "instagram" ||
-                  sec.id === "instagram"||
-                  sec.type === "tiktok" ||
-                  sec.id === "tiktok"||
-                  sec.type === "informacion" ||
-                  sec.id === "informacion";
-
-                return (
-                  <tr key={sec.id} className="border-b border-neutral-100 last:border-0">
-                    <td className="py-2 px-4 font-mono text-[11px]">{sec.id}</td>
-                    <td className="py-2 px-4 text-xs text-neutral-900">{sec.name}</td>
-                    <td className="py-2 px-4 text-[11px] text-neutral-600">{inferTypeFromId(sec.type)}</td>
-                    <td className="py-2 px-4 text-[11px] text-neutral-500">{buildSectionHref(sec.id)}</td>
-                    <td className="py-2 px-4">
-                      <SectionBadge enabled={sec.enabled} supported={isSupported} />
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <Button size="sm" type="button" onClick={() => openEditor(sec.id)}>
-                        Editar
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="sections-overview__filters" role="group" aria-label="Filtrar secciones">
+          {OVERVIEW_FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              className="sections-overview__filter"
+              aria-pressed={overviewFilter === filter.id}
+              onClick={() => setOverviewFilter(filter.id)}
+            >{filter.label}</button>
+          ))}
         </div>
-      </div>
+        <div className="sections-overview__grid">
+          {visibleOverview.map(({ section, label, status, detail }) => {
+            const Icon = OVERVIEW_ICONS[section.id] || CircleHelp;
+            const StatusIcon = OVERVIEW_STATUS[status].icon;
+            return (
+              <article className="sections-overview__card" data-status={status} key={section.id}>
+                <span className="sections-overview__icon" aria-hidden="true"><Icon /></span>
+                <div className="sections-overview__content">
+                  <h3 title={section.name}>{label}</h3>
+                  <p>{detail}</p>
+                  <span className="sections-overview__status" data-status={status}><StatusIcon aria-hidden="true" />{OVERVIEW_STATUS[status].label}</span>
+                </div>
+                {status !== 'unsupported' && <div className="sections-overview__actions">
+                  <button
+                    type="button"
+                    role="switch"
+                    className="sections-overview__toggle"
+                    aria-label={`Mostrar ${label} en la tienda`}
+                    aria-checked={section.enabled !== false}
+                    title={section.enabled === false ? `Mostrar ${label}` : `Ocultar ${label}`}
+                    onClick={() => patchSection(section.id, { enabled: section.enabled === false })}
+                  >{section.enabled === false ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button>
+                  <button
+                    type="button"
+                    className="sections-overview__edit"
+                    aria-label={`Editar ${label}`}
+                    title={`Editar ${label}`}
+                    onClick={() => openEditor(section.id)}
+                  ><Pencil aria-hidden="true" /></button>
+                </div>}
+              </article>
+            );
+          })}
+        </div>
+        {!visibleOverview.length && <p className="sections-overview__empty">No hay secciones en este estado.</p>}
+      </section>
 
       {selected ? (
       <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`}>
