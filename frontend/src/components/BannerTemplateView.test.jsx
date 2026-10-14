@@ -177,13 +177,19 @@ describe('plantillas sobre contenido existente', () => {
     rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { atelier: { ...banner.templateConfigs.atelier, cards: [{ categoryId: 'actual-a', lineColor: '#18ad7c' }] } } }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
-  it('recoge las categorías en móvil y mantiene sus enlaces al desplegarlas', () => {
-    const banner = { templateId: 'editorial' };
+  it('muestra dos categorías y recoge las adicionales en móvil', () => {
+    const banner = { templateId: 'editorial', templateConfigs: { editorial: { cards: [
+      { categoryId: 'actual-a', enabled: true },
+      { categoryId: 'actual-b', enabled: true },
+      { destinationType: 'catalogCategory', catalogCategoryId: 'legacy:Zapatos', catalogCategoryName: 'Zapatos', enabled: true },
+    ] } } };
     const { container } = render(<BannerTemplateView banner={banner} sections={categories} preview device="mobile" />);
-    const toggle = screen.getByRole('button', { name: /Explorar categorías/ });
+    const toggle = screen.getByRole('button', { name: /Ver 1 categorías más/ });
     const rail = container.querySelector('.rb-template__rail');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(rail).toHaveAttribute('data-mobile-open', 'false');
+    expect(container.querySelectorAll('.rb-template__card:not(.rb-template__card--extra)')).toHaveLength(2);
+    expect(container.querySelectorAll('.rb-template__card--extra')).toHaveLength(1);
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(rail).toHaveAttribute('data-mobile-open', 'true');
