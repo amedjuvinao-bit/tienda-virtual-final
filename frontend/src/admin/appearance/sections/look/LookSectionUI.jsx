@@ -255,7 +255,7 @@ export default function LookSectionUI({
   }, [selectedItems, config.selectedProductId]);
 
   return (
-    <div className="section-editor-workspace grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.45fr)] gap-4" data-tab={tab}>
+    <div className="section-editor-workspace grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)] gap-4" data-tab={tab}>
       <div className="section-editor-workspace__controls space-y-4 min-w-0">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -997,7 +997,7 @@ export default function LookSectionUI({
         )}
       </div>
 
-      <div className="section-editor-workspace__preview space-y-4 w-full xl:max-w-[560px] xl:ml-auto">
+      <div className="section-editor-workspace__preview space-y-4 w-full min-w-0">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 sticky top-4">
           <div className="text-base font-extrabold text-neutral-900 mb-3">Vista previa LOOK</div>
 

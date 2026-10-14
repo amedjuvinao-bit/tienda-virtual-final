@@ -201,7 +201,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
         </div>
       </div>
 
-      <div className="section-info-editor grid grid-cols-1 xl:grid-cols-[320px,minmax(0,1fr)] gap-4 items-start" data-tab={activeTab}>
+      <div className="section-info-editor grid grid-cols-1 xl:grid-cols-[minmax(380px,0.9fr)_minmax(0,1.1fr)] gap-4 items-start" data-tab={activeTab}>
         <div className="space-y-4 xl:sticky xl:top-28">
           <MiniStat label="Bloques" value={`${cards.length} configurados`} />
           <MiniStat label="Ancho" value={`${config.containerMaxWidth || 1200}px`} />

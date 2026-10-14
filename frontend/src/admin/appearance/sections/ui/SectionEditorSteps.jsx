@@ -13,7 +13,11 @@ export default function SectionEditorSteps({ value, onChange, items }) {
           className="section-editor-steps__item"
           aria-current={value === id ? 'step' : undefined}
           title={hint}
-          onClick={() => onChange(id)}
+          onClick={(event) => {
+            onChange(id);
+            const scrollArea = event.currentTarget.closest('[data-section-modal-scroll]');
+            scrollArea?.scrollTo?.({ top: 0, behavior: 'auto' });
+          }}
         >
           <span className="section-editor-steps__number" aria-hidden="true">{index + 1}</span>
           <span>{label}</span>

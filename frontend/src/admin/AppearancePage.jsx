@@ -1243,6 +1243,7 @@ export default function AppearancePage() {
             <SectionsPanel
               theme={theme}
               setPath={setPath}
+              disabled={saving || !canEditSections}
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinary={uploadToCloudinaryViaBackend}

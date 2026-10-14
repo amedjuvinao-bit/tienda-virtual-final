@@ -1681,8 +1681,8 @@ function PreviewTab({ section }) {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm font-semibold text-neutral-900">Vista previa (admin)</div>
-      <div className="text-xs text-neutral-500 mb-2">Esta preview es solo del panel admin. ✅ Aquí ya debe verse el <b>descuento</b> si lo activas.</div>
+      <div className="text-base font-semibold text-neutral-900">Así se verá En tendencia</div>
+      <div className="text-sm text-neutral-600 mb-2">Revisa imágenes, textos y precios antes de guardar.</div>
 
       <div
         data-admin-storefront-preview="true"
@@ -1790,7 +1790,7 @@ function PreviewTab({ section }) {
 // -----------------------------------------------------------------------------
 // Componente principal
 // -----------------------------------------------------------------------------
-export default function SectionsPanel({ theme, setPath, uploading, setUploading, uploadToCloudinary }) {
+export default function SectionsPanel({ theme, setPath, disabled = false, uploading, setUploading, uploadToCloudinary }) {
   const initialSections = useMemo(() => normalizeSectionsArray(theme || {}), [theme]);
 
   const [sections, setSections] = useState(() => cloneSections(initialSections));
@@ -1988,7 +1988,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
       </section>
 
       {selected ? (
-      <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`}>
+      <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
         {isLookSection ? (
           <LookSectionUI
             theme={{ sections }}

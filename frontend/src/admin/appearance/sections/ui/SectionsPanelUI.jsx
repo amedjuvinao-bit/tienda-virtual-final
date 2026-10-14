@@ -1,6 +1,8 @@
 // src/admin/appearance/sections/ui/SectionsPanelUI.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button, Field, Input } from "./UiComponents";
+import "./sectionModal.css";
 import { isHexColor, clampNumber } from "./sectionHelpers";
 
 // ✅ IMPORTANTE: se mantiene porque CardImageMover sí consulta imágenes del producto por productId
@@ -47,10 +49,9 @@ export function TabButton({ active, children, onClick }) {
 // ============================================
 // ✅ Modal reusable (overlay + panel)
 // ============================================
-export function ModalShell({ open, title, onClose, children }) {
+export function ModalShell({ open, title, onClose, disabled = false, children }) {
   const isOpen = typeof open === "boolean" ? open : true;
-  const contentRef = useRef(null);
-  const scrollTopRef = useRef(0);
+  const dialogRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,35 +66,29 @@ export function ModalShell({ open, title, onClose, children }) {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const previousFocus = document.activeElement;
+    dialogRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
+      previousFocus?.focus?.();
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const el = contentRef.current;
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollTop = scrollTopRef.current || 0;
-    });
-  });
-
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[9999]">
+  return createPortal(
+    <div className="section-modal" role="presentation">
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="section-modal__backdrop"
         onClick={onClose}
-        aria-label="Cerrar"
+        aria-label="Cerrar editor"
       />
-      <div className="absolute inset-0 p-3 sm:p-6 flex items-center justify-center">
-        <div className="w-full max-w-6xl max-h-[90vh] rounded-2xl bg-white shadow-xl border border-neutral-200 overflow-hidden relative">
+      <div className="section-modal__positioner">
+        <div ref={dialogRef} tabIndex={-1} className="section-modal__panel" role="dialog" aria-modal="true" aria-label={title || "Editar sección"}>
           {title ? (
-            <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
-              <div className="text-base sm:text-lg font-extrabold text-neutral-900">
+            <div className="section-modal__header">
+              <div className="section-modal__title">
                 {title}
               </div>
               <Button type="button" kind="ghost" onClick={onClose}>
@@ -103,22 +98,14 @@ export function ModalShell({ open, title, onClose, children }) {
           ) : null}
 
           <div
-            ref={contentRef}
-            onScroll={() => {
-              const el = contentRef.current;
-              if (el) scrollTopRef.current = el.scrollTop;
-            }}
-            className={
-              title
-                ? "p-4 overflow-y-auto max-h-[calc(90vh-70px)]"
-                : "p-4 overflow-y-auto max-h-[90vh]"
-            }
+            className="section-modal__content"
+            data-section-modal-scroll="true"
           >
-            {children}
+            <fieldset disabled={disabled} className="section-modal__fields">{children}</fieldset>
           </div>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
