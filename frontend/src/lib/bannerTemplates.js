@@ -106,7 +106,7 @@ export function getBannerTemplate(banner, sections) {
           ...item,
           label: item.label || title || '',
           text: item.text || title || '',
-          image: item.image || image || '',
+          image: item.image && item.imageSource !== 'catalog' ? item.image : image || '',
           link: productCard ? `/producto/${encodeURIComponent(productId)}`
             : catalogCard ? `/buscar?${catalogQuery.toString()}`
               : item.destinationType === 'category' ? category.link : item.link || category.link,
