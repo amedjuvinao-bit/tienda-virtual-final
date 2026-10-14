@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const SiteSettings = require('../models/SiteSettings');
+const siteSettingsRouter = require('../routes/siteSettings');
 
 async function main() {
   const uri = process.env.MONGODB_URI || '';
@@ -12,38 +13,36 @@ async function main() {
 
   await mongoose.connect(uri);
   try {
+    await SiteSettings.deleteMany({});
     const doc = await SiteSettings.create({
       theme: { banner: { templateConfigs: {
-        editorial: { cards: [{ text: 'Vestidos', label: 'Elegante', labelColor: '#f472b6' }] },
+        editorial: { cards: [{ text: 'Vestidos', label: 'Elegante' }] },
       } } },
     });
-
-    const requestedCardColors = {
-      'theme.banner.templateConfigs.editorial.cards.0.labelColor': '#ed246b',
-      'theme.banner.templateConfigs.editorial.cards.0.titleColor': '#ffffff',
+    const putHandler = siteSettingsRouter.stack.find(
+      (layer) => layer.route?.path === '/' && layer.route.methods.put
+    ).route.stack.at(-1).handle;
+    const result = { status: 200, body: null };
+    const res = {
+      status(code) { result.status = code; return this; },
+      json(value) { result.body = value; return this; },
     };
-    const updated = await SiteSettings.findOneAndUpdate(
-      { _id: doc._id, appearanceRevision: doc.appearanceRevision },
-      { $set: { 'theme.banner.templateConfigs.editorial.cards': [{
+    await putHandler({ body: { appearanceRevision: doc.appearanceRevision, theme: {
+      banner: { templateConfigs: { editorial: { cards: [{
         text: 'Vestidos', label: 'Elegante', labelColor: '#ed246b', titleColor: '#ffffff',
-      }] }, $inc: { appearanceRevision: 1 } },
-      { new: true, strict: false, runValidators: false }
-    ).lean();
-    assert.ok(updated);
+      }] } } },
+    } } }, res, (error) => { throw error; });
 
-    const result = await SiteSettings.collection.updateOne(
-      { _id: doc._id, appearanceRevision: updated.appearanceRevision },
-      { $set: requestedCardColors }
-    );
-    assert.equal(result.matchedCount, 1);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
+    assert.equal(result.body.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
     const raw = await SiteSettings.collection.findOne({ _id: doc._id });
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].labelColor, '#ed246b');
     assert.equal(raw.theme.banner.templateConfigs.editorial.cards[0].titleColor, '#ffffff');
-    assert.equal(raw.appearanceRevision, updated.appearanceRevision);
-
-    await SiteSettings.deleteOne({ _id: doc._id });
-    console.log('Colores de tarjetas guardados y leídos en MongoDB: OK');
+    assert.equal(raw.appearanceRevision, doc.appearanceRevision + 1);
+    console.log('Guardado de Apariencia y lectura directa en MongoDB: OK');
   } finally {
+    await SiteSettings.deleteMany({});
     await mongoose.disconnect();
   }
 }
