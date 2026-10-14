@@ -640,7 +640,8 @@ export default function AppearancePage() {
   const setPath = useCallback((path, value) => {
     setTheme((prev) => {
       const currentValue = getValueAtPath(prev, path);
-      if (deepEqual(currentValue, value)) {
+      const nextValue = typeof value === 'function' ? value(currentValue, prev) : value;
+      if (deepEqual(currentValue, nextValue)) {
         return prev;
       }
 
@@ -655,7 +656,7 @@ export default function AppearancePage() {
         ref = ref[keys[i]];
       }
 
-      ref[keys.at(-1)] = value;
+      ref[keys.at(-1)] = nextValue;
       return draft;
     });
   }, []);
@@ -985,6 +986,13 @@ export default function AppearancePage() {
           wanted.forEach((slide, index) => checkFields(slide, received[index], [...devicePositionKeys, ...imageKeys], `slide ${index + 1}`));
         } else if (requestedBanner.type === 'image') {
           checkFields(requestedBanner, storedBanner, [...singlePositionKeys, ...singleImageKeys], 'imagen principal');
+        }
+        for (const [templateId, template] of Object.entries(requestedBanner.templateConfigs || {})) {
+          (template?.cards || []).forEach((card, index) => {
+            if (card?.image && storedBanner?.templateConfigs?.[templateId]?.cards?.[index]?.image !== card.image) {
+              mismatches.push(`miniatura de tarjeta ${index + 1} (${templateId})`);
+            }
+          });
         }
         if (mismatches.length) {
           setAppearanceRevision(saved.appearanceRevision);
