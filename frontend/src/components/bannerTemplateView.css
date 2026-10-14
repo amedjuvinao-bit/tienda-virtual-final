@@ -23,20 +23,6 @@
 .rb-template__card-copy { display: grid; flex: 1; min-width: 0; }
 .rb-template__card small { color: var(--rb-template-accent); font: 700 clamp(10px,.8cqw,12px) system-ui,sans-serif; letter-spacing: .11em; }
 .rb-template__card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 clamp(12px,1.15cqw,18px) Georgia,serif; }
-/* The metallic finish colors the glyphs themselves and keeps the card surface transparent. */
-.rb-template :is(.rb-template__card-copy,.rb-template__spot-copy) strong[data-metallic='true'] {
-  background: linear-gradient(165deg,
-    color-mix(in srgb,var(--rb-card-metal-base) 42%,#ffffff) 3%,
-    color-mix(in srgb,var(--rb-card-metal-base) 48%,#21191c) 31%,
-    color-mix(in srgb,var(--rb-card-metal-base) 58%,#fff7e3) 52%,
-    color-mix(in srgb,var(--rb-card-metal-base) 54%,#38251e) 79%,
-    color-mix(in srgb,var(--rb-card-metal-base) 72%,#ffffff) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: none;
-  filter: drop-shadow(0 1px 1px rgba(28,16,22,.28));
-}
 .rb-template__card > span:last-child { color: var(--rb-template-accent); font-size: 20px; }
 .rb-template--editorial .rb-template__content { top: 23%; left: 6%; width: 42%; }
 .rb-template--editorial .rb-template__title { font-style: italic; font-size: clamp(28px,5.6cqw,88px); }
