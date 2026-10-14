@@ -989,8 +989,12 @@ export default function AppearancePage() {
         }
         for (const [templateId, template] of Object.entries(requestedBanner.templateConfigs || {})) {
           (template?.cards || []).forEach((card, index) => {
-            if (card?.image && storedBanner?.templateConfigs?.[templateId]?.cards?.[index]?.image !== card.image) {
+            const storedCard = storedBanner?.templateConfigs?.[templateId]?.cards?.[index];
+            if (card?.image && storedCard?.image !== card.image) {
               mismatches.push(`miniatura de tarjeta ${index + 1} (${templateId})`);
+            }
+            if (card?.imageSource && storedCard?.imageSource !== card.imageSource) {
+              mismatches.push(`origen de imagen de tarjeta ${index + 1} (${templateId})`);
             }
           });
         }
