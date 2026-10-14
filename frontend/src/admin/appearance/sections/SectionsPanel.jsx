@@ -85,9 +85,6 @@ const SECTION_CATALOG = [
   { id: "instagram", label: "Instagram — instagram" },
   { id: "tiktok", label: "TikTok — tiktok" },
   { id: "informacion", label: "Información — informacion" },
-  { id: "separador1", label: "Separador 1 — separador1" },
-  { id: "separador2", label: "Separador 2 — separador2" },
-  { id: "newsletter", label: "Newsletter — newsletter" },
 ];
 
 // -----------------------------------------------------------------------------
@@ -388,15 +385,6 @@ function buildTendenciaProductFromBackend(product) {
 function BasicTab({ section, onChange }) {
   const href = buildSectionHref(section.id);
 
-  const handleTypeChange = (value) => {
-    const found = SECTION_CATALOG.find((s) => s.id === value);
-    onChange({
-      type: value,
-      name: found ? found.label.split("—")[0].trim() : section.name,
-      config: value === "tendencia" ? normalizeTendenciaConfigPlus(section.config) : section.config || {},
-    });
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -410,18 +398,8 @@ function BasicTab({ section, onChange }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Tipo de sección" hint="Solo categorías diseñadas" name="type">
-          <select
-            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-            value={section.type}
-            onChange={(e) => handleTypeChange(e.target.value)}
-          >
-            {SECTION_CATALOG.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        <Field label="Tipo de sección" hint="Fijo para mantener el contenido de esta sección" name="type">
+          <Input value={section.type} readOnly />
         </Field>
 
         <Field label="Nombre interno" hint="Cómo lo ves en el panel" name="name">
@@ -1792,20 +1770,11 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
   const [editingId, setEditingId] = useState(null);
   const [activeTab, setActiveTab] = useState("basic");
 
-  const pushTimerRef = useRef(null);
   const lastIncomingFromThemeRef = useRef(JSON.stringify(initialSections));
   const lastPushedToParentRef = useRef(JSON.stringify(initialSections));
 
   useEffect(() => {
     ensureGoogleFontsLoaded();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (pushTimerRef.current) {
-        clearTimeout(pushTimerRef.current);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -1831,21 +1800,9 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
 
     if (serialized === lastPushedToParentRef.current) return;
 
-    if (pushTimerRef.current) {
-      clearTimeout(pushTimerRef.current);
-    }
-
-    pushTimerRef.current = setTimeout(() => {
-      lastPushedToParentRef.current = serialized;
-      lastIncomingFromThemeRef.current = serialized;
-      setPath("sections", normalizedForParent);
-    }, 120);
-
-    return () => {
-      if (pushTimerRef.current) {
-        clearTimeout(pushTimerRef.current);
-      }
-    };
+    lastPushedToParentRef.current = serialized;
+    lastIncomingFromThemeRef.current = serialized;
+    setPath("sections", normalizedForParent);
   }, [sections, setPath]);
 
   const selected = useMemo(() => sections.find((s) => s.id === editingId) || null, [sections, editingId]);

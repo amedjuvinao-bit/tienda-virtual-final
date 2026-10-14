@@ -1,11 +1,14 @@
 export function mountStorefrontSectionMotion(container) {
-  const sections = Array.from(container?.children || []).filter((node) => node.tagName === 'SECTION');
-  if (!sections.length) return () => {};
+  if (!container) return () => {};
   let active = null;
   let frame = 0;
 
   const update = () => {
     frame = 0;
+    const sections = Array.from(container.children).filter((node) =>
+      node.tagName === 'SECTION' && !node.matches('.storefront-section-shell:empty')
+    );
+    if (!sections.length) return;
     const anchor = window.scrollY + window.innerHeight * 0.42;
     const next = sections.find((section) => section.offsetTop <= anchor &&
       section.offsetTop + section.offsetHeight > anchor)
@@ -23,11 +26,14 @@ export function mountStorefrontSectionMotion(container) {
   };
   const schedule = () => { if (!frame) frame = window.requestAnimationFrame(update); };
   schedule();
+  const observer = new MutationObserver(schedule);
+  observer.observe(container, { childList: true, subtree: true });
   window.addEventListener('scroll', schedule, { passive: true });
   window.addEventListener('resize', schedule);
   return () => {
     window.removeEventListener('scroll', schedule);
     window.removeEventListener('resize', schedule);
+    observer.disconnect();
     if (frame) window.cancelAnimationFrame(frame);
   };
 }

@@ -77,53 +77,6 @@ export default function TrendingSection({ theme }) {
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
 
-  const fallbackProducts = [
-    {
-      id: 1,
-      image1: "/Tendencia1a.jpg",
-      image2: "/Tendencia1b.jpg",
-      name: "Vestido Rosado Elegante",
-      price: 129000,
-      finalPrice: 103200,
-      hasDiscount: true,
-      discountPercent: 20,
-      features: ["Talla S/M/L", "Tela lino", "Edición limitada"],
-    },
-    {
-      id: 2,
-      image1: "/Tendencia2b.jpg",
-      image2: "/Tendencia2a.jpg",
-      name: "Bolso Floral Chic",
-      price: 95000,
-      finalPrice: 95000,
-      hasDiscount: false,
-      discountPercent: 0,
-      features: ["Cuero sintético", "Color rosa pastel", "Correa ajustable"],
-    },
-    {
-      id: 3,
-      image1: "/Tendencia3a.jpg",
-      image2: "/Tendencia3b.jpg",
-      name: "Vestido Largo Vintage",
-      price: 165000,
-      finalPrice: 132000,
-      hasDiscount: true,
-      discountPercent: 20,
-      features: ["Encaje", "Colores tierra", "Talla única"],
-    },
-    {
-      id: 4,
-      image1: "/Tendencia4b.jpg",
-      image2: "/Tendencia4a.jpg",
-      name: "Perfume Rosa Gardenia",
-      price: 72000,
-      finalPrice: 72000,
-      hasDiscount: false,
-      discountPercent: 0,
-      features: ["50 ml", "Aroma floral", "Duración 12h+"],
-    },
-  ];
-
   const tendenciaSection = useMemo(() => {
     const list = Array.isArray(theme?.sections) ? theme.sections : [];
     return list.find((s) => (typeof s?.id === "string" ? s.id.trim() : "") === "tendencia");
@@ -292,25 +245,19 @@ export default function TrendingSection({ theme }) {
       .slice(0, maxItems);
   }, [productRefsKey, maxItems]);
 
-  const shouldUseConfig = !!config && tendenciaSection?.enabled !== false && refs.length > 0;
+  const shouldUseConfig = tendenciaSection?.enabled !== false && refs.length > 0 && maxItems > 0;
 
-  const [remoteProducts, setRemoteProducts] = useState([]);
-  const [remoteLoading, setRemoteLoading] = useState(false);
-  const [remoteError, setRemoteError] = useState(null);
+  const [remoteResult, setRemoteResult] = useState({ key: "", products: [] });
+  const requestKey = `${productRefsKey}:${maxItems}`;
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       if (!shouldUseConfig) {
-        setRemoteProducts([]);
-        setRemoteLoading(false);
-        setRemoteError(null);
+        setRemoteResult({ key: requestKey, products: [] });
         return;
       }
-
-      setRemoteLoading(true);
-      setRemoteError(null);
 
       try {
         const uniqueIds = Array.from(new Set(refs.map((r) => r.productId)));
@@ -326,18 +273,6 @@ export default function TrendingSection({ theme }) {
         }
         const payload = await res.json();
         const oks = Array.isArray(payload?.products) ? payload.products : [];
-
-        if (oks.length === 0) {
-          setRemoteProducts([]);
-          setRemoteLoading(false);
-
-          setRemoteError({
-            message: "Ninguno de los productos seleccionados está disponible en el catálogo público. Revisa la selección en Apariencia → Tendencia.",
-            missingIds: uniqueIds.slice(0, 10),
-            totalMissing: uniqueIds.length,
-          });
-          return;
-        }
 
         const byId = new Map();
         for (const p of oks) {
@@ -400,26 +335,12 @@ export default function TrendingSection({ theme }) {
           })
           .filter(Boolean);
 
-        setRemoteProducts(normalized);
-        setRemoteLoading(false);
-
-        const missing = refs.filter((r) => !byId.has(String(r.productId))).map((r) => r.productId);
-        if (missing.length > 0) {
-          setRemoteError({
-            message:
-              "Algunos productos seleccionados ya no están publicados o disponibles. Revísalos en Apariencia → Tendencia.",
-            missingIds: missing.slice(0, 10),
-            totalMissing: missing.length,
-          });
-        }
+        if (cancelled) return;
+        setRemoteResult({ key: requestKey, products: normalized });
       } catch (err) {
         if (cancelled) return;
-        setRemoteProducts([]);
-        setRemoteLoading(false);
-        setRemoteError({
-          message: "Error general cargando productos de tendencia.",
-          details: err?.message || String(err),
-        });
+        setRemoteResult({ key: requestKey, products: [] });
+        console.warn("No se pudieron cargar los productos de Tendencia:", err);
       }
     }
 
@@ -427,14 +348,11 @@ export default function TrendingSection({ theme }) {
     return () => {
       cancelled = true;
     };
-  }, [refs, shouldUseConfig]);
+  }, [refs, shouldUseConfig, requestKey]);
 
-  const mustUseRemoteOnly = shouldUseConfig;
-
-  const productsToRender = useMemo(() => {
-    if (!mustUseRemoteOnly) return fallbackProducts;
-    return remoteProducts;
-  }, [mustUseRemoteOnly, remoteProducts]);
+  const productsToRender = shouldUseConfig && remoteResult.key === requestKey
+    ? remoteResult.products.slice(0, maxItems)
+    : [];
 
   function buildCartPayload(product) {
     return {
@@ -459,52 +377,10 @@ export default function TrendingSection({ theme }) {
     };
   }
 
-  if (mustUseRemoteOnly && remoteError && (!remoteProducts || remoteProducts.length === 0)) {
-    return (
-      <section id="tendencia" className="pb-24 pt-5 relative overflow-hidden">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-5">
-            <div className="flex items-center justify-center">
-              <img
-                src={titleImage}
-                alt="En tendencia"
-                className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none"
-              />
-            </div>
-          </div>
-
-          <div className="border border-red-300 bg-red-50 rounded-xl p-4 text-sm text-red-800">
-            <div className="font-extrabold mb-2">Error cargando productos de “En Tendencia”</div>
-            <div className="mb-2">{remoteError.message}</div>
-
-            {remoteError.firstFail ? (
-              <div className="text-xs whitespace-pre-wrap bg-white/70 border border-red-200 rounded-lg p-3">
-                <div>
-                  <b>URL:</b> {remoteError.firstFail.url}
-                </div>
-                <div>
-                  <b>Status:</b> {remoteError.firstFail.status}
-                </div>
-                {remoteError.firstFail.body ? (
-                  <div className="mt-2">
-                    <b>Body:</b>
-                    <div className="mt-1">{remoteError.firstFail.body.slice(0, 300)}</div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="mt-3 text-xs text-red-700">
-              <b>API_BASE usado:</b> {API_BASE}
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (!productsToRender.length) return null;
 
   return (
-    <section id="tendencia" className="pb-24 pt-5 relative overflow-hidden">
+    <section className="pb-24 pt-5 relative overflow-hidden">
       <div className="max-w-6xl mx-auto px-4">
         <div className="text-center mb-5">
           <div className="flex items-center justify-center">
@@ -515,18 +391,6 @@ export default function TrendingSection({ theme }) {
             />
           </div>
         </div>
-
-        {mustUseRemoteOnly && remoteError && remoteProducts.length > 0 ? (
-          <div className="mb-3 border border-amber-200 bg-amber-50 rounded-xl p-3 text-xs text-amber-900">
-            <div className="font-extrabold">Aviso</div>
-            <div>{remoteError.message}</div>
-            {remoteError.missingIds ? (
-              <div className="mt-1">
-                <b>IDs faltantes (muestra):</b> {remoteError.missingIds.join(", ")}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
         <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: sectionStyle.spacingPx }}>
           {productsToRender.map((product, index) => {
@@ -816,9 +680,6 @@ export default function TrendingSection({ theme }) {
           })}
         </div>
 
-        {mustUseRemoteOnly && remoteLoading ? (
-          <div className="mt-4 text-center text-xs text-gray-500">Cargando productos…</div>
-        ) : null}
       </div>
     </section>
   );

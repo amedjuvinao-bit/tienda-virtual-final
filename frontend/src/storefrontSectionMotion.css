@@ -1,3 +1,6 @@
+/* Empty sections have no scroll target while their catalog content loads or is unavailable. */
+.storefront-section-shell:empty { display: none; }
+
 /* A single visual language for section changes: a soft aperture, depth and staggered content. */
 @media (prefers-reduced-motion: no-preference) {
   .storefront-sections > section[data-section-motion="entering"] {

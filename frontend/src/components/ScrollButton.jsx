@@ -35,7 +35,7 @@ function getLayoutTop(element) {
 function getSectionTargets(sectionIds) {
   return sectionIds
     .map((id) => document.getElementById(id))
-    .filter(Boolean)
+    .filter((element) => element && !element.matches('.storefront-section-shell:empty'))
     .map((element) => ({
       id: element.id,
       top: getLayoutTop(element),

@@ -26,6 +26,7 @@ import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
 import { mountStorefrontSectionMotion } from './lib/storefrontSectionMotion';
+import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
@@ -127,20 +128,20 @@ function GlobalFloatingButtons({ theme }) {
 function Home({ theme }) {
   const sectionsRef = useRef(null);
 
-  useEffect(() => mountStorefrontSectionMotion(sectionsRef.current), []);
+  useEffect(() => mountStorefrontSectionMotion(sectionsRef.current), [theme]);
 
   return (
     <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
       <div ref={sectionsRef} className="storefront-sections min-w-0 max-w-full flex-grow overflow-x-clip">
         <section id="banner" className="w-full"><CarouselBanner /></section>
-        <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
-        <section id="look" className="w-full"><LookSection theme={theme} /></section>
-        <section id="complementos" className="w-full"><ComplementosLook theme={theme} imageSrc="/SeccionComplementos/Complementos.png" /></section>
-        <section id="categorias" className="w-full"><CategoriasSection theme={theme} /></section>
-        <section id="instagram" className="w-full"><InstagramSection theme={theme} posts={[]} /></section>
-        <section id="tiktok" className="w-full"><TiktokSection theme={theme} posts={[]} /></section>
-        <section id="informacion" className="w-full"><InformacionSection theme={theme} /></section>
+        {isStorefrontSectionVisible(theme, 'tendencia') && <section id="tendencia" className="storefront-section-shell w-full"><TrendingSection theme={theme} /></section>}
+        {isStorefrontSectionVisible(theme, 'look') && <section id="look" className="storefront-section-shell w-full"><LookSection theme={theme} /></section>}
+        {isStorefrontSectionVisible(theme, 'complementos') && <section id="complementos" className="storefront-section-shell w-full"><ComplementosLook theme={theme} imageSrc="/SeccionComplementos/Complementos.png" /></section>}
+        {isStorefrontSectionVisible(theme, 'categorias') && <section id="categorias" className="storefront-section-shell w-full"><CategoriasSection theme={theme} /></section>}
+        {isStorefrontSectionVisible(theme, 'instagram') && <section id="instagram" className="storefront-section-shell w-full"><InstagramSection theme={theme} posts={[]} /></section>}
+        {isStorefrontSectionVisible(theme, 'tiktok') && <section id="tiktok" className="storefront-section-shell w-full"><TiktokSection theme={theme} posts={[]} /></section>}
+        {isStorefrontSectionVisible(theme, 'informacion') && <section id="informacion" className="storefront-section-shell w-full"><InformacionSection theme={theme} /></section>}
         <section id="footer" className="w-full"><FooterSection theme={theme} /></section>
       </div>
     </div>

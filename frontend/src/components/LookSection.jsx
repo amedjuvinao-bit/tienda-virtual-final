@@ -129,6 +129,7 @@ export default function LookSection({ theme }) {
   const style = lookSection.style;
 
   const [products, setProducts] = useState([]);
+  const [loadedProductsKey, setLoadedProductsKey] = useState('');
   const [selectedId, setSelectedId] = useState(config.selectedProductId || "");
   const [loading, setLoading] = useState(false);
 
@@ -188,8 +189,9 @@ export default function LookSection({ theme }) {
       const refs = JSON.parse(productRefsKey);
       const productIds = [...new Set(refs.map((ref) => String(ref?.productId || "").trim()).filter(Boolean))];
 
-      if (!productIds.length) {
+      if (lookSection.enabled === false || !productIds.length) {
         setProducts([]);
+        setLoadedProductsKey(productRefsKey);
         setLoading(false);
         return;
       }
@@ -218,8 +220,12 @@ export default function LookSection({ theme }) {
             ref
           )).filter(Boolean)
         );
+        setLoadedProductsKey(productRefsKey);
       } catch {
-        if (!cancelled) setProducts([]);
+        if (!cancelled) {
+          setProducts([]);
+          setLoadedProductsKey(productRefsKey);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -229,7 +235,7 @@ export default function LookSection({ theme }) {
     return () => {
       cancelled = true;
     };
-  }, [productRefsKey]);
+  }, [productRefsKey, lookSection.enabled]);
 
   useEffect(() => {
     if (!products.length) {
@@ -458,6 +464,8 @@ export default function LookSection({ theme }) {
       </div>
     );
   }
+
+  if (lookSection.enabled === false || loadedProductsKey !== productRefsKey || !products.length) return null;
 
   return (
     <section style={wrapperStyle}>
