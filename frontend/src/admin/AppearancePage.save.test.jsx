@@ -49,7 +49,9 @@ vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }
   { categoryId: 'hogar', titleColor: '#332211', labelColor: '#ddaa88' },
 ])}>Cambiar colores de tarjeta</button><button onClick={() => setPath('banner.templateConfigs.editorial.cards', [
   { categoryId: 'hogar', titleSizePx: 22, labelSizePx: 16 },
-])}>Cambiar tamaños de tarjeta</button></> }));
+])}>Cambiar tamaños de tarjeta</button><button onClick={() => setPath('banner.templateConfigs.editorial.cardTextStyle', {
+  titleColor: '#b78853', labelColor: '#383433', titleSizePx: 22, labelSizePx: 16, metallicTitle: true,
+})}>Estilo global de tarjetas</button></> }));
 vi.mock('./appearance/sections/SectionsPanel', () => ({
   default: ({ theme, setPath }) => <button onClick={() => setPath('sections', theme.sections.map((section) =>
     section.id === 'look' ? { ...section, title: 'Nuevos looks' } : section
@@ -387,6 +389,36 @@ describe('guardado seguro de Apariencia', () => {
     expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
     expect(fetchSiteSettings).toHaveBeenCalledTimes(1);
     expect(saveSiteSettings.mock.calls[0][0].theme.banner.templateConfigs.editorial.cards[0]).toMatchObject({ titleSizePx: 22, labelSizePx: 16 });
+  });
+
+  it('confirma el estilo global solo si vuelve en la lectura pública', async () => {
+    const user = userEvent.setup();
+    saveSiteSettings.mockImplementation(async (payload) => ({ theme: { banner: payload.theme.banner }, menus: initial.menus, appearanceRevision: 4 }));
+    fetchSiteSettings.mockImplementation(async () => ({ theme: { banner: saveSiteSettings.mock.calls[0][0].theme.banner } }));
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+    await user.click(screen.getByRole('button', { name: 'Estilo global de tarjetas' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.templateConfigs.editorial.cardTextStyle).toMatchObject({ metallicTitle: true, titleSizePx: 22 });
+    expect(fetchSiteSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantiene pendiente el estilo global si la respuesta pública lo omite', async () => {
+    const user = userEvent.setup();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      saveSiteSettings.mockImplementation(async (payload) => ({ theme: { banner: payload.theme.banner }, menus: initial.menus, appearanceRevision: 4 }));
+      fetchSiteSettings.mockResolvedValue({ theme: { banner: { templateConfigs: { editorial: {} } } } });
+      render(<AppearancePage />);
+      await screen.findByText('Cambiar WhatsApp');
+      await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+      await user.click(screen.getByRole('button', { name: 'Estilo global de tarjetas' }));
+      await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('La tienda pública no conserva los estilos de texto');
+      expect(screen.getByText('1 área pendiente por guardar')).toBeInTheDocument();
+    } finally { log.mockRestore(); }
   });
 
   it('conserva el color editado si el PUT responde 200 pero la tienda pública no lo lee', async () => {
