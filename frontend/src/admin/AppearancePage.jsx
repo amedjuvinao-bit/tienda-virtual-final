@@ -949,6 +949,9 @@ export default function AppearancePage() {
       // Lee otra vez la ruta que usa la tienda antes de confirmar el guardado.
       const cardTextSettings = [];
       for (const [templateId, template] of Object.entries(changedTheme.banner?.templateConfigs || {})) {
+        for (const key of ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx', 'metallicTitle']) {
+          if (template?.cardTextStyle?.[key] !== undefined) cardTextSettings.push({ templateId, index: null, key, value: template.cardTextStyle[key] });
+        }
         (template?.cards || []).forEach((card, index) => {
           for (const key of ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx']) {
             if (card?.[key] !== undefined) cardTextSettings.push({ templateId, index, key, value: card[key] });
@@ -956,9 +959,12 @@ export default function AppearancePage() {
         });
       }
       if (cardTextSettings.length) {
-        const detail = cardTextSettings.some(({ key }) => key.endsWith('SizePx')) ? 'colores o tamaños' : 'colores';
+        const detail = cardTextSettings.some(({ key }) => key === 'metallicTitle') ? 'estilos de texto'
+          : cardTextSettings.some(({ key }) => key.endsWith('SizePx')) ? 'colores o tamaños' : 'colores';
         const matches = (settings) => cardTextSettings.every(({ templateId, index, key, value }) =>
-          String(settings?.theme?.banner?.templateConfigs?.[templateId]?.cards?.[index]?.[key] ?? '').toLowerCase()
+          String((index === null
+            ? settings?.theme?.banner?.templateConfigs?.[templateId]?.cardTextStyle?.[key]
+            : settings?.theme?.banner?.templateConfigs?.[templateId]?.cards?.[index]?.[key]) ?? '').toLowerCase()
             === String(value ?? '').toLowerCase()
         );
         if (!matches(saved)) {
