@@ -16,6 +16,7 @@ const {
 } = require("../security/siteSettingsWritePermissions");
 const {
   isAppearanceWrite,
+  appearanceVersionFilter,
   updateAppearanceWithRevision,
 } = require('../services/appearanceSettingsRevisionService');
 
@@ -739,8 +740,33 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
 
     const protectedSet = stripProtectedWriteFields($set);
 
+    // Store card colors with the same atomic revision update as the rest of
+    // Appearance. Mongoose can cast an entire cards array using an older
+    // compiled nested schema and silently omit recently added card fields.
+    const hasCardColors = Object.values(theme?.banner?.templateConfigs || {}).some(
+      (template) => Array.isArray(template?.cards) && template.cards.some((card) =>
+        card && (Object.hasOwn(card, 'titleColor') || Object.hasOwn(card, 'labelColor')))
+    );
+    if (hasCardColors) {
+      for (const template of Object.values(theme.banner.templateConfigs)) {
+        for (const card of template?.cards || []) {
+          for (const key of ['titleColor', 'labelColor']) {
+            if (card?.[key] !== undefined && card[key] !== '' && !/^#[0-9a-f]{6}$/i.test(card[key])) {
+              return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_COLOR', message: 'El color de texto de una tarjeta no es válido.' });
+            }
+          }
+        }
+      }
+    }
+
     const updated = appearanceWrite
-      ? await updateAppearanceWithRevision({ id, revision: appearanceRevision, changes: protectedSet })
+      ? hasCardColors
+        ? await SiteSettings.collection.findOneAndUpdate(
+          appearanceVersionFilter(id, appearanceRevision),
+          { $set: protectedSet, $inc: { appearanceRevision: 1 } },
+          { returnDocument: 'after' }
+        )
+        : await updateAppearanceWithRevision({ id, revision: appearanceRevision, changes: protectedSet })
       : await SiteSettings.findByIdAndUpdate(
         id,
         { $set: protectedSet },
