@@ -73,6 +73,8 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
   }, [group, productQuery]);
   const current = banner.templateConfigs?.[id] || {};
   const update = (patch) => setPath(`banner.templateConfigs.${id}`, (latest = {}) => ({ ...latest, ...patch }));
+  const cardTextStyle = current.cardTextStyle || {};
+  const updateCardTextStyle = (patch) => setPath(`banner.templateConfigs.${id}.cardTextStyle`, (latest = {}) => ({ ...latest, ...patch }));
   const updateAction = (key, patch) => update({ [key]: { ...config[key], ...patch } });
   const maxCards = id === 'atelier' ? 2 : id === 'editorial' ? 8 : 3;
   const refs = Array.isArray(current.cards) && current.cards.length
@@ -194,6 +196,18 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
 
     {group === 'categories' && <div className="banner-template-inspector banner-template-inspector--cards">
       <div className="banner-template-cards-heading"><strong>Accesos del banner</strong><span>Elige una tarjeta y asígnale una categoría del catálogo o un producto.</span></div>
+        <details className="banner-template-card-details"><summary>Texto de todas las tarjetas</summary>
+          <p className="banner-template-help">Estos colores, tamaños y el acabado metalizado se aplican a todas las tarjetas de este diseño, incluso a las que añadas después.</p>
+          <div className="banner-template-color-grid">
+            <Field type="color" label="Color de los títulos" value={cardTextStyle.titleColor || refs[0]?.titleColor || config.textColor || '#ffffff'} onChange={(event) => updateCardTextStyle({ titleColor: event.target.value })} />
+            <Field type="color" label="Color de las etiquetas" value={cardTextStyle.labelColor || refs[0]?.labelColor || config.accentColor || '#ffffff'} onChange={(event) => updateCardTextStyle({ labelColor: event.target.value })} />
+          </div>
+          <div className="banner-template-color-grid">
+            <label className="banner-template-field"><span>Tamaño de los títulos · {cardTextStyle.titleSizePx ?? refs[0]?.titleSizePx ?? 'original'}{(cardTextStyle.titleSizePx ?? refs[0]?.titleSizePx) ? ' px' : ''}</span><input type="range" min="10" max="24" value={cardTextStyle.titleSizePx ?? refs[0]?.titleSizePx ?? 14} onChange={(event) => updateCardTextStyle({ titleSizePx: Number(event.target.value) })} /></label>
+            <label className="banner-template-field"><span>Tamaño de las etiquetas · {cardTextStyle.labelSizePx ?? refs[0]?.labelSizePx ?? 'original'}{(cardTextStyle.labelSizePx ?? refs[0]?.labelSizePx) ? ' px' : ''}</span><input type="range" min="8" max="18" value={cardTextStyle.labelSizePx ?? refs[0]?.labelSizePx ?? 10} onChange={(event) => updateCardTextStyle({ labelSizePx: Number(event.target.value) })} /></label>
+          </div>
+          <label className="banner-template-toggle"><input type="checkbox" checked={cardTextStyle.metallicTitle === true} onChange={(event) => updateCardTextStyle({ metallicTitle: event.target.checked })} /> Acabado metalizado en los títulos</label>
+        </details>
         <div className="banner-template-parts" role="group" aria-label="Acceso de categoría para editar">
           {refs.map((entry, cardIndex) => {
             const linked = categories.find((item) => item.id === entry.categoryId);
@@ -252,16 +266,6 @@ export default function BannerTemplatePanel({ theme, setPath, uploading, setUplo
           <details className="banner-template-card-details"><summary>Texto e imágenes <span>opcional</span></summary>
           <Field label="Texto visible (opcional)" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.text || ''} onChange={(event) => updateCard(index, { text: event.target.value })} />
           <p className="banner-template-help">Si dejas el texto vacío, se muestra el nombre del destino seleccionado.</p>
-          <div className="banner-template-color-grid">
-            <Field type="color" label="Color del título de esta tarjeta" value={card.titleColor || config.textColor || '#ffffff'} onChange={(event) => updateCard(index, { titleColor: event.target.value })} />
-            <Field type="color" label="Color de la etiqueta de esta tarjeta" value={card.labelColor || config.accentColor || '#ffffff'} onChange={(event) => updateCard(index, { labelColor: event.target.value })} />
-          </div>
-          {(card.titleColor || card.labelColor) && <button type="button" className="banner-btn" onClick={() => updateCard(index, { titleColor: '', labelColor: '' })}>Usar colores generales</button>}
-          <div className="banner-template-color-grid">
-            <label className="banner-template-field"><span>Tamaño del título · {card.titleSizePx ?? 'original'}{card.titleSizePx ? ' px' : ''}</span><input type="range" min="10" max="24" value={card.titleSizePx ?? 14} onChange={(event) => updateCard(index, { titleSizePx: Number(event.target.value) })} /></label>
-            <label className="banner-template-field"><span>Tamaño de la etiqueta · {card.labelSizePx ?? 'original'}{card.labelSizePx ? ' px' : ''}</span><input type="range" min="8" max="18" value={card.labelSizePx ?? 10} onChange={(event) => updateCard(index, { labelSizePx: Number(event.target.value) })} /></label>
-          </div>
-          {(card.titleSizePx != null || card.labelSizePx != null) && <button type="button" className="banner-btn" onClick={() => updateCard(index, { titleSizePx: null, labelSizePx: null })}>Usar tamaños originales</button>}
           <div className="banner-template-card-media"><strong>Imagen de la tarjeta</strong><p className="banner-template-help">Se muestra la foto del {destinationType === 'product' ? 'producto' : 'categoría'}. Puedes subir otra imagen para esta tarjeta.</p>
             <Field label="Etiqueta pequeña" placeholder={(destinationType === 'product' ? card.featuredProductTitle : destinationType === 'catalogCategory' ? card.catalogCategoryName : category?.title) || ''} value={card.label || ''} onChange={(event) => updateCard(index, { label: event.target.value })} />
             <label className="banner-template-field"><span>Imagen propia</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => uploadCardImage(index, event.target.files?.[0])} /></label>
