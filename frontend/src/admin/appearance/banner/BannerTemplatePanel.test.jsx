@@ -45,7 +45,8 @@ describe('editor de plantillas', () => {
     const select = screen.getByLabelText('Acceso anterior');
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['Hogar', 'Regalos']);
     expect(screen.getAllByLabelText('Acceso anterior')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: /Acceso 2/ }));
+    fireEvent.click(screen.getByRole('button', { name: /02.*Regalos/ }));
+    fireEvent.click(screen.getByText(/Texto e imagen/));
     fireEvent.change(screen.getByLabelText('Texto visible (opcional)'), { target: { value: 'Un regalo' } });
     fireEvent.click(screen.getByRole('button', { name: '② Botones' }));
     fireEvent.change(screen.getByLabelText('Texto del botón'), { target: { value: 'Comprar' } });
@@ -59,6 +60,7 @@ describe('editor de plantillas', () => {
     render(<Editor />);
     fireEvent.click(screen.getByRole('button', { name: 'Vitrina' }));
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    fireEvent.click(screen.getByText('Ubicación y señalador'));
     fireEvent.click(screen.getByRole('button', { name: 'Señalar lugar en la imagen' }));
     expect(screen.getByText(/Ahora haz clic en el objeto/)).toHaveTextContent('vista previa');
     fireEvent.change(screen.getByLabelText('Punto horizontal %'), { target: { value: '31' } });
@@ -130,6 +132,15 @@ describe('editor de plantillas', () => {
     expect(card.text).toBe('Vestidos');
     expect(card.image).toBe('/vestidos.png');
     expect(card.link).toBe('/buscar?category=68a4a78a59706e44cade0316&categoryName=Vestidos');
+  });
+
+  it('muestra tarjetas compactas y deja los ajustes de imagen plegados', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
+    const grid = screen.getByRole('group', { name: 'Acceso de categoría para editar' });
+    expect(grid).toHaveClass('banner-template-parts');
+    expect(screen.getByText('Texto e imagen', { exact: false }).closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByLabelText('Al hacer clic, abrir')).toBeInTheDocument();
   });
 
 });
