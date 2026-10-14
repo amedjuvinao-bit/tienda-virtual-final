@@ -740,14 +740,14 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
 
     const protectedSet = stripProtectedWriteFields($set);
 
-    // Store card colors with the same atomic revision update as the rest of
+    // Store card text overrides with the same atomic revision update as the rest of
     // Appearance. Mongoose can cast an entire cards array using an older
     // compiled nested schema and silently omit recently added card fields.
-    const hasCardColors = Object.values(theme?.banner?.templateConfigs || {}).some(
+    const hasCardTextOverrides = Object.values(theme?.banner?.templateConfigs || {}).some(
       (template) => Array.isArray(template?.cards) && template.cards.some((card) =>
-        card && (Object.hasOwn(card, 'titleColor') || Object.hasOwn(card, 'labelColor')))
+        card && ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx'].some((key) => Object.hasOwn(card, key)))
     );
-    if (hasCardColors) {
+    if (hasCardTextOverrides) {
       for (const template of Object.values(theme.banner.templateConfigs)) {
         for (const card of template?.cards || []) {
           for (const key of ['titleColor', 'labelColor']) {
@@ -755,12 +755,18 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
               return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_COLOR', message: 'El color de texto de una tarjeta no es válido.' });
             }
           }
+          for (const [key, min, max] of [['titleSizePx', 10, 24], ['labelSizePx', 8, 18]]) {
+            const value = card?.[key];
+            if (value !== undefined && value !== null && (!Number.isInteger(value) || value < min || value > max)) {
+              return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_TEXT_SIZE', message: 'El tamaño de texto de una tarjeta no es válido.' });
+            }
+          }
         }
       }
     }
 
     const updated = appearanceWrite
-      ? hasCardColors
+      ? hasCardTextOverrides
         ? await SiteSettings.collection.findOneAndUpdate(
           appearanceVersionFilter(id, appearanceRevision),
           { $set: protectedSet, $inc: { appearanceRevision: 1 } },
