@@ -195,7 +195,6 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
               items={[
                 { value: "contenido", label: "Contenido", hint: "Escribe el título y configura los bloques de información." },
                 { value: "general", label: "Diseño", hint: "Ajusta dimensiones, tipografía, fondos e iconos." },
-                { value: "preview", label: "Vista previa", hint: "Revisa los bloques con el diseño de la tienda." },
               ]}
             />
             {["contenido", "bloques"].includes(activeTab) && (

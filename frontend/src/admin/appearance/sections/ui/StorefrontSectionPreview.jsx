@@ -24,7 +24,7 @@ class StorefrontPreviewBoundary extends React.Component {
 
   render() {
     if (this.state.failed) {
-      return <p className="section-real-preview__empty">No se pudo cargar la vista previa. Revisa la sección y vuelve a abrir este paso.</p>;
+      return <p className="section-real-preview__empty">No se pudo cargar la vista previa. Revisa la sección y vuelve a abrir el editor.</p>;
     }
     return this.props.children;
   }
@@ -53,8 +53,8 @@ export default function StorefrontSectionPreview({ section, theme }) {
   return (
     <section className="section-real-preview" aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
-        <div><span className="section-real-preview__eyebrow">Vista real</span><h3>Así verá el cliente esta sección</h3></div>
-        <p>Usa tus cambios actuales. Cierra el editor y pulsa Guardar cambios para publicarlos en la tienda.</p>
+        <div><span className="section-real-preview__eyebrow">Se actualiza al editar</span><h3>Vista en vivo de la tienda</h3></div>
+        <p>Estás viendo los cambios de esta sección. Para publicarlos, cierra el editor y pulsa Guardar cambios.</p>
       </header>
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
       <div className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
@@ -62,7 +62,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
         event.stopPropagation();
       }}>
         {overview.status === 'needs-content' ? (
-          <div className="section-real-preview__empty"><strong>Aún falta contenido para mostrarla.</strong><span>{overview.detail}. Vuelve a Contenido y completa esos datos.</span></div>
+          <div className="section-real-preview__empty"><strong>Agrega contenido para verla aquí.</strong><span>{overview.detail}. Completa los datos en Contenido y la vista aparecerá automáticamente.</span></div>
         ) : PublicSection ? (
           <StorefrontPreviewBoundary key={section.id}>
             <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>

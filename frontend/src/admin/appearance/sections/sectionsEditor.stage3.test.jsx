@@ -18,15 +18,15 @@ function Harness({ id, onSave }) {
 
 describe('editor de secciones, etapa 3', () => {
   it.each(['tendencia', 'look', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion'])(
-    'permite recorrer contenido, diseño y vista previa de %s', (id) => {
+    'muestra vista previa permanente al editar contenido y diseño de %s', (id) => {
       render(<Harness id={id} onSave={vi.fn()} />);
       fireEvent.click(screen.getByRole('button', { name: `Editar ${id === 'categorias' ? 'Categorías' : id === 'informacion' ? 'Información' : id === 'tiktok' ? 'TikTok' : id === 'look' ? 'Looks' : id === 'complementos' ? 'Complementos' : id === 'instagram' ? 'Instagram' : 'En tendencia'}` }));
       const steps = screen.getByRole('navigation', { name: 'Pasos de edición' });
+      expect(screen.getByRole('region', { name: 'Vista real de la tienda' })).toBeInTheDocument();
       fireEvent.click(within(steps).getByRole('button', { name: /Diseño/ }));
       expect(within(steps).getByRole('button', { name: /Diseño/ })).toHaveAttribute('aria-current', 'step');
-      fireEvent.click(within(steps).getByRole('button', { name: /Vista previa/ }));
-      expect(within(steps).getByRole('button', { name: /Vista previa/ })).toHaveAttribute('aria-current', 'step');
-      expect(within(steps).getAllByRole('button')).toHaveLength(3);
+      expect(screen.getByRole('region', { name: 'Vista real de la tienda' })).toBeInTheDocument();
+      expect(within(steps).getAllByRole('button')).toHaveLength(2);
       expect(screen.getByRole('region', { name: 'Vista real de la tienda' })).toBeInTheDocument();
     },
   );
@@ -40,7 +40,6 @@ describe('editor de secciones, etapa 3', () => {
       target: { value: 'https://instagram.com/rosa' },
     });
     fireEvent.click(within(steps).getByRole('button', { name: /Diseño/ }));
-    fireEvent.click(within(steps).getByRole('button', { name: /Vista previa/ }));
     fireEvent.click(within(steps).getByRole('button', { name: /Contenido/ }));
     expect(screen.getByPlaceholderText('https://instagram.com/tuusuario')).toHaveValue('https://instagram.com/rosa');
     await waitFor(() => expect(screen.getByPlaceholderText('https://instagram.com/tuusuario')).toHaveValue('https://instagram.com/rosa'));
@@ -55,10 +54,11 @@ describe('editor de secciones, etapa 3', () => {
     }] };
     render(<SectionsPanel theme={theme} setPath={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Editar Complementos' }));
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Vista previa/ }));
     const preview = screen.getByRole('region', { name: 'Vista real de la tienda' });
     await waitFor(() => expect(within(preview).getByAltText('Mi banner')).toHaveAttribute('src', '/mi-banner.jpg'));
     expect(within(preview).getByText('Descubrir')).toBeInTheDocument();
     expect(within(preview).getByText('Descubrir').closest('.complementos-look-section')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Conócelos'), { target: { value: 'Comprar ahora' } });
+    await waitFor(() => expect(within(preview).getByText('Comprar ahora')).toBeInTheDocument());
   });
 });

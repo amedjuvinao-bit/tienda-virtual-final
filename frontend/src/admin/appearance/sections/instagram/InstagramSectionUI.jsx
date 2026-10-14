@@ -481,7 +481,6 @@ export default function InstagramSectionUI({
       <SectionEditorSteps value={step} onChange={setStep} sectionName="Instagram" items={[
         { value: "content", label: "Contenido", hint: "Añade el perfil y las fotos con sus enlaces." },
         { value: "design", label: "Diseño", hint: "Ajusta logo, tarjetas, marca de agua y efectos." },
-        { value: "preview", label: "Vista previa", hint: "Comprueba las publicaciones con el diseño público." },
       ]} />
 
       <div className="section-social-editor__grid grid grid-cols-1 xl:grid-cols-2 gap-4">

@@ -272,7 +272,6 @@ export default function CategoriasSectionUI({
               <SectionEditorSteps value={tab} onChange={setTab} sectionName="Categorías" items={[
                 { value: "contenido", label: "Contenido", hint: "Añade categorías y sus imágenes para el carrusel." },
                 { value: "estilos", label: "Diseño", hint: "Ajusta tarjetas, flechas, textos y movimiento." },
-                { value: "preview", label: "Vista previa", hint: "Comprueba el carrusel con el diseño real de la tienda." },
               ]} />
 
               <Button

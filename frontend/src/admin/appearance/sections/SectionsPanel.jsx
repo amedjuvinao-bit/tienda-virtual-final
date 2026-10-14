@@ -10,7 +10,7 @@ import TiktokSectionUI from "./tiktok/TiktokSectionUI";
 import InfoSectionUI from "./info/infoSectionUI";
 import { getSectionOverview } from './sectionsOverviewModel';
 import './sectionsOverview.css';
-import SectionEditorSteps, { SectionEditorStepContext } from './ui/SectionEditorSteps';
+import SectionEditorSteps from './ui/SectionEditorSteps';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
@@ -1797,7 +1797,6 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
   const [sections, setSections] = useState(() => cloneSections(initialSections));
   const [editingId, setEditingId] = useState(null);
   const [activeTab, setActiveTab] = useState("basic");
-  const [editorStep, setEditorStep] = useState("basic");
   const [overviewFilter, setOverviewFilter] = useState('all');
 
   const lastIncomingFromThemeRef = useRef(JSON.stringify(initialSections));
@@ -1921,7 +1920,6 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
   const openEditor = (id) => {
     setEditingId(id);
     setActiveTab("basic");
-    setEditorStep("basic");
   };
 
   const closeEditor = () => {
@@ -1992,7 +1990,8 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
 
       {selected ? (
       <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
-        <SectionEditorStepContext.Provider value={setEditorStep}>
+        <div className="section-editor-layout">
+        <div className="section-editor-layout__form">
         {isLookSection ? (
           <LookSectionUI
             theme={{ sections }}
@@ -2075,7 +2074,6 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
             <SectionEditorSteps value={["image", "products"].includes(activeTab) ? "basic" : activeTab} onChange={setActiveTab} sectionName="En tendencia" items={[
               { value: "basic", label: "Contenido", hint: "Define el título, las imágenes y los productos de la sección." },
               { value: "styles", label: "Diseño", hint: "Ajusta colores, tarjetas, tipografía y efectos." },
-              { value: "preview", label: "Vista previa", hint: "Comprueba los productos con el diseño real de la tienda." },
             ]} />
             {["basic", "image", "products"].includes(activeTab) && (
               <nav className="section-editor-substeps mt-3" aria-label="Opciones de contenido">
@@ -2106,8 +2104,11 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
             </div>
           </>
         )}
-        {editorStep === "preview" && <StorefrontSectionPreview section={selected} theme={{ ...theme, sections }} />}
-        </SectionEditorStepContext.Provider>
+        </div>
+        <aside className="section-editor-layout__preview">
+          <StorefrontSectionPreview section={selected} theme={{ ...theme, sections }} />
+        </aside>
+        </div>
       </ModalShell>
       ) : null}
     </div>

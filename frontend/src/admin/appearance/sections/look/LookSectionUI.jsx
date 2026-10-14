@@ -269,7 +269,6 @@ export default function LookSectionUI({
             <SectionEditorSteps value={["slider-movil", "acciones"].includes(tab) ? "estilos" : tab} onChange={setTab} sectionName="LOOK" items={[
               { value: "contenido", label: "Contenido", hint: "Elige productos y define los textos e imágenes que mostrarás." },
               { value: "estilos", label: "Diseño", hint: "Ajusta la apariencia, el slider móvil y los botones." },
-              { value: "preview", label: "Vista previa", hint: "Comprueba la sección tal como se dibuja en la tienda." },
             ]} />
           </div>
         </div>
