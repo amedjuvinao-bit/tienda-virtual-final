@@ -31,16 +31,15 @@ function Editor({ upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' 
 }
 
 describe('edición del encabezado', () => {
-  it('elige el reflejo del encabezado y lo reproduce en la vista previa', async () => {
+  it('mantiene el vidrio sin destello de seguimiento en la vista previa', async () => {
     const user = userEvent.setup();
     render(<Editor />);
     await user.click(screen.getByRole('button', { name: /Fondo/ }));
     await user.click(screen.getByRole('button', { name: 'Forma y vidrio' }));
-    const choices = screen.getByRole('group', { name: 'Efecto de vidrio del encabezado' });
-    await user.click(within(choices).getByRole('button', { name: /Cometa/ }));
-    expect(within(choices).getByRole('button', { name: /Cometa/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Vista previa en vivo').closest('.appearance-header__preview').querySelector('.storefront-header-surface'))
-      .toHaveAttribute('data-button-animation', 'comet');
+    expect(screen.queryByRole('group', { name: 'Efecto de vidrio del encabezado' })).toBeNull();
+    const header = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview').querySelector('.storefront-header-surface');
+    expect(header.querySelector('.rb-chrome-hover__surface')).toBeNull();
+    expect(header).not.toHaveAttribute('data-button-animation');
   });
   it('resume los enlaces y mantiene abierto solo el editor elegido al añadir y reordenar', async () => {
     const user = userEvent.setup();

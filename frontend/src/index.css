@@ -44,7 +44,6 @@
   --header-menu-hover-scale: 1.12;
   --header-menu-hover-ty: 0px;
   --header-menu-hover-rot: 0deg;
-  --header-menu-hover-glow: 8px;
 
   /* ✅ Parámetros de animación (íconos) */
   --header-icon-hover-scale: 1.12;
@@ -204,7 +203,7 @@ video {
 /* ✅ MENÚ: color independiente */
 .header-menu a {
   color: var(--header-menu-text);
-  transition: transform 220ms ease, filter 220ms ease, opacity 220ms ease, color 220ms ease;
+  transition: transform 220ms ease, opacity 220ms ease, color 220ms ease;
   display: inline-block;
 }
 .header-menu {
@@ -229,7 +228,6 @@ video {
   color: var(--header-menu-hover);
   opacity: 0.95;
   transform: translateY(var(--header-menu-hover-ty)) scale(var(--header-menu-hover-scale)) rotate(var(--header-menu-hover-rot));
-  filter: drop-shadow(0 0 var(--header-menu-hover-glow) rgba(255, 255, 255, 0.9));
 }
 
 /* ✅ ICONOS: color independiente */

@@ -104,18 +104,17 @@ export function applyTheme(theme) {
       set("--header-menu-hover-scale", cfg.scale);
       set("--header-menu-hover-ty", cfg.ty);
       set("--header-menu-hover-rot", cfg.rot);
-      set("--header-menu-hover-glow", cfg.glow);
     };
 
     if (menuAnim === "none")
-      setMenuAnim({ scale: 1, ty: "0px", rot: "0deg", glow: "0px" });
+      setMenuAnim({ scale: 1, ty: "0px", rot: "0deg" });
     else if (menuAnim === "float")
-      setMenuAnim({ scale: 1.06, ty: "-2px", rot: "0deg", glow: "10px" });
+      setMenuAnim({ scale: 1.06, ty: "-2px", rot: "0deg" });
     else if (menuAnim === "rotate")
-      setMenuAnim({ scale: 1.05, ty: "0px", rot: "-3deg", glow: "10px" });
+      setMenuAnim({ scale: 1.05, ty: "0px", rot: "-3deg" });
     else if (menuAnim === "pop")
-      setMenuAnim({ scale: 1.14, ty: "0px", rot: "0deg", glow: "14px" });
-    else setMenuAnim({ scale: 1.1, ty: "0px", rot: "0deg", glow: "8px" }); // soft default
+      setMenuAnim({ scale: 1.14, ty: "0px", rot: "0deg" });
+    else setMenuAnim({ scale: 1.1, ty: "0px", rot: "0deg" }); // soft default
 
     // ✅ Animación (íconos)
     const iconAnim = (header.iconAnimation || "soft").trim();

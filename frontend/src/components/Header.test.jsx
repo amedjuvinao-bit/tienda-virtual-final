@@ -29,6 +29,9 @@ describe('encabezado de la tienda', () => {
     const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
     await waitFor(() => expect(within(navigation).getAllByRole('link')).toHaveLength(2));
     expect(within(navigation).getAllByRole('link').every((link) => link.classList.contains('rb-metallic-text'))).toBe(true);
+    expect(within(navigation).getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page');
+    expect(within(navigation).getByRole('link', { name: 'Inicio' })).not.toHaveClass('underline');
+    expect(navigation.closest('header').querySelector('.rb-chrome-hover__surface')).toBeNull();
   });
   it('deja el menú sin efecto cuando la opción no está activada', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);

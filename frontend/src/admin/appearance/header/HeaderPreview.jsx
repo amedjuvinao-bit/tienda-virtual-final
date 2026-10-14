@@ -8,10 +8,7 @@ import AtelierMobileMenu from '../../../components/AtelierMobileMenu';
 import MobileMenuTrigger from '../../../components/MobileMenuTrigger';
 import { MobileMenuLinkIcon } from '../../../components/mobileMenuIcons';
 import '../../../components/headerSearch.css';
-import '../../../components/storefrontChromeGlassHover.css';
 import '../../../components/metallicText.css';
-import { safeBannerButtonAnimation } from '../../../lib/bannerTemplates';
-import { moveChromeGlassLight, resolveChromeGlassMotion } from '../../../lib/chromeGlassMotion';
 
 export default function HeaderPreview({ theme, menus }) {
   const [viewport, setViewport] = useState('desktop');
@@ -52,10 +49,8 @@ export default function HeaderPreview({ theme, menus }) {
     </div>
     <div className="appearance-header__scene">
       <div className="appearance-header__device" data-viewport={viewport} data-menu-open={mobile && drawerOpen ? (atelier ? 'atelier' : 'drawer') : undefined} style={bannerImage ? { backgroundImage: `linear-gradient(rgba(244, 155, 201, .13), rgba(96, 20, 76, .12)), url(${JSON.stringify(bannerImage)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-        <div className="appearance-header__store-header storefront-header-surface" onPointerMove={moveChromeGlassLight}
-          data-button-animation={resolveChromeGlassMotion(header.glassMotion, safeBannerButtonAnimation(theme?.banner?.templateConfigs?.[theme?.banner?.templateId]?.buttonAnimation))}
+        <div className="appearance-header__store-header storefront-header-surface"
           data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, ...headerSearchColorVariables(header, theme?.colors), '--header-menu-text': header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), '--header-menu-hover': header.linkColor || '#c2410c', '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', '--storefront-action-size': `${Math.max(28, Math.min(40, Number(header.iconSizePx) || 34))}px`, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
-          <span className="rb-chrome-hover__surface" aria-hidden="true" />
           {mobile && <MobileMenuTrigger config={header} expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}
             aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} />}
           <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
