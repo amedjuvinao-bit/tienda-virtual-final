@@ -177,4 +177,19 @@ describe('plantillas sobre contenido existente', () => {
     rerender(<BannerTemplateView banner={{ ...banner, templateConfigs: { atelier: { ...banner.templateConfigs.atelier, cards: [{ categoryId: 'actual-a', lineColor: '#18ad7c' }] } } }} sections={categories}><img src="/mi-foto.jpg" alt="" /></BannerTemplateView>);
     expect(container.querySelector('.rb-template__spot-connector polyline')).toHaveAttribute('stroke', '#18ad7c');
   });
+  it('recoge las categorías en móvil y mantiene sus enlaces al desplegarlas', () => {
+    const banner = { templateId: 'editorial' };
+    const { container } = render(<BannerTemplateView banner={banner} sections={categories} preview device="mobile" />);
+    const toggle = screen.getByRole('button', { name: /Explorar categorías/ });
+    const rail = container.querySelector('.rb-template__rail');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(rail).toHaveAttribute('data-mobile-open', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(rail).toHaveAttribute('data-mobile-open', 'true');
+    expect(container.querySelector('.rb-template__card[href="/categoria/hogar"]')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(rail).toHaveAttribute('data-mobile-open', 'false');
+  });
+
 });
