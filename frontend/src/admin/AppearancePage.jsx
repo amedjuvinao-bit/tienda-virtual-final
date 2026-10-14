@@ -945,35 +945,36 @@ export default function AppearancePage() {
         throw new Error('La respuesta de guardado no incluyó la revisión de Apariencia. Recarga antes de guardar de nuevo.');
       }
 
-      // Un PUT 200 no demuestra que los colores lleguen a la tienda pública.
+      // Un PUT 200 no demuestra que los ajustes lleguen a la tienda pública.
       // Lee otra vez la ruta que usa la tienda antes de confirmar el guardado.
-      const cardColors = [];
+      const cardTextSettings = [];
       for (const [templateId, template] of Object.entries(changedTheme.banner?.templateConfigs || {})) {
         (template?.cards || []).forEach((card, index) => {
-          for (const key of ['titleColor', 'labelColor']) {
-            if (card?.[key] !== undefined) cardColors.push({ templateId, index, key, value: card[key] });
+          for (const key of ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx']) {
+            if (card?.[key] !== undefined) cardTextSettings.push({ templateId, index, key, value: card[key] });
           }
         });
       }
-      if (cardColors.length) {
-        const matches = (settings) => cardColors.every(({ templateId, index, key, value }) =>
+      if (cardTextSettings.length) {
+        const detail = cardTextSettings.some(({ key }) => key.endsWith('SizePx')) ? 'colores o tamaños' : 'colores';
+        const matches = (settings) => cardTextSettings.every(({ templateId, index, key, value }) =>
           String(settings?.theme?.banner?.templateConfigs?.[templateId]?.cards?.[index]?.[key] ?? '').toLowerCase()
             === String(value ?? '').toLowerCase()
         );
         if (!matches(saved)) {
           setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('El servidor omitió los colores de las tarjetas en la respuesta de guardado. Tus cambios siguen en el editor y no se marcaron como guardados.');
+          throw new Error(`El servidor omitió los ${detail} de las tarjetas en la respuesta de guardado. Tus cambios siguen en el editor y no se marcaron como guardados.`);
         }
         let publicSettings;
         try {
           publicSettings = await fetchSiteSettings();
         } catch (error) {
           setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('El servidor respondió al guardado, pero no se pudo comprobar la lectura pública. Los colores siguen en el editor; vuelve a guardar cuando haya conexión.');
+          throw new Error('El servidor respondió al guardado, pero no se pudo comprobar la lectura pública. Tus ajustes siguen en el editor; vuelve a guardar cuando haya conexión.');
         }
         if (!matches(publicSettings)) {
           setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('La tienda pública no conserva los colores de las tarjetas. Tus cambios siguen en el editor y no se marcaron como guardados.');
+          throw new Error(`La tienda pública no conserva los ${detail} de las tarjetas. Tus cambios siguen en el editor y no se marcaron como guardados.`);
         }
       }
 
