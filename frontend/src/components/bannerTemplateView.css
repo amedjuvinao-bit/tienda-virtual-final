@@ -619,3 +619,35 @@
   .rb-template--editorial .rb-template__card-visual img { transition: none; }
   .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual img { transform: none; }
 }
+
+/* A translucent local halo separates cutout products from changing hero photography. */
+.rb-template--editorial .rb-template__card-visual::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -9px -8px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse 58% 48% at 50% 48%,
+    rgba(255,248,238,.54) 0%,
+    rgba(255,222,217,.34) 37%,
+    rgba(255,192,205,.14) 62%,
+    transparent 83%);
+  filter: blur(3px);
+  opacity: .8;
+  pointer-events: none;
+  transition: opacity .38s ease,transform .38s ease;
+}
+.rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual::before {
+  opacity: 1;
+  transform: scale(1.16);
+}
+.rb-template--editorial .rb-template__card-visual::after { z-index: 0; }
+.rb-template--editorial .rb-template__card-visual img,
+.rb-template--editorial[data-preview-device] .rb-template__card-visual img {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-template--editorial .rb-template__card-visual::before { transition: none; }
+  .rb-template--editorial .rb-template__card:is(:hover,:focus-visible) .rb-template__card-visual::before { transform: none; }
+}
