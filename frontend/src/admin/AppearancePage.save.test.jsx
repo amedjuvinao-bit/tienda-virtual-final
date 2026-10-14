@@ -47,7 +47,9 @@ vi.mock('./appearance/banner/BannerPanel', () => ({ default: ({ theme, setPath }
   cards: [{ categoryId: 'hogar', position: { desktop: { x: 45, y: 37 } } }],
 })}>Mover tarjeta</button><button onClick={() => setPath('banner.slides', [{ image: '/portada.jpg', posX: 50, posY: 50, mobilePosX: 73, mobilePosY: 31 }])}>Ajustar encuadre móvil</button><button onClick={() => setPath('banner.templateConfigs.editorial.cards', [
   { categoryId: 'hogar', titleColor: '#332211', labelColor: '#ddaa88' },
-])}>Cambiar colores de tarjeta</button></> }));
+])}>Cambiar colores de tarjeta</button><button onClick={() => setPath('banner.templateConfigs.editorial.cards', [
+  { categoryId: 'hogar', titleSizePx: 22, labelSizePx: 16 },
+])}>Cambiar tamaños de tarjeta</button></> }));
 vi.mock('./appearance/sections/SectionsPanel', () => ({
   default: ({ theme, setPath }) => <button onClick={() => setPath('sections', theme.sections.map((section) =>
     section.id === 'look' ? { ...section, title: 'Nuevos looks' } : section
@@ -367,6 +369,24 @@ describe('guardado seguro de Apariencia', () => {
     } finally {
       log.mockRestore();
     }
+  });
+
+  it('confirma tamaños solo cuando la tienda pública devuelve los mismos valores', async () => {
+    const user = userEvent.setup();
+    saveSiteSettings.mockImplementation(async (payload) => ({
+      theme: { banner: payload.theme.banner }, menus: initial.menus, appearanceRevision: 4,
+    }));
+    fetchSiteSettings.mockImplementation(async () => ({
+      theme: { banner: saveSiteSettings.mock.calls[0][0].theme.banner },
+    }));
+    render(<AppearancePage />);
+    await screen.findByText('Cambiar WhatsApp');
+    await user.click(screen.getByRole('button', { name: /Portada Imagen o video/ }));
+    await user.click(screen.getByRole('button', { name: 'Cambiar tamaños de tarjeta' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.')).toBeInTheDocument();
+    expect(fetchSiteSettings).toHaveBeenCalledTimes(1);
+    expect(saveSiteSettings.mock.calls[0][0].theme.banner.templateConfigs.editorial.cards[0]).toMatchObject({ titleSizePx: 22, labelSizePx: 16 });
   });
 
   it('conserva el color editado si el PUT responde 200 pero la tienda pública no lo lee', async () => {
