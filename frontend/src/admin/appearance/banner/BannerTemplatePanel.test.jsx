@@ -231,30 +231,24 @@ describe('editor de plantillas', () => {
     ));
   });
 
-  it('guarda colores propios para título y etiqueta de cada tarjeta y permite restaurar los generales', () => {
+  it('aplica colores, tamaños y metalizado a todas las tarjetas de un diseño', () => {
     render(<Editor />);
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
-    fireEvent.click(screen.getByText(/Texto e imágenes/));
-    fireEvent.change(screen.getByLabelText('Color del título de esta tarjeta'), { target: { value: '#332211' } });
-    fireEvent.change(screen.getByLabelText('Color de la etiqueta de esta tarjeta'), { target: { value: '#ddaa88' } });
+    fireEvent.click(screen.getByText('Texto de todas las tarjetas'));
+    fireEvent.change(screen.getByLabelText('Color de los títulos'), { target: { value: '#332211' } });
+    fireEvent.change(screen.getByLabelText('Color de las etiquetas'), { target: { value: '#ddaa88' } });
+    fireEvent.change(screen.getByLabelText(/Tamaño de los títulos/), { target: { value: '22' } });
+    fireEvent.change(screen.getByLabelText(/Tamaño de las etiquetas/), { target: { value: '16' } });
+    fireEvent.click(screen.getByLabelText('Acabado metalizado en los títulos'));
     let saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleColor: '#332211', labelColor: '#ddaa88' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Usar colores generales' }));
-    saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleColor: '', labelColor: '' }));
-  });
-
-  it('ajusta y restablece el tamaño de los textos de cada tarjeta', () => {
-    render(<Editor />);
+    expect(saved.templateConfigs.discovery.cardTextStyle).toEqual({ titleColor: '#332211', labelColor: '#ddaa88', titleSizePx: 22, labelSizePx: 16, metallicTitle: true });
+    fireEvent.click(screen.getByRole('button', { name: /Editorial/ }));
     fireEvent.click(screen.getByRole('button', { name: '③ Categorías' }));
-    fireEvent.click(screen.getByText(/Texto e imágenes/));
-    fireEvent.change(screen.getByLabelText(/Tamaño del título/), { target: { value: '22' } });
-    fireEvent.change(screen.getByLabelText(/Tamaño de la etiqueta/), { target: { value: '16' } });
-    let saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleSizePx: 22, labelSizePx: 16 }));
-    fireEvent.click(screen.getByRole('button', { name: 'Usar tamaños originales' }));
+    fireEvent.click(screen.getByText('Texto de todas las tarjetas'));
+    expect(screen.getByLabelText('Acabado metalizado en los títulos')).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /Descubrimiento/ }));
     saved = JSON.parse(screen.getByTestId('state').textContent);
-    expect(saved.templateConfigs.discovery.cards[0]).toEqual(expect.objectContaining({ titleSizePx: null, labelSizePx: null }));
+    expect(saved.templateConfigs.discovery.cardTextStyle.metallicTitle).toBe(true);
   });
 
 });
