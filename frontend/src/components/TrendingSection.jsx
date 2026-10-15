@@ -93,10 +93,10 @@ export default function TrendingSection({ theme, previewProducts }) {
   const floatingTextStyle = (existing, color, fontSize) => floatingGlass ? { ...existing, color, ...(fontSize ? { fontSize } : {}) } : existing;
   const sceneImage = presentation.backdropMode === "custom" ? presentation.backgroundImage
     : presentation.backdropMode === "boutique" ? boutiqueBackdrop : "";
-  const floatingStageStyle = floatingGlass ? {
+  const floatingSectionStyle = floatingGlass ? {
     ...trendingPresentationVars(presentation),
     ...(sceneImage ? {
-      backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .22)), transparent 42%), linear-gradient(rgba(255,255,255,.24), rgba(255,255,255,.24)), url("${sceneImage}")`,
+      backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .22)), transparent 42%), linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,.12)), url("${sceneImage}")`,
       backgroundSize: "cover",
       backgroundPosition: "center",
     } : {}),
@@ -406,8 +406,8 @@ export default function TrendingSection({ theme, previewProducts }) {
   if (!productsToRender.length) return null;
 
   return (
-    <section className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`}>
-      <div className={floatingGlass ? "trending-section__stage max-w-6xl mx-auto px-4" : "max-w-6xl mx-auto px-4"} style={floatingStageStyle}>
+    <section className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`} style={floatingSectionStyle}>
+      <div className={floatingGlass ? "trending-section__content max-w-6xl mx-auto px-4" : "max-w-6xl mx-auto px-4"}>
         {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
         <div className={floatingGlass ? "text-center mb-3" : "text-center mb-5"}>
           <div className={`flex items-center justify-center trending-section__heading ${presentation.ornamentEnabled ? "" : "trending-section__heading--plain"}`}>
@@ -504,7 +504,7 @@ export default function TrendingSection({ theme, previewProducts }) {
             );
 
             return (
-              <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block">
+              <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block" title={floatingGlass ? product.name : undefined}>
                 <div
                   className={floatingGlass ? "relative group trending-card--floating-glass" : "relative group bg-white border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col"}
                   style={floatingGlass ? undefined : { borderRadius: radius, overflow: "hidden" }}
@@ -565,8 +565,8 @@ export default function TrendingSection({ theme, previewProducts }) {
                         {product.name}
                       </h3>
 
-                      <div className="mt-1 flex items-end justify-between gap-1.5 md:gap-2">
-                        <div className="flex items-end gap-1.5 md:gap-2 min-w-0">
+                      <div className={floatingGlass ? "trending-card__pricing" : "mt-1 flex items-end justify-between gap-1.5 md:gap-2"}>
+                        <div className={floatingGlass ? "trending-card__price-line" : "flex items-end gap-1.5 md:gap-2 min-w-0"}>
                           {product.hasDiscount ? (
                             <>
                               <span className="text-[9px] md:text-[12px] text-gray-400 line-through font-bold" style={floatingGlass ? { color: presentation.cardMutedColor, fontSize: presentation.oldPriceSizePx } : undefined}>
@@ -597,7 +597,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                       </div>
 
                       {showMetaBlock ? (
-                        <div className="mt-1.5 md:mt-2 rounded-xl bg-transparent px-0 py-0 border-0 shadow-none">
+                        <div className={floatingGlass ? "trending-card__metadata rounded-xl bg-transparent px-0 py-0 border-0 shadow-none" : "mt-1.5 md:mt-2 rounded-xl bg-transparent px-0 py-0 border-0 shadow-none"}>
                           {sectionStyle.showSizes && sizesArrAll.length ? (
                             <div className="flex items-start gap-1.5 md:gap-2">
                               <div

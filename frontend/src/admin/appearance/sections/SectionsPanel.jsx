@@ -1109,7 +1109,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
             </details>
             <details className="rounded-xl border border-neutral-200 p-3" open>
               <summary className="cursor-pointer text-sm font-semibold">Fondo y luz</summary>
-              <p className="mt-2 text-xs text-neutral-600">El fondo floral se muestra dentro de la vitrina, como en la referencia. Puedes cambiarlo por un color o tu propia imagen.</p>
+              <p className="mt-2 text-xs text-neutral-600">El fondo floral ocupa el ancho completo de la sección. Puedes cambiarlo por un color o tu propia imagen.</p>
               <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Tipo de fondo">
                 {[
                   { value: "boutique", label: "Floral incluido" },
