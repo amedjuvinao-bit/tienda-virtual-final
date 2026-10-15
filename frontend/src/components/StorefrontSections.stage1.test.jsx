@@ -46,8 +46,11 @@ describe('contenido real de las secciones', () => {
     expect(container.querySelector('.trending-card--floating-glass')).toBeNull();
     rerender(<MemoryRouter><TrendingSection theme={makeTheme({ mode: 'floatingGlass', titleColor: '#ac5678', dockGapPx: 17 })} /></MemoryRouter>);
     expect(container.querySelector('.trending-section--floating-glass')).toHaveStyle('--trending-dock-gap: 17px');
+    expect(container.querySelector('.trending-section--floating-glass').style.backgroundImage).toContain('trending-vitrine-boutique.webp');
     expect(container.querySelector('.trending-card--floating-glass .trending-card__dock')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Colección nueva' })).toHaveStyle('color: #ac5678');
+    expect(screen.getByText('Artículo real')).toHaveStyle('color: #35242a');
+    expect(container.querySelector('.trending-card__dock img[alt=""]')).toBeNull();
     expect(screen.getByTitle('Agregar al carrito')).toBeInTheDocument();
     rerender(<MemoryRouter><TrendingSection theme={makeTheme({ mode: 'classic' })} /></MemoryRouter>);
     expect(container.querySelector('.trending-card--floating-glass')).toBeNull();

@@ -15,6 +15,7 @@ import SectionEditorCardTabs from './ui/SectionEditorCardTabs';
 import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
 import { normalizeTrendingPresentation } from '../../../components/trendingPresentation';
+import boutiqueBackdrop from '../../../assets/trending-vitrine-boutique.webp';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -919,10 +920,12 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
   };
 
   const FieldStyleEditor = ({ title, prefix, defaultSize = 12, sizeMin = 10, sizeMax = 32, weightDefault = 700 }) => {
-    const inline = buildInlineStyle(prefix);
+    const floatingColorKey = { cardTitle: "cardTitleColor", cardPrice: "cardPriceColor", cardMeta: "cardMetaColor", cardDesc: "cardDescColor" }[prefix];
+    const isFloating = presentation.mode === "floatingGlass";
+    const inline = { ...buildInlineStyle(prefix), ...(isFloating && floatingColorKey ? { color: presentation[floatingColorKey] } : {}) };
 
     const currentFont = typeof st?.[`${prefix}FontFamily`] === "string" ? st[`${prefix}FontFamily`] : "";
-    const currentColor = typeof st?.[`${prefix}Color`] === "string" ? st[`${prefix}Color`] : "";
+    const currentColor = isFloating && floatingColorKey ? presentation[floatingColorKey] : typeof st?.[`${prefix}Color`] === "string" ? st[`${prefix}Color`] : "";
     const currentSize = Number.isFinite(Number(st?.[`${prefix}SizePx`])) ? Number(st[`${prefix}SizePx`]) : defaultSize;
     const currentWeight = Number.isFinite(Number(st?.[`${prefix}Weight`])) ? Number(st[`${prefix}Weight`]) : weightDefault;
     const currentItalic = typeof st?.[`${prefix}Italic`] === "boolean" ? st[`${prefix}Italic`] : false;
@@ -980,7 +983,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
           <ColorField
             label="Color"
             value={currentColor || ""}
-            onChange={(value) => patchStyle({ [`${prefix}Color`]: value })}
+            onChange={(value) => isFloating && floatingColorKey ? patchPresentation({ [floatingColorKey]: value }) : patchStyle({ [`${prefix}Color`]: value })}
           />
 
           <div className="flex items-center gap-4">
@@ -1037,7 +1040,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
     try {
       const url = await uploadToCloudinary(file);
       if (!url || !normalizeTrendingPresentation({ backgroundImage: url }).backgroundImage) throw new Error("No se recibió una imagen válida de Cloudinary.");
-      patchPresentation({ backgroundImage: url });
+      patchPresentation({ backgroundImage: url, backdropMode: "custom" });
     } catch (error) {
       setBackgroundError(error?.message || "No se pudo cargar el fondo.");
     } finally {
@@ -1076,7 +1079,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
               <span className="block text-sm font-semibold">{option.label}</span>
               <span className="block text-xs text-neutral-600">{option.hint}</span>
               <span aria-hidden="true" className="mt-3 flex h-16 max-w-28 flex-col gap-1">
-                <span className={`block flex-1 border border-rose-200 bg-gradient-to-br from-rose-100 via-white to-amber-100 ${option.preview}`} />
+                <span className={`block flex-1 border border-rose-200 bg-gradient-to-br from-rose-100 via-white to-amber-100 ${option.preview}`} style={option.mode === "floatingGlass" ? { backgroundImage: `url(${boutiqueBackdrop})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
                 {option.mode === "floatingGlass" ? <span className="block h-4 rounded-lg border border-amber-200 bg-white/70 shadow-sm" /> : null}
               </span>
             </button>
@@ -1107,15 +1110,30 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
             </details>
             <details className="rounded-xl border border-neutral-200 p-3" open>
               <summary className="cursor-pointer text-sm font-semibold">Fondo y luz</summary>
+              <p className="mt-2 text-xs text-neutral-600">El fondo floral de la referencia ya viene incluido. Puedes cambiarlo por un color o por tu propia imagen.</p>
+              <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Tipo de fondo">
+                {[
+                  { value: "boutique", label: "Floral incluido" },
+                  { value: "color", label: "Color y luz" },
+                  { value: "custom", label: "Mi imagen" },
+                ].map((option) => (
+                  <button key={option.value} type="button" aria-pressed={presentation.backdropMode === option.value}
+                    onClick={() => patchPresentation({ backdropMode: option.value })}
+                    className={`rounded-xl border px-2 py-2 text-xs ${presentation.backdropMode === option.value ? "border-rose-500 bg-rose-50 text-rose-950" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {colorPresentationField("backgroundColor", "Color de fondo")}
                 {colorPresentationField("glowColor", "Color de la luz ambiental")}
                 {numericPresentationField("glowStrength", "Intensidad de luz (0–1)", 0, 1, .05)}
-                <Field label="Imagen de fondo opcional" name="config.presentation.backgroundImage">
-                  <input type="file" accept="image/*" onChange={uploadBackground} disabled={uploadingBackground} className="block w-full text-xs" />
+                <Field label="Cargar mi imagen de fondo" name="config.presentation.backgroundImage">
+                  <input type="file" accept="image/*" aria-label="Cargar mi imagen de fondo" onChange={uploadBackground} disabled={uploadingBackground} className="block w-full text-xs" />
                   {uploadingBackground ? <span role="status" className="text-xs">Cargando imagen…</span> : null}
                   {backgroundError ? <span role="alert" className="text-xs text-red-700">{backgroundError}</span> : null}
-                  {presentation.backgroundImage ? <button type="button" onClick={() => patchPresentation({ backgroundImage: "" })} className="mt-1 text-xs underline">Quitar fondo</button> : null}
+                  {presentation.backgroundImage ? <button type="button" onClick={() => patchPresentation({ backgroundImage: "", backdropMode: "boutique" })} className="mt-1 text-xs underline">Volver al floral incluido</button> : null}
+                  {presentation.backdropMode === "custom" && !presentation.backgroundImage ? <span className="block text-xs text-amber-800">Carga una imagen para verla en la vitrina.</span> : null}
                 </Field>
               </div>
             </details>
@@ -1132,6 +1150,17 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
               </div>
             </details>
             <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Letras de las fichas</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {colorPresentationField("cardTitleColor", "Nombre del producto")}
+                {colorPresentationField("cardPriceColor", "Precio")}
+                {colorPresentationField("cardMetaColor", "Tallas y colores")}
+                {colorPresentationField("cardDescColor", "Descripción y características")}
+                {colorPresentationField("cardMutedColor", "Precio anterior")}
+              </div>
+              <p className="mt-2 text-xs text-neutral-600">La tipografía y los tamaños siguen disponibles en «Campos de la tarjeta».</p>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3">
               <summary className="cursor-pointer text-sm font-semibold">Forma y botones</summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {numericPresentationField("imageHeightPx", "Alto de la foto (px)", 240, 600)}
@@ -1143,7 +1172,8 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
                 {numericPresentationField("actionSizePx", "Tamaño de los botones (px)", 28, 52)}
                 {colorPresentationField("actionColor", "Color de los iconos")}
                 {colorPresentationField("actionBackgroundColor", "Fondo de los botones")}
-                <label className="flex items-center gap-2 text-sm"> <Toggle checked={presentation.ornamentEnabled} onChange={(value) => patchPresentation({ ornamentEnabled: !!value })} /> Decoración junto al título</label>
+                <Toggle checked={presentation.ornamentEnabled} label="Decoración junto al título" onChange={(value) => patchPresentation({ ornamentEnabled: !!value })} />
+                <Toggle checked={presentation.showWatermark} label="Mostrar marca de agua en las fichas" onChange={(value) => patchPresentation({ showWatermark: !!value })} />
               </div>
             </details>
           </div>
