@@ -39,6 +39,10 @@
 .trending-section--floating-glass .trending-section__heading--plain::after { display: none; }
 
 .trending-card--floating-glass {
+  --trending-frame-inset: 0px;
+  --trending-frame-turn: 0deg;
+  --trending-frame-corners: var(--trending-image-radius);
+  --trending-dock-corners: var(--trending-dock-radius);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -48,6 +52,28 @@
   transition: transform .4s cubic-bezier(.2, .8, .2, 1), filter .4s ease;
 }
 .trending-section--floating-glass .trending-section__content .grid > a { height: 100%; }
+.trending-section--floating-glass .grid > a:nth-child(4n+1) .trending-card--floating-glass {
+  --trending-frame-turn: -.5deg;
+  --trending-frame-corners: calc(var(--trending-image-radius) * 1.35) calc(var(--trending-image-radius) * .65) calc(var(--trending-image-radius) * 1.2) calc(var(--trending-image-radius) * .55);
+  --trending-dock-corners: calc(var(--trending-dock-radius) * 1.25) calc(var(--trending-dock-radius) * .7) calc(var(--trending-dock-radius) * 1.2) calc(var(--trending-dock-radius) * .8);
+}
+.trending-section--floating-glass .grid > a:nth-child(4n+2) .trending-card--floating-glass {
+  --trending-frame-inset: 12px;
+  --trending-frame-turn: .55deg;
+  --trending-frame-corners: calc(var(--trending-image-radius) * .7) calc(var(--trending-image-radius) * 1.35) calc(var(--trending-image-radius) * .65) calc(var(--trending-image-radius) * 1.25);
+  --trending-dock-corners: calc(var(--trending-dock-radius) * .8) calc(var(--trending-dock-radius) * 1.25) calc(var(--trending-dock-radius) * .7) calc(var(--trending-dock-radius) * 1.25);
+}
+.trending-section--floating-glass .grid > a:nth-child(4n+3) .trending-card--floating-glass {
+  --trending-frame-inset: 8px;
+  --trending-frame-turn: -.35deg;
+  --trending-frame-corners: calc(var(--trending-image-radius) * 1.25) calc(var(--trending-image-radius) * .7) calc(var(--trending-image-radius) * 1.4) calc(var(--trending-image-radius) * .6);
+  --trending-dock-corners: calc(var(--trending-dock-radius) * 1.2) calc(var(--trending-dock-radius) * .7) calc(var(--trending-dock-radius) * 1.25) calc(var(--trending-dock-radius) * .8);
+}
+.trending-section--floating-glass .grid > a:nth-child(4n+4) .trending-card--floating-glass {
+  --trending-frame-turn: .45deg;
+  --trending-frame-corners: calc(var(--trending-image-radius) * .75) calc(var(--trending-image-radius) * 1.4) calc(var(--trending-image-radius) * .6) calc(var(--trending-image-radius) * 1.25);
+  --trending-dock-corners: calc(var(--trending-dock-radius) * .75) calc(var(--trending-dock-radius) * 1.25) calc(var(--trending-dock-radius) * .8) calc(var(--trending-dock-radius) * 1.25);
+}
 .trending-card--floating-glass:hover {
   transform: translateY(calc(-1 * var(--trending-hover-lift)));
   filter: drop-shadow(0 24px 18px rgba(89, 42, 47, calc(var(--trending-shadow-strength) * .55)));
@@ -55,7 +81,11 @@
 .trending-card--floating-glass .trending-card__photo {
   position: relative;
   overflow: hidden;
-  border-radius: var(--trending-image-radius);
+  height: calc(var(--img-h-mobile) - var(--trending-frame-inset));
+  margin-top: var(--trending-frame-inset);
+  border-radius: var(--trending-frame-corners);
+  transform: perspective(900px) rotateY(var(--trending-frame-turn));
+  transform-origin: center bottom;
   border: var(--trending-border-width) solid rgba(var(--trending-border-rgb), var(--trending-border-opacity));
   box-shadow:
     0 0 0 1px rgba(255,255,255,.92),
@@ -90,11 +120,11 @@
   margin-top: var(--trending-dock-gap);
   padding: var(--trending-dock-padding);
   border: var(--trending-border-width) solid rgba(var(--trending-border-rgb), var(--trending-border-opacity));
-  border-radius: var(--trending-dock-radius);
+  border-radius: var(--trending-dock-corners);
   overflow: hidden;
   background:
     linear-gradient(142deg, rgba(255,255,255,.34), rgba(255,255,255,.045) 38%, transparent 68%, rgba(255,255,255,.17)),
-    rgba(var(--trending-glass-rgb), calc(var(--trending-glass-opacity) * .09));
+    rgba(var(--trending-glass-rgb), calc(var(--trending-glass-opacity) * .23));
   box-shadow:
     0 0 0 1px rgba(255,255,255,.82),
     0 0 0 2px rgba(var(--trending-border-rgb),.22),
@@ -103,8 +133,8 @@
     inset -2px -2px rgba(var(--trending-border-rgb),.24),
     0 9px 12px rgba(73,35,50,calc(var(--trending-shadow-strength) * .38)),
     0 21px 22px rgba(73,35,50,calc(var(--trending-shadow-strength) * .42));
-  -webkit-backdrop-filter: blur(calc(var(--trending-blur) * .22)) saturate(1.28);
-  backdrop-filter: blur(calc(var(--trending-blur) * .22)) saturate(1.28);
+  -webkit-backdrop-filter: blur(calc(var(--trending-blur) * .55)) saturate(1.15);
+  backdrop-filter: blur(calc(var(--trending-blur) * .55)) saturate(1.15);
 }
 .trending-card--floating-glass .trending-card__dock::before {
   content: "";
@@ -188,7 +218,16 @@
 .trending-card--floating-glass .trending-card__dock .trending-card__discount { font-size: 9px; padding: 1px 5px; }
 .trending-card--floating-glass .trending-card__dock .trending-card__details { line-height: 1.2; }
 
+@media (min-width: 640px) {
+  .trending-card--floating-glass .trending-card__photo { height: calc(var(--img-h-tablet) - var(--trending-frame-inset)); }
+}
+@media (min-width: 768px) {
+  .trending-card--floating-glass .trending-card__photo { height: calc(var(--img-h-desktop) - var(--trending-frame-inset)); }
+}
 @media (max-width: 767px) {
+  .trending-section--floating-glass .grid > a:nth-child(4n+2) .trending-card--floating-glass,
+  .trending-section--floating-glass .grid > a:nth-child(4n+3) .trending-card--floating-glass { --trending-frame-inset: 6px; }
+  .trending-card--floating-glass .trending-card__photo { transform: none; }
   .trending-card--floating-glass .trending-card__dock { min-height: 142px; padding: max(9px, calc(var(--trending-dock-padding) * .8)); }
   .trending-card--floating-glass .trending-card__actions { right: 6px; top: 6px; gap: 4px; }
   .trending-card--floating-glass .trending-card__action { width: min(var(--trending-action-size), 30px); height: min(var(--trending-action-size), 30px); }
