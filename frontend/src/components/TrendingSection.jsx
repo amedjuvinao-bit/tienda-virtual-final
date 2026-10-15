@@ -620,7 +620,7 @@ export default function TrendingSection({ theme, previewProducts }) {
 
                                 {extraSizes > 0 ? (
                                   <span
-                                    className="px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-500 border border-[#ead1db] bg-transparent rounded-lg"
+                                    className={`px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-500 border border-[#ead1db] bg-transparent rounded-lg ${floatingGlass ? "trending-card__size" : ""}`}
                                     style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                     title={`${extraSizes} tallas más`}
                                   >

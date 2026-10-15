@@ -1269,7 +1269,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
       <div className="grid gap-3">
         <FieldStyleEditor title="Título del producto" prefix="cardTitle" defaultSize={12} sizeMin={10} sizeMax={20} weightDefault={800} />
         <FieldStyleEditor title="Precio" prefix="cardPrice" defaultSize={14} sizeMin={10} sizeMax={22} weightDefault={800} />
-        <FieldStyleEditor title="Tallas y colores" prefix="cardMeta" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={700} />
+        <FieldStyleEditor title="Tallas y colores" prefix="cardMeta" defaultSize={12} sizeMin={12} sizeMax={18} weightDefault={700} />
         <FieldStyleEditor title="Descripción y características" prefix="cardDesc" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={600} />
       </div>
 

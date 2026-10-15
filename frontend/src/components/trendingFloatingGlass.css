@@ -281,7 +281,20 @@
 .trending-card--floating-glass .trending-card__action:hover { transform: scale(1.07); background: linear-gradient(140deg, rgba(255,255,255,.56), rgba(255,255,255,.12) 65%), rgba(var(--trending-action-background-rgb), .3); }
 .trending-card--floating-glass .trending-card__dock h3 { font-family: Georgia, serif; font-weight: 500; }
 .trending-card--floating-glass .trending-card__dock .trending-card__discount { color: #8f3152; background: rgba(255,240,244,.78); border-color: rgba(232,171,194,.5); }
-.trending-card--floating-glass .trending-card__dock .trending-card__size { border-color: rgba(var(--trending-border-rgb), .45); background: rgba(255,250,247,.38); }
+.trending-card--floating-glass .trending-card__dock .trending-card__size {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 24px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  font-weight: 800;
+  line-height: 1.1;
+  border-color: rgba(var(--trending-border-rgb), .72);
+  background: rgba(255,250,247,.84);
+  box-shadow: inset 0 1px rgba(255,255,255,.92), 0 2px 6px rgba(75,36,50,.12);
+}
 .trending-card--floating-glass .trending-card__dock .trending-card__discount { font-size: 9px; padding: 1px 5px; }
 .trending-card--floating-glass .trending-card__dock .trending-card__details { line-height: 1.2; }
 
@@ -313,6 +326,7 @@
   .trending-card--floating-glass .trending-card__actions { right: 6px; top: 6px; gap: 4px; }
   .trending-card--floating-glass .trending-card__action { width: min(var(--trending-action-size), 30px); height: min(var(--trending-action-size), 30px); }
   .trending-card--floating-glass .trending-card__dock > .trending-card__details { padding-right: 32px; }
+  .trending-card--floating-glass .trending-card__meta-row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .trending-section--floating-glass .trending-section__heading::before,
   .trending-section--floating-glass .trending-section__heading::after { width: 25px; }
   .trending-section--floating-glass .trending-section__content { padding-inline: 12px; }
