@@ -11,7 +11,34 @@
   padding-top: clamp(34px, 4vw, 52px);
   padding-bottom: clamp(42px, 5vw, 66px);
 }
+.trending-section--floating-glass::before,
+.trending-section--floating-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.trending-section--floating-glass::before {
+  background-image: var(--trending-scene-image, none);
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--trending-scene-blur)) brightness(.76) saturate(.86);
+  opacity: calc(var(--trending-scene-depth) * .78);
+  transform: scale(1.035);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 28%, transparent 75%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 28%, transparent 75%);
+}
+.trending-section--floating-glass::after {
+  background:
+    radial-gradient(ellipse 57% 40% at 50% 40%, rgba(255,248,241,calc(var(--trending-scene-depth) * var(--trending-scene-light) * .72)), transparent 75%),
+    radial-gradient(ellipse 52% 16% at 50% 91%, rgba(255,255,255,calc(var(--trending-scene-depth) * var(--trending-scene-light) * .62)), transparent 88%),
+    radial-gradient(ellipse 49% 12% at 50% 77%, rgba(87,35,57,calc(var(--trending-scene-depth) * .28)), transparent 88%),
+    linear-gradient(90deg, rgba(93,36,58,calc(var(--trending-scene-depth) * .24)), transparent 18%, transparent 82%, rgba(93,36,58,calc(var(--trending-scene-depth) * .24)));
+}
 .trending-section--floating-glass .trending-section__content {
+  position: relative;
+  z-index: 1;
   max-width: 1100px;
   padding-inline: 16px;
 }

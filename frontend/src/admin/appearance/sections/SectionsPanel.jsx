@@ -1135,6 +1135,19 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
                   {presentation.backdropMode === "custom" && !presentation.backgroundImage ? <span className="block text-xs text-amber-800">Carga una imagen para verla en la vitrina.</span> : null}
                 </Field>
               </div>
+              <div className="mt-3 rounded-xl border border-rose-200/70 bg-rose-50/40 p-3">
+                <div className="text-xs font-semibold text-rose-950">Profundidad del escenario</div>
+                <p className="mt-1 text-xs text-neutral-600">Separa visualmente la pared, ilumina los productos y da apoyo al suelo. Puedes llevar Profundidad a 0 para apagar el efecto.</p>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[["sceneDepth", "Profundidad", 1, "%"], ["sceneLight", "Luz detrás de las fotos", 1, "%"], ["sceneBlurPx", "Desenfoque de la pared", 12, "px"]].map(([key, label, max, unit]) => (
+                    <label key={key} className="block text-xs text-neutral-800">
+                      <span className="flex items-center justify-between gap-2"><span>{label}</span><strong>{unit === "%" ? `${Math.round(presentation[key] * 100)}%` : `${presentation[key]} px`}</strong></span>
+                      <input type="range" aria-label={label} min={0} max={max} step={unit === "%" ? .05 : 1} value={presentation[key]}
+                        onChange={(event) => patchPresentation({ [key]: Number(event.target.value) })} className="mt-2 w-full accent-rose-600" />
+                    </label>
+                  ))}
+                </div>
+              </div>
             </details>
             <details className="rounded-xl border border-neutral-200 p-3">
               <summary className="cursor-pointer text-sm font-semibold">Vidrio y bordes</summary>

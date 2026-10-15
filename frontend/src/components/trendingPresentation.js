@@ -5,6 +5,9 @@ export const DEFAULT_TRENDING_PRESENTATION = Object.freeze({
   backdropMode: "boutique",
   glowColor: "#f4b5cc",
   glowStrength: 0.24,
+  sceneDepth: 0.65,
+  sceneLight: 0.55,
+  sceneBlurPx: 6,
   glassColor: "#fffaf7",
   glassOpacity: 0.68,
   blurPx: 18,
@@ -58,7 +61,8 @@ export function normalizeTrendingPresentation(raw) {
     ? input.backgroundImage : "";
   result.backdropMode = ["boutique", "color", "custom"].includes(input.backdropMode) ? input.backdropMode : result.backgroundImage ? "custom" : defaults.backdropMode;
   for (const [key, min, max] of [
-    ["glowStrength", 0, 1], ["glassOpacity", 0.25, 1], ["blurPx", 0, 40],
+    ["glowStrength", 0, 1], ["sceneDepth", 0, 1], ["sceneLight", 0, 1], ["sceneBlurPx", 0, 12],
+    ["glassOpacity", 0.25, 1], ["blurPx", 0, 40],
     ["borderOpacity", 0, 1], ["borderWidthPx", 0, 4], ["shadowStrength", 0, 1],
     ["imageRadiusPx", 0, 60], ["imageHeightPx", 240, 600], ["dockRadiusPx", 0, 60],
     ["dockGapPx", 0, 30], ["dockPaddingPx", 8, 30], ["hoverLiftPx", 0, 18],
@@ -89,6 +93,9 @@ export function trendingPresentationVars(value) {
     "--trending-background": config.backgroundColor,
     "--trending-glow-rgb": hexToRgbTriplet(config.glowColor),
     "--trending-glow-strength": config.glowStrength,
+    "--trending-scene-depth": config.sceneDepth,
+    "--trending-scene-light": config.sceneLight,
+    "--trending-scene-blur": `${config.sceneBlurPx}px`,
     "--trending-glass-rgb": hexToRgbTriplet(config.glassColor),
     "--trending-glass-opacity": config.glassOpacity,
     "--trending-blur": `${config.blurPx}px`,

@@ -33,10 +33,13 @@ describe('editor de secciones, etapa 3', () => {
     expect(screen.getByRole('button', { name: 'Floral incluido' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Color y luz' }));
     expect(screen.getByRole('button', { name: 'Color y luz' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(screen.getByRole('slider', { name: 'Profundidad' }), { target: { value: '.8' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Luz detrás de las fotos' }), { target: { value: '.4' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Desenfoque de la pared' }), { target: { value: '9' } });
     fireEvent.click(screen.getByText('Forma y botones'));
     fireEvent.change(screen.getByLabelText('Separación foto/ficha (px)'), { target: { value: '19' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ presentation: expect.objectContaining({ mode: 'floatingGlass', backdropMode: 'color', dockGapPx: 19, showWatermark: false }) }) }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ presentation: expect.objectContaining({ mode: 'floatingGlass', backdropMode: 'color', dockGapPx: 19, sceneDepth: .8, sceneLight: .4, sceneBlurPx: 9, showWatermark: false }) }) }));
   });
   it.each(['tendencia', 'look', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion'])(
     'muestra vista previa permanente al editar contenido y diseño de %s', (id) => {

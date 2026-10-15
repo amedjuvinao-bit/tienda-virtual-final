@@ -47,6 +47,7 @@ describe('contenido real de las secciones', () => {
     expect(screen.getByText('Detalle largo del producto')).toBeInTheDocument();
     rerender(<MemoryRouter><TrendingSection theme={makeTheme({ mode: 'floatingGlass', titleColor: '#ac5678', dockGapPx: 17 })} /></MemoryRouter>);
     expect(container.querySelector('.trending-section--floating-glass')).toHaveStyle('--trending-dock-gap: 17px');
+    expect(container.querySelector('.trending-section--floating-glass')).toHaveStyle('--trending-scene-depth: 0.65');
     expect(container.querySelector('.trending-section--floating-glass').style.backgroundImage).toContain('trending-vitrine-boutique.webp');
     expect(container.querySelector('.trending-card--floating-glass .trending-card__dock')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Colección nueva' })).toHaveStyle('color: #ac5678');

@@ -95,6 +95,7 @@ export default function TrendingSection({ theme, previewProducts }) {
     : presentation.backdropMode === "boutique" ? boutiqueBackdrop : "";
   const floatingSectionStyle = floatingGlass ? {
     ...trendingPresentationVars(presentation),
+    "--trending-scene-image": sceneImage ? `url("${sceneImage}")` : "none",
     ...(sceneImage ? {
       backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .22)), transparent 42%), linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,.12)), url("${sceneImage}")`,
       backgroundSize: "cover",
