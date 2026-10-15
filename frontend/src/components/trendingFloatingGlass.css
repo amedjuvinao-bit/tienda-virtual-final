@@ -1,4 +1,6 @@
 .trending-section--floating-glass {
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--trending-background);
   background-image:
     radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), var(--trending-glow-strength)), transparent 42%),
