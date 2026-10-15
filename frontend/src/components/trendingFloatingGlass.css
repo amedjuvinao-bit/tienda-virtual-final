@@ -49,7 +49,6 @@
     0 6px 11px rgba(88,37,55,.22),
     0 13px 24px rgba(88,37,55,.12);
 }
-.trending-section--floating-glass .trending-section__sparkle { position: absolute; top: -23px; left: 50%; transform: translateX(-50%); font-size: 20px; line-height: 1; color: #ad751f; text-shadow: 0 1px 7px rgba(255,243,206,.9); }
 .trending-section--floating-glass .trending-section__heading--plain::before,
 .trending-section--floating-glass .trending-section__heading--plain::after { display: none; }
 

@@ -411,7 +411,6 @@ export default function TrendingSection({ theme, previewProducts }) {
         {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
         <div className={floatingGlass ? "text-center mb-3" : "text-center mb-5"}>
           <div className={`flex items-center justify-center trending-section__heading ${presentation.ornamentEnabled ? "" : "trending-section__heading--plain"}`}>
-            {floatingGlass && presentation.ornamentEnabled ? <span className="trending-section__sparkle" aria-hidden="true">✦</span> : null}
             {floatingGlass && presentation.titleMode === "text" ? (
               <h2 className="trending-section__title" style={{ "--trending-title-ink": presentation.titleColor, color: presentation.titleColor, fontSize: `clamp(18px, 5vw, ${presentation.titleSizePx}px)`, fontFamily: presentation.titleFontFamily }}>
                 {String(config?.title || "EN TENDENCIA")}
