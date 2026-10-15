@@ -40,26 +40,27 @@
 
 .trending-section--floating-glass .trending-section__stage {
   /* One vanishing point for the four cards, rather than four independent projections. */
-  perspective: 1100px;
+  perspective: 1000px;
   perspective-origin: 50% 44%;
 }
 .trending-section--floating-glass .trending-section__stage > a {
   position: relative;
+  z-index: 1;
   align-self: stretch;
   transform-style: preserve-3d;
 }
 .trending-section--floating-glass .trending-section__stage > a::after {
   content: "";
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   left: 8%;
   right: 8%;
-  bottom: -18px;
-  height: 24px;
+  bottom: -15px;
+  height: 30px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(76, 36, 45, .34), rgba(98, 55, 58, .12) 48%, transparent 73%);
-  filter: blur(8px);
+  background: radial-gradient(ellipse, rgba(76, 36, 45, .42), rgba(98, 55, 58, .16) 48%, transparent 73%);
+  filter: blur(9px);
   opacity: .6;
 }
 .trending-section--floating-glass .trending-section__stage > a:hover { z-index: 5; }
@@ -70,6 +71,8 @@
   --trending-stage-angle: 0deg;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
   height: 100%;
   min-width: 0;
   background: transparent;
@@ -92,33 +95,34 @@
   transform: scale(.82);
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+1) .trending-card--floating-glass {
-  --trending-stage-depth: 12px;
-  --trending-stage-angle: 5deg;
+  --trending-stage-depth: 16px;
+  --trending-stage-angle: 7deg;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+2) .trending-card--floating-glass {
-  --trending-stage-depth: -12px;
-  --trending-stage-angle: 1.5deg;
+  --trending-stage-depth: -16px;
+  --trending-stage-angle: 2.5deg;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+3) .trending-card--floating-glass {
-  --trending-stage-depth: -12px;
-  --trending-stage-angle: -1.5deg;
+  --trending-stage-depth: -16px;
+  --trending-stage-angle: -2.5deg;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) {
   z-index: 2;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) .trending-card--floating-glass {
-  --trending-stage-depth: 12px;
-  --trending-stage-angle: -5deg;
+  --trending-stage-depth: 16px;
+  --trending-stage-angle: -7deg;
 }
 @media (min-width: 768px) {
   .trending-card--floating-glass {
-    -webkit-box-reflect: below 3px linear-gradient(to bottom, rgba(255,255,255,.24), transparent 14%);
+    -webkit-box-reflect: below 3px linear-gradient(to bottom, rgba(255,255,255,.36), transparent 9%);
   }
 }
-.trending-card--floating-glass:hover {
-  transform: translate3d(0, calc(var(--trending-stage-y) - var(--trending-hover-lift)), calc(var(--trending-stage-depth) + 10px)) rotateY(var(--trending-stage-angle));
+.trending-section--floating-glass .trending-section__stage > a:is(:hover, :focus-visible) .trending-card--floating-glass {
+  transform: translate3d(0, calc(var(--trending-stage-y) - max(9px, var(--trending-hover-lift))), calc(var(--trending-stage-depth) + 25px)) rotateY(var(--trending-stage-angle));
   filter: drop-shadow(0 24px 18px rgba(89, 42, 47, calc(var(--trending-shadow-strength) * .55)));
 }
+.trending-section--floating-glass .trending-section__stage > a:is(:hover, :focus-visible)::after { opacity: 1; transform: scale(1.2); }
 .trending-card--floating-glass .trending-card__photo {
   position: relative;
   flex: none;
@@ -150,7 +154,7 @@
     linear-gradient(180deg, rgba(255,255,255,.16), transparent 21%, transparent 75%, rgba(94,40,49,.08));
 }
 .trending-card--floating-glass .trending-card__photo img { transition: opacity .35s ease, transform .75s cubic-bezier(.22,.6,.24,1); }
-.trending-card--floating-glass:hover .trending-card__photo img { transform: scale(1.035); }
+.trending-section--floating-glass .trending-section__stage > a:is(:hover, :focus-visible) .trending-card__photo img { transform: scale(1.065); }
 .trending-card--floating-glass .trending-card__dock {
   position: relative;
   flex: 1 0 auto;
@@ -279,7 +283,7 @@
   .trending-section--floating-glass .trending-section__stage > a { transform-style: flat; }
   .trending-section--floating-glass .trending-section__stage > a::after { display: none; }
   .trending-card--floating-glass { transform: none; }
-  .trending-card--floating-glass:hover { transform: translateY(calc(-1 * var(--trending-hover-lift))); }
+  .trending-section--floating-glass .trending-section__stage > a:is(:hover, :focus-visible) .trending-card--floating-glass { transform: translateY(calc(-1 * var(--trending-hover-lift))); }
   .trending-card--floating-glass .trending-card__dock { min-height: 142px; padding: max(9px, calc(var(--trending-dock-padding) * .8)); }
   .trending-card--floating-glass .trending-card__actions { right: 6px; top: 6px; gap: 4px; }
   .trending-card--floating-glass .trending-card__action { width: min(var(--trending-action-size), 30px); height: min(var(--trending-action-size), 30px); }
@@ -291,8 +295,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .trending-card--floating-glass, .trending-card--floating-glass .trending-card__action { transition: none; }
-  .trending-card--floating-glass:hover { transform: translate3d(0, var(--trending-stage-y), var(--trending-stage-depth)) rotateY(var(--trending-stage-angle)); }
+  .trending-section--floating-glass .trending-section__stage > a:is(:hover, :focus-visible) .trending-card--floating-glass { transform: translate3d(0, var(--trending-stage-y), var(--trending-stage-depth)) rotateY(var(--trending-stage-angle)); }
 }
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
-  .trending-card--floating-glass:hover { transform: none; }
+  .trending-section--floating-glass .trending-section__stage > a:is(:hover, :focus-visible) .trending-card--floating-glass { transform: none; }
 }
