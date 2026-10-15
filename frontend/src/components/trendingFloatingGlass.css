@@ -40,12 +40,12 @@
 
 .trending-section--floating-glass .trending-section__stage {
   /* One vanishing point for the four cards, rather than four independent projections. */
-  perspective: 920px;
+  perspective: 1100px;
   perspective-origin: 50% 44%;
 }
 .trending-section--floating-glass .trending-section__stage > a {
   position: relative;
-  align-self: end;
+  align-self: stretch;
   transform-style: preserve-3d;
 }
 .trending-section--floating-glass .trending-section__stage > a::after {
@@ -70,6 +70,7 @@
   --trending-stage-angle: 0deg;
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-width: 0;
   background: transparent;
   transform: translate3d(0, var(--trending-stage-y), var(--trending-stage-depth)) rotateY(var(--trending-stage-angle));
@@ -91,27 +92,23 @@
   transform: scale(.82);
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+1) .trending-card--floating-glass {
-  --trending-stage-depth: 48px;
-  --trending-stage-y: -2px;
-  --trending-stage-angle: 4deg;
+  --trending-stage-depth: 12px;
+  --trending-stage-angle: 5deg;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+2) .trending-card--floating-glass {
-  --trending-stage-depth: -35px;
-  --trending-stage-y: 2px;
-  --trending-stage-angle: 1.2deg;
+  --trending-stage-depth: -12px;
+  --trending-stage-angle: 1.5deg;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+3) .trending-card--floating-glass {
-  --trending-stage-depth: -35px;
-  --trending-stage-y: 2px;
-  --trending-stage-angle: -1.2deg;
+  --trending-stage-depth: -12px;
+  --trending-stage-angle: -1.5deg;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) {
   z-index: 2;
 }
 .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) .trending-card--floating-glass {
-  --trending-stage-depth: 48px;
-  --trending-stage-y: -2px;
-  --trending-stage-angle: -4deg;
+  --trending-stage-depth: 12px;
+  --trending-stage-angle: -5deg;
 }
 @media (min-width: 768px) {
   .trending-card--floating-glass {
@@ -124,6 +121,7 @@
 }
 .trending-card--floating-glass .trending-card__photo {
   position: relative;
+  flex: none;
   overflow: hidden;
   height: var(--img-h-mobile);
   border-radius: var(--trending-image-radius);
@@ -155,6 +153,7 @@
 .trending-card--floating-glass:hover .trending-card__photo img { transform: scale(1.035); }
 .trending-card--floating-glass .trending-card__dock {
   position: relative;
+  flex: 1 0 auto;
   min-width: 0;
   min-height: 124px;
   margin-top: var(--trending-dock-gap);
@@ -262,13 +261,18 @@
 }
 @media (min-width: 768px) {
   .trending-card--floating-glass .trending-card__photo { height: var(--img-h-desktop); }
+  .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+1) .trending-card__photo,
+  .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) .trending-card__photo {
+    height: calc(var(--img-h-desktop) + 12px);
+    margin-top: -12px;
+  }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
   .trending-section--floating-glass .trending-section__stage { padding-inline: 20px; }
   .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+1) .trending-card--floating-glass,
-  .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) .trending-card--floating-glass { --trending-stage-depth: 24px; --trending-stage-angle: 2deg; }
+  .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+4) .trending-card--floating-glass { --trending-stage-depth: 8px; --trending-stage-angle: 2deg; }
   .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+2) .trending-card--floating-glass,
-  .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+3) .trending-card--floating-glass { --trending-stage-depth: -18px; --trending-stage-angle: 0deg; }
+  .trending-section--floating-glass .trending-section__stage > a:nth-child(4n+3) .trending-card--floating-glass { --trending-stage-depth: -8px; --trending-stage-angle: 0deg; }
 }
 @media (max-width: 767px) {
   .trending-section--floating-glass .trending-section__stage { perspective: none; }
