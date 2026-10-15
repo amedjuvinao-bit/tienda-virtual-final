@@ -462,7 +462,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     min={0}
                     max={300}
                     step="1"
-                    label="Offset superior (px)"
+                    label="Espacio para el encabezado al subir (px)"
                     value={globalConfig.scrollButtons.offsetTopPx ?? 80}
                     onChange={(e) =>
                       setPath("global.scrollButtons.offsetTopPx", Number(e.target.value))

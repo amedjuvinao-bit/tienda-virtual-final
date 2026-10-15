@@ -132,13 +132,14 @@ export default function ScrollButton({ config, buttonAnimation }) {
   const navigate = (direction) => {
     const targets = getSectionTargets(sectionIds);
     if (!targets.length) return;
-    const offset = Math.max(0, offsetTopPx);
-    const at = window.scrollY + offset;
-    const tolerance = 4;
-    const target = direction === "next"
-      ? targets.find((item) => item.top > at + tolerance) || targets[0]
-      : [...targets].reverse().find((item) => item.top < at - tolerance) || targets[targets.length - 1];
-    scrollExactlyToSection(target, { offsetTopPx: offset, behavior });
+    const headerOffset = Math.max(0, offsetTopPx);
+    const currentTop = window.scrollY + headerOffset + 4;
+    const currentIndex = targets.reduce((index, item, nextIndex) => item.top <= currentTop ? nextIndex : index, 0);
+    const targetIndex = direction === "next"
+      ? (currentIndex + 1) % targets.length
+      : (currentIndex - 1 + targets.length) % targets.length;
+    const target = targets[targetIndex];
+    scrollExactlyToSection(target, { offsetTopPx: direction === "next" ? 0 : headerOffset, behavior });
   };
 
   const handlePrev = () => {

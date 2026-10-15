@@ -137,6 +137,36 @@ describe("herramientas de Apariencia", () => {
     expect(loader.querySelector(".storefront-liquid-icon")).not.toBeInTheDocument();
   });
 
+  it("al bajar muestra el inicio completo de la sección y al subir respeta el encabezado", () => {
+    const originalScrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    let currentScrollY = 0;
+    Object.defineProperty(window, 'scrollY', { configurable: true, get: () => currentScrollY });
+    try {
+      render(<>
+        <section id="banner" />
+        <section id="tendencia" />
+        <section id="look" />
+        <ScrollButton config={{ enabled: true, sectionIds: ['banner', 'tendencia', 'look'], offsetTopPx: 80, behavior: 'auto' }} />
+      </>);
+      for (const [id, top] of [['banner', 0], ['tendencia', 600], ['look', 1200]]) {
+        Object.defineProperty(document.getElementById(id), 'offsetTop', { configurable: true, value: top });
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Siguiente sección' }));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 600, behavior: 'auto' });
+      currentScrollY = 600;
+      fireEvent.click(screen.getByRole('button', { name: 'Siguiente sección' }));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 1200, behavior: 'auto' });
+      currentScrollY = 1200;
+      fireEvent.click(screen.getByRole('button', { name: 'Sección anterior' }));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 520, behavior: 'auto' });
+    } finally {
+      scrollTo.mockRestore();
+      if (originalScrollY) Object.defineProperty(window, 'scrollY', originalScrollY);
+      else delete window.scrollY;
+    }
+  });
+
   it("separa la navegación de las tarjetas inferiores de la portada", async () => {
     const rail = document.createElement('div');
     rail.className = 'rb-template__rail';
