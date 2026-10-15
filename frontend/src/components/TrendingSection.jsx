@@ -556,7 +556,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                       />
                     ) : null}
 
-                    <div className="relative z-10 trending-card__details">
+                    <div className="relative z-10 trending-card__details" style={floatingGlass ? { "--trending-card-title-size": `${presentation.productTitleSizePx}px`, "--trending-card-price-size": `${presentation.priceSizePx}px`, "--trending-card-meta-size": `${presentation.metaSizePx}px` } : undefined}>
                       <h3
                         className="text-[10px] md:text-sm font-extrabold text-gray-900 leading-snug line-clamp-1"
                         style={floatingTextStyle(sectionStyle.titleStyle, presentation.cardTitleColor, presentation.productTitleSizePx)}
@@ -598,7 +598,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                       {showMetaBlock ? (
                         <div className={floatingGlass ? "trending-card__metadata rounded-xl bg-transparent px-0 py-0 border-0 shadow-none" : "mt-1.5 md:mt-2 rounded-xl bg-transparent px-0 py-0 border-0 shadow-none"}>
                           {sectionStyle.showSizes && sizesArrAll.length ? (
-                            <div className="flex items-start gap-1.5 md:gap-2">
+                            <div className={`flex items-start gap-1.5 md:gap-2 ${floatingGlass ? "trending-card__meta-row" : ""}`}>
                               <div
                                 className="trending-card__meta-label shrink-0 text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
                                 style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
@@ -633,7 +633,7 @@ export default function TrendingSection({ theme, previewProducts }) {
 
                           {sectionStyle.showColors && colorsHex.length ? (
                             <div className={sectionStyle.showSizes && sizesArrAll.length ? "mt-1" : ""}>
-                              <div className="flex items-center justify-between gap-1.5 md:gap-2">
+                              <div className={`flex items-center justify-between gap-1.5 md:gap-2 ${floatingGlass ? "trending-card__meta-row" : ""}`}>
                                 <div
                                   className="trending-card__meta-label text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
                                   style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
