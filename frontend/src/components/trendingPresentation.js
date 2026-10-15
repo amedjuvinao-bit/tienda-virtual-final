@@ -26,6 +26,12 @@ export const DEFAULT_TRENDING_PRESENTATION = Object.freeze({
   cardMetaColor: "#66464d",
   cardDescColor: "#725a60",
   cardMutedColor: "#85757b",
+  productTitleSizePx: 13,
+  priceSizePx: 14,
+  oldPriceSizePx: 10,
+  metaSizePx: 10,
+  descSizePx: 10,
+  showDescription: false,
   showWatermark: false,
   ornamentEnabled: true,
   titleMode: "text",
@@ -56,10 +62,13 @@ export function normalizeTrendingPresentation(raw) {
     ["borderOpacity", 0, 1], ["borderWidthPx", 0, 4], ["shadowStrength", 0, 1],
     ["imageRadiusPx", 0, 60], ["imageHeightPx", 240, 600], ["dockRadiusPx", 0, 60],
     ["dockGapPx", 0, 30], ["dockPaddingPx", 8, 30], ["hoverLiftPx", 0, 18],
-    ["actionSizePx", 28, 52],
+    ["actionSizePx", 28, 52], ["productTitleSizePx", 10, 20],
+    ["priceSizePx", 10, 22], ["oldPriceSizePx", 8, 15],
+    ["metaSizePx", 8, 18], ["descSizePx", 8, 18],
   ]) result[key] = bounded(input[key], defaults[key], min, max);
   result.ornamentEnabled = typeof input.ornamentEnabled === "boolean" ? input.ornamentEnabled : defaults.ornamentEnabled;
   result.showWatermark = typeof input.showWatermark === "boolean" ? input.showWatermark : defaults.showWatermark;
+  result.showDescription = typeof input.showDescription === "boolean" ? input.showDescription : defaults.showDescription;
   result.titleMode = input.titleMode === "image" ? "image" : "text";
   result.titleColor = validHex(input.titleColor) ? input.titleColor : defaults.titleColor;
   result.titleSizePx = bounded(input.titleSizePx, defaults.titleSizePx, 20, 80);

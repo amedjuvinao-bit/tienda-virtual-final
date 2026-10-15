@@ -921,12 +921,13 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
 
   const FieldStyleEditor = ({ title, prefix, defaultSize = 12, sizeMin = 10, sizeMax = 32, weightDefault = 700 }) => {
     const floatingColorKey = { cardTitle: "cardTitleColor", cardPrice: "cardPriceColor", cardMeta: "cardMetaColor", cardDesc: "cardDescColor" }[prefix];
+    const floatingSizeKey = { cardTitle: "productTitleSizePx", cardPrice: "priceSizePx", cardMeta: "metaSizePx", cardDesc: "descSizePx" }[prefix];
     const isFloating = presentation.mode === "floatingGlass";
-    const inline = { ...buildInlineStyle(prefix), ...(isFloating && floatingColorKey ? { color: presentation[floatingColorKey] } : {}) };
+    const inline = { ...buildInlineStyle(prefix), ...(isFloating && floatingColorKey ? { color: presentation[floatingColorKey], fontSize: presentation[floatingSizeKey] } : {}) };
 
     const currentFont = typeof st?.[`${prefix}FontFamily`] === "string" ? st[`${prefix}FontFamily`] : "";
     const currentColor = isFloating && floatingColorKey ? presentation[floatingColorKey] : typeof st?.[`${prefix}Color`] === "string" ? st[`${prefix}Color`] : "";
-    const currentSize = Number.isFinite(Number(st?.[`${prefix}SizePx`])) ? Number(st[`${prefix}SizePx`]) : defaultSize;
+    const currentSize = isFloating && floatingSizeKey ? presentation[floatingSizeKey] : Number.isFinite(Number(st?.[`${prefix}SizePx`])) ? Number(st[`${prefix}SizePx`]) : defaultSize;
     const currentWeight = Number.isFinite(Number(st?.[`${prefix}Weight`])) ? Number(st[`${prefix}Weight`]) : weightDefault;
     const currentItalic = typeof st?.[`${prefix}Italic`] === "boolean" ? st[`${prefix}Italic`] : false;
     const currentUnderline = typeof st?.[`${prefix}Underline`] === "boolean" ? st[`${prefix}Underline`] : false;
@@ -956,11 +957,9 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
               min={sizeMin}
               max={sizeMax}
               value={currentSize}
-              onChange={(e) =>
-                patchStyle({
-                  [`${prefix}SizePx`]: clampNumber(Number(e.target.value) || defaultSize, sizeMin, sizeMax),
-                })
-              }
+              onChange={(e) => isFloating && floatingSizeKey
+                ? patchPresentation({ [floatingSizeKey]: clampNumber(Number(e.target.value) || defaultSize, sizeMin, sizeMax) })
+                : patchStyle({ [`${prefix}SizePx`]: clampNumber(Number(e.target.value) || defaultSize, sizeMin, sizeMax) })}
             />
           </Field>
 
@@ -1110,7 +1109,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
             </details>
             <details className="rounded-xl border border-neutral-200 p-3" open>
               <summary className="cursor-pointer text-sm font-semibold">Fondo y luz</summary>
-              <p className="mt-2 text-xs text-neutral-600">El fondo floral de la referencia ya viene incluido. Puedes cambiarlo por un color o por tu propia imagen.</p>
+              <p className="mt-2 text-xs text-neutral-600">El fondo floral se muestra dentro de la vitrina, como en la referencia. Puedes cambiarlo por un color o tu propia imagen.</p>
               <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Tipo de fondo">
                 {[
                   { value: "boutique", label: "Floral incluido" },
@@ -1159,6 +1158,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
                 {colorPresentationField("cardMutedColor", "Precio anterior")}
               </div>
               <p className="mt-2 text-xs text-neutral-600">La tipografía y los tamaños siguen disponibles en «Campos de la tarjeta».</p>
+              {numericPresentationField("oldPriceSizePx", "Precio anterior (px)", 8, 15)}
             </details>
             <details className="rounded-xl border border-neutral-200 p-3">
               <summary className="cursor-pointer text-sm font-semibold">Forma y botones</summary>
@@ -1174,6 +1174,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
                 {colorPresentationField("actionBackgroundColor", "Fondo de los botones")}
                 <Toggle checked={presentation.ornamentEnabled} label="Decoración junto al título" onChange={(value) => patchPresentation({ ornamentEnabled: !!value })} />
                 <Toggle checked={presentation.showWatermark} label="Mostrar marca de agua en las fichas" onChange={(value) => patchPresentation({ showWatermark: !!value })} />
+                <Toggle checked={presentation.showDescription} label="Mostrar descripción y características" onChange={(value) => patchPresentation({ showDescription: !!value })} />
               </div>
             </details>
           </div>

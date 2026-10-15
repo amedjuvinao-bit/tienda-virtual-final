@@ -1,11 +1,16 @@
 .trending-section--floating-glass {
+  background: #fff9f7;
+  isolation: isolate;
+  padding-top: 0;
+  padding-bottom: 32px;
+}
+.trending-section--floating-glass .trending-section__stage {
+  max-width: 1100px;
   background-color: var(--trending-background);
   background-image:
     radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), var(--trending-glow-strength)), transparent 42%),
     radial-gradient(ellipse at 91% 76%, rgba(var(--trending-glow-rgb), var(--trending-glow-strength)), transparent 45%);
-  isolation: isolate;
-  padding-top: clamp(32px, 4vw, 58px);
-  padding-bottom: clamp(54px, 6vw, 82px);
+  padding: 38px 28px 28px;
 }
 
 .trending-section--floating-glass .trending-section__heading {
@@ -14,7 +19,7 @@
   justify-content: center;
   gap: clamp(10px, 2vw, 32px);
   position: relative;
-  margin-bottom: clamp(25px, 3vw, 38px);
+  margin-bottom: 0;
 }
 .trending-section--floating-glass .trending-section__heading::before,
 .trending-section--floating-glass .trending-section__heading::after {
@@ -66,10 +71,10 @@
   border: var(--trending-border-width) solid rgba(var(--trending-border-rgb), var(--trending-border-opacity));
   border-radius: var(--trending-dock-radius);
   overflow: hidden;
-  background: linear-gradient(152deg, rgba(255,255,255,.53) 0%, transparent 38%, rgba(255,255,255,.11) 68%, rgba(var(--trending-border-rgb), .08) 100%), rgba(var(--trending-glass-rgb), var(--trending-glass-opacity));
-  box-shadow: 0 0 0 1px rgba(255,255,255,.57), inset 0 1px rgba(255,255,255,.93), inset 0 -1px rgba(var(--trending-border-rgb), .3), 0 9px 16px rgba(73,35,50, calc(var(--trending-shadow-strength) * .55)), 0 18px 24px rgba(73,35,50, calc(var(--trending-shadow-strength) * .4));
-  -webkit-backdrop-filter: blur(var(--trending-blur)) saturate(1.25);
-  backdrop-filter: blur(var(--trending-blur)) saturate(1.25);
+  background: linear-gradient(148deg, rgba(255,255,255,.32), rgba(255,255,255,.06) 55%, rgba(var(--trending-border-rgb), .07)), rgba(var(--trending-glass-rgb), calc(var(--trending-glass-opacity) * .54));
+  box-shadow: 0 0 0 1px rgba(255,255,255,.7), inset 0 1px rgba(255,255,255,.78), inset 0 -1px rgba(var(--trending-border-rgb), .27), 0 9px 16px rgba(73,35,50, calc(var(--trending-shadow-strength) * .45));
+  -webkit-backdrop-filter: blur(calc(var(--trending-blur) * .58)) saturate(1.1);
+  backdrop-filter: blur(calc(var(--trending-blur) * .58)) saturate(1.1);
 }
 .trending-card--floating-glass .trending-card__dock::before {
   content: "";
@@ -122,7 +127,10 @@
 .trending-card--floating-glass .trending-card__dock h3 { font-family: Georgia, serif; font-weight: 500; }
 .trending-card--floating-glass .trending-card__dock .trending-card__discount { color: #8f3152; background: rgba(255,240,244,.78); border-color: rgba(232,171,194,.5); }
 .trending-card--floating-glass .trending-card__dock .trending-card__size { border-color: rgba(var(--trending-border-rgb), .45); background: rgba(255,250,247,.38); }
-.trending-card--floating-glass .trending-card__dock .trending-card__details > div:nth-child(2) { flex-wrap: wrap; }
+.trending-card--floating-glass .trending-card__dock .trending-card__details > div:nth-child(2) { flex-wrap: wrap; row-gap: 2px; }
+.trending-card--floating-glass .trending-card__dock .trending-card__discount { font-size: 9px; padding: 1px 5px; }
+.trending-card--floating-glass .trending-card__dock .trending-card__details { line-height: 1.2; }
+.trending-card--floating-glass .trending-card__dock .trending-card__details > div:nth-child(3) { margin-top: 5px; }
 
 @media (max-width: 767px) {
   .trending-card--floating-glass .trending-card__dock { min-height: 112px; padding: max(9px, calc(var(--trending-dock-padding) * .8)); }
@@ -131,7 +139,7 @@
   .trending-card--floating-glass .trending-card__dock > .trending-card__details { padding-right: 32px; }
   .trending-section--floating-glass .trending-section__heading::before,
   .trending-section--floating-glass .trending-section__heading::after { width: 25px; }
-  .trending-section--floating-glass { background-position: center top; }
+  .trending-section--floating-glass .trending-section__stage { padding: 32px 12px 24px; background-position: center top; }
 }
 
 @media (prefers-reduced-motion: reduce) {

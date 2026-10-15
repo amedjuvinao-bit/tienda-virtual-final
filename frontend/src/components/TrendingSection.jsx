@@ -90,13 +90,13 @@ export default function TrendingSection({ theme, previewProducts }) {
   }, [tendenciaSection]);
   const presentation = normalizeTrendingPresentation(config?.presentation);
   const floatingGlass = presentation.mode === "floatingGlass";
-  const floatingTextStyle = (existing, color) => floatingGlass ? { ...existing, color } : existing;
+  const floatingTextStyle = (existing, color, fontSize) => floatingGlass ? { ...existing, color, ...(fontSize ? { fontSize } : {}) } : existing;
   const sceneImage = presentation.backdropMode === "custom" ? presentation.backgroundImage
     : presentation.backdropMode === "boutique" ? boutiqueBackdrop : "";
-  const floatingSectionStyle = floatingGlass ? {
+  const floatingStageStyle = floatingGlass ? {
     ...trendingPresentationVars(presentation),
     ...(sceneImage ? {
-      backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .3)), transparent 42%), linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), url("${sceneImage}")`,
+      backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .22)), transparent 42%), linear-gradient(rgba(255,255,255,.24), rgba(255,255,255,.24)), url("${sceneImage}")`,
       backgroundSize: "cover",
       backgroundPosition: "center",
     } : {}),
@@ -406,10 +406,10 @@ export default function TrendingSection({ theme, previewProducts }) {
   if (!productsToRender.length) return null;
 
   return (
-    <section className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`} style={floatingSectionStyle}>
-      <div className="max-w-6xl mx-auto px-4">
+    <section className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`}>
+      <div className={floatingGlass ? "trending-section__stage max-w-6xl mx-auto px-4" : "max-w-6xl mx-auto px-4"} style={floatingStageStyle}>
         {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
-        <div className="text-center mb-5">
+        <div className={floatingGlass ? "text-center mb-3" : "text-center mb-5"}>
           <div className={`flex items-center justify-center trending-section__heading ${presentation.ornamentEnabled ? "" : "trending-section__heading--plain"}`}>
             {floatingGlass && presentation.ornamentEnabled ? <span className="trending-section__sparkle" aria-hidden="true">✦</span> : null}
             {floatingGlass && presentation.titleMode === "text" ? (
@@ -443,6 +443,7 @@ export default function TrendingSection({ theme, previewProducts }) {
 
             const showDescription =
               sectionStyle.showDescription &&
+              (!floatingGlass || presentation.showDescription) &&
               !featuresList.length &&
               typeof product.description === "string" &&
               product.description.trim();
@@ -559,7 +560,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                     <div className="relative z-10 trending-card__details">
                       <h3
                         className="text-[10px] md:text-sm font-extrabold text-gray-900 leading-snug line-clamp-1"
-                        style={floatingTextStyle(sectionStyle.titleStyle, presentation.cardTitleColor)}
+                        style={floatingTextStyle(sectionStyle.titleStyle, presentation.cardTitleColor, presentation.productTitleSizePx)}
                       >
                         {product.name}
                       </h3>
@@ -568,12 +569,12 @@ export default function TrendingSection({ theme, previewProducts }) {
                         <div className="flex items-end gap-1.5 md:gap-2 min-w-0">
                           {product.hasDiscount ? (
                             <>
-                              <span className="text-[9px] md:text-[12px] text-gray-400 line-through font-bold" style={floatingGlass ? { color: presentation.cardMutedColor } : undefined}>
+                              <span className="text-[9px] md:text-[12px] text-gray-400 line-through font-bold" style={floatingGlass ? { color: presentation.cardMutedColor, fontSize: presentation.oldPriceSizePx } : undefined}>
                                 {moneyCOP(product.price)}
                               </span>
                               <span
                                 className="trending-card__price text-[12px] md:text-base text-pink-700 font-extrabold tracking-tight"
-                                style={floatingTextStyle(sectionStyle.priceStyle, presentation.cardPriceColor)}
+                                style={floatingTextStyle(sectionStyle.priceStyle, presentation.cardPriceColor, presentation.priceSizePx)}
                               >
                                 {moneyCOP(product.finalPrice)}
                               </span>
@@ -581,7 +582,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                           ) : (
                             <span
                               className="trending-card__price text-[12px] md:text-base text-gray-900 font-extrabold tracking-tight"
-                              style={floatingTextStyle(sectionStyle.priceStyle, presentation.cardPriceColor)}
+                              style={floatingTextStyle(sectionStyle.priceStyle, presentation.cardPriceColor, presentation.priceSizePx)}
                             >
                               {moneyCOP(product.price)}
                             </span>
@@ -601,7 +602,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                             <div className="flex items-start gap-1.5 md:gap-2">
                               <div
                                 className="trending-card__meta-label shrink-0 text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
-                                style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor)}
+                                style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                               >
                                 TALLAS
                               </div>
@@ -611,7 +612,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                                   <span
                                     key={sz}
                                     className="trending-card__size px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-800 border border-[#ead1db] bg-transparent rounded-lg"
-                                    style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor)}
+                                    style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                     title={`Talla ${sz}`}
                                   >
                                     {sz}
@@ -621,7 +622,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                                 {extraSizes > 0 ? (
                                   <span
                                     className="px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-500 border border-[#ead1db] bg-transparent rounded-lg"
-                                    style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor)}
+                                    style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                     title={`${extraSizes} tallas más`}
                                   >
                                     +{extraSizes}
@@ -636,7 +637,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                               <div className="flex items-center justify-between gap-1.5 md:gap-2">
                                 <div
                                   className="trending-card__meta-label text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
-                                  style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor)}
+                                  style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                 >
                                   COLORES
                                 </div>
@@ -653,7 +654,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                                   {colorsHex.length > colorsToShow.length ? (
                                     <span
                                       className="text-[9px] md:text-[11px] font-extrabold text-gray-500 ml-1"
-                                      style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor)}
+                                      style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                       title={`${colorsHex.length - colorsToShow.length} colores más`}
                                     >
                                       +{colorsHex.length - colorsToShow.length}
@@ -666,12 +667,12 @@ export default function TrendingSection({ theme, previewProducts }) {
                         </div>
                       ) : null}
 
-                      {sectionStyle.showFeatures && featuresList.length ? (
+                      {sectionStyle.showFeatures && (!floatingGlass || presentation.showDescription) && featuresList.length ? (
                         <ul className="mt-1.5 text-[9px] md:text-[11px] text-gray-600 space-y-0.5">
                           {featuresList.map((f, i) => (
                             <li key={i} className="flex gap-1.5 md:gap-2 leading-snug line-clamp-1">
                               <span className="text-pink-600 font-extrabold">•</span>
-                              <span className="font-semibold" style={floatingTextStyle(sectionStyle.descStyle, presentation.cardDescColor)}>
+                              <span className="font-semibold" style={floatingTextStyle(sectionStyle.descStyle, presentation.cardDescColor, presentation.descSizePx)}>
                                 {f}
                               </span>
                             </li>
@@ -682,7 +683,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                       {showDescription ? (
                         <p
                           className="mt-1.5 text-[9px] md:text-[11px] text-gray-600 leading-snug line-clamp-1"
-                          style={floatingTextStyle(sectionStyle.descStyle, presentation.cardDescColor)}
+                          style={floatingTextStyle(sectionStyle.descStyle, presentation.cardDescColor, presentation.descSizePx)}
                         >
                           {product.description}
                         </p>
