@@ -413,7 +413,7 @@ export default function TrendingSection({ theme, previewProducts }) {
           <div className={`flex items-center justify-center trending-section__heading ${presentation.ornamentEnabled ? "" : "trending-section__heading--plain"}`}>
             {floatingGlass && presentation.ornamentEnabled ? <span className="trending-section__sparkle" aria-hidden="true">✦</span> : null}
             {floatingGlass && presentation.titleMode === "text" ? (
-              <h2 className="trending-section__title" style={{ color: presentation.titleColor, fontSize: `clamp(18px, 5vw, ${presentation.titleSizePx}px)`, fontFamily: presentation.titleFontFamily }}>
+              <h2 className="trending-section__title" style={{ "--trending-title-ink": presentation.titleColor, color: presentation.titleColor, fontSize: `clamp(18px, 5vw, ${presentation.titleSizePx}px)`, fontFamily: presentation.titleFontFamily }}>
                 {String(config?.title || "EN TENDENCIA")}
               </h2>
             ) : (
