@@ -422,7 +422,7 @@ export default function TrendingSection({ theme, previewProducts }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: sectionStyle.spacingPx }}>
+        <div className={`grid grid-cols-2 md:grid-cols-4 ${floatingGlass ? "trending-section__stage" : ""}`} style={{ gap: sectionStyle.spacingPx }}>
           {productsToRender.map((product, index) => {
             const radius = sectionStyle.cardRadiusPx;
             const imgH = floatingGlass ? presentation.imageHeightPx : sectionStyle.imageHeightPx;
