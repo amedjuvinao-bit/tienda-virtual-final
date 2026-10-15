@@ -1,10 +1,12 @@
 // src/components/TrendingSection.jsx
-import { Star, ShoppingCart } from "lucide-react";
+import { Star, Heart, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import { normalizeTrendingPresentation, trendingPresentationVars } from "./trendingPresentation";
+import "./trendingFloatingGlass.css";
 
 function moneyCOP(value) {
   const n = Number(value);
@@ -85,6 +87,8 @@ export default function TrendingSection({ theme, previewProducts }) {
   const config = useMemo(() => {
     return tendenciaSection?.config && typeof tendenciaSection.config === "object" ? tendenciaSection.config : null;
   }, [tendenciaSection]);
+  const presentation = normalizeTrendingPresentation(config?.presentation);
+  const floatingGlass = presentation.mode === "floatingGlass";
 
   const sectionStyle = useMemo(() => {
     const st = tendenciaSection?.style && typeof tendenciaSection.style === "object" ? tendenciaSection.style : {};
@@ -152,11 +156,11 @@ export default function TrendingSection({ theme, previewProducts }) {
 
     return {
       favorite: {
-        enabled: typeof fav.enabled === "boolean" ? fav.enabled : true,
+        enabled: typeof raw.favoritesEnabled === "boolean" ? raw.favoritesEnabled : typeof fav.enabled === "boolean" ? fav.enabled : true,
         link: typeof fav.link === "string" && fav.link.trim() ? fav.link.trim() : "/favoritos",
       },
       cart: {
-        enabled: typeof cart.enabled === "boolean" ? cart.enabled : true,
+        enabled: typeof raw.cartEnabled === "boolean" ? raw.cartEnabled : typeof cart.enabled === "boolean" ? cart.enabled : true,
         link: typeof cart.link === "string" && cart.link.trim() ? cart.link.trim() : "/carrito",
       },
     };
@@ -390,23 +394,25 @@ export default function TrendingSection({ theme, previewProducts }) {
   if (!productsToRender.length) return null;
 
   return (
-    <section className="pb-24 pt-5 relative overflow-hidden">
+    <section className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`} style={floatingGlass ? { ...trendingPresentationVars(presentation), ...(presentation.backgroundImage ? { backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), var(--trending-glow-strength)), transparent 42%), radial-gradient(ellipse at 91% 76%, rgba(var(--trending-glow-rgb), var(--trending-glow-strength)), transparent 45%), linear-gradient(rgba(255,255,255,.12),rgba(255,255,255,.12)), url("${presentation.backgroundImage}")`, backgroundSize: "cover", backgroundPosition: "center" } : {}) } : undefined}>
       <div className="max-w-6xl mx-auto px-4">
         {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
         <div className="text-center mb-5">
-          <div className="flex items-center justify-center">
-            <img
-              src={titleImage}
-              alt="En tendencia"
-              className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none"
-            />
+          <div className={`flex items-center justify-center trending-section__heading ${presentation.ornamentEnabled ? "" : "trending-section__heading--plain"}`}>
+            {floatingGlass && presentation.titleMode === "text" ? (
+              <h2 className="trending-section__title" style={{ color: presentation.titleColor, fontSize: `clamp(18px, 5vw, ${presentation.titleSizePx}px)`, fontFamily: presentation.titleFontFamily }}>
+                {String(config?.title || "EN TENDENCIA")}
+              </h2>
+            ) : (
+              <img src={titleImage} alt="En tendencia" className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none" />
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: sectionStyle.spacingPx }}>
           {productsToRender.map((product, index) => {
             const radius = sectionStyle.cardRadiusPx;
-            const imgH = sectionStyle.imageHeightPx;
+            const imgH = floatingGlass ? presentation.imageHeightPx : sectionStyle.imageHeightPx;
 
             const mobileImgHeight = Math.max(145, Math.round(imgH * 0.66));
             const tabletImgHeight = Math.max(165, Math.round(imgH * 0.78));
@@ -464,12 +470,30 @@ export default function TrendingSection({ theme, previewProducts }) {
             const favoritePayload = buildFavoritePayload(product);
             const cartPayload = buildCartPayload(product);
             const favoriteActive = isFavorite(favoritePayload);
+            const cardActions = (
+              <div className={`trending-card__actions ${floatingGlass ? "" : "absolute top-2 right-2 z-30 flex flex-col gap-1.5 md:gap-2"}`}>
+                {actions.favorite.enabled ? (
+                  <button type="button" title={favoriteActive ? "Quitar de favoritos" : "Agregar a favoritos"}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(favoritePayload); }}
+                    className={`trending-card__action ${floatingGlass ? "" : "w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"}`}>
+                    {floatingGlass ? <Heart className={`w-4 h-4 ${favoriteActive ? "fill-current" : ""}`} /> : <Star className={`w-3.5 h-3.5 md:w-4 md:h-4 transition ${favoriteActive ? "text-yellow-500 fill-yellow-500" : "text-pink-600"}`} />}
+                  </button>
+                ) : null}
+                {actions.cart.enabled ? (
+                  <button type="button" title="Agregar al carrito"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToCart(cartPayload); }}
+                    className={`trending-card__action ${floatingGlass ? "" : "w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"}`}>
+                    <ShoppingCart className={`w-3.5 h-3.5 md:w-4 md:h-4 ${floatingGlass ? "" : "text-pink-600"}`} />
+                  </button>
+                ) : null}
+              </div>
+            );
 
             return (
               <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block">
                 <div
-                  className="relative group bg-white border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col"
-                  style={{ borderRadius: radius, overflow: "hidden" }}
+                  className={floatingGlass ? "relative group trending-card--floating-glass" : "relative group bg-white border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col"}
+                  style={floatingGlass ? undefined : { borderRadius: radius, overflow: "hidden" }}
                 >
                   {product.hasDiscount ? (
                     <div className="absolute top-2 left-2 z-30 bg-pink-100 text-pink-700 text-[9px] md:text-[11px] font-extrabold px-2 py-[3px] md:py-1 rounded-full border border-pink-200">
@@ -477,44 +501,10 @@ export default function TrendingSection({ theme, previewProducts }) {
                     </div>
                   ) : null}
 
-                  <div className="absolute top-2 right-2 z-30 flex flex-col gap-1.5 md:gap-2">
-                    {actions.favorite.enabled ? (
-                      <button
-                        type="button"
-                        title={favoriteActive ? "Quitar de favoritos" : "Agregar a favoritos"}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleFavorite(favoritePayload);
-                        }}
-                        className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"
-                      >
-                        <Star
-                          className={`w-3.5 h-3.5 md:w-4 md:h-4 transition ${
-                            favoriteActive ? "text-yellow-500 fill-yellow-500" : "text-pink-600"
-                          }`}
-                        />
-                      </button>
-                    ) : null}
-
-                    {actions.cart.enabled ? (
-                      <button
-                        type="button"
-                        title="Agregar al carrito"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          addToCart(cartPayload);
-                        }}
-                        className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"
-                      >
-                        <ShoppingCart className="w-3.5 h-3.5 md:w-4 md:h-4 text-pink-600" />
-                      </button>
-                    ) : null}
-                  </div>
+                  {!floatingGlass ? cardActions : null}
 
                   <div
-                    className="relative md:h-[var(--img-h-desktop)] sm:h-[var(--img-h-tablet)] h-[var(--img-h-mobile)]"
+                    className="trending-card__photo relative md:h-[var(--img-h-desktop)] sm:h-[var(--img-h-tablet)] h-[var(--img-h-mobile)]"
                     style={{
                       "--img-h-mobile": `${mobileImgHeight}px`,
                       "--img-h-tablet": `${tabletImgHeight}px`,
@@ -535,7 +525,8 @@ export default function TrendingSection({ theme, previewProducts }) {
                     />
                   </div>
 
-                  <div className="px-2.5 md:px-3 pt-2 md:pt-2.5 pb-2 relative overflow-hidden flex-1 min-h-[108px] sm:min-h-[126px] md:min-h-[180px]">
+                  <div className={floatingGlass ? "trending-card__dock" : "px-2.5 md:px-3 pt-2 md:pt-2.5 pb-2 relative overflow-hidden flex-1 min-h-[108px] sm:min-h-[126px] md:min-h-[180px]"}>
+                    {floatingGlass ? cardActions : null}
                     {watermarkImage ? (
                       <img
                         src={watermarkImage}
@@ -552,7 +543,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                       />
                     ) : null}
 
-                    <div className="relative z-10">
+                    <div className="relative z-10 trending-card__details">
                       <h3
                         className="text-[10px] md:text-sm font-extrabold text-gray-900 leading-snug line-clamp-1"
                         style={sectionStyle.titleStyle}
@@ -568,7 +559,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                                 {moneyCOP(product.price)}
                               </span>
                               <span
-                                className="text-[12px] md:text-base text-pink-700 font-extrabold tracking-tight"
+                                className="trending-card__price text-[12px] md:text-base text-pink-700 font-extrabold tracking-tight"
                                 style={sectionStyle.priceStyle}
                               >
                                 {moneyCOP(product.finalPrice)}
@@ -576,7 +567,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                             </>
                           ) : (
                             <span
-                              className="text-[12px] md:text-base text-gray-900 font-extrabold tracking-tight"
+                              className="trending-card__price text-[12px] md:text-base text-gray-900 font-extrabold tracking-tight"
                               style={sectionStyle.priceStyle}
                             >
                               {moneyCOP(product.price)}
@@ -585,7 +576,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                         </div>
 
                         {product.hasDiscount ? (
-                          <span className="text-[8px] md:text-[11px] font-extrabold text-pink-700 bg-pink-50 border border-pink-100 px-1.5 md:px-2 py-[2px] rounded-full whitespace-nowrap">
+                          <span className="trending-card__discount text-[8px] md:text-[11px] font-extrabold text-pink-700 bg-pink-50 border border-pink-100 px-1.5 md:px-2 py-[2px] rounded-full whitespace-nowrap">
                             Ahorra {product.discountPercent}%
                           </span>
                         ) : null}
@@ -596,7 +587,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                           {sectionStyle.showSizes && sizesArrAll.length ? (
                             <div className="flex items-start gap-1.5 md:gap-2">
                               <div
-                                className="shrink-0 text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
+                                className="trending-card__meta-label shrink-0 text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
                                 style={sectionStyle.metaStyle}
                               >
                                 TALLAS
@@ -606,7 +597,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                                 {sizesToShow.map((sz) => (
                                   <span
                                     key={sz}
-                                    className="px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-800 border border-[#ead1db] bg-transparent rounded-lg"
+                                    className="trending-card__size px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-800 border border-[#ead1db] bg-transparent rounded-lg"
                                     style={sectionStyle.metaStyle}
                                     title={`Talla ${sz}`}
                                   >
@@ -631,7 +622,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                             <div className={sectionStyle.showSizes && sizesArrAll.length ? "mt-1" : ""}>
                               <div className="flex items-center justify-between gap-1.5 md:gap-2">
                                 <div
-                                  className="text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
+                                  className="trending-card__meta-label text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
                                   style={sectionStyle.metaStyle}
                                 >
                                   COLORES

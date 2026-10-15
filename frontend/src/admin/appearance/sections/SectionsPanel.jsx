@@ -14,6 +14,7 @@ import SectionEditorSteps from './ui/SectionEditorSteps';
 import SectionEditorCardTabs from './ui/SectionEditorCardTabs';
 import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
+import { normalizeTrendingPresentation } from '../../../components/trendingPresentation';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -243,6 +244,7 @@ function normalizeTendenciaConfigPlus(raw) {
     watermarkPosXPct: clampNumber(watermarkPosXPct, 0, 100),
     watermarkPosYPct: clampNumber(watermarkPosYPct, 0, 100),
     watermarkRotateDeg: clampNumber(watermarkRotateDeg, -180, 180),
+    presentation: normalizeTrendingPresentation(src.presentation),
   };
 }
 
@@ -885,8 +887,10 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
   );
 }
 
-function StylesTab({ section, onChange }) {
+function StylesTab({ section, onChange, uploadToCloudinary }) {
   const st = section.style || DEFAULT_STYLE;
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [backgroundError, setBackgroundError] = useState("");
 
   const patchStyle = (partial) => {
     onChange({ style: { ...st, ...partial } });
@@ -1013,6 +1017,33 @@ function StylesTab({ section, onChange }) {
 
   const cfg = section.type === "tendencia" ? normalizeTendenciaConfigPlus(section.config) : section.config || {};
   const cardFields = cfg?.cardFields && typeof cfg.cardFields === "object" ? cfg.cardFields : {};
+  const presentation = normalizeTrendingPresentation(cfg.presentation);
+  const patchPresentation = (partial) => onChange({ config: { ...cfg, presentation: normalizeTrendingPresentation({ ...presentation, ...partial }) } });
+  const numericPresentationField = (key, label, min, max, step = 1) => (
+    <Field label={label} name={`config.presentation.${key}`} key={key}>
+      <Input type="number" aria-label={label} min={min} max={max} step={step} value={presentation[key]}
+        onChange={(event) => patchPresentation({ [key]: clampNumber(Number(event.target.value), min, max) })} />
+    </Field>
+  );
+  const colorPresentationField = (key, label) => (
+    <ColorField key={key} label={label} value={presentation[key]} onChange={(value) => patchPresentation({ [key]: value })} />
+  );
+  const uploadBackground = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !uploadToCloudinary) return;
+    setBackgroundError("");
+    setUploadingBackground(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      if (!url || !normalizeTrendingPresentation({ backgroundImage: url }).backgroundImage) throw new Error("No se recibió una imagen válida de Cloudinary.");
+      patchPresentation({ backgroundImage: url });
+    } catch (error) {
+      setBackgroundError(error?.message || "No se pudo cargar el fondo.");
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
 
   const patchCardFields = (partial) => {
     if (section.type !== "tendencia") return;
@@ -1028,7 +1059,96 @@ function StylesTab({ section, onChange }) {
   };
 
   return (
-    <SectionEditorCardTabs label="Diseño de Tendencia" labels={['Texto general', 'Campos de la tarjeta', 'Datos visibles', 'Tarjetas y espacio']}>
+    <SectionEditorCardTabs label="Diseño de Tendencia" labels={['Plantilla', 'Texto general', 'Campos de la tarjeta', 'Datos visibles', 'Tarjetas y espacio']}>
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4">
+        <div>
+          <h3 className="text-sm font-semibold text-neutral-900">Elige cómo se muestran los productos</h3>
+          <p className="mt-1 text-xs text-neutral-600">La vista previa muestra la tienda con los productos que elegiste. Cambia de plantilla sin perder los ajustes de la otra.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { mode: "classic", label: "Tarjeta actual", hint: "Imagen y detalles en una sola tarjeta", preview: "rounded-t-xl rounded-b-xl" },
+            { mode: "floatingGlass", label: "Vitrina flotante", hint: "Foto protagonista y ficha de vidrio separada", preview: "rounded-2xl" },
+          ].map((option) => (
+            <button key={option.mode} type="button" aria-pressed={presentation.mode === option.mode}
+              onClick={() => patchPresentation({ mode: option.mode })}
+              className={`rounded-2xl border-2 p-3 text-left transition ${presentation.mode === option.mode ? "border-rose-500 bg-rose-50/50" : "border-neutral-200 hover:border-rose-200"}`}>
+              <span className="block text-sm font-semibold">{option.label}</span>
+              <span className="block text-xs text-neutral-600">{option.hint}</span>
+              <span aria-hidden="true" className="mt-3 flex h-16 max-w-28 flex-col gap-1">
+                <span className={`block flex-1 border border-rose-200 bg-gradient-to-br from-rose-100 via-white to-amber-100 ${option.preview}`} />
+                {option.mode === "floatingGlass" ? <span className="block h-4 rounded-lg border border-amber-200 bg-white/70 shadow-sm" /> : null}
+              </span>
+            </button>
+          ))}
+        </div>
+        {presentation.mode === "floatingGlass" ? (
+          <div className="space-y-3">
+            <p className="text-xs text-neutral-600">Las fotos y los artículos se editan en Contenido → Productos. Las letras y datos de la ficha se ajustan en las pestañas siguientes.</p>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Título de la vitrina</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Mostrar título como" name="config.presentation.titleMode">
+                  <select className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" value={presentation.titleMode} onChange={(event) => patchPresentation({ titleMode: event.target.value })}>
+                    <option value="text">Texto editable</option><option value="image">Imagen del título</option>
+                  </select>
+                </Field>
+                {presentation.titleMode === "text" ? <>
+                  <Field label="Texto" name="config.title"><Input value={cfg.title || ""} placeholder="EN TENDENCIA" onChange={(event) => onChange({ config: { ...cfg, title: event.target.value } })} /></Field>
+                  {colorPresentationField("titleColor", "Color del título")}
+                  {numericPresentationField("titleSizePx", "Tamaño máximo del título (px)", 20, 80)}
+                  <Field label="Fuente del título" name="config.presentation.titleFontFamily">
+                    <select className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" value={presentation.titleFontFamily} onChange={(event) => patchPresentation({ titleFontFamily: event.target.value })}>
+                      {[{ label: "Clásica elegante", value: "Georgia, serif" }, ...CARD_FONT_OPTIONS.filter((item) => item.value)].map((item) => <option key={item.label} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </Field>
+                </> : <p className="text-xs text-neutral-600">Carga la imagen del título en Contenido → Imágenes.</p>}
+              </div>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3" open>
+              <summary className="cursor-pointer text-sm font-semibold">Fondo y luz</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {colorPresentationField("backgroundColor", "Color de fondo")}
+                {colorPresentationField("glowColor", "Color de la luz ambiental")}
+                {numericPresentationField("glowStrength", "Intensidad de luz (0–1)", 0, 1, .05)}
+                <Field label="Imagen de fondo opcional" name="config.presentation.backgroundImage">
+                  <input type="file" accept="image/*" onChange={uploadBackground} disabled={uploadingBackground} className="block w-full text-xs" />
+                  {uploadingBackground ? <span role="status" className="text-xs">Cargando imagen…</span> : null}
+                  {backgroundError ? <span role="alert" className="text-xs text-red-700">{backgroundError}</span> : null}
+                  {presentation.backgroundImage ? <button type="button" onClick={() => patchPresentation({ backgroundImage: "" })} className="mt-1 text-xs underline">Quitar fondo</button> : null}
+                </Field>
+              </div>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Vidrio y bordes</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {colorPresentationField("glassColor", "Color del vidrio")}
+                {colorPresentationField("borderColor", "Color del borde")}
+                {numericPresentationField("glassOpacity", "Opacidad del vidrio (0,25–1)", .25, 1, .05)}
+                {numericPresentationField("blurPx", "Desenfoque (px)", 0, 40)}
+                {numericPresentationField("borderOpacity", "Opacidad del borde (0–1)", 0, 1, .05)}
+                {numericPresentationField("borderWidthPx", "Grosor del borde (px)", 0, 4, .5)}
+                {numericPresentationField("shadowStrength", "Intensidad de sombra (0–1)", 0, 1, .05)}
+              </div>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Forma y botones</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {numericPresentationField("imageHeightPx", "Alto de la foto (px)", 240, 600)}
+                {numericPresentationField("imageRadiusPx", "Redondeo de la foto (px)", 0, 60)}
+                {numericPresentationField("dockRadiusPx", "Redondeo de la ficha (px)", 0, 60)}
+                {numericPresentationField("dockGapPx", "Separación foto/ficha (px)", 0, 30)}
+                {numericPresentationField("dockPaddingPx", "Espacio interior de la ficha (px)", 8, 30)}
+                {numericPresentationField("hoverLiftPx", "Elevación al pasar el mouse (px)", 0, 18)}
+                {numericPresentationField("actionSizePx", "Tamaño de los botones (px)", 28, 52)}
+                {colorPresentationField("actionColor", "Color de los iconos")}
+                {colorPresentationField("actionBackgroundColor", "Fondo de los botones")}
+                <label className="flex items-center gap-2 text-sm"> <Toggle checked={presentation.ornamentEnabled} onChange={(value) => patchPresentation({ ornamentEnabled: !!value })} /> Decoración junto al título</label>
+              </div>
+            </details>
+          </div>
+        ) : null}
+      </div>
       <div className="rounded-2xl border border-neutral-200 bg-white p-4">
         <div className="text-sm font-semibold text-neutral-900 mb-2">Texto de todas las tarjetas</div>
 
@@ -2074,7 +2194,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
                 />
               ) : null}
 
-              {activeTab === "styles" ? <StylesTab section={selected} onChange={handleChangeSelected} /> : null}
+              {activeTab === "styles" ? <StylesTab section={selected} onChange={handleChangeSelected} uploadToCloudinary={uploadToCloudinary} /> : null}
 
               {activeTab === "products" && selected.type === "tendencia" ? (
                 <ProductsTab section={selected} onChange={handleChangeSelected} uploadToCloudinary={uploadToCloudinary} />

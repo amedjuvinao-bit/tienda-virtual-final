@@ -22,6 +22,19 @@ function Harness({ id, onSave }) {
 }
 
 describe('editor de secciones, etapa 3', () => {
+  it('ofrece la vitrina como opción y conserva sus parámetros al guardar', () => {
+    const onSave = vi.fn();
+    render(<Harness id="tendencia" onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar En tendencia' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
+    expect(screen.getByRole('button', { name: /Tarjeta actual/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /Vitrina flotante/ }));
+    expect(screen.getByRole('button', { name: /Vitrina flotante/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByText('Forma y botones'));
+    fireEvent.change(screen.getByLabelText('Separación foto/ficha (px)'), { target: { value: '19' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ presentation: expect.objectContaining({ mode: 'floatingGlass', dockGapPx: 19 }) }) }));
+  });
   it.each(['tendencia', 'look', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion'])(
     'muestra vista previa permanente al editar contenido y diseño de %s', (id) => {
       render(<Harness id={id} onSave={vi.fn()} />);
