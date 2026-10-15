@@ -7,7 +7,7 @@
     animation: storefront-aperture-in 1050ms cubic-bezier(.16,1,.3,1) backwards;
   }
   .storefront-sections > section[data-section-motion="leaving"] {
-    animation: storefront-aperture-out 260ms cubic-bezier(.55,0,.85,.35) both;
+    animation: storefront-aperture-out 260ms cubic-bezier(.55,0,.85,.35) backwards;
   }
   .storefront-sections > section[data-section-motion="entering"][data-section-direction="up"] {
     animation-name: storefront-aperture-in-up;
