@@ -355,6 +355,40 @@ export default function LookSection({ theme, previewProducts }) {
     });
   }
 
+  function renderHeroCard(isMobile = false) {
+    if (!hasCustomHero) return null;
+
+    return (
+      <button
+        key="look-custom-hero"
+        type="button"
+        aria-label="Mostrar imagen principal"
+        aria-pressed={!selectedId}
+        onClick={() => setSelectedId("")}
+        className={`group block shrink-0 text-center transition-transform duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${isMobile ? "w-[calc(50%-6px)] snap-start" : "w-full"}`}
+        style={isMobile ? undefined : { maxWidth: thumbCardMaxWidthPx }}
+        onMouseEnter={(event) => {
+          event.currentTarget.style.transform = `scale(${style.thumbHoverScale}) rotate(${style.thumbHoverRotateDeg}deg)`;
+        }}
+        onMouseLeave={(event) => {
+          event.currentTarget.style.transform = "scale(1) rotate(0deg)";
+        }}
+      >
+        <span
+          className="block w-full overflow-hidden"
+          style={{
+            height: isMobile ? Math.max(150, Math.round(thumbHeightPx * 0.9)) : thumbHeightPx,
+            borderRadius: style.thumbRadiusPx,
+            boxShadow: style.thumbShadow ? "0 10px 24px rgba(0,0,0,0.12)" : "none",
+          }}
+        >
+          <img src={config.heroImage} alt="Portada de Looks" className="h-full w-full object-cover" draggable={false} />
+        </span>
+        <span className="mt-2 block leading-tight" style={thumbTitleStyle}>Imagen principal</span>
+      </button>
+    );
+  }
+
   function renderProductCard(prod, isMobile = false) {
     const favoritePayload = buildFavoritePayload(prod);
     const cartPayload = buildCartPayload(prod);
@@ -568,14 +602,6 @@ export default function LookSection({ theme, previewProducts }) {
                   }}
                 />
 
-                {hasCustomHero && selectedId ? (
-                  <button type="button" onMouseEnter={() => setZoomActive(false)} onClick={() => setSelectedId("")}
-                    className="absolute left-3 top-3 z-30 cursor-pointer rounded-full border border-white/75 bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-950 shadow-sm backdrop-blur"
-                    aria-label="Volver a la imagen principal">
-                    Volver a portada
-                  </button>
-                ) : null}
-
                 <div
                   className="pointer-events-none absolute inset-0 transition-opacity duration-200"
                   style={{
@@ -677,10 +703,11 @@ export default function LookSection({ theme, previewProducts }) {
                 paddingBottom: 4,
               }}
             >
+              {renderHeroCard(true)}
               {products.map((prod) => renderProductCard(prod, true))}
             </div>
 
-            {products.length > 2 ? (
+            {products.length + Number(hasCustomHero) > 2 ? (
               <div
                 className="flex items-center justify-center"
                 style={{ marginTop: safeMobileSliderControlMarginTopPx }}
@@ -745,6 +772,7 @@ export default function LookSection({ theme, previewProducts }) {
               justifyItems: "center",
             }}
           >
+            {renderHeroCard(false)}
             {products.map((prod) => renderProductCard(prod, false))}
           </div>
         </div>

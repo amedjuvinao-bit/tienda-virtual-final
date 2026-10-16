@@ -48,9 +48,10 @@ describe('imagen principal independiente de Looks', () => {
     ] }) }));
     render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
+    expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })).toHaveLength(2);
     fireEvent.click(screen.getAllByAltText('Vestido azul')[0]);
-    expect(screen.getByRole('button', { name: 'Volver a la imagen principal' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Volver a la imagen principal' }));
+    expect(screen.getAllByAltText('Portada de Looks')).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[0]);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
   });
 

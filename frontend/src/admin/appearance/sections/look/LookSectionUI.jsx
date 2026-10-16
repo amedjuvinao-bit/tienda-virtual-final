@@ -326,7 +326,7 @@ export default function LookSectionUI({
             {contentStep === "principal" && <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
               <div>
                 <h3 className="text-base font-extrabold text-neutral-900">Imagen grande al abrir Looks</h3>
-                <p className="mt-1 text-xs text-neutral-600">Puede ser una foto independiente del catálogo. Al tocar un producto, se mostrará su foto; el visitante podrá volver a esta portada.</p>
+                <p className="mt-1 text-xs text-neutral-600">Puede ser una foto independiente del catálogo. También quedará como primera tarjeta de la galería para volver a verla al tocar una prenda.</p>
               </div>
               <div className="grid grid-cols-2 gap-2" role="group" aria-label="Origen de la imagen grande">
                 <button type="button" aria-pressed={config.heroMode === "custom"} onClick={() => patchConfig({ heroMode: "custom" })}
