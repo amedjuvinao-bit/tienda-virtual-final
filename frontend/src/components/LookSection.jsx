@@ -130,7 +130,8 @@ export default function LookSection({ theme, previewProducts }) {
 
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [loadedProductsKey, setLoadedProductsKey] = useState('');
-  const [selectedId, setSelectedId] = useState(config.selectedProductId || "");
+  const hasCustomHero = config.heroMode === "custom" && !!config.heroImage;
+  const [selectedId, setSelectedId] = useState(hasCustomHero ? "" : config.selectedProductId || "");
   const [loading, setLoading] = useState(false);
 
   const [zoomActive, setZoomActive] = useState(false);
@@ -256,10 +257,16 @@ export default function LookSection({ theme, previewProducts }) {
   const usingDraft = draftProducts.some((product) => !catalogById.has(product.id));
 
   useEffect(() => {
+    setSelectedId(hasCustomHero ? "" : config.selectedProductId || "");
+  }, [hasCustomHero, config.heroImage, config.selectedProductId]);
+
+  useEffect(() => {
     if (!products.length) {
       setSelectedId("");
       return;
     }
+
+    if (hasCustomHero && !selectedId) return;
 
     const exists = products.some((p) => String(p.id) === String(selectedId));
     if (exists) return;
@@ -269,8 +276,8 @@ export default function LookSection({ theme, previewProducts }) {
         products.find((p) => String(p.id) === String(config.selectedProductId))) ||
       products[0];
 
-    setSelectedId(preferred?.id || "");
-  }, [products, selectedId, config?.selectedProductId]);
+    setSelectedId(hasCustomHero ? "" : preferred?.id || "");
+  }, [products, selectedId, config?.selectedProductId, hasCustomHero]);
 
   useEffect(() => {
     setZoomActive(false);
@@ -281,6 +288,8 @@ export default function LookSection({ theme, previewProducts }) {
   const selected = useMemo(() => {
     return products.find((p) => String(p.id) === String(selectedId)) || products[0] || null;
   }, [products, selectedId]);
+  const mainImage = hasCustomHero && !selectedId ? config.heroImage : selected?.image;
+  const mainImageAlt = hasCustomHero && !selectedId ? (config.titleText || "Imagen principal de Looks") : selected?.subtitle;
 
   const titleStyle = useMemo(() => buildTextStyleFrom(style, "title"), [style]);
   const descStyle = useMemo(() => buildTextStyleFrom(style, "desc"), [style]);
@@ -527,7 +536,7 @@ export default function LookSection({ theme, previewProducts }) {
         <div className="relative">
           <div
             className={`${getAspectClass(style.mainImageAspect)} relative w-full overflow-hidden group ${
-              selected ? "cursor-none" : ""
+              mainImage ? "cursor-none" : ""
             }`}
             style={{
               borderRadius: style.mainImageRadiusPx,
@@ -537,7 +546,7 @@ export default function LookSection({ theme, previewProducts }) {
               boxShadow: style.mainImageShadow ? "0 20px 40px rgba(0,0,0,0.12)" : "none",
             }}
             onMouseEnter={() => {
-              if (selected) setZoomActive(true);
+              if (mainImage) setZoomActive(true);
             }}
             onMouseMove={handleMainImageMouseMove}
             onMouseLeave={() => {
@@ -546,11 +555,11 @@ export default function LookSection({ theme, previewProducts }) {
               setLensPosition({ x: 50, y: 50 });
             }}
           >
-            {selected ? (
+            {mainImage ? (
               <>
                 <img
-                  src={selected.image}
-                  alt={selected.subtitle}
+                  src={mainImage}
+                  alt={mainImageAlt}
                   className="w-full h-full object-cover select-none transition-transform duration-150 ease-out"
                   draggable={false}
                   style={{
@@ -558,6 +567,14 @@ export default function LookSection({ theme, previewProducts }) {
                     transformOrigin: `${zoomPosition.x}% ${zoomPosition.y}%`,
                   }}
                 />
+
+                {hasCustomHero && selectedId ? (
+                  <button type="button" onMouseEnter={() => setZoomActive(false)} onClick={() => setSelectedId("")}
+                    className="absolute left-3 top-3 z-30 cursor-pointer rounded-full border border-white/75 bg-white/85 px-3 py-1.5 text-xs font-semibold text-rose-950 shadow-sm backdrop-blur"
+                    aria-label="Volver a la imagen principal">
+                    Volver a portada
+                  </button>
+                ) : null}
 
                 <div
                   className="pointer-events-none absolute inset-0 transition-opacity duration-200"

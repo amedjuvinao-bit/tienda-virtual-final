@@ -18,6 +18,8 @@ export const LOOK_SECTION_DEFAULTS = {
       "¡Descubre nuestros looks pensados para bautizos, celebraciones y recuerdos eternos!",
     maxItems: 6,
     selectedProductId: "",
+    heroMode: "product",
+    heroImage: "",
     products: [],
     actions: {
       favorite: {
@@ -235,6 +237,11 @@ export function normalizeLookSectionConfig(input = {}) {
     titleImage: asString(input?.titleImage, base.titleImage).trim() || base.titleImage,
     titleText: asString(input?.titleText, base.titleText),
     description: asString(input?.description, base.description),
+    heroMode: input?.heroMode === "custom" ? "custom" : "product",
+    heroImage: (() => {
+      const url = asString(input?.heroImage, "").trim();
+      return /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url) || /^\/(?!\/)[^\s]*$/.test(url) ? url : "";
+    })(),
     maxItems: clampNumber(input?.maxItems, 1, LOOK_MAX_PRODUCTS, base.maxItems),
     selectedProductId,
     products,

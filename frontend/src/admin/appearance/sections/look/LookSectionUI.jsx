@@ -84,6 +84,9 @@ export default function LookSectionUI({
 }) {
   const section = useMemo(() => getLookSectionFromTheme(theme), [theme]);
   const [tab, setTab] = useState("contenido");
+  const [contentStep, setContentStep] = useState("principal");
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [heroError, setHeroError] = useState("");
 
   const style = section?.style || LOOK_SECTION_DEFAULTS.style;
   const config = section?.config || LOOK_SECTION_DEFAULTS.config;
@@ -100,6 +103,9 @@ export default function LookSectionUI({
       null
     );
   }, [selectedItems, selectedProductId]);
+  const previewMainImage = config.heroMode === "custom" && config.heroImage
+    ? config.heroImage
+    : selectedPreviewItem?.mainImage;
 
   const safeThumbHeightPx = useMemo(() => {
     const n = Number(style?.thumbHeightPx);
@@ -211,6 +217,29 @@ export default function LookSectionUI({
     setProducts(next);
   };
 
+  const uploadHero = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!uploadToCloudinary) {
+      setHeroError("No está disponible la carga de imágenes.");
+      return;
+    }
+    setUploadingHero(true);
+    setHeroError("");
+    try {
+      const url = await uploadToCloudinary(file);
+      if (!url || !normalizeLookSection({ config: { heroImage: url } }).config.heroImage) {
+        throw new Error("No se recibió una imagen válida. Inténtalo de nuevo.");
+      }
+      patchConfig({ heroImage: url, heroMode: "custom" });
+    } catch (error) {
+      setHeroError(error?.message || "No se pudo subir la imagen.");
+    } finally {
+      setUploadingHero(false);
+    }
+  };
+
   const titleTextStyle = useMemo(
     () => buildPreviewTextStyle(style, "title", { fontSize: 28, fontWeight: 700, color: "#374151" }),
     [style]
@@ -263,7 +292,7 @@ export default function LookSectionUI({
             <div>
               <div className="text-base font-extrabold text-neutral-900">Editor de sección LOOK</div>
               <div className="text-sm text-neutral-500 mt-1">
-                Configura título, descripción, productos, imagen principal dinámica y estilos visuales.
+                Elige la imagen grande, agrega productos y ajusta las fotos de sus tarjetas.
               </div>
             </div>
 
@@ -284,8 +313,59 @@ export default function LookSectionUI({
 
         {tab === "contenido" && (
           <>
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">Datos principales</div>
+            <nav className="section-editor-substeps" aria-label="Editar contenido de Looks">
+              {[
+                { value: "principal", label: "1 · Imagen grande" },
+                { value: "products", label: `2 · Productos (${selectedItems.length})` },
+                { value: "photos", label: "3 · Fotos de tarjetas" },
+              ].map(({ value, label }) => (
+                <button key={value} type="button" aria-pressed={contentStep === value} onClick={() => setContentStep(value)}>{label}</button>
+              ))}
+            </nav>
+
+            {contentStep === "principal" && <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+              <div>
+                <h3 className="text-base font-extrabold text-neutral-900">Imagen grande al abrir Looks</h3>
+                <p className="mt-1 text-xs text-neutral-600">Puede ser una foto independiente del catálogo. Al tocar un producto, se mostrará su foto; el visitante podrá volver a esta portada.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Origen de la imagen grande">
+                <button type="button" aria-pressed={config.heroMode === "custom"} onClick={() => patchConfig({ heroMode: "custom" })}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${config.heroMode === "custom" ? "border-rose-500 bg-rose-50 text-rose-900" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                  Subir imagen propia
+                </button>
+                <button type="button" aria-pressed={config.heroMode !== "custom"} onClick={() => patchConfig({ heroMode: "product" })}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${config.heroMode !== "custom" ? "border-rose-500 bg-rose-50 text-rose-900" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                  Usar foto de producto
+                </button>
+              </div>
+              {config.heroMode === "custom" ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
+                  {config.heroImage ? <img src={config.heroImage} alt="Imagen principal elegida" className="h-24 w-20 rounded-lg object-cover" /> : <div className="flex h-24 w-20 items-center justify-center rounded-lg border border-dashed border-rose-200 text-xs text-neutral-500">Sin imagen</div>}
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <label className="inline-flex cursor-pointer rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700">
+                      {uploadingHero ? "Subiendo…" : config.heroImage ? "Cambiar imagen grande" : "Cargar imagen grande"}
+                      <input type="file" accept="image/*" aria-label="Cargar imagen grande" className="sr-only" disabled={uploadingHero} onChange={uploadHero} />
+                    </label>
+                    {config.heroImage ? <button type="button" onClick={() => patchConfig({ heroImage: "", heroMode: "product" })} className="ml-2 text-xs font-semibold text-rose-800 underline">Quitar imagen</button> : null}
+                    {heroError ? <p role="alert" className="text-xs text-red-700">{heroError}</p> : null}
+                    {!config.heroImage && !heroError ? <p className="text-xs text-neutral-600">Carga una foto para verla en la vista previa.</p> : null}
+                  </div>
+                </div>
+              ) : (
+                <Field label="Producto cuya foto se muestra al abrir">
+                  {selectedItems.length ? (
+                    <select className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm" value={selectedProductId}
+                      onChange={(event) => patchConfig({ selectedProductId: event.target.value })}>
+                      {selectedItems.map((item) => <option key={item.productId} value={item.productId}>{item.title || "Producto"}</option>)}
+                    </select>
+                  ) : <p className="text-sm text-neutral-600">Agrega productos en el paso 2 para elegir uno.</p>}
+                </Field>
+              )}
+            </div>}
+
+            {contentStep === "principal" && <details className="rounded-2xl border border-neutral-200 bg-white p-4">
+              <summary className="cursor-pointer text-sm font-extrabold text-neutral-900">Título, descripción y visibilidad</summary>
+              <div className="mt-4 space-y-3">
 
               <Field label="Activa esta sección">
                 <div className="flex flex-wrap gap-2">
@@ -367,9 +447,10 @@ export default function LookSectionUI({
                   placeholder="Texto descriptivo de la sección LOOK…"
                 />
               </Field>
-            </div>
+              </div>
+            </details>}
 
-            <LookProductPicker
+            {contentStep === "products" && <LookProductPicker
               title="Productos de la sección LOOK"
               value={selectedItems}
               maxItems={LOOK_MAX_PRODUCTS}
@@ -383,70 +464,19 @@ export default function LookSectionUI({
                   maxItems: LOOK_MAX_PRODUCTS,
                 });
               }}
-            />
+            />}
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                Producto inicial (imagen grande al cargar)
-              </div>
-
-              {!selectedItems.length ? (
-                <div className="text-sm text-neutral-500">
-                  Primero agrega productos arriba.
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {selectedItems.map((item, index) => {
-                    const pid = String(item?.productId || "").trim();
-                    const active = pid === selectedProductId;
-
-                    return (
-                      <button
-                        key={`${pid}_${index}`}
-                        type="button"
-                        onClick={() => patchConfig({ selectedProductId: pid })}
-                        className={[
-                          "rounded-xl border p-3 text-left transition",
-                          active
-                            ? "section-editor-accent-border section-editor-accent text-white"
-                            : "border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-14 h-14 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-50 shrink-0">
-                            {item?.mainImage ? (
-                              <img
-                                src={item.mainImage}
-                                alt={item.title || pid}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[10px] text-neutral-400">
-                                —
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold line-clamp-1">
-                              {item?.title || "Producto"}
-                            </div>
-                            <div className="text-xs opacity-80 line-clamp-1">{pid}</div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {!!selectedItems.length && (
+            {contentStep === "photos" && (selectedItems.length ? (
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                  Imágenes por producto
+                <h3 className="text-sm font-extrabold text-neutral-900">Fotos de las tarjetas</h3>
+                <p className="mb-3 mt-1 text-xs text-neutral-600">Selecciona una tarjeta y cambia su foto normal o la que aparece al pasar el cursor. La imagen grande independiente se edita en el paso 1.</p>
+                <div className="flex gap-2 overflow-x-auto pb-2" role="group" aria-label="Tarjeta para editar">
+                  {selectedItems.map((item) => <button key={item.productId} type="button" aria-pressed={item.productId === selectedProductId}
+                    onClick={() => patchConfig({ selectedProductId: item.productId })}
+                    className={`flex shrink-0 items-center gap-2 rounded-xl border p-2 text-left text-xs font-semibold ${item.productId === selectedProductId ? "border-rose-500 bg-rose-50 text-rose-950" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                    {item.mainImage ? <img src={item.mainImage} alt="" className="h-9 w-9 rounded-lg object-cover" /> : null}{item.title || "Producto"}
+                  </button>)}
                 </div>
-                <p className="mb-3 text-xs text-neutral-600">Selecciona un producto arriba para editar sus imágenes aquí.</p>
 
                 <div className="space-y-4">
                   {selectedItems.map((item, index) => {
@@ -458,9 +488,7 @@ export default function LookSectionUI({
                         className="rounded-xl border border-neutral-200 bg-neutral-50 p-3"
                         hidden={pid !== selectedProductId}
                       >
-                        <div className="text-sm font-bold text-neutral-900 mb-2">
-                          {item?.title || "Producto"} · {pid}
-                        </div>
+                        <div className="text-sm font-bold text-neutral-900 mb-2">{item?.title || "Producto"}</div>
 
                         <CardImageMover
                           productId={pid}
@@ -473,7 +501,7 @@ export default function LookSectionUI({
                   })}
                 </div>
               </div>
-            )}
+            ) : <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Agrega productos en el paso 2 para editar sus fotos.</div>)}
           </>
         )}
 
@@ -1046,10 +1074,10 @@ export default function LookSectionUI({
                     boxShadow: style.mainImageShadow ? "0 20px 40px rgba(0,0,0,0.12)" : "none",
                   }}
                 >
-                  {selectedPreviewItem?.mainImage ? (
+                  {previewMainImage ? (
                     <img
-                      src={selectedPreviewItem.mainImage}
-                      alt={selectedPreviewItem.title || "Producto seleccionado"}
+                      src={previewMainImage}
+                      alt={config.heroMode === "custom" && config.heroImage ? "Imagen principal elegida" : selectedPreviewItem?.title || "Producto seleccionado"}
                       className="w-full h-full object-cover"
                     />
                   ) : (
