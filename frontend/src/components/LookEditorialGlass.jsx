@@ -51,7 +51,6 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-cards-visible": style.editorialVisibleCards,
     "--look-hero-radius": `${style.mainImageRadiusPx}px`,
     "--look-card-radius": `${style.thumbRadiusPx}px`,
-    "--look-rim-width": `${Math.max(1, Math.min(2, style.mainImageBorderPx))}px`,
     "--look-card-zoom": style.thumbHoverScale,
     "--look-button-bg": style.actionButtonBg,
     "--look-button-border": style.actionButtonBorderColor,
@@ -74,7 +73,10 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   return <section className="look-editorial" style={css} aria-label="Looks">
     <div className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
       <div className="look-editorial__hero">
-        {mainImage ? <img src={mainImage} alt={mainImageAlt || "Imagen principal de Looks"} />
+        {mainImage ? <>
+          <img className="look-editorial__hero-backdrop" src={mainImage} alt="" aria-hidden="true" />
+          <img className="look-editorial__hero-photo" src={mainImage} alt={mainImageAlt || "Imagen principal de Looks"} />
+        </>
           : <div className="look-editorial__empty">{loading ? "Cargando looks…" : "Selecciona una portada o un producto"}</div>}
         <div className="look-editorial__hero-controls">
           <button type="button" aria-label="Look anterior" onClick={() => moveHero(-1)} disabled={options.length < 2}><ChevronLeft size={21} /></button>

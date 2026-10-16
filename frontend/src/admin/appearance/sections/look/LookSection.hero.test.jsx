@@ -50,6 +50,8 @@ describe('imagen principal independiente de Looks', () => {
     ] }) }));
     render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
+    expect(document.querySelector('.look-editorial__hero-photo')).toHaveAttribute('src', imageUrl);
+    expect(document.querySelector('.look-editorial__hero-backdrop')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByRole('button', { name: 'Mostrar imagen principal' }).closest('.look-editorial__rail')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
