@@ -46,19 +46,26 @@ export default function LookGlassRim({ variant = "hero", radius = 26 }) {
         </linearGradient>
         <radialGradient id={`${id}-light`}><stop stopColor="#fff" stopOpacity=".98" /><stop offset=".16" stopColor="#fffaf0" stopOpacity=".85" /><stop offset=".53" stopColor="#ffe1cb" stopOpacity=".3" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></radialGradient>
       </defs>
-      <rect x="1" y="1" width={w - 2} height={h - 2} rx={curve} fill="none" stroke="rgba(92,38,37,.45)" strokeWidth="1" />
-      <rect x={rim} y={rim} width={w - rim * 2} height={h - rim * 2} rx={Math.max(0, curve - rim)}
-        fill="none" stroke="#fff8e9" strokeWidth={card ? 5 : 7} opacity=".13" />
-      <rect x={rim} y={rim} width={w - rim * 2} height={h - rim * 2} rx={Math.max(0, curve - rim)}
-        fill="none" stroke={`url(#${id}-edge)`} strokeWidth={card ? 1.5 : 1.8} />
-      <rect x={rim + 3} y={rim + 3} width={w - (rim + 3) * 2} height={h - (rim + 3) * 2}
-        rx={Math.max(0, curve - rim - 3)} fill="none" stroke="rgba(255,255,255,.39)" strokeWidth=".75" />
-      <path d={`M ${curve + 4} ${rim - 2} H ${w - curve - 4}`} stroke="rgba(255,250,237,.46)" strokeWidth=".9" />
-      <path d={`M ${curve + 4} ${h - rim + 2} H ${w - curve - 4}`} stroke="rgba(134,58,48,.35)" strokeWidth=".8" />
-      {sparkle(w * .31, rim, true, card ? .65 : 1.4)}
-      {!card && sparkle(w * .81, rim, true, 1.1)}
-      {!card && sparkle(rim, h * .4, false, 1)}
-      {sparkle(w * .74, h - rim, true, card ? .6 : 1.4)}
+      {card ? <>
+        <rect x="1.5" y="1.5" width={w - 3} height={h - 3} rx={curve}
+          fill="none" stroke="rgba(92,38,37,.26)" strokeWidth="1" />
+        <rect x={rim} y={rim} width={w - rim * 2} height={h - rim * 2} rx={Math.max(0, curve - rim)}
+          fill="none" stroke={`url(#${id}-edge)`} strokeWidth="1" opacity=".72" />
+      </> : <>
+        <rect x="1" y="1" width={w - 2} height={h - 2} rx={curve} fill="none" stroke="rgba(92,38,37,.45)" strokeWidth="1" />
+        <rect x={rim} y={rim} width={w - rim * 2} height={h - rim * 2} rx={Math.max(0, curve - rim)}
+          fill="none" stroke="#fff8e9" strokeWidth="7" opacity=".13" />
+        <rect x={rim} y={rim} width={w - rim * 2} height={h - rim * 2} rx={Math.max(0, curve - rim)}
+          fill="none" stroke={`url(#${id}-edge)`} strokeWidth="1.8" />
+        <rect x={rim + 3} y={rim + 3} width={w - (rim + 3) * 2} height={h - (rim + 3) * 2}
+          rx={Math.max(0, curve - rim - 3)} fill="none" stroke="rgba(255,255,255,.39)" strokeWidth=".75" />
+        <path d={`M ${curve + 4} ${rim - 2} H ${w - curve - 4}`} stroke="rgba(255,250,237,.46)" strokeWidth=".9" />
+        <path d={`M ${curve + 4} ${h - rim + 2} H ${w - curve - 4}`} stroke="rgba(134,58,48,.35)" strokeWidth=".8" />
+        {sparkle(w * .31, rim, true, 1.4)}
+        {sparkle(w * .81, rim, true, 1.1)}
+        {sparkle(rim, h * .4, false, 1)}
+        {sparkle(w * .74, h - rim, true, 1.4)}
+      </>}
     </svg>}
   </span>;
 }

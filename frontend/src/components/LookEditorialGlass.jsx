@@ -29,7 +29,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     loop: canSlide,
     drag: canSlide,
     defaultAnimation: { duration: 320, easing: (progress) => 1 - (1 - progress) ** 3 },
-    slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
+    slides: { perView: visibleCards || 1, spacing: Math.max(style.editorialCardGapPx, 12) },
     breakpoints: {
       "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: Math.min(style.editorialCardGapPx, 12) } },
     },
