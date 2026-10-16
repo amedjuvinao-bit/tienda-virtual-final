@@ -28,6 +28,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const [railRef, railInstanceRef] = useKeenSlider({
     loop: canSlide,
     drag: canSlide,
+    defaultAnimation: { duration: 320, easing: (progress) => 1 - (1 - progress) ** 3 },
     slides: { perView: visibleCards || 1, spacing: 0 },
     breakpoints: {
       "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: 0 } },
@@ -39,7 +40,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     const interval = window.setInterval(() => {
       if (pausedRef.current || document.hidden || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
       railInstanceRef.current?.next();
-    }, 3600);
+    }, 5200);
     return () => window.clearInterval(interval);
   }, [canSlide, railInstanceRef]);
 
@@ -66,7 +67,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-hero-radius": `${style.mainImageRadiusPx}px`,
     "--look-rail-radius": `${style.thumbRadiusPx + 11}px`,
     "--look-card-zoom": style.thumbHoverScale,
-    "--look-product-scale": Math.max(.82, 1 - (style.editorialCardGapPx - 12) / 120),
+    "--look-card-gap": `${style.editorialCardGapPx}px`,
     "--look-button-bg": style.actionButtonBg,
     "--look-button-border": style.actionButtonBorderColor,
     "--look-favorite-color": style.actionFavoriteColor,

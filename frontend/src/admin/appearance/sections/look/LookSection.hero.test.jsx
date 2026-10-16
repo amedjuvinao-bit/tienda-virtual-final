@@ -59,7 +59,7 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByRole('button', { name: 'Mostrar imagen principal' }).closest('.look-editorial__rail')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
-    expect(interval).toHaveBeenCalledWith(expect.any(Function), 3600);
+    expect(interval).toHaveBeenCalledWith(expect.any(Function), 5200);
     const productSurface = screen.getByRole('button', { name: 'Mostrar Vestido azul' }).closest('.look-editorial__card-surface');
     const animate = vi.fn();
     productSurface.animate = animate;
