@@ -70,6 +70,18 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
   });
 
+  it('en móvil muestra primero los productos y mantiene la portada accesible al final', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
+    const cards = [...document.querySelectorAll('.look-editorial__cards .look-editorial__card')];
+    expect(cards).toHaveLength(2);
+    expect(cards[0].querySelector('[aria-label="Mostrar Vestido azul"]')).toBeInTheDocument();
+    expect(cards[1].querySelector('[aria-label="Mostrar imagen principal"]')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
+    expect(document.querySelector('.look-editorial__hero-photo')).toHaveAttribute('src', imageUrl);
+  });
+
   it('conserva los controles editoriales y muestra productos enlazados con su precio', () => {
     const section = normalizeLookSection({ config: { products, editorialEyebrow: 'Nueva colección', editorialHeadline: 'Nuestros looks' },
       style: { editorialDepth: 82, editorialGlassOpacity: 48, editorialOverlapPercent: 14 } });

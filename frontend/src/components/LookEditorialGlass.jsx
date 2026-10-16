@@ -21,8 +21,11 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const pausedRef = useRef(false);
   const [loadedHero, setLoadedHero] = useState({ src: "", ratio: "" });
   const [railIndex, setRailIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" &&
+    Boolean(window.matchMedia?.("(max-width: 699px)").matches));
   const hasCover = config.heroMode === "custom" && Boolean(config.heroImage);
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
+  const mobileOptions = [...products, ...(hasCover ? [{ id: "", image: config.heroImage }] : [])];
   const cardCount = products.length + Number(hasCover);
   const canSlide = cardCount > 1;
   const visibleCards = Math.min(style.editorialVisibleCards === 2 ? 2 : 3, cardCount || 1);
@@ -32,10 +35,21 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     defaultAnimation: { duration: 320, easing: (progress) => 1 - (1 - progress) ** 3 },
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(cardCount || 1, 2.2), spacing: Math.min(style.editorialCardGapPx, 8) } },
+      "(max-width: 699px)": {
+        slides: { perView: Math.min(cardCount || 1, 2.2), spacing: Math.min(style.editorialCardGapPx, 8) },
+      },
     },
     slideChanged(slider) { setRailIndex(slider.track.details.rel); },
   });
+
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 699px)");
+    if (!media) return undefined;
+    const updateMobile = () => setIsMobile(media.matches);
+    updateMobile();
+    media.addEventListener?.("change", updateMobile);
+    return () => media.removeEventListener?.("change", updateMobile);
+  }, []);
 
   useEffect(() => {
     if (!canSlide) return undefined;
@@ -46,7 +60,10 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     return () => window.clearInterval(interval);
   }, [canSlide, railInstanceRef]);
 
-  useEffect(() => { railInstanceRef.current?.update?.(); }, [cardCount, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
+  useEffect(() => {
+    railInstanceRef.current?.update?.();
+    setRailIndex(railInstanceRef.current?.track?.details?.rel || 0);
+  }, [cardCount, isMobile, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
   const position = style.editorialRailPositionPercent;
@@ -118,6 +135,20 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     ], { duration: 520, easing: "cubic-bezier(.22, 1, .36, 1)" });
   };
 
+  const coverCard = <article key="cover"
+    className={`look-editorial__card look-editorial__card--cover keen-slider__slide ${!selectedId ? "is-selected" : ""}`}>
+    <div className="look-editorial__card-surface">
+      <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={(event) => selectCard(event, "")}>
+        <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
+        <span className="look-editorial__cover-badge" aria-hidden="true">Portada</span>
+      </button>
+      <div className="look-editorial__card-details">
+        <span className="look-editorial__card-name" style={cardNameStyle}>Imagen principal</span>
+      </div>
+      <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
+    </div>
+  </article>;
+
   return <section className="look-editorial" style={css} aria-label="Looks">
     <div className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
       <div className={`look-editorial__hero ${style.editorialHeroFit === "crop" ? "look-editorial__hero--crop" : ""}`}>
@@ -148,18 +179,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
         onMouseLeave={() => { pausedRef.current = false; }} onFocusCapture={() => { pausedRef.current = true; }}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) pausedRef.current = false; }}>
         <div ref={railRef} className="look-editorial__cards keen-slider">
-          {hasCover && <article className={`look-editorial__card look-editorial__card--cover keen-slider__slide ${!selectedId ? "is-selected" : ""}`}>
-            <div className="look-editorial__card-surface">
-              <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={(event) => selectCard(event, "")}>
-                <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
-                <span className="look-editorial__cover-badge" aria-hidden="true">Portada</span>
-              </button>
-              <div className="look-editorial__card-details">
-                <span className="look-editorial__card-name" style={cardNameStyle}>Imagen principal</span>
-              </div>
-              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
-            </div>
-          </article>}
+          {hasCover && !isMobile && coverCard}
           {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
             <div className="look-editorial__card-surface">
               <img className="look-editorial__card-backdrop" src={product.image} alt="" aria-hidden="true" loading="lazy" />
@@ -181,13 +201,14 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
           </article>)}
+          {hasCover && isMobile && coverCard}
         </div>
         {canSlide && <div className="look-editorial__rail-controls">
           <button type="button" aria-label="Tarjeta anterior" onClick={() => railInstanceRef.current?.prev()}><ChevronLeft size={17} /></button>
           <button type="button" aria-label="Tarjeta siguiente" onClick={() => railInstanceRef.current?.next()}><ChevronRight size={17} /></button>
         </div>}
         {canSlide && <div className="look-editorial__rail-pagination" aria-label="Productos del look">
-          {options.map((option, index) => <button key={option.id || "cover"} type="button"
+          {mobileOptions.map((option, index) => <button key={option.id || "cover"} type="button"
             className={railIndex === index ? "is-active" : ""}
             aria-label={`Mostrar tarjeta ${index + 1} de ${cardCount}`}
             aria-current={railIndex === index ? "true" : undefined}

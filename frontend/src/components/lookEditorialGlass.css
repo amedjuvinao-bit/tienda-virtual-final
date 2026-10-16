@@ -58,25 +58,29 @@
 .look-editorial__rail-pagination { display: none; }
 @media (max-width: 1099px) { .look-editorial__scene { grid-template-columns: 50% 50%; min-height: 0; gap: 0; } .look-editorial__intro { padding: 6% 4% 0 7%; } .look-editorial__rail { position: relative; grid-column: 1 / -1; width: 100%; left: auto; bottom: auto; margin-top: 18px; } }
 @media (max-width: 699px) {
-  .look-editorial { padding: max(80px, var(--look-padding-top)) clamp(12px, 4vw, 18px) 28px; }
+  .look-editorial { padding: calc(var(--site-header-height, 92px) + max(72px, var(--look-padding-top))) clamp(10px, 3vw, 16px) 24px; }
   .look-editorial__scene { display: flex; flex-direction: column; gap: 0; min-height: 0; }
-  .look-editorial__intro { order: 0; width: 100%; padding: 0 4px; margin: 0 0 12px; }
-  .look-editorial__eyebrow { margin-bottom: 5px; font-size: 10px; }
-  .look-editorial__intro h2 { max-width: 340px; font-size: clamp(28px, 8vw, 34px); line-height: 1.03; }
-  .look-editorial__intro p { max-width: 340px; margin-top: 7px; font-size: clamp(12px, 3.4vw, 14px); line-height: 1.38; }
-  .look-editorial__hero { order: 1; width: 100%; aspect-ratio: 4 / 5; }
+  .look-editorial__intro { order: 0; width: 100%; padding: 0 10px; margin: 0 0 12px; }
+  .look-editorial__eyebrow { display: none; }
+  .look-editorial__intro h2 { max-width: 390px; font-size: clamp(27px, 8.3vw, 36px); line-height: .98; letter-spacing: -.045em; }
+  .look-editorial__intro p { max-width: 390px; margin-top: 6px; font-size: clamp(12px, 3.4vw, 14px); line-height: 1.28; }
+  .look-editorial__hero { order: 1; width: 100%; aspect-ratio: 9 / 10; }
   .look-editorial__hero-photo { object-fit: cover; }
   .look-editorial__hero-controls { inset: 50% 10px auto; transform: translateY(-50%); justify-content: space-between; pointer-events: none; }
   .look-editorial__hero-controls button { width: 36px; height: 36px; pointer-events: auto; }
-  .look-editorial__rail { order: 2; align-self: center; width: calc(100% + 8px); margin: -72px 0 30px; left: auto; bottom: auto; padding: 11px 3px 6px; }
-  .look-editorial__cards { padding: 0 7px; }
-  .look-editorial__card-details { min-height: 58px; padding: 6px 8px 6px; }
+  .look-editorial__rail { order: 2; align-self: center; width: calc(100% + 16px); margin: -64px 0 27px; left: auto; bottom: auto; padding: 0; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .look-editorial__rail > .look-glass-rim { display: none; }
+  .look-editorial__cards { padding: 0 14px; border-radius: 0; }
+  .look-editorial__card-surface { aspect-ratio: 1 / 1.05; box-shadow: 0 8px 18px rgba(72,29,46,.2), inset 0 6px 16px rgba(255,255,255,.12); }
+  .look-editorial__card-details { min-height: 49px; padding: 5px 8px 5px; background: linear-gradient(transparent, color-mix(in srgb, var(--look-glass) 42%, transparent)); }
+  .look-editorial__card-name { text-transform: none; }
+  .look-editorial__card-foot { min-height: 23px; font-size: 12px; }
   .look-editorial__card-foot button { width: 30px; height: 30px; }
   .look-editorial__card-foot button svg { width: 20px; height: 20px; }
   .look-editorial__favorite { top: 7px; right: 6px; width: 30px; height: 30px; }
   .look-editorial__favorite svg { width: 21px; height: 21px; }
   .look-editorial__rail-controls { display: none; }
-  .look-editorial__rail-pagination { position: absolute; bottom: -22px; left: 50%; z-index: 6; display: flex; align-items: center; gap: 5px; transform: translateX(-50%); }
+  .look-editorial__rail-pagination { position: absolute; bottom: -22px; left: 50%; z-index: 6; display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 999px; background: color-mix(in srgb, var(--look-glass) 50%, transparent); backdrop-filter: blur(10px); transform: translateX(-50%); }
   .look-editorial__rail-pagination button { width: 7px; height: 5px; padding: 0; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--look-accent) 38%, white); cursor: pointer; transition: width .25s ease, background .25s ease; }
   .look-editorial__rail-pagination button.is-active { width: 19px; background: var(--look-accent); }
 }
