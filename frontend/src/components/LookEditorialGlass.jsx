@@ -20,6 +20,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   onCart, onFavorite, isFavorite, loading }) {
   const pausedRef = useRef(false);
   const [loadedHero, setLoadedHero] = useState({ src: "", ratio: "" });
+  const [railIndex, setRailIndex] = useState(0);
   const hasCover = config.heroMode === "custom" && Boolean(config.heroImage);
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
   const cardCount = products.length + Number(hasCover);
@@ -31,8 +32,9 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     defaultAnimation: { duration: 320, easing: (progress) => 1 - (1 - progress) ** 3 },
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: Math.min(style.editorialCardGapPx, 12) } },
+      "(max-width: 699px)": { slides: { perView: Math.min(cardCount || 1, 2.2), spacing: Math.min(style.editorialCardGapPx, 8) } },
     },
+    slideChanged(slider) { setRailIndex(slider.track.details.rel); },
   });
 
   useEffect(() => {
@@ -183,6 +185,13 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
         {canSlide && <div className="look-editorial__rail-controls">
           <button type="button" aria-label="Tarjeta anterior" onClick={() => railInstanceRef.current?.prev()}><ChevronLeft size={17} /></button>
           <button type="button" aria-label="Tarjeta siguiente" onClick={() => railInstanceRef.current?.next()}><ChevronRight size={17} /></button>
+        </div>}
+        {canSlide && <div className="look-editorial__rail-pagination" aria-label="Productos del look">
+          {options.map((option, index) => <button key={option.id || "cover"} type="button"
+            className={railIndex === index ? "is-active" : ""}
+            aria-label={`Mostrar tarjeta ${index + 1} de ${cardCount}`}
+            aria-current={railIndex === index ? "true" : undefined}
+            onClick={() => railInstanceRef.current?.moveToIdx(index)} />)}
         </div>}
         <LookGlassRim variant="rail" radius={style.thumbRadiusPx + 11} />
       </div>
