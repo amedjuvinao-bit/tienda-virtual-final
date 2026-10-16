@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Heart, ShoppingCart } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
+import LookGlassRim from "./LookGlassRim";
 import "./lookEditorialGlass.css";
 
 function moneyCOP(value) {
@@ -85,6 +86,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
           <button type="button" aria-label="Look anterior" onClick={() => moveHero(-1)} disabled={options.length < 2}><ChevronLeft size={21} /></button>
           <button type="button" aria-label="Look siguiente" onClick={() => moveHero(1)} disabled={options.length < 2}><ChevronRight size={21} /></button>
         </div>
+        <LookGlassRim radius={style.mainImageRadiusPx} />
       </div>
 
       <div className="look-editorial__intro">
@@ -105,6 +107,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
             <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={() => onSelect("")}>
               <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
             </button><span className="look-editorial__card-name">Imagen principal</span>
+            <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
           </article>}
           {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
             <button type="button" className="look-editorial__card-image" onClick={() => onSelect(product.id)} aria-label={`Mostrar ${product.subtitle}`}>
@@ -122,12 +125,14 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
                 <ShoppingCart size={17} /></button>}
             </div>
+            <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
           </article>)}
         </div>
         {canSlide && <div className="look-editorial__rail-controls">
           <button type="button" aria-label="Tarjeta anterior" onClick={() => railInstanceRef.current?.prev()}><ChevronLeft size={17} /></button>
           <button type="button" aria-label="Tarjeta siguiente" onClick={() => railInstanceRef.current?.next()}><ChevronRight size={17} /></button>
         </div>}
+        <LookGlassRim variant="rail" radius={27} />
       </div>
     </div>
   </section>;
