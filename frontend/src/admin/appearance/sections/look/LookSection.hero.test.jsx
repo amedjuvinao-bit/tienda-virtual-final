@@ -81,6 +81,24 @@ describe('imagen principal independiente de Looks', () => {
     expect(normalizeLookSection({ style: { editorialVisibleCards: 4 } }).style.editorialVisibleCards).toBe(3);
   });
 
+  it('migra la tipografía antigua de la vitrina y conserva una elección posterior del usuario', () => {
+    const migrated = normalizeLookSection({ style: {
+      layoutPreset: 'editorialGlass', thumbTitleColor: '#1f2937', thumbPriceColor: '#e11d48',
+      thumbTitleFontFamily: '', thumbPriceFontFamily: '',
+    } }).style;
+    expect(migrated).toMatchObject({
+      thumbTitleColor: '#633847', thumbPriceColor: '#a34e66',
+      thumbTitleFontFamily: "Georgia, 'Times New Roman', serif", editorialCardTextVersion: 1,
+    });
+
+    const chosen = normalizeLookSection({ style: { ...migrated, thumbTitleColor: '#1f2937',
+      thumbTitleFontFamily: 'system-ui', thumbTitleWeight: 700 } }).style;
+    expect(chosen).toMatchObject({ thumbTitleColor: '#1f2937', thumbTitleFontFamily: 'system-ui', thumbTitleWeight: 700 });
+
+    expect(normalizeLookSection({ style: { layoutPreset: 'classic' } }).style)
+      .toMatchObject({ thumbTitleColor: '#1f2937', thumbPriceColor: '#e11d48' });
+  });
+
   it('permite escoger el recorte y conserva la proporción elegida', () => {
     const onSave = vi.fn();
     const { unmount } = render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);

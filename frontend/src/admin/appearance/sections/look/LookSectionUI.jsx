@@ -827,14 +827,14 @@ export default function LookSectionUI({
 
               <div className="grid xl:grid-cols-2 gap-4 mt-4">
                 <TextStyleFields
-                  title="Texto nombre de miniatura"
+                  title="Nombre en las tarjetas"
                   prefix="thumbTitle"
                   style={style}
                   onChange={patchStyle}
                 />
 
                 <TextStyleFields
-                  title="Texto precio miniatura"
+                  title="Precio en las tarjetas"
                   prefix="thumbPrice"
                   style={style}
                   onChange={patchStyle}

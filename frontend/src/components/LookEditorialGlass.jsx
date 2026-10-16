@@ -80,6 +80,23 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     onSelect(options[(currentIndex + step + options.length) % options.length].id);
   };
 
+  const cardNameStyle = {
+    color: style.thumbTitleColor,
+    fontFamily: style.thumbTitleFontFamily || "Georgia, 'Times New Roman', serif",
+    fontSize: style.thumbTitleSizePx,
+    fontWeight: style.thumbTitleWeight,
+    fontStyle: style.thumbTitleItalic ? "italic" : undefined,
+    textDecoration: style.thumbTitleUnderline ? "underline" : undefined,
+  };
+  const cardPriceStyle = {
+    color: style.thumbPriceColor,
+    fontFamily: style.thumbPriceFontFamily || "Georgia, 'Times New Roman', serif",
+    fontSize: style.thumbPriceSizePx,
+    fontWeight: style.thumbPriceWeight,
+    fontStyle: style.thumbPriceItalic ? "italic" : undefined,
+    textDecoration: style.thumbPriceUnderline ? "underline" : undefined,
+  };
+
   const selectCard = (event, id) => {
     onSelect(id);
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
@@ -129,8 +146,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                 <span className="look-editorial__cover-badge" aria-hidden="true">Portada</span>
               </button>
               <div className="look-editorial__card-details">
-                <span className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
-                  fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>Imagen principal</span>
+                <span className="look-editorial__card-name" style={cardNameStyle}>Imagen principal</span>
               </div>
             </div>
           </article>}
@@ -143,12 +159,10 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                 aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
                 onClick={() => onFavorite(product)}><Heart size={18} strokeWidth={1.5} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
               <div className="look-editorial__card-details">
-                <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
-                  fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>
+                <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={cardNameStyle}>
                   {product.subtitle}</a>
                 <div className="look-editorial__card-foot">
-                  <span style={{ color: style.thumbPriceColor, fontFamily: style.thumbPriceFontFamily || undefined,
-                    fontSize: style.thumbPriceSizePx }}>{moneyCOP(product.price)}</span>
+                  <span style={cardPriceStyle}>{moneyCOP(product.price)}</span>
                   {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
                     <ShoppingBag size={17} strokeWidth={1.5} /></button>}
                 </div>
