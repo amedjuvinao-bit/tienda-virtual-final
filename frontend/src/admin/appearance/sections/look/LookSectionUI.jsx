@@ -489,10 +489,10 @@ export default function LookSectionUI({
                   <RangeNumberField label="Tamaño de la descripción" min={12} max={30} step={1} value={style.editorialDescriptionSizePx} onChange={(v) => patchStyle({ editorialDescriptionSizePx: v })} />
                   <RangeNumberField label="Superposición de tarjetas (%)" min={0} max={22} step={1} value={style.editorialOverlapPercent} onChange={(v) => patchStyle({ editorialOverlapPercent: v })} />
                   <RangeNumberField label="Posición horizontal del carrusel" hint="0 = izquierda · 100 = posición original · 150 = más a la derecha. En móvil se adapta al ancho." min={0} max={150} step={1} value={style.editorialRailPositionPercent} onChange={(v) => patchStyle({ editorialRailPositionPercent: v })} />
-                  <Field label="Tamaño de las tarjetas" hint="La siguiente tarjeta asoma para invitar a recorrer el carrusel.">
+                  <Field label="Tamaño de las tarjetas" hint="Equilibradas muestra más productos; amplias destaca cada foto sin ocupar toda la sección.">
                     <div className="flex flex-wrap gap-2">
-                      <ToggleChip active={style.editorialVisibleCards === 3} onClick={() => patchStyle({ editorialVisibleCards: 3 })}>Amplias</ToggleChip>
-                      <ToggleChip active={style.editorialVisibleCards === 2} onClick={() => patchStyle({ editorialVisibleCards: 2 })}>Protagonistas</ToggleChip>
+                      <ToggleChip active={style.editorialVisibleCards === 3} onClick={() => patchStyle({ editorialVisibleCards: 3 })}>Equilibradas</ToggleChip>
+                      <ToggleChip active={style.editorialVisibleCards === 2} onClick={() => patchStyle({ editorialVisibleCards: 2 })}>Amplias</ToggleChip>
                     </div>
                   </Field>
                   <RangeNumberField label="Separación de tarjetas" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />

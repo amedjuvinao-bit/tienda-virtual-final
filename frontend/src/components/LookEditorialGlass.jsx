@@ -17,14 +17,14 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
   const cardCount = products.length + Number(hasCover);
   const canSlide = cardCount > 1;
-  const cardWidth = style.editorialVisibleCards === 2 ? 1.5 : 2.15;
+  const cardWidth = style.editorialVisibleCards === 2 ? 2.25 : 2.75;
   const visibleCards = Math.min(cardWidth, canSlide ? cardCount - .25 : 1);
   const [railRef, railInstanceRef] = useKeenSlider({
     loop: canSlide,
     drag: canSlide,
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.28), spacing: Math.min(style.editorialCardGapPx, 10) } },
+      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.45), spacing: Math.min(style.editorialCardGapPx, 10) } },
     },
   });
 
