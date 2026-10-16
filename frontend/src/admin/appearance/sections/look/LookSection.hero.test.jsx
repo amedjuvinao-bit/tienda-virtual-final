@@ -109,6 +109,23 @@ describe('imagen principal independiente de Looks', () => {
     }));
   });
 
+  it('mueve toda la franja de tarjetas y conserva la posición al guardar', () => {
+    const onSave = vi.fn();
+    const { unmount } = render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Composición' }));
+    const positionField = screen.getByText('Posición horizontal del carrusel').parentElement;
+    fireEvent.change(positionField.querySelector('input[type="number"]'), { target: { value: '35' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    const saved = onSave.mock.calls[0][0];
+    expect(saved.style.editorialRailPositionPercent).toBe(35);
+    unmount();
+
+    render(<LookSection theme={{ sections: [saved] }} previewProducts={products} />);
+    expect(document.querySelector('.look-editorial')).toHaveStyle({ '--look-rail-left': '15.75%' });
+    expect(document.querySelector('.look-editorial__rail')).toBeInTheDocument();
+  });
+
   it('ignora rutas inseguras y conserva el comportamiento anterior sin imagen propia', () => {
     const config = normalizeLookSection({ config: { products, heroMode: 'custom', heroImage: 'javascript:alert(1)' } }).config;
     expect(config.heroImage).toBe('');

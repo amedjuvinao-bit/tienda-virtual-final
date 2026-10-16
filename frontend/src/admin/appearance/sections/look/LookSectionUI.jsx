@@ -488,6 +488,7 @@ export default function LookSectionUI({
                   <RangeNumberField label="Grosor del título" min={300} max={800} step={100} value={style.editorialTitleWeight} onChange={(v) => patchStyle({ editorialTitleWeight: v })} />
                   <RangeNumberField label="Tamaño de la descripción" min={12} max={30} step={1} value={style.editorialDescriptionSizePx} onChange={(v) => patchStyle({ editorialDescriptionSizePx: v })} />
                   <RangeNumberField label="Superposición de tarjetas (%)" min={0} max={22} step={1} value={style.editorialOverlapPercent} onChange={(v) => patchStyle({ editorialOverlapPercent: v })} />
+                  <RangeNumberField label="Posición horizontal del carrusel" hint="0 = izquierda · 100 = derecha. Mueve toda la franja; en móvil se adapta al ancho." min={0} max={100} step={1} value={style.editorialRailPositionPercent} onChange={(v) => patchStyle({ editorialRailPositionPercent: v })} />
                   <RangeNumberField label="Tarjetas visibles" min={2} max={4} step={1} value={style.editorialVisibleCards} onChange={(v) => patchStyle({ editorialVisibleCards: v })} />
                   <RangeNumberField label="Separación de tarjetas" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
                   <RangeNumberField label="Profundidad del cristal" min={0} max={100} step={1} value={style.editorialDepth} onChange={(v) => patchStyle({ editorialDepth: v })} />
