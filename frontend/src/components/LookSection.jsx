@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import LookEditorialGlass from "./LookEditorialGlass";
 import {
   LOOK_MAX_PRODUCTS,
   LOOK_SECTION_DEFAULTS,
@@ -527,6 +528,14 @@ export default function LookSection({ theme, previewProducts }) {
   }
 
   if (lookSection.enabled === false || !products.length) return null;
+
+  if (style.layoutPreset === "editorialGlass") {
+    return <LookEditorialGlass config={config} style={style} products={products} mainImage={mainImage}
+      mainImageAlt={mainImageAlt} selectedId={selectedId} onSelect={setSelectedId}
+      onCart={(product) => addToCart(buildCartPayload(product))}
+      onFavorite={(product) => toggleFavorite(buildFavoritePayload(product))}
+      isFavorite={(product) => isFavorite(buildFavoritePayload(product))} loading={loading} />;
+  }
 
   return (
     <section style={wrapperStyle}>

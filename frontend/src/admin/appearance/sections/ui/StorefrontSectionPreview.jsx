@@ -105,6 +105,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
       </header>
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
       <div ref={viewportRef} className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
+        if (section.id === 'look' && event.target.closest('.look-editorial__card-image, .look-editorial__hero-controls button, .look-editorial__rail-controls button')) return;
         event.preventDefault();
         event.stopPropagation();
       }}>

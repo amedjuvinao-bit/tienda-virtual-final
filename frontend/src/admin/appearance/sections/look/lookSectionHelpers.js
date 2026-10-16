@@ -20,6 +20,9 @@ export const LOOK_SECTION_DEFAULTS = {
     selectedProductId: "",
     heroMode: "product",
     heroImage: "",
+    editorialEyebrow: "LOOKS",
+    editorialHeadline: "Momentos que visten su historia",
+    editorialBackgroundImage: "",
     products: [],
     actions: {
       favorite: {
@@ -41,6 +44,22 @@ export const LOOK_SECTION_DEFAULTS = {
 
     desktopLeftRatio: 2,
     desktopRightRatio: 1,
+    layoutPreset: "editorialGlass",
+    editorialBackgroundColor: "#f2d6d0",
+    editorialGlassColor: "#fce6e3",
+    editorialGlassOpacity: 54,
+    editorialGlassBlurPx: 18,
+    editorialDepth: 74,
+    editorialAccentColor: "#ba735f",
+    editorialTextColor: "#53242f",
+    editorialOverlapPercent: 7,
+    editorialHeroAspect: "1/1",
+    editorialContentWidthPx: 1600,
+    editorialHeadlineSizePx: 62,
+    editorialDescriptionSizePx: 20,
+    editorialTitleWeight: 400,
+    editorialVisibleCards: 4,
+    editorialCardGapPx: 12,
 
     titleAlign: "center",
     titleImageWidthPx: 520,
@@ -238,6 +257,12 @@ export function normalizeLookSectionConfig(input = {}) {
     titleText: asString(input?.titleText, base.titleText),
     description: asString(input?.description, base.description),
     heroMode: input?.heroMode === "custom" ? "custom" : "product",
+    editorialEyebrow: asString(input?.editorialEyebrow, base.editorialEyebrow).slice(0, 80),
+    editorialHeadline: asString(input?.editorialHeadline, asString(input?.titleText).trim() || base.editorialHeadline).slice(0, 160),
+    editorialBackgroundImage: (() => {
+      const url = asString(input?.editorialBackgroundImage, "").trim();
+      return /^https:\/\/res\.cloudinary\.com\/[a-z0-9_/-]+\/image\/upload\/[a-z0-9_.,/%?=&~-]+$/i.test(url) || /^\/(?!\/)[a-z0-9_.,/%~-]+$/i.test(url) ? url : "";
+    })(),
     heroImage: (() => {
       const url = asString(input?.heroImage, "").trim();
       return /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url) || /^\/(?!\/)[^\s]*$/.test(url) ? url : "";
@@ -274,6 +299,23 @@ export function normalizeLookSectionStyle(input = {}) {
 
     desktopLeftRatio: clampNumber(input?.desktopLeftRatio, 1, 4, base.desktopLeftRatio),
     desktopRightRatio: clampNumber(input?.desktopRightRatio, 1, 4, base.desktopRightRatio),
+    layoutPreset: input?.layoutPreset === "classic" ? "classic" : "editorialGlass",
+    editorialBackgroundColor: asString(input?.editorialBackgroundColor, base.editorialBackgroundColor),
+    editorialGlassColor: asString(input?.editorialGlassColor, base.editorialGlassColor),
+    editorialGlassOpacity: clampNumber(input?.editorialGlassOpacity, 0, 90, base.editorialGlassOpacity),
+    editorialGlassBlurPx: clampNumber(input?.editorialGlassBlurPx, 0, 40, base.editorialGlassBlurPx),
+    editorialDepth: clampNumber(input?.editorialDepth, 0, 100, base.editorialDepth),
+    editorialAccentColor: asString(input?.editorialAccentColor, base.editorialAccentColor),
+    editorialTextColor: asString(input?.editorialTextColor, base.editorialTextColor),
+    editorialOverlapPercent: clampNumber(input?.editorialOverlapPercent, 0, 22, base.editorialOverlapPercent),
+    editorialHeroAspect: ["1/1", "3/4", "4/5", "16/9"].includes(input?.editorialHeroAspect)
+      ? input.editorialHeroAspect : base.editorialHeroAspect,
+    editorialContentWidthPx: clampNumber(input?.editorialContentWidthPx, 1000, 1800, base.editorialContentWidthPx),
+    editorialHeadlineSizePx: clampNumber(input?.editorialHeadlineSizePx, 30, 90, base.editorialHeadlineSizePx),
+    editorialDescriptionSizePx: clampNumber(input?.editorialDescriptionSizePx, 12, 30, base.editorialDescriptionSizePx),
+    editorialTitleWeight: clampNumber(input?.editorialTitleWeight, 300, 800, base.editorialTitleWeight),
+    editorialVisibleCards: clampNumber(input?.editorialVisibleCards, 2, 4, base.editorialVisibleCards),
+    editorialCardGapPx: clampNumber(input?.editorialCardGapPx, 4, 30, base.editorialCardGapPx),
 
     titleAlign: ["left", "center", "right"].includes(input?.titleAlign)
       ? input.titleAlign

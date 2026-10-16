@@ -48,13 +48,36 @@ describe('imagen principal independiente de Looks', () => {
     ] }) }));
     render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
-    expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[1].closest('.look-thumb-grid')).toHaveClass('items-start');
-    expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[1]).toHaveClass('self-start');
-    fireEvent.click(screen.getAllByAltText('Vestido azul')[0]);
-    expect(screen.getAllByAltText('Portada de Looks')).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[0]);
+    expect(screen.getByRole('button', { name: 'Mostrar imagen principal' }).closest('.look-editorial__rail')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
+    expect(document.querySelector('.look-editorial__hero img')).toHaveAttribute('src', '/vestido.jpg');
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
+  });
+
+  it('conserva los controles editoriales y muestra productos enlazados con su precio', () => {
+    const section = normalizeLookSection({ config: { products, editorialEyebrow: 'Nueva colección', editorialHeadline: 'Nuestros looks' },
+      style: { editorialDepth: 82, editorialGlassOpacity: 48, editorialOverlapPercent: 14 } });
+    expect(section).toMatchObject({ config: { editorialHeadline: 'Nuestros looks' }, style: { editorialDepth: 82, editorialGlassOpacity: 48, editorialOverlapPercent: 14 } });
+    render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
+    expect(screen.getByText('Nuestros looks')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Vestido azul' })).toHaveAttribute('href', '/producto/p1');
+    expect(screen.getByText('$100.000')).toBeInTheDocument();
+  });
+
+  it('guarda el fondo, textos y profundidad elegidos en el panel', async () => {
+    const onSave = vi.fn();
+    render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('Texto descriptivo de la sección LOOK…'), { target: { value: 'Una historia nueva' } });
+    fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Composición' }));
+    const depthField = screen.getByText('Profundidad del cristal').parentElement;
+    fireEvent.change(depthField.querySelector('input[type="number"]'), { target: { value: '85' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({ description: 'Una historia nueva' }),
+      style: expect.objectContaining({ layoutPreset: 'editorialGlass', editorialDepth: 85 }),
+    }));
   });
 
   it('ignora rutas inseguras y conserva el comportamiento anterior sin imagen propia', () => {
