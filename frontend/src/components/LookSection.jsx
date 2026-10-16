@@ -365,7 +365,7 @@ export default function LookSection({ theme, previewProducts }) {
         aria-label="Mostrar imagen principal"
         aria-pressed={!selectedId}
         onClick={() => setSelectedId("")}
-        className={`group block shrink-0 text-center transition-transform duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${isMobile ? "w-[calc(50%-6px)] snap-start" : "w-full"}`}
+        className={`group block self-start shrink-0 text-center transition-transform duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${isMobile ? "w-[calc(50%-6px)] snap-start" : "w-full"}`}
         style={isMobile ? undefined : { maxWidth: thumbCardMaxWidthPx }}
         onMouseEnter={(event) => {
           event.currentTarget.style.transform = `scale(${style.thumbHoverScale}) rotate(${style.thumbHoverRotateDeg}deg)`;
@@ -697,7 +697,7 @@ export default function LookSection({ theme, previewProducts }) {
           <div className="w-full md:hidden">
             <div
               ref={mobileSliderRef}
-              className="look-mobile-slider flex overflow-x-auto snap-x snap-mandatory"
+              className="look-mobile-slider flex items-start overflow-x-auto snap-x snap-mandatory"
               style={{
                 gap: safeMobileSliderGapPx,
                 paddingBottom: 4,
@@ -765,7 +765,7 @@ export default function LookSection({ theme, previewProducts }) {
           </div>
 
           <div
-            className="look-thumb-grid hidden md:grid w-full"
+            className="look-thumb-grid hidden md:grid w-full items-start"
             style={{
               gap: style.thumbGapPx,
               gridTemplateColumns: `repeat(${style.thumbGridColsMobile}, minmax(0, 1fr))`,

@@ -49,6 +49,8 @@ describe('imagen principal independiente de Looks', () => {
     render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
     expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[1].closest('.look-thumb-grid')).toHaveClass('items-start');
+    expect(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[1]).toHaveClass('self-start');
     fireEvent.click(screen.getAllByAltText('Vestido azul')[0]);
     expect(screen.getAllByAltText('Portada de Looks')).toHaveLength(2);
     fireEvent.click(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[0]);
