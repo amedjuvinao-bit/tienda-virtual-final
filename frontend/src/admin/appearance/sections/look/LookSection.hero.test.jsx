@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LookSectionUI from './LookSectionUI';
+import SectionsPanel from '../SectionsPanel';
 import { normalizeLookSection } from './lookSectionHelpers';
 import LookSection from '../../../../components/LookSection';
 
@@ -127,27 +128,35 @@ describe('imagen principal independiente de Looks', () => {
   });
 
   it('permite llevar el carrusel hasta el espacio libre a la derecha del diseño', () => {
-    const observers = [];
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback) { observers.push(callback); }
-      observe() {}
-      disconnect() {}
-    });
     const section = normalizeLookSection({ config: { products }, style: {
       editorialContentWidthPx: 1000, editorialRailPositionPercent: 150,
     } });
     render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
     const wrapper = document.querySelector('.look-editorial');
-    const scene = document.querySelector('.look-editorial__scene');
-    Object.defineProperties(wrapper, { clientWidth: { configurable: true, value: 1280 } });
-    Object.defineProperties(scene, {
-      offsetLeft: { configurable: true, value: 140 },
-      offsetWidth: { configurable: true, value: 1000 },
-    });
-    wrapper.style.paddingRight = '16px';
-    act(() => observers.forEach((callback) => callback()));
-    expect(wrapper).toHaveStyle({ '--look-rail-left': 'calc(45% + 124px)' });
+    expect(wrapper).toHaveStyle({ '--look-rail-left': '57%' });
     expect(normalizeLookSection({ style: { editorialRailPositionPercent: 200 } }).style.editorialRailPositionPercent).toBe(150);
+  });
+
+  it('actualiza la posición en la vista previa real del modal al mover el control', async () => {
+    function PreviewEditor() {
+      const [theme, setTheme] = useState({ sections: [{ id: 'look', type: 'look', name: 'Looks',
+        config: { products, heroMode: 'custom', heroImage: imageUrl },
+        style: { editorialContentWidthPx: 1000 },
+      }] });
+      return <SectionsPanel theme={theme} setPath={(path, value) => {
+        if (path === 'sections') setTheme((current) => ({ ...current, sections: value }));
+      }} uploadToCloudinary={vi.fn()} />;
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ products: [] }) }));
+    render(<PreviewEditor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Looks' }));
+    fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Composición' }));
+    await waitFor(() => expect(document.querySelector('.section-real-preview .look-editorial')).toBeInTheDocument());
+    const field = screen.getByText('Posición horizontal del carrusel').parentElement;
+    fireEvent.change(field.querySelector('input[type="number"]'), { target: { value: '150' } });
+    await waitFor(() => expect(document.querySelector('.section-real-preview .look-editorial'))
+      .toHaveStyle({ '--look-rail-left': '57%' }));
   });
 
   it('ignora rutas inseguras y conserva el comportamiento anterior sin imagen propia', () => {
