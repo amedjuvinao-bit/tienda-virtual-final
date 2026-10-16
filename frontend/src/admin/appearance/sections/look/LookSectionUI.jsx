@@ -494,8 +494,14 @@ export default function LookSectionUI({
                   <RangeNumberField label="Opacidad del cristal (%)" min={0} max={90} step={1} value={style.editorialGlassOpacity} onChange={(v) => patchStyle({ editorialGlassOpacity: v })} />
                   <RangeNumberField label="Desenfoque del cristal" min={0} max={40} step={1} value={style.editorialGlassBlurPx} onChange={(v) => patchStyle({ editorialGlassBlurPx: v })} />
                 </div>
-                <Field label="Proporción de la foto grande"><div className="flex flex-wrap gap-2">{["1/1", "3/4", "4/5", "16/9"].map((aspect) =>
-                  <ToggleChip key={aspect} active={style.editorialHeroAspect === aspect} onClick={() => patchStyle({ editorialHeroAspect: aspect })}>{aspect}</ToggleChip>)}</div></Field>
+                <Field label="Encuadre de la foto grande" hint="Foto completa adapta el marco a cada imagen. Recortar llena la proporción elegida, pero puede ocultar bordes de la foto.">
+                  <div className="flex flex-wrap gap-2">
+                    <ToggleChip active={style.editorialHeroFit !== "crop"} onClick={() => patchStyle({ editorialHeroFit: "natural" })}>Foto completa</ToggleChip>
+                    <ToggleChip active={style.editorialHeroFit === "crop"} onClick={() => patchStyle({ editorialHeroFit: "crop" })}>Recortar</ToggleChip>
+                  </div>
+                  {style.editorialHeroFit === "crop" && <div className="mt-2 flex flex-wrap gap-2">{["1/1", "3/4", "4/5", "16/9"].map((aspect) =>
+                    <ToggleChip key={aspect} active={style.editorialHeroAspect === aspect} onClick={() => patchStyle({ editorialHeroAspect: aspect })}>{aspect}</ToggleChip>)}</div>}
+                </Field>
               </>}
               {heroError && <p role="alert" className="text-xs text-red-700">{heroError}</p>}
             </div>

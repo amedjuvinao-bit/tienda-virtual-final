@@ -51,7 +51,10 @@ describe('imagen principal independiente de Looks', () => {
     render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
     expect(document.querySelector('.look-editorial__hero-photo')).toHaveAttribute('src', imageUrl);
-    expect(document.querySelector('.look-editorial__hero-backdrop')).toHaveAttribute('aria-hidden', 'true');
+    const hero = document.querySelector('.look-editorial__hero');
+    Object.defineProperties(screen.getByAltText('Imagen principal de Looks'), { naturalWidth: { value: 800 }, naturalHeight: { value: 1000 } });
+    fireEvent.load(screen.getByAltText('Imagen principal de Looks'));
+    expect(hero.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '800 / 1000' });
     expect(screen.getByRole('button', { name: 'Mostrar imagen principal' }).closest('.look-editorial__rail')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
@@ -70,6 +73,25 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByText('Nuestros looks')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Vestido azul' })).toHaveAttribute('href', '/producto/p1');
     expect(screen.getByText('$100.000')).toBeInTheDocument();
+  });
+
+  it('permite escoger el recorte y conserva la proporción elegida', () => {
+    const onSave = vi.fn();
+    const { unmount } = render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Composición' }));
+    expect(screen.getByRole('button', { name: 'Foto completa' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Recortar' }));
+    fireEvent.click(screen.getByRole('button', { name: '4/5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      style: expect.objectContaining({ editorialHeroFit: 'crop', editorialHeroAspect: '4/5' }),
+    }));
+    unmount();
+
+    render(<LookSection theme={{ sections: [onSave.mock.calls[0][0]] }} previewProducts={products} />);
+    expect(document.querySelector('.look-editorial__hero')).toHaveClass('look-editorial__hero--crop');
+    expect(document.querySelector('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '4 / 5' });
   });
 
   it('guarda el fondo, textos y profundidad elegidos en el panel', async () => {

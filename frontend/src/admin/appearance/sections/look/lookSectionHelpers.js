@@ -53,6 +53,7 @@ export const LOOK_SECTION_DEFAULTS = {
     editorialAccentColor: "#ba735f",
     editorialTextColor: "#53242f",
     editorialOverlapPercent: 7,
+    editorialHeroFit: "natural",
     editorialHeroAspect: "1/1",
     editorialContentWidthPx: 1600,
     editorialHeadlineSizePx: 62,
@@ -308,6 +309,7 @@ export function normalizeLookSectionStyle(input = {}) {
     editorialAccentColor: asString(input?.editorialAccentColor, base.editorialAccentColor),
     editorialTextColor: asString(input?.editorialTextColor, base.editorialTextColor),
     editorialOverlapPercent: clampNumber(input?.editorialOverlapPercent, 0, 22, base.editorialOverlapPercent),
+    editorialHeroFit: input?.editorialHeroFit === "crop" ? "crop" : "natural",
     editorialHeroAspect: ["1/1", "3/4", "4/5", "16/9"].includes(input?.editorialHeroAspect)
       ? input.editorialHeroAspect : base.editorialHeroAspect,
     editorialContentWidthPx: clampNumber(input?.editorialContentWidthPx, 1000, 1800, base.editorialContentWidthPx),
