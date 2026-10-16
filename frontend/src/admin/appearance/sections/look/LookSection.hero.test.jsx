@@ -60,8 +60,12 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
     expect(interval).toHaveBeenCalledWith(expect.any(Function), 3600);
+    const productSurface = screen.getByRole('button', { name: 'Mostrar Vestido azul' }).closest('.look-editorial__card-surface');
+    const animate = vi.fn();
+    productSurface.animate = animate;
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
     expect(document.querySelector('.look-editorial__hero img')).toHaveAttribute('src', '/vestido.jpg');
+    expect(animate).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
   });
@@ -74,6 +78,7 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByText('Nuestros looks')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Vestido azul' })).toHaveAttribute('href', '/producto/p1');
     expect(screen.getByText('$100.000')).toBeInTheDocument();
+    expect(normalizeLookSection({ style: { editorialVisibleCards: 4 } }).style.editorialVisibleCards).toBe(3);
   });
 
   it('permite escoger el recorte y conserva la proporción elegida', () => {

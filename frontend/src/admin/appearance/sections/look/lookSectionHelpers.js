@@ -60,7 +60,7 @@ export const LOOK_SECTION_DEFAULTS = {
     editorialHeadlineSizePx: 62,
     editorialDescriptionSizePx: 20,
     editorialTitleWeight: 400,
-    editorialVisibleCards: 4,
+    editorialVisibleCards: 3,
     editorialCardGapPx: 12,
 
     titleAlign: "center",
@@ -318,7 +318,7 @@ export function normalizeLookSectionStyle(input = {}) {
     editorialHeadlineSizePx: clampNumber(input?.editorialHeadlineSizePx, 30, 90, base.editorialHeadlineSizePx),
     editorialDescriptionSizePx: clampNumber(input?.editorialDescriptionSizePx, 12, 30, base.editorialDescriptionSizePx),
     editorialTitleWeight: clampNumber(input?.editorialTitleWeight, 300, 800, base.editorialTitleWeight),
-    editorialVisibleCards: clampNumber(input?.editorialVisibleCards, 2, 4, base.editorialVisibleCards),
+    editorialVisibleCards: clampNumber(input?.editorialVisibleCards, 2, 3, base.editorialVisibleCards),
     editorialCardGapPx: clampNumber(input?.editorialCardGapPx, 4, 30, base.editorialCardGapPx),
 
     titleAlign: ["left", "center", "right"].includes(input?.titleAlign)

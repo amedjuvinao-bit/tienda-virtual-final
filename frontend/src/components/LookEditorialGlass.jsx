@@ -77,6 +77,18 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     onSelect(options[(currentIndex + step + options.length) % options.length].id);
   };
 
+  const selectCard = (event, id) => {
+    onSelect(id);
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    // Keen moves the slide itself. Animate its inner surface so the click never fights that movement.
+    event.currentTarget.closest(".look-editorial__card-surface")?.animate?.([
+      { transform: "perspective(850px) translateY(-3px) scale(1)" },
+      { transform: "perspective(850px) translateY(1px) scale(.97)", offset: .18 },
+      { transform: "perspective(850px) translateY(-12px) scale(1.045)", offset: .56 },
+      { transform: "perspective(850px) translateY(-7px) scale(1.015)" },
+    ], { duration: 520, easing: "cubic-bezier(.22, 1, .36, 1)" });
+  };
+
   return <section className="look-editorial" style={css} aria-label="Looks">
     <div className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
       <div className={`look-editorial__hero ${style.editorialHeroFit === "crop" ? "look-editorial__hero--crop" : ""}`}>
@@ -107,29 +119,41 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
         onMouseLeave={() => { pausedRef.current = false; }} onFocusCapture={() => { pausedRef.current = true; }}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) pausedRef.current = false; }}>
         <div ref={railRef} className="look-editorial__cards keen-slider">
-          {hasCover && <article className={`look-editorial__card keen-slider__slide ${!selectedId ? "is-selected" : ""}`}>
-            <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={() => onSelect("")}>
-              <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
-            </button><span className="look-editorial__card-name">Imagen principal</span>
-            <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
+          {hasCover && <article className={`look-editorial__card look-editorial__card--cover keen-slider__slide ${!selectedId ? "is-selected" : ""}`}>
+            <div className="look-editorial__card-surface">
+              <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={(event) => selectCard(event, "")}>
+                <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
+                <span className="look-editorial__cover-badge" aria-hidden="true">Portada</span>
+              </button>
+              <div className="look-editorial__card-details">
+                <span className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
+                  fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>Imagen principal</span>
+                <span className="look-editorial__cover-detail" style={{ color: style.thumbPriceColor }}>Imagen del look</span>
+              </div>
+              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
+            </div>
           </article>}
           {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
-            <button type="button" className="look-editorial__card-image" onClick={() => onSelect(product.id)} aria-label={`Mostrar ${product.subtitle}`}>
-              <img src={product.image} alt={product.subtitle} loading="lazy" />
-            </button>
-            {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
-              aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
-              onClick={() => onFavorite(product)}><Heart size={18} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
-            <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
-              fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>
-              {product.subtitle}</a>
-            <div className="look-editorial__card-foot">
-              <span style={{ color: style.thumbPriceColor, fontFamily: style.thumbPriceFontFamily || undefined,
-                fontSize: style.thumbPriceSizePx }}>{moneyCOP(product.price)}</span>
-              {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
-                <ShoppingCart size={17} /></button>}
+            <div className="look-editorial__card-surface">
+              <button type="button" className="look-editorial__card-image" onClick={(event) => selectCard(event, product.id)} aria-label={`Mostrar ${product.subtitle}`}>
+                <img src={product.image} alt={product.subtitle} loading="lazy" />
+              </button>
+              {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
+                aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
+                onClick={() => onFavorite(product)}><Heart size={18} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
+              <div className="look-editorial__card-details">
+                <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
+                  fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>
+                  {product.subtitle}</a>
+                <div className="look-editorial__card-foot">
+                  <span style={{ color: style.thumbPriceColor, fontFamily: style.thumbPriceFontFamily || undefined,
+                    fontSize: style.thumbPriceSizePx }}>{moneyCOP(product.price)}</span>
+                  {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
+                    <ShoppingCart size={17} /></button>}
+                </div>
+              </div>
+              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
-            <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
           </article>)}
         </div>
         {canSlide && <div className="look-editorial__rail-controls">

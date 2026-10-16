@@ -489,7 +489,7 @@ export default function LookSectionUI({
                   <RangeNumberField label="Tamaño de la descripción" min={12} max={30} step={1} value={style.editorialDescriptionSizePx} onChange={(v) => patchStyle({ editorialDescriptionSizePx: v })} />
                   <RangeNumberField label="Superposición de tarjetas (%)" min={0} max={22} step={1} value={style.editorialOverlapPercent} onChange={(v) => patchStyle({ editorialOverlapPercent: v })} />
                   <RangeNumberField label="Posición horizontal del carrusel" hint="0 = izquierda · 100 = posición original · 150 = más a la derecha. En móvil se adapta al ancho." min={0} max={150} step={1} value={style.editorialRailPositionPercent} onChange={(v) => patchStyle({ editorialRailPositionPercent: v })} />
-                  <RangeNumberField label="Tarjetas visibles" min={2} max={4} step={1} value={style.editorialVisibleCards} onChange={(v) => patchStyle({ editorialVisibleCards: v })} />
+                  <RangeNumberField label="Tarjetas visibles" hint="Dos o tres tarjetas grandes. Las demás se recorren con el carrusel." min={2} max={3} step={1} value={style.editorialVisibleCards} onChange={(v) => patchStyle({ editorialVisibleCards: v })} />
                   <RangeNumberField label="Separación de tarjetas" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
                   <RangeNumberField label="Profundidad del cristal" min={0} max={100} step={1} value={style.editorialDepth} onChange={(v) => patchStyle({ editorialDepth: v })} />
                   <RangeNumberField label="Opacidad del cristal (%)" min={0} max={90} step={1} value={style.editorialGlassOpacity} onChange={(v) => patchStyle({ editorialGlassOpacity: v })} />
