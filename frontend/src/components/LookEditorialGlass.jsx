@@ -29,9 +29,9 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     loop: canSlide,
     drag: canSlide,
     defaultAnimation: { duration: 320, easing: (progress) => 1 - (1 - progress) ** 3 },
-    slides: { perView: visibleCards || 1, spacing: 10 },
+    slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: 8 } },
+      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: Math.min(style.editorialCardGapPx, 12) } },
     },
   });
 
@@ -44,7 +44,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     return () => window.clearInterval(interval);
   }, [canSlide, railInstanceRef]);
 
-  useEffect(() => { railInstanceRef.current?.update?.(); }, [cardCount, style.editorialVisibleCards, railInstanceRef]);
+  useEffect(() => { railInstanceRef.current?.update?.(); }, [cardCount, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
   const position = style.editorialRailPositionPercent;
@@ -66,6 +66,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-cards-visible": style.editorialVisibleCards,
     "--look-hero-radius": `${style.mainImageRadiusPx}px`,
     "--look-rail-radius": `${style.thumbRadiusPx + 11}px`,
+    "--look-card-radius": `${style.thumbRadiusPx}px`,
     "--look-card-zoom": style.thumbHoverScale,
     "--look-card-gap": `${style.editorialCardGapPx}px`,
     "--look-button-bg": style.actionButtonBg,
@@ -154,10 +155,12 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               <div className="look-editorial__card-details">
                 <span className="look-editorial__card-name" style={cardNameStyle}>Imagen principal</span>
               </div>
+              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
           </article>}
           {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
             <div className="look-editorial__card-surface">
+              <img className="look-editorial__card-backdrop" src={product.image} alt="" aria-hidden="true" loading="lazy" />
               <button type="button" className="look-editorial__card-image" onClick={(event) => selectCard(event, product.id)} aria-label={`Mostrar ${product.subtitle}`}>
                 <img src={product.image} alt={product.subtitle} loading="lazy" />
               </button>
@@ -173,6 +176,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                     <ShoppingBag size={17} strokeWidth={1.5} /></button>}
                 </div>
               </div>
+              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
           </article>)}
         </div>
