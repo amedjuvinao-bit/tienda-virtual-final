@@ -14,16 +14,17 @@
 .look-editorial__intro h2 { margin: 0; max-width: 650px; font-family: Georgia, serif; font-size: clamp(30px, 4vw, var(--look-headline-size)); line-height: 1.04; letter-spacing: -.035em; }
 .look-editorial__intro p { max-width: 520px; margin: 16px 0 0; font-size: var(--look-description-size); line-height: 1.5; opacity: .83; }
 .look-editorial__rail { position: absolute; z-index: 3; width: var(--look-rail-width); bottom: clamp(35px, calc(72% - 385px), 190px); left: var(--look-rail-left); padding: 5px 4px 7px; border: 1px solid transparent; border-radius: var(--look-rail-radius); background: linear-gradient(145deg, rgba(255,255,255,.19), rgba(255,255,255,.006) 40%, rgba(255,255,255,.025) 75%, rgba(255,255,255,.1)), color-mix(in srgb, var(--look-glass) var(--look-glass-fill), transparent); backdrop-filter: blur(var(--look-blur)) saturate(1.25); -webkit-backdrop-filter: blur(var(--look-blur)) saturate(1.25); box-shadow: var(--look-shadow), inset 0 13px 24px rgba(255,255,255,.13), inset 0 -10px 20px rgba(91,38,45,.06); }
-.look-editorial__cards { display: flex; align-items: stretch; overflow: hidden; padding: 1px 2px 2px; border-radius: calc(var(--look-rail-radius) - 5px); touch-action: pan-y; }
+.look-editorial__cards { display: flex; align-items: stretch; overflow: hidden; padding: 0; border-radius: calc(var(--look-rail-radius) - 5px); touch-action: pan-y; }
 .look-editorial__cards.keen-slider .keen-slider__slide { overflow: visible; }
 .look-editorial__card { position: relative; min-width: 0; height: auto; }
 .look-editorial__card:hover, .look-editorial__card:focus-within { z-index: 1; }
-.look-editorial__card-surface { position: relative; width: 100%; min-width: 0; aspect-ratio: 1 / 1.43; overflow: hidden; border: 0; border-radius: 0; background: linear-gradient(180deg, rgba(255,255,255,.045), transparent 42%, rgba(255,255,255,.08)); }
-.look-editorial__card:not(:last-child)::after { content: ""; position: absolute; z-index: 2; top: 1%; bottom: 1%; right: 0; width: 1px; background: linear-gradient(transparent, rgba(255,255,255,.88) 8%, rgba(255,255,255,.55) 88%, transparent); box-shadow: 1px 0 4px rgba(106,55,63,.16); pointer-events: none; }
-.look-editorial__card-image { position: absolute; inset: 5px calc(var(--look-card-gap) * .38) 58px; z-index: 1; width: auto; padding: 0; border: 0; border-radius: 0; overflow: hidden; display: block; background: transparent; cursor: pointer; }
+.look-editorial__card-surface { position: relative; width: 100%; min-width: 0; aspect-ratio: 1 / 1.43; overflow: hidden; border: 0; border-radius: 0; background: transparent; }
+.look-editorial__card-image { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; overflow: hidden; display: block; background: transparent; cursor: pointer; }
 .look-glass-rim { position: absolute; inset: 0; z-index: 4; display: block; pointer-events: none; }
-.look-editorial__card-image img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; -webkit-mask-image: radial-gradient(ellipse 80% 82% at center, #000 55%, transparent 100%); mask-image: radial-gradient(ellipse 80% 82% at center, #000 55%, transparent 100%); filter: drop-shadow(0 9px 9px rgba(77,29,43,.18)); transition: transform .6s cubic-bezier(.2,.7,.2,1), filter .6s ease; }
-.look-editorial__card:hover .look-editorial__card-image img { transform: translateY(-4px) scale(var(--look-card-zoom)); filter: drop-shadow(0 15px 10px rgba(77,29,43,.24)); }
+.look-editorial__card-image img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; -webkit-mask-image: radial-gradient(ellipse 90% 92% at center, #000 54%, transparent 100%); mask-image: radial-gradient(ellipse 90% 92% at center, #000 54%, transparent 100%); filter: drop-shadow(0 9px 9px rgba(77,29,43,.18)); transition: transform .6s cubic-bezier(.2,.7,.2,1), filter .6s ease; }
+.look-editorial__card:not(.look-editorial__card--cover) .look-editorial__card-image img { transform: scale(var(--look-product-scale)); }
+.look-editorial__card--cover .look-editorial__card-image img { object-fit: cover; -webkit-mask-image: none; mask-image: none; }
+.look-editorial__card:not(.look-editorial__card--cover):hover .look-editorial__card-image img { transform: translateY(-4px) scale(calc(var(--look-product-scale) * var(--look-card-zoom))); filter: drop-shadow(0 15px 10px rgba(77,29,43,.24)); }
 .look-editorial__cover-badge { position: absolute; z-index: 1; top: 13px; left: 13px; padding: 6px 10px; border: 1px solid rgba(255,255,255,.8); border-radius: 999px; background: color-mix(in srgb, var(--look-glass) 76%, transparent); backdrop-filter: blur(13px); color: var(--look-text); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; box-shadow: 0 4px 14px rgba(42,19,24,.16); }
 .look-editorial__favorite { position: absolute; z-index: 3; top: 8px; right: 9px; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--look-favorite-color); filter: drop-shadow(0 1px 2px rgba(48,21,33,.26)); cursor: pointer; transition: transform .25s cubic-bezier(.2,.7,.2,1), filter .25s ease; }
 .look-editorial__favorite:hover { transform: translateY(-2px) scale(1.1); filter: drop-shadow(0 1px 3px white) drop-shadow(0 3px 7px rgba(48,21,33,.36)); }
@@ -37,16 +38,8 @@
   min-width: 0;
   min-height: 57px;
   padding: 6px 12px 4px;
-  background: linear-gradient(0deg, color-mix(in srgb, var(--look-glass) 28%, transparent), color-mix(in srgb, var(--look-glass) 9%, transparent) 70%, transparent);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--look-glass) 59%, transparent), color-mix(in srgb, var(--look-glass) 25%, transparent) 58%, transparent);
   transition: background-color .35s ease;
-}
-.look-editorial__card-details::before {
-  content: "";
-  position: absolute;
-  inset: 0 5px auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
-  pointer-events: none;
 }
 .look-editorial__card:hover .look-editorial__card-details,
 .look-editorial__card:focus-within .look-editorial__card-details {

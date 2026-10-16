@@ -496,7 +496,7 @@ export default function LookSectionUI({
                       <ToggleChip active={style.editorialVisibleCards === 2} onClick={() => patchStyle({ editorialVisibleCards: 2 })}>Amplias</ToggleChip>
                     </div>
                   </Field>
-                  <RangeNumberField label="Espacio alrededor de cada producto" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
+                  <RangeNumberField label="Margen visual del producto" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
                   <RangeNumberField label="Profundidad del cristal" min={0} max={100} step={1} value={style.editorialDepth} onChange={(v) => patchStyle({ editorialDepth: v })} />
                   <RangeNumberField label="Opacidad del cristal (%)" min={0} max={90} step={1} value={style.editorialGlassOpacity} onChange={(v) => patchStyle({ editorialGlassOpacity: v })} />
                   <RangeNumberField label="Desenfoque del cristal" min={0} max={40} step={1} value={style.editorialGlassBlurPx} onChange={(v) => patchStyle({ editorialGlassBlurPx: v })} />
