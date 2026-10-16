@@ -128,7 +128,7 @@ describe('imagen principal independiente de Looks', () => {
     unmount();
 
     render(<LookSection theme={{ sections: [saved] }} previewProducts={products} />);
-    expect(document.querySelector('.look-editorial')).toHaveStyle({ '--look-rail-left': '15.75%' });
+    expect(document.querySelector('.look-editorial')).toHaveStyle({ '--look-rail-left': '13.3%' });
     expect(document.querySelector('.look-editorial__rail')).toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe('imagen principal independiente de Looks', () => {
     } });
     render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
     const wrapper = document.querySelector('.look-editorial');
-    expect(wrapper).toHaveStyle({ '--look-rail-left': '57%' });
+    expect(wrapper).toHaveStyle({ '--look-rail-left': '50%' });
     expect(normalizeLookSection({ style: { editorialRailPositionPercent: 200 } }).style.editorialRailPositionPercent).toBe(150);
   });
 
@@ -161,7 +161,7 @@ describe('imagen principal independiente de Looks', () => {
     const field = screen.getByText('Posición horizontal del carrusel').parentElement;
     fireEvent.change(field.querySelector('input[type="number"]'), { target: { value: '150' } });
     await waitFor(() => expect(document.querySelector('.section-real-preview .look-editorial'))
-      .toHaveStyle({ '--look-rail-left': '57%' }));
+      .toHaveStyle({ '--look-rail-left': '50%' }));
   });
 
   it('ignora rutas inseguras y conserva el comportamiento anterior sin imagen propia', () => {

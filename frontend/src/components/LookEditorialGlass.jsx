@@ -40,18 +40,18 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
   const position = style.editorialRailPositionPercent;
-  const railLeft = (52 - style.editorialOverlapPercent * .55) * Math.min(position, 100) / 100
+  const railLeft = (52 - style.editorialOverlapPercent * 2) * Math.min(position, 100) / 100
     + 12 * Math.max(0, position - 100) / 50;
   const css = {
     "--look-backdrop": `url("${config.editorialBackgroundImage || "/looks-editorial-background.webp"}")`,
     "--look-background": style.editorialBackgroundColor,
     "--look-glass": style.editorialGlassColor,
-    "--look-glass-fill": `${style.editorialGlassOpacity * .32}%`,
+    "--look-glass-fill": `${style.editorialGlassOpacity * .2}%`,
     "--look-blur": `${Math.round(style.editorialGlassBlurPx * .45)}px`,
     "--look-accent": style.editorialAccentColor,
     "--look-text": style.editorialTextColor,
     "--look-overlap": `${style.editorialOverlapPercent}%`,
-    "--look-rail-width": `${45 + style.editorialOverlapPercent * .7}%`,
+    "--look-rail-width": `${55 + style.editorialOverlapPercent}%`,
     "--look-rail-left": `${railLeft}%`,
     "--look-headline-size": `${style.editorialHeadlineSizePx}px`,
     "--look-description-size": `${style.editorialDescriptionSizePx}px`,
@@ -141,7 +141,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               </button>
               {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
                 aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
-                onClick={() => onFavorite(product)}><Heart size={23} strokeWidth={1.7} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
+                onClick={() => onFavorite(product)}><Heart size={18} strokeWidth={1.5} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
               <div className="look-editorial__card-details">
                 <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
                   fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>
