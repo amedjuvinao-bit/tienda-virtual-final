@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Heart, ShoppingCart } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
 import LookGlassRim from "./LookGlassRim";
@@ -12,7 +12,10 @@ function moneyCOP(value) {
 export default function LookEditorialGlass({ config, style, products, mainImage, mainImageAlt, selectedId, onSelect,
   onCart, onFavorite, isFavorite, loading }) {
   const pausedRef = useRef(false);
+  const sectionRef = useRef(null);
+  const sceneRef = useRef(null);
   const [loadedHero, setLoadedHero] = useState({ src: "", ratio: "" });
+  const [rightRoom, setRightRoom] = useState(0);
   const hasCover = config.heroMode === "custom" && Boolean(config.heroImage);
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
   const cardCount = products.length + Number(hasCover);
@@ -37,8 +40,28 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   }, [canSlide, railInstanceRef]);
 
   useEffect(() => { railInstanceRef.current?.update?.(); }, [cardCount, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const scene = sceneRef.current;
+    if (!section || !scene) return undefined;
+    const measure = () => {
+      // offsetWidth/offsetLeft remain in CSS pixels even when the admin preview is scaled.
+      const paddingRight = parseFloat(window.getComputedStyle(section).paddingRight) || 0;
+      const available = Math.max(0, section.clientWidth - paddingRight - scene.offsetLeft - scene.offsetWidth);
+      setRightRoom((current) => current === available ? current : available);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(section);
+    observer.observe(scene);
+    return () => observer.disconnect();
+  }, [style.editorialContentWidthPx, style.sectionPaddingXPx]);
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
+  const position = style.editorialRailPositionPercent;
+  const railLeft = (52 - style.editorialOverlapPercent) * Math.min(position, 100) / 100;
+  const extension = rightRoom * Math.max(0, position - 100) / 50;
   const css = {
     "--look-backdrop": `url("${config.editorialBackgroundImage || "/looks-editorial-background.webp"}")`,
     "--look-background": style.editorialBackgroundColor,
@@ -48,7 +71,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-accent": style.editorialAccentColor,
     "--look-text": style.editorialTextColor,
     "--look-overlap": `${style.editorialOverlapPercent}%`,
-    "--look-rail-left": `${(52 - style.editorialOverlapPercent) * style.editorialRailPositionPercent / 100}%`,
+    "--look-rail-left": extension ? `calc(${railLeft}% + ${extension}px)` : `${railLeft}%`,
     "--look-headline-size": `${style.editorialHeadlineSizePx}px`,
     "--look-description-size": `${style.editorialDescriptionSizePx}px`,
     "--look-cards-visible": style.editorialVisibleCards,
@@ -74,8 +97,8 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     onSelect(options[(currentIndex + step + options.length) % options.length].id);
   };
 
-  return <section className="look-editorial" style={css} aria-label="Looks">
-    <div className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
+  return <section ref={sectionRef} className="look-editorial" style={css} aria-label="Looks">
+    <div ref={sceneRef} className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
       <div className={`look-editorial__hero ${style.editorialHeroFit === "crop" ? "look-editorial__hero--crop" : ""}`}>
         {mainImage ? <img className="look-editorial__hero-photo" src={mainImage} alt={mainImageAlt || "Imagen principal de Looks"}
           onLoad={(event) => {

@@ -310,7 +310,7 @@ export function normalizeLookSectionStyle(input = {}) {
     editorialAccentColor: asString(input?.editorialAccentColor, base.editorialAccentColor),
     editorialTextColor: asString(input?.editorialTextColor, base.editorialTextColor),
     editorialOverlapPercent: clampNumber(input?.editorialOverlapPercent, 0, 22, base.editorialOverlapPercent),
-    editorialRailPositionPercent: clampNumber(input?.editorialRailPositionPercent, 0, 100, base.editorialRailPositionPercent),
+    editorialRailPositionPercent: clampNumber(input?.editorialRailPositionPercent, 0, 150, base.editorialRailPositionPercent),
     editorialHeroFit: input?.editorialHeroFit === "crop" ? "crop" : "natural",
     editorialHeroAspect: ["1/1", "3/4", "4/5", "16/9"].includes(input?.editorialHeroAspect)
       ? input.editorialHeroAspect : base.editorialHeroAspect,

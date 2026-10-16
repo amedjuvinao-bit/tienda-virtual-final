@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LookSectionUI from './LookSectionUI';
 import { normalizeLookSection } from './lookSectionHelpers';
@@ -124,6 +124,30 @@ describe('imagen principal independiente de Looks', () => {
     render(<LookSection theme={{ sections: [saved] }} previewProducts={products} />);
     expect(document.querySelector('.look-editorial')).toHaveStyle({ '--look-rail-left': '15.75%' });
     expect(document.querySelector('.look-editorial__rail')).toBeInTheDocument();
+  });
+
+  it('permite llevar el carrusel hasta el espacio libre a la derecha del diseño', () => {
+    const observers = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { observers.push(callback); }
+      observe() {}
+      disconnect() {}
+    });
+    const section = normalizeLookSection({ config: { products }, style: {
+      editorialContentWidthPx: 1000, editorialRailPositionPercent: 150,
+    } });
+    render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
+    const wrapper = document.querySelector('.look-editorial');
+    const scene = document.querySelector('.look-editorial__scene');
+    Object.defineProperties(wrapper, { clientWidth: { configurable: true, value: 1280 } });
+    Object.defineProperties(scene, {
+      offsetLeft: { configurable: true, value: 140 },
+      offsetWidth: { configurable: true, value: 1000 },
+    });
+    wrapper.style.paddingRight = '16px';
+    act(() => observers.forEach((callback) => callback()));
+    expect(wrapper).toHaveStyle({ '--look-rail-left': 'calc(45% + 124px)' });
+    expect(normalizeLookSection({ style: { editorialRailPositionPercent: 200 } }).style.editorialRailPositionPercent).toBe(150);
   });
 
   it('ignora rutas inseguras y conserva el comportamiento anterior sin imagen propia', () => {
