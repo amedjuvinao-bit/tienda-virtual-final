@@ -9,6 +9,13 @@ function moneyCOP(value) {
   return `$${Math.round(Number(value) || 0).toLocaleString("es-CO")}`;
 }
 
+function displayProductName(value) {
+  const name = String(value || "").trim();
+  if (!name || name !== name.toLocaleUpperCase("es-CO")) return name;
+  return name.toLocaleLowerCase("es-CO").replace(/(^|[\s/-])(\p{L})/gu,
+    (_, separator, letter) => separator + letter.toLocaleUpperCase("es-CO"));
+}
+
 export default function LookEditorialGlass({ config, style, products, mainImage, mainImageAlt, selectedId, onSelect,
   onCart, onFavorite, isFavorite, loading }) {
   const pausedRef = useRef(false);
@@ -82,7 +89,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
 
   const cardNameStyle = {
     color: style.thumbTitleColor,
-    fontFamily: style.thumbTitleFontFamily || "Georgia, 'Times New Roman', serif",
+    fontFamily: style.thumbTitleFontFamily || '"Cormorant Garamond", Georgia, serif',
     fontSize: style.thumbTitleSizePx,
     fontWeight: style.thumbTitleWeight,
     fontStyle: style.thumbTitleItalic ? "italic" : undefined,
@@ -90,7 +97,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   };
   const cardPriceStyle = {
     color: style.thumbPriceColor,
-    fontFamily: style.thumbPriceFontFamily || "Georgia, 'Times New Roman', serif",
+    fontFamily: style.thumbPriceFontFamily || '"Manrope", system-ui, sans-serif',
     fontSize: style.thumbPriceSizePx,
     fontWeight: style.thumbPriceWeight,
     fontStyle: style.thumbPriceItalic ? "italic" : undefined,
@@ -160,7 +167,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                 onClick={() => onFavorite(product)}><Heart size={18} strokeWidth={1.5} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
               <div className="look-editorial__card-details">
                 <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={cardNameStyle}>
-                  {product.subtitle}</a>
+                  {displayProductName(product.subtitle)}</a>
                 <div className="look-editorial__card-foot">
                   <span style={cardPriceStyle}>{moneyCOP(product.price)}</span>
                   {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>

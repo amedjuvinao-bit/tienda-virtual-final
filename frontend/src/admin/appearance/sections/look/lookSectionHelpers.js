@@ -5,11 +5,14 @@ export const LOOK_SECTION_ID = "look";
 export const LOOK_MAX_PRODUCTS = 6;
 
 const EDITORIAL_CARD_TEXT_DEFAULTS = {
-  titleColor: "#633847",
-  priceColor: "#a34e66",
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  titleWeight: 400,
-  priceWeight: 600,
+  titleColor: "#5d3446",
+  priceColor: "#a45f68",
+  titleFontFamily: '"Cormorant Garamond", Georgia, serif',
+  priceFontFamily: '"Manrope", system-ui, sans-serif',
+  titleWeight: 600,
+  priceWeight: 500,
+  titleSizePx: 17,
+  priceSizePx: 13,
 };
 
 export const LOOK_SECTION_DEFAULTS = {
@@ -311,7 +314,7 @@ export function normalizeLookSectionStyle(input = {}) {
     desktopLeftRatio: clampNumber(input?.desktopLeftRatio, 1, 4, base.desktopLeftRatio),
     desktopRightRatio: clampNumber(input?.desktopRightRatio, 1, 4, base.desktopRightRatio),
     layoutPreset: input?.layoutPreset === "classic" ? "classic" : "editorialGlass",
-    editorialCardTextVersion: input?.editorialCardTextVersion === 1 ? 1 : 0,
+    editorialCardTextVersion: [1, 2].includes(input?.editorialCardTextVersion) ? input.editorialCardTextVersion : 0,
     editorialBackgroundColor: asString(input?.editorialBackgroundColor, base.editorialBackgroundColor),
     editorialGlassColor: asString(input?.editorialGlassColor, base.editorialGlassColor),
     editorialGlassOpacity: clampNumber(input?.editorialGlassOpacity, 0, 90, base.editorialGlassOpacity),
@@ -447,19 +450,31 @@ export function normalizeLookSectionStyle(input = {}) {
     ),
   };
 
-  if (normalized.layoutPreset === "editorialGlass" && normalized.editorialCardTextVersion !== 1) {
+  if (normalized.layoutPreset === "editorialGlass" && normalized.editorialCardTextVersion !== 2) {
     // Los colores y fuentes iniciales del editor antiguo no pertenecían a la vitrina editorial.
     // Una vez migrados, el usuario puede escoger cualquiera de ellos de forma explícita.
     const inherited = (key, legacy) => !input?.[key]
       || String(input[key]).trim().toLowerCase() === legacy;
-    if (inherited("thumbTitleColor", "#1f2937")) normalized.thumbTitleColor = EDITORIAL_CARD_TEXT_DEFAULTS.titleColor;
-    if (inherited("thumbPriceColor", "#e11d48")) normalized.thumbPriceColor = EDITORIAL_CARD_TEXT_DEFAULTS.priceColor;
-    if (inherited("thumbTitleFontFamily", "")) normalized.thumbTitleFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.fontFamily;
-    if (inherited("thumbPriceFontFamily", "")) normalized.thumbPriceFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.fontFamily;
-    if (input?.thumbTitleWeight == null || Number(input.thumbTitleWeight) === 500) normalized.thumbTitleWeight = EDITORIAL_CARD_TEXT_DEFAULTS.titleWeight;
-    if (input?.thumbPriceWeight == null || Number(input.thumbPriceWeight) === 500) normalized.thumbPriceWeight = EDITORIAL_CARD_TEXT_DEFAULTS.priceWeight;
+    const darkNames = ["#000", "#000000", "#111", "#111111", "#111827", "#1f2937", "#374151", "#633847"];
+    const loudPrices = ["#f00", "#ff0000", "#e11d48", "#a34e66"];
+    if (!input?.thumbTitleColor || darkNames.includes(String(input.thumbTitleColor).trim().toLowerCase())) {
+      normalized.thumbTitleColor = EDITORIAL_CARD_TEXT_DEFAULTS.titleColor;
+    }
+    if (!input?.thumbPriceColor || loudPrices.includes(String(input.thumbPriceColor).trim().toLowerCase())) {
+      normalized.thumbPriceColor = EDITORIAL_CARD_TEXT_DEFAULTS.priceColor;
+    }
+    if (inherited("thumbTitleFontFamily", "") || inherited("thumbTitleFontFamily", "georgia, 'times new roman', serif")) {
+      normalized.thumbTitleFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.titleFontFamily;
+    }
+    if (inherited("thumbPriceFontFamily", "") || inherited("thumbPriceFontFamily", "georgia, 'times new roman', serif")) {
+      normalized.thumbPriceFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.priceFontFamily;
+    }
+    if (input?.thumbTitleWeight == null || [400, 500].includes(Number(input.thumbTitleWeight))) normalized.thumbTitleWeight = EDITORIAL_CARD_TEXT_DEFAULTS.titleWeight;
+    if (input?.thumbPriceWeight == null || [500, 600].includes(Number(input.thumbPriceWeight))) normalized.thumbPriceWeight = EDITORIAL_CARD_TEXT_DEFAULTS.priceWeight;
+    if (input?.thumbTitleSizePx == null || Number(input.thumbTitleSizePx) === 14) normalized.thumbTitleSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.titleSizePx;
+    if (input?.thumbPriceSizePx == null || Number(input.thumbPriceSizePx) === 14) normalized.thumbPriceSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.priceSizePx;
   }
-  if (normalized.layoutPreset === "editorialGlass") normalized.editorialCardTextVersion = 1;
+  if (normalized.layoutPreset === "editorialGlass") normalized.editorialCardTextVersion = 2;
 
   return normalized;
 }

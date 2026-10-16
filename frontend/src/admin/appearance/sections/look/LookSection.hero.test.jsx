@@ -87,13 +87,20 @@ describe('imagen principal independiente de Looks', () => {
       thumbTitleFontFamily: '', thumbPriceFontFamily: '',
     } }).style;
     expect(migrated).toMatchObject({
-      thumbTitleColor: '#633847', thumbPriceColor: '#a34e66',
-      thumbTitleFontFamily: "Georgia, 'Times New Roman', serif", editorialCardTextVersion: 1,
+      thumbTitleColor: '#5d3446', thumbPriceColor: '#a45f68',
+      thumbTitleFontFamily: '"Cormorant Garamond", Georgia, serif',
+      thumbPriceFontFamily: '"Manrope", system-ui, sans-serif',
+      thumbTitleSizePx: 17, thumbPriceSizePx: 13, editorialCardTextVersion: 2,
     });
 
     const chosen = normalizeLookSection({ style: { ...migrated, thumbTitleColor: '#1f2937',
       thumbTitleFontFamily: 'system-ui', thumbTitleWeight: 700 } }).style;
     expect(chosen).toMatchObject({ thumbTitleColor: '#1f2937', thumbTitleFontFamily: 'system-ui', thumbTitleWeight: 700 });
+
+    const fromLastRelease = normalizeLookSection({ style: { layoutPreset: 'editorialGlass', editorialCardTextVersion: 1,
+      thumbTitleColor: '#000000', thumbPriceColor: '#a34e66', thumbTitleFontFamily: "Georgia, 'Times New Roman', serif" } }).style;
+    expect(fromLastRelease).toMatchObject({ editorialCardTextVersion: 2, thumbTitleColor: '#5d3446',
+      thumbPriceColor: '#a45f68', thumbTitleFontFamily: '"Cormorant Garamond", Georgia, serif' });
 
     expect(normalizeLookSection({ style: { layoutPreset: 'classic' } }).style)
       .toMatchObject({ thumbTitleColor: '#1f2937', thumbPriceColor: '#e11d48' });
