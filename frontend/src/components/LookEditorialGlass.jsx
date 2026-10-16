@@ -17,14 +17,13 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
   const cardCount = products.length + Number(hasCover);
   const canSlide = cardCount > 1;
-  const cardWidth = style.editorialVisibleCards === 2 ? 2.25 : 2.75;
-  const visibleCards = Math.min(cardWidth, canSlide ? cardCount - .25 : 1);
+  const visibleCards = Math.min(style.editorialVisibleCards === 2 ? 2 : 3, cardCount || 1);
   const [railRef, railInstanceRef] = useKeenSlider({
     loop: canSlide,
     drag: canSlide,
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.45), spacing: Math.min(style.editorialCardGapPx, 10) } },
+      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: Math.min(style.editorialCardGapPx, 10) } },
     },
   });
 
@@ -41,7 +40,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
   const position = style.editorialRailPositionPercent;
-  const railLeft = (52 - style.editorialOverlapPercent) * Math.min(position, 100) / 100
+  const railLeft = (52 - style.editorialOverlapPercent * .55) * Math.min(position, 100) / 100
     + 12 * Math.max(0, position - 100) / 50;
   const css = {
     "--look-backdrop": `url("${config.editorialBackgroundImage || "/looks-editorial-background.webp"}")`,
@@ -52,6 +51,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-accent": style.editorialAccentColor,
     "--look-text": style.editorialTextColor,
     "--look-overlap": `${style.editorialOverlapPercent}%`,
+    "--look-rail-width": `${45 + style.editorialOverlapPercent * .7}%`,
     "--look-rail-left": `${railLeft}%`,
     "--look-headline-size": `${style.editorialHeadlineSizePx}px`,
     "--look-description-size": `${style.editorialDescriptionSizePx}px`,
@@ -59,6 +59,8 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-hero-radius": `${style.mainImageRadiusPx}px`,
     "--look-card-radius": `${style.thumbRadiusPx}px`,
     "--look-card-zoom": style.thumbHoverScale,
+    "--look-card-gap": `${style.editorialCardGapPx}px`,
+    "--look-card-gap-half": `${style.editorialCardGapPx / 2}px`,
     "--look-button-bg": style.actionButtonBg,
     "--look-button-border": style.actionButtonBorderColor,
     "--look-favorite-color": style.actionFavoriteColor,
@@ -130,7 +132,6 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                 <span className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
                   fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>Imagen principal</span>
               </div>
-              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
           </article>}
           {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
@@ -149,10 +150,9 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                   <span style={{ color: style.thumbPriceColor, fontFamily: style.thumbPriceFontFamily || undefined,
                     fontSize: style.thumbPriceSizePx }}>{moneyCOP(product.price)}</span>
                   {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
-                    <ShoppingBag size={17} strokeWidth={1.7} /><span aria-hidden="true">Agregar</span></button>}
+                    <ShoppingBag size={17} strokeWidth={1.5} /></button>}
                 </div>
               </div>
-              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
           </article>)}
         </div>
