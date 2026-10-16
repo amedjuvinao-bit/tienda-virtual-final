@@ -442,6 +442,7 @@ export default function LookSectionUI({
                         hidden={pid !== selectedProductId}
                       >
                         <div className="text-sm font-bold text-neutral-900 mb-2">{item?.title || "Producto"}</div>
+                        {style.layoutPreset === "editorialGlass" && <p className="mb-2 text-xs text-neutral-600">Para que el producto flote sobre el cristal como en la referencia, carga aquí una imagen PNG o WebP con fondo transparente. La foto actual del catálogo se conserva hasta que la reemplaces.</p>}
 
                         <CardImageMover
                           productId={pid}
@@ -495,7 +496,7 @@ export default function LookSectionUI({
                       <ToggleChip active={style.editorialVisibleCards === 2} onClick={() => patchStyle({ editorialVisibleCards: 2 })}>Amplias</ToggleChip>
                     </div>
                   </Field>
-                  <RangeNumberField label="Separación de tarjetas" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
+                  <RangeNumberField label="Espacio alrededor de cada producto" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
                   <RangeNumberField label="Profundidad del cristal" min={0} max={100} step={1} value={style.editorialDepth} onChange={(v) => patchStyle({ editorialDepth: v })} />
                   <RangeNumberField label="Opacidad del cristal (%)" min={0} max={90} step={1} value={style.editorialGlassOpacity} onChange={(v) => patchStyle({ editorialGlassOpacity: v })} />
                   <RangeNumberField label="Desenfoque del cristal" min={0} max={40} step={1} value={style.editorialGlassBlurPx} onChange={(v) => patchStyle({ editorialGlassBlurPx: v })} />
@@ -817,9 +818,9 @@ export default function LookSectionUI({
               </div>}
 
               {style.layoutPreset === "editorialGlass" && <div className="grid gap-3 sm:grid-cols-2">
-                <RangeNumberField label="Radio de las tarjetas" min={0} max={40} step={1} value={style.thumbRadiusPx} onChange={(v) => patchStyle({ thumbRadiusPx: v })} />
+                <RangeNumberField label="Radio de la vitrina de cristal" min={0} max={40} step={1} value={style.thumbRadiusPx} onChange={(v) => patchStyle({ thumbRadiusPx: v })} />
                 <RangeNumberField label="Ampliación de la foto al pasar" min={1} max={1.2} step={0.01} value={style.thumbHoverScale} onChange={(v) => patchStyle({ thumbHoverScale: v })} />
-                <Field label="Profundidad de las tarjetas"><div className="flex gap-2">
+                <Field label="Sombra de la vitrina"><div className="flex gap-2">
                   <ToggleChip active={!!style.thumbShadow} onClick={() => patchStyle({ thumbShadow: true })}>Con sombra</ToggleChip>
                   <ToggleChip active={!style.thumbShadow} onClick={() => patchStyle({ thumbShadow: false })}>Sin sombra</ToggleChip>
                 </div></Field>

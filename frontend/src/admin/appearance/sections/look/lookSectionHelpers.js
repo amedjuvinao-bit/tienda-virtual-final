@@ -6,12 +6,12 @@ export const LOOK_MAX_PRODUCTS = 6;
 
 const EDITORIAL_CARD_TEXT_DEFAULTS = {
   titleColor: "#5d3446",
-  priceColor: "#a45f68",
+  priceColor: "#c54a69",
   titleFontFamily: '"Cormorant Garamond", Georgia, serif',
   priceFontFamily: '"Manrope", system-ui, sans-serif',
   titleWeight: 600,
-  priceWeight: 500,
-  titleSizePx: 17,
+  priceWeight: 600,
+  titleSizePx: 12,
   priceSizePx: 13,
 };
 
@@ -314,7 +314,7 @@ export function normalizeLookSectionStyle(input = {}) {
     desktopLeftRatio: clampNumber(input?.desktopLeftRatio, 1, 4, base.desktopLeftRatio),
     desktopRightRatio: clampNumber(input?.desktopRightRatio, 1, 4, base.desktopRightRatio),
     layoutPreset: input?.layoutPreset === "classic" ? "classic" : "editorialGlass",
-    editorialCardTextVersion: [1, 2].includes(input?.editorialCardTextVersion) ? input.editorialCardTextVersion : 0,
+    editorialCardTextVersion: [1, 2, 3].includes(input?.editorialCardTextVersion) ? input.editorialCardTextVersion : 0,
     editorialBackgroundColor: asString(input?.editorialBackgroundColor, base.editorialBackgroundColor),
     editorialGlassColor: asString(input?.editorialGlassColor, base.editorialGlassColor),
     editorialGlassOpacity: clampNumber(input?.editorialGlassOpacity, 0, 90, base.editorialGlassOpacity),
@@ -450,13 +450,23 @@ export function normalizeLookSectionStyle(input = {}) {
     ),
   };
 
-  if (normalized.layoutPreset === "editorialGlass" && normalized.editorialCardTextVersion !== 2) {
+  const previousEditorialPreset = normalized.editorialCardTextVersion === 2
+    && String(input?.thumbTitleColor).toLowerCase() === "#5d3446"
+    && String(input?.thumbPriceColor).toLowerCase() === "#a45f68"
+    && Number(input?.thumbTitleSizePx) === 17
+    && Number(input?.thumbPriceSizePx) === 13
+    && Number(input?.thumbTitleWeight) === 600
+    && Number(input?.thumbPriceWeight) === 500
+    && input?.thumbTitleFontFamily === EDITORIAL_CARD_TEXT_DEFAULTS.titleFontFamily
+    && input?.thumbPriceFontFamily === EDITORIAL_CARD_TEXT_DEFAULTS.priceFontFamily;
+  if (normalized.layoutPreset === "editorialGlass"
+    && (normalized.editorialCardTextVersion < 2 || previousEditorialPreset)) {
     // Los colores y fuentes iniciales del editor antiguo no pertenecían a la vitrina editorial.
     // Una vez migrados, el usuario puede escoger cualquiera de ellos de forma explícita.
     const inherited = (key, legacy) => !input?.[key]
       || String(input[key]).trim().toLowerCase() === legacy;
     const darkNames = ["#000", "#000000", "#111", "#111111", "#111827", "#1f2937", "#374151", "#633847"];
-    const loudPrices = ["#f00", "#ff0000", "#e11d48", "#a34e66"];
+    const loudPrices = ["#f00", "#ff0000", "#e11d48", "#a34e66", "#a45f68"];
     if (!input?.thumbTitleColor || darkNames.includes(String(input.thumbTitleColor).trim().toLowerCase())) {
       normalized.thumbTitleColor = EDITORIAL_CARD_TEXT_DEFAULTS.titleColor;
     }
@@ -470,11 +480,11 @@ export function normalizeLookSectionStyle(input = {}) {
       normalized.thumbPriceFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.priceFontFamily;
     }
     if (input?.thumbTitleWeight == null || [400, 500].includes(Number(input.thumbTitleWeight))) normalized.thumbTitleWeight = EDITORIAL_CARD_TEXT_DEFAULTS.titleWeight;
-    if (input?.thumbPriceWeight == null || [500, 600].includes(Number(input.thumbPriceWeight))) normalized.thumbPriceWeight = EDITORIAL_CARD_TEXT_DEFAULTS.priceWeight;
-    if (input?.thumbTitleSizePx == null || Number(input.thumbTitleSizePx) === 14) normalized.thumbTitleSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.titleSizePx;
+    if (input?.thumbPriceWeight == null || Number(input.thumbPriceWeight) === 500) normalized.thumbPriceWeight = EDITORIAL_CARD_TEXT_DEFAULTS.priceWeight;
+    if (input?.thumbTitleSizePx == null || [14, 17].includes(Number(input.thumbTitleSizePx))) normalized.thumbTitleSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.titleSizePx;
     if (input?.thumbPriceSizePx == null || Number(input.thumbPriceSizePx) === 14) normalized.thumbPriceSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.priceSizePx;
   }
-  if (normalized.layoutPreset === "editorialGlass") normalized.editorialCardTextVersion = 2;
+  if (normalized.layoutPreset === "editorialGlass") normalized.editorialCardTextVersion = 3;
 
   return normalized;
 }

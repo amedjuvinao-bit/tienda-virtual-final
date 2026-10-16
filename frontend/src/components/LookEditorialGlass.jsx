@@ -28,9 +28,9 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const [railRef, railInstanceRef] = useKeenSlider({
     loop: canSlide,
     drag: canSlide,
-    slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
+    slides: { perView: visibleCards || 1, spacing: 0 },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: Math.min(style.editorialCardGapPx, 10) } },
+      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.55), spacing: 0 } },
     },
   });
 
@@ -43,7 +43,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     return () => window.clearInterval(interval);
   }, [canSlide, railInstanceRef]);
 
-  useEffect(() => { railInstanceRef.current?.update?.(); }, [cardCount, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
+  useEffect(() => { railInstanceRef.current?.update?.(); }, [cardCount, style.editorialVisibleCards, railInstanceRef]);
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
   const position = style.editorialRailPositionPercent;
@@ -54,7 +54,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-background": style.editorialBackgroundColor,
     "--look-glass": style.editorialGlassColor,
     "--look-glass-fill": `${style.editorialGlassOpacity * .2}%`,
-    "--look-blur": `${Math.round(style.editorialGlassBlurPx * .45)}px`,
+    "--look-blur": `${Math.round(style.editorialGlassBlurPx * .2)}px`,
     "--look-accent": style.editorialAccentColor,
     "--look-text": style.editorialTextColor,
     "--look-overlap": `${style.editorialOverlapPercent}%`,
@@ -64,19 +64,17 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-description-size": `${style.editorialDescriptionSizePx}px`,
     "--look-cards-visible": style.editorialVisibleCards,
     "--look-hero-radius": `${style.mainImageRadiusPx}px`,
-    "--look-card-radius": `${style.thumbRadiusPx}px`,
+    "--look-rail-radius": `${style.thumbRadiusPx + 11}px`,
     "--look-card-zoom": style.thumbHoverScale,
     "--look-card-gap": `${style.editorialCardGapPx}px`,
-    "--look-card-gap-half": `${style.editorialCardGapPx / 2}px`,
     "--look-button-bg": style.actionButtonBg,
     "--look-button-border": style.actionButtonBorderColor,
     "--look-favorite-color": style.actionFavoriteColor,
     "--look-cart-color": style.actionCartColor,
     "--look-hero-aspect": style.editorialHeroFit !== "crop" && loadedHero.src === mainImage
       ? loadedHero.ratio : style.editorialHeroAspect.replace("/", " / "),
-    "--look-shadow": `0 ${Math.round(16 + depth * 26)}px ${Math.round(28 + depth * 46)}px rgba(72, 29, 46, ${(.17 + depth * .22).toFixed(2)}), 0 ${Math.round(7 + depth * 10)}px ${Math.round(10 + depth * 15)}px rgba(94, 45, 44, ${(.11 + depth * .17).toFixed(2)})`,
+    "--look-shadow": style.thumbShadow ? `0 ${Math.round(16 + depth * 26)}px ${Math.round(28 + depth * 46)}px rgba(72, 29, 46, ${(.17 + depth * .22).toFixed(2)}), 0 ${Math.round(7 + depth * 10)}px ${Math.round(10 + depth * 15)}px rgba(94, 45, 44, ${(.11 + depth * .17).toFixed(2)})` : "none",
     "--look-hero-shadow": style.mainImageShadow ? `0 ${Math.round(16 + depth * 26)}px ${Math.round(28 + depth * 46)}px rgba(72, 29, 46, ${(.17 + depth * .22).toFixed(2)}), 0 9px 16px rgba(94,45,44,.16)` : "none",
-    "--look-card-shadow": style.thumbShadow ? `0 ${Math.round(5 + depth * 7)}px ${Math.round(9 + depth * 15)}px rgba(83,37,45,${(.12 + depth * .17).toFixed(2)}), inset 0 1px rgba(255,255,255,.85)` : "none",
     "--look-padding-top": `${style.sectionPaddingTopPx}px`,
     "--look-padding-bottom": `${style.sectionPaddingBottomPx}px`,
     "--look-padding-x": `${style.sectionPaddingXPx}px`,
@@ -181,7 +179,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
           <button type="button" aria-label="Tarjeta anterior" onClick={() => railInstanceRef.current?.prev()}><ChevronLeft size={17} /></button>
           <button type="button" aria-label="Tarjeta siguiente" onClick={() => railInstanceRef.current?.next()}><ChevronRight size={17} /></button>
         </div>}
-        <LookGlassRim variant="rail" radius={27} />
+        <LookGlassRim variant="rail" radius={style.thumbRadiusPx + 11} />
       </div>
     </div>
   </section>;
