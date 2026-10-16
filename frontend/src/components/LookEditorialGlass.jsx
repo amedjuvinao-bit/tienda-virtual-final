@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Heart, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, ShoppingBag } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
@@ -17,13 +17,14 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
   const cardCount = products.length + Number(hasCover);
   const canSlide = cardCount > 1;
-  const visibleCards = Math.min(style.editorialVisibleCards, canSlide ? cardCount - .5 : 1);
+  const cardWidth = style.editorialVisibleCards === 2 ? 1.5 : 2.15;
+  const visibleCards = Math.min(cardWidth, canSlide ? cardCount - .25 : 1);
   const [railRef, railInstanceRef] = useKeenSlider({
     loop: canSlide,
     drag: canSlide,
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
-      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 2.15), spacing: style.editorialCardGapPx } },
+      "(max-width: 699px)": { slides: { perView: Math.min(visibleCards, 1.28), spacing: Math.min(style.editorialCardGapPx, 10) } },
     },
   });
 
@@ -128,7 +129,6 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               <div className="look-editorial__card-details">
                 <span className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
                   fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>Imagen principal</span>
-                <span className="look-editorial__cover-detail" style={{ color: style.thumbPriceColor }}>Imagen del look</span>
               </div>
               <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
             </div>
@@ -140,7 +140,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               </button>
               {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
                 aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
-                onClick={() => onFavorite(product)}><Heart size={18} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
+                onClick={() => onFavorite(product)}><Heart size={23} strokeWidth={1.7} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
               <div className="look-editorial__card-details">
                 <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={{ color: style.thumbTitleColor,
                   fontFamily: style.thumbTitleFontFamily || undefined, fontSize: style.thumbTitleSizePx }}>
@@ -149,7 +149,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                   <span style={{ color: style.thumbPriceColor, fontFamily: style.thumbPriceFontFamily || undefined,
                     fontSize: style.thumbPriceSizePx }}>{moneyCOP(product.price)}</span>
                   {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
-                    <ShoppingCart size={17} /></button>}
+                    <ShoppingBag size={17} strokeWidth={1.7} /><span aria-hidden="true">Agregar</span></button>}
                 </div>
               </div>
               <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
