@@ -36,7 +36,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
       "(max-width: 699px)": {
-        slides: { perView: Math.min(cardCount || 1, 2.2), spacing: Math.min(style.editorialCardGapPx, 8) },
+        slides: { perView: Math.min(cardCount || 1, 2.5), spacing: Math.min(style.editorialCardGapPx, 8) },
       },
     },
     slideChanged(slider) { setRailIndex(slider.track.details.rel); },
