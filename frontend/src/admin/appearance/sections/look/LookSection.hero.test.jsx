@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LookSectionUI from './LookSectionUI';
 import { normalizeLookSection } from './lookSectionHelpers';
 import LookSection from '../../../../components/LookSection';
@@ -9,6 +9,7 @@ vi.mock('../../../../context/CartContext', () => ({ useCart: () => ({ addToCart:
 vi.mock('../../../../context/FavoritesContext', () => ({ useFavorites: () => ({ toggleFavorite: vi.fn(), isFavorite: () => false }) }));
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+beforeEach(() => { vi.stubGlobal('matchMedia', () => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })); });
 
 const imageUrl = 'https://res.cloudinary.com/tienda/image/upload/v1/portada-look.jpg';
 const products = [{ productId: 'p1', title: 'Vestido azul', mainImage: '/vestido.jpg', price: 100000 }];
@@ -43,12 +44,16 @@ describe('imagen principal independiente de Looks', () => {
   });
 
   it('muestra la portada propia y permite volver a ella tras elegir una tarjeta', async () => {
+    const interval = vi.spyOn(window, 'setInterval');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ products: [
       { _id: 'p1', title: 'Vestido azul', image: '/vestido.jpg', price: 100000 },
     ] }) }));
     render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
     expect(screen.getByRole('button', { name: 'Mostrar imagen principal' }).closest('.look-editorial__rail')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
+    expect(interval).toHaveBeenCalledWith(expect.any(Function), 3600);
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
     expect(document.querySelector('.look-editorial__hero img')).toHaveAttribute('src', '/vestido.jpg');
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
