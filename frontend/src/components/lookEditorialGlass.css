@@ -32,18 +32,6 @@
 .look-editorial__favorite:hover { transform: translateY(-3px) scale(1.13); }
 .look-editorial__favorite:hover svg { filter: drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 3px 3px rgba(64,23,44,.8)) drop-shadow(0 8px 9px rgba(64,23,44,.42)); }
 .look-editorial__favorite:active { transform: translateY(1px) scale(.9); }
-.look-editorial__card-foot button {
-  border: 1px solid rgba(255,255,255,.72);
-  background: linear-gradient(145deg, rgba(255,255,255,.37), rgba(255,255,255,.08) 50%, rgba(97,42,66,.1)), color-mix(in srgb, var(--look-glass) 32%, transparent);
-  -webkit-backdrop-filter: blur(9px) saturate(1.4);
-  backdrop-filter: blur(9px) saturate(1.4);
-  box-shadow: 0 6px 12px rgba(65,25,45,.25), inset 0 1px 1px rgba(255,255,255,.93), inset 0 -2px 3px rgba(87,37,57,.12);
-  cursor: pointer;
-  transition: transform .25s cubic-bezier(.2,.7,.2,1), box-shadow .25s ease, background .25s ease;
-}
-.look-editorial__card-foot button svg { filter: drop-shadow(0 1px 0 rgba(255,255,255,.85)) drop-shadow(0 2px 2px rgba(60,24,42,.38)); }
-.look-editorial__card-foot button:hover { transform: translateY(-3px); box-shadow: 0 9px 16px rgba(65,25,45,.3), inset 0 1px 2px rgba(255,255,255,.98), inset 0 -2px 4px rgba(87,37,57,.16); }
-.look-editorial__card-foot button:active { transform: translateY(1px) scale(.94); box-shadow: 0 2px 5px rgba(65,25,45,.22), inset 0 2px 4px rgba(87,37,57,.2); }
 .look-editorial__card-details {
   position: absolute;
   z-index: 3;
@@ -59,7 +47,11 @@
 .look-editorial__card-name:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .look-editorial__card-foot { display: flex; min-height: 25px; align-items: center; justify-content: space-between; gap: 5px; margin-top: 1px; font-size: 13px; font-weight: 500; color: var(--look-accent); }
 .look-editorial__card-foot span { min-width: 0; font-family: "Manrope", system-ui, sans-serif; font-variant-numeric: lining-nums tabular-nums; letter-spacing: .015em; text-shadow: 0 1px 0 rgba(255,255,255,.72), 0 2px 3px rgba(71,27,46,.24), 0 5px 9px rgba(71,27,46,.28); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.look-editorial__card-foot button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; min-height: 30px; flex: none; padding: 3px; border-radius: 9px; color: var(--look-cart-color); }
+.look-editorial__card-foot button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none; padding: 0; border: 0; background: transparent; color: var(--look-cart-color); cursor: pointer; transition: transform .25s cubic-bezier(.2,.7,.2,1); }
+.look-editorial__card-foot button svg { filter: drop-shadow(0 -1px 1px rgba(255,255,255,.95)) drop-shadow(0 2px 2px rgba(64,23,44,.72)) drop-shadow(0 5px 7px rgba(64,23,44,.36)); transition: filter .25s ease; }
+.look-editorial__card-foot button:hover { transform: translateY(-3px) scale(1.13); }
+.look-editorial__card-foot button:hover svg { filter: drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 3px 3px rgba(64,23,44,.8)) drop-shadow(0 8px 9px rgba(64,23,44,.42)); }
+.look-editorial__card-foot button:active { transform: translateY(1px) scale(.9); }
 .look-editorial__card--cover .look-editorial__card-details { display: flex; align-items: center; }
 .look-editorial__rail-controls { position: absolute; z-index: 5; right: 18px; bottom: -17px; display: flex; gap: 7px; }
 .look-editorial__rail-controls button { width: 28px; height: 28px; background: color-mix(in srgb, var(--look-glass) 50%, transparent); }

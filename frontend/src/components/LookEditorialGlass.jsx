@@ -173,7 +173,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
                 <div className="look-editorial__card-foot">
                   <span style={cardPriceStyle}>{moneyCOP(product.price)}</span>
                   {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
-                    <ShoppingBag size={17} strokeWidth={1.5} /></button>}
+                    <ShoppingBag size={22} strokeWidth={1.7} /></button>}
                 </div>
               </div>
               <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
