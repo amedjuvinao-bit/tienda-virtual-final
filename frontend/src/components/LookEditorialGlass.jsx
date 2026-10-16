@@ -166,7 +166,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
               </button>
               {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
                 aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
-                onClick={() => onFavorite(product)}><Heart size={18} strokeWidth={1.5} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
+                onClick={() => onFavorite(product)}><Heart size={23} strokeWidth={1.7} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
               <div className="look-editorial__card-details">
                 <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={cardNameStyle}>
                   {displayProductName(product.subtitle)}</a>
