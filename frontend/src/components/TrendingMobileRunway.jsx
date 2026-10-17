@@ -2,6 +2,7 @@ import { ArrowRight, Heart, ShoppingBag } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useKeenSlider } from "keen-slider/react";
+import { trendingMobileColorsVars } from "./trendingPresentation";
 import "keen-slider/keen-slider.min.css";
 import "./trendingMobileRunway.css";
 
@@ -53,7 +54,7 @@ export default function TrendingMobileRunway({ products, title, titleImage, pres
     slider.current?.moveToIdx(absolute + distance, true);
   };
 
-  return <div className="trending-runway" style={{ "--runway-heading-font": presentation.titleFontFamily }}>
+  return <div className="trending-runway" style={{ ...trendingMobileColorsVars(presentation), "--runway-heading-font": presentation.titleFontFamily }}>
     <header className="trending-runway__heading">
       {presentation.titleMode === "image"
         ? <img className="trending-runway__title-image" src={titleImage} alt={heading} />

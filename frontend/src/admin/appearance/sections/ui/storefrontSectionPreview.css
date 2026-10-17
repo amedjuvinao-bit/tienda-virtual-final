@@ -12,3 +12,7 @@
 .section-real-preview__empty span { max-width: 440px; font-size: 13px; }
 .section-real-preview__loading { padding: 48px 20px; color: #765e6d; text-align: center; }
 .section-real-preview__footnote { padding: 10px 20px 14px; color: var(--admin-card-muted-text, #866f7f); font-size: 11px; }
+
+.section-real-preview__devices { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.section-real-preview__devices button { min-height: 34px; padding: 6px 9px; border: 1px solid #e5ceda; border-radius: 9px; background: #fff; color: #785269; font-size: 11px; cursor: pointer; }
+.section-real-preview__devices [aria-pressed="true"] { border-color: #c9779d; color: #812c57; background: #fff0f7; }

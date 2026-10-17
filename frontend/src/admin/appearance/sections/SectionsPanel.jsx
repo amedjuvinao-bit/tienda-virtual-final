@@ -16,6 +16,7 @@ import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
 import { normalizeTrendingPresentation } from '../../../components/trendingPresentation';
 import boutiqueBackdrop from '../../../assets/trending-vitrine-boutique.webp';
+import TrendingMobileColorsEditor from './editor/TrendingMobileColorsEditor';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -1061,7 +1062,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
   };
 
   return (
-    <SectionEditorCardTabs label="Diseño de Tendencia" labels={['Plantilla', 'Texto general', 'Campos de la tarjeta', 'Datos visibles', 'Tarjetas y espacio']}>
+    <SectionEditorCardTabs label="Diseño de Tendencia" labels={['Plantilla', 'Móvil', 'Texto general', 'Campos de la tarjeta', 'Datos visibles', 'Tarjetas y espacio']}>
       <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4">
         <div>
           <h3 className="text-sm font-semibold text-neutral-900">Elige cómo se muestran los productos</h3>
@@ -1086,7 +1087,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
         </div>
         {presentation.mode === "floatingGlass" ? (
           <div className="space-y-3">
-            <p className="text-xs text-neutral-600">Las fotos y los artículos se editan en Contenido → Productos. Las letras y datos de la ficha se ajustan en las pestañas siguientes.</p>
+            <p className="text-xs text-neutral-600">Las fotos y los artículos se editan en Contenido → Productos. Los colores de Pasarela se ajustan en Móvil; las fichas de escritorio, en las opciones de esta pestaña.</p>
             <details className="rounded-xl border border-neutral-200 p-3">
               <summary className="cursor-pointer text-sm font-semibold">Título de la vitrina</summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1192,6 +1193,11 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
             </details>
           </div>
         ) : null}
+      </div>
+      <div>
+        {presentation.mode === "floatingGlass"
+          ? <TrendingMobileColorsEditor presentation={presentation} onChange={patchPresentation} />
+          : <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Selecciona Vitrina flotante en Plantilla para personalizar los colores de Pasarela en móvil.</p>}
       </div>
       <div className="rounded-2xl border border-neutral-200 bg-white p-4">
         <div className="text-sm font-semibold text-neutral-900 mb-2">Texto de todas las tarjetas</div>

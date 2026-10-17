@@ -105,10 +105,12 @@ export default function TrendingSection({ theme, previewProducts }) {
   }, []);
   const mobileRunway = floatingGlass && isMobile;
   const floatingTextStyle = (existing, color, fontSize) => floatingGlass ? { ...existing, color, ...(fontSize ? { fontSize } : {}) } : existing;
-  const sceneImage = presentation.backdropMode === "custom" ? presentation.backgroundImage
+  const mobileSolidBackground = mobileRunway && presentation.mobileBackgroundMode === "color";
+  const sceneImage = mobileSolidBackground ? "" : presentation.backdropMode === "custom" ? presentation.backgroundImage
     : presentation.backdropMode === "boutique" ? (mobileRunway ? runwayBackdrop : boutiqueBackdrop) : "";
   const floatingSectionStyle = floatingGlass ? {
     ...trendingPresentationVars(presentation),
+    ...(mobileSolidBackground ? { "--trending-background": presentation.mobileBackgroundColor } : {}),
     "--trending-scene-image": sceneImage ? `url("${sceneImage}")` : "none",
     ...(sceneImage ? {
       backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .22)), transparent 42%), linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,.12)), url("${sceneImage}")`,

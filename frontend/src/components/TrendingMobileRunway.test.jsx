@@ -150,4 +150,21 @@ describe('Pasarela móvil de En tendencia', () => {
     expect(screen.getByRole('img', { name: 'Vestido a rayas' })).toHaveAttribute('src', '/rayas.jpg');
     expect(document.querySelectorAll('.trending-runway__slide')).toHaveLength(1);
   });
+
+  it('aplica los colores móviles guardados y conserva el fondo y título del escritorio', async () => {
+    const { container } = render(view(theme({ presentation: { mode: 'floatingGlass',
+      mobileTitleColor: '#123456', mobilePriceColor: '#345678', mobileButtonColor: '#234567',
+      mobileFavoriteActiveColor: '#456789', mobileBackgroundMode: 'color', mobileBackgroundColor: '#eef1ff',
+      titleColor: '#654321', backgroundColor: '#ffeedd',
+    } })));
+    await screen.findByRole('link', { name: 'Ver producto' });
+    expect(container.querySelector('.trending-runway')).toHaveStyle({ '--runway-title': '#123456', '--runway-price': '#345678',
+      '--runway-button': '#234567', '--runway-favorite-active': '#456789' });
+    expect(container.querySelector('section')).toHaveStyle('--trending-background: #eef1ff');
+    expect(container.querySelector('section').style.backgroundImage).toBe('');
+    act(() => resize(1024));
+    expect(container.querySelector('section')).toHaveStyle('--trending-background: #ffeedd');
+    expect(screen.getByRole('heading', { name: 'EN TENDENCIA' })).toHaveStyle('color: #654321');
+    expect(container.querySelector('.trending-runway')).toBeNull();
+  });
 });
