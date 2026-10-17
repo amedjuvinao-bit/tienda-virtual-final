@@ -1,12 +1,14 @@
 // src/components/TrendingSection.jsx
 import { Star, Heart, ShoppingCart } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
 import { normalizeTrendingPresentation, trendingPresentationVars } from "./trendingPresentation";
 import boutiqueBackdrop from "../assets/trending-vitrine-boutique.webp";
+import runwayBackdrop from "../assets/trending-runway-mobile.webp";
+import TrendingMobileRunway from "./TrendingMobileRunway";
 import "./trendingFloatingGlass.css";
 
 function moneyCOP(value) {
@@ -90,9 +92,21 @@ export default function TrendingSection({ theme, previewProducts }) {
   }, [tendenciaSection]);
   const presentation = normalizeTrendingPresentation(config?.presentation);
   const floatingGlass = presentation.mode === "floatingGlass";
+  const viewportRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(() => Boolean(window.matchMedia?.("(max-width: 767px)")?.matches));
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 767px)");
+    if (!media) return undefined;
+    const update = () => setIsMobile(viewportRef.current?.clientWidth > 0
+      ? viewportRef.current.clientWidth < 768 : media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+  const mobileRunway = floatingGlass && isMobile;
   const floatingTextStyle = (existing, color, fontSize) => floatingGlass ? { ...existing, color, ...(fontSize ? { fontSize } : {}) } : existing;
   const sceneImage = presentation.backdropMode === "custom" ? presentation.backgroundImage
-    : presentation.backdropMode === "boutique" ? boutiqueBackdrop : "";
+    : presentation.backdropMode === "boutique" ? (mobileRunway ? runwayBackdrop : boutiqueBackdrop) : "";
   const floatingSectionStyle = floatingGlass ? {
     ...trendingPresentationVars(presentation),
     "--trending-scene-image": sceneImage ? `url("${sceneImage}")` : "none",
@@ -380,6 +394,18 @@ export default function TrendingSection({ theme, previewProducts }) {
   const productsToRender = shouldUseConfig && draftProducts.length
     ? draftProducts.map((product) => catalogById.get(product.id) || product)
     : catalogProducts;
+  const hasProducts = productsToRender.length > 0;
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element || !floatingGlass) return undefined;
+    // clientWidth is unscaled, so the admin's mobile canvas works inside a desktop window too.
+    const measure = () => { if (element.clientWidth > 0) setIsMobile(element.clientWidth < 768); };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasProducts, floatingGlass]);
 
   function buildCartPayload(product) {
     return {
@@ -406,8 +432,23 @@ export default function TrendingSection({ theme, previewProducts }) {
 
   if (!productsToRender.length) return null;
 
+  if (mobileRunway) return <section ref={viewportRef} className="relative overflow-hidden trending-section--floating-glass trending-section--mobile-runway"
+    style={floatingSectionStyle}>
+    <div className="trending-section__content">
+      {usingDraft && <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">
+        {remoteResult.key !== requestKey || remoteResult.status === "loading"
+          ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados."
+          : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}
+      </p>}
+      <TrendingMobileRunway key={productsToRender.map((product) => product.id).join("|")} products={productsToRender}
+        title={config?.title} titleImage={titleImage} presentation={presentation} fields={sectionStyle}
+        favoriteEnabled={actions.favorite.enabled} isFavorite={(product) => isFavorite(buildFavoritePayload(product))}
+        onFavorite={(product) => toggleFavorite(buildFavoritePayload(product))} />
+    </div>
+  </section>;
+
   return (
-    <section className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`} style={floatingSectionStyle}>
+    <section ref={viewportRef} className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`} style={floatingSectionStyle}>
       <div className={floatingGlass ? "trending-section__content max-w-6xl mx-auto px-4" : "max-w-6xl mx-auto px-4"}>
         {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
         <div className={floatingGlass ? "text-center mb-3" : "text-center mb-5"}>
