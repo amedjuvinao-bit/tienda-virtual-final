@@ -1,3 +1,4 @@
+import { normalizeLookSection } from '../look/lookSectionHelpers';
 // src/admin/appearance/sections/complementos/complementosSectionHelpers.js
 export const COMPLEMENTOS_SECTION_ID = "complementos";
 
@@ -11,6 +12,7 @@ export const COMPLEMENTOS_SECTION_DEFAULTS = {
   config: {
     imageSrc: "/complementos/cristal-floral-desktop.webp",
     mobileImageSrc: "/complementos/cristal-floral-mobile.webp",
+    sectionBackgroundImage: "",
     title: "Complementos",
     subtitle: "Detalles que hacen más especial cada historia",
     titleEnabled: true,
@@ -27,7 +29,10 @@ export const COMPLEMENTOS_SECTION_DEFAULTS = {
   },
 
   style: {
-    sectionMarginTopPx: 48,
+    sectionMarginTopPx: 32,
+    sectionPaddingBottomPx: 32,
+    sectionBackgroundMode: "continuity",
+    sectionBackgroundColor: "#f2d6d0",
     sectionPaddingXPx: 16,
     contentMaxWidthPx: 1440,
     layout: "frame",
@@ -135,6 +140,7 @@ export function normalizeComplementosSectionConfig(input = {}) {
     imageSrc: migratedDefault ? base.imageSrc : source,
     mobileImageSrc: asString(input?.mobileImageSrc,
       source === base.imageSrc || migratedDefault ? base.mobileImageSrc : "").trim(),
+    sectionBackgroundImage: asString(input?.sectionBackgroundImage, base.sectionBackgroundImage).trim(),
     title: asString(input?.title, base.title),
     subtitle: asString(input?.subtitle, base.subtitle),
     titleEnabled: asBool(input?.titleEnabled, base.titleEnabled),
@@ -325,6 +331,7 @@ export function safeComplementosHref(value) {
 }
 
 const FLORAL_RANGES = {
+  sectionPaddingBottomPx: [0, 160],
   titleFontSizePx: [20, 100], titleWeight: [100, 900], subtitleFontSizePx: [10, 28],
   subtitleLetterSpacingPx: [0, 6], contentWidthPercent: [25, 70], contentPaddingPx: [16, 80],
   contentGapPx: [4, 40], imagePositionX: [0, 100], imagePositionY: [0, 100],
@@ -343,14 +350,36 @@ function normalizeFloralStyle(input) {
     const value = input?.[key];
     output[key] = value == null || value === "" ? base[key] : clampNumber(value, min, max, base[key]);
   }
-  for (const key of ["titleColor", "subtitleColor", "titleFontFamily", "bannerBg", "frameColor", "overlayColor", "buttonBorderColor"]) {
+  for (const key of ["sectionBackgroundColor", "titleColor", "subtitleColor", "titleFontFamily", "bannerBg", "frameColor", "overlayColor", "buttonBorderColor"]) {
     output[key] = asString(input?.[key], base[key]) || base[key];
   }
   for (const [key, options] of Object.entries({
+    sectionBackgroundMode: ["continuity", "global", "custom", "color"],
     layout: ["frame", "immersive", "floating"], contentPosition: ["left", "center", "right"],
     contentAlign: ["left", "center", "right"], mobileContentPosition: ["top", "bottom"],
     mobileImageObjectFit: ["cover", "contain"],
   })) output[key] = options.includes(input?.[key]) ? input[key] : base[key];
   output.frameEnabled = asBool(input?.frameEnabled, base.frameEnabled);
   return output;
+}
+
+
+// Reuse the source section's current backdrop rather than freezing a copy in Complementos.
+export function resolveComplementosBackdrop(theme, section) {
+  const mode = section.style.sectionBackgroundMode;
+  if (mode === "global") return { color: theme?.colors?.background || "#ffffff", image: "", wash: 0 };
+  if (mode === "color" || mode === "custom") return {
+    color: section.style.sectionBackgroundColor,
+    image: mode === "custom" ? section.config.sectionBackgroundImage : "",
+    wash: 0,
+  };
+  const entries = Array.isArray(theme?.sections) ? theme.sections : [];
+  const source = entries.find((item) => item?.id === "look" || item?.type === "look");
+  const look = normalizeLookSection(source);
+  if (look.style.layoutPreset === "classic") return { color: source?.style?.bgColor || theme?.colors?.background || "#f2d6d0", image: "", wash: 0 };
+  return {
+    color: look.style.editorialBackgroundColor,
+    image: look.config.editorialBackgroundImage || "/looks-editorial-background.webp",
+    wash: 16,
+  };
 }

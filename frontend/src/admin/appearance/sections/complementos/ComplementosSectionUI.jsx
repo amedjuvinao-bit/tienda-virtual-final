@@ -40,11 +40,11 @@ export default function ComplementosSectionUI({ theme, setPath, uploadToCloudina
   const color = (key, label) => <ColorField key={key} label={label} value={s[key]} onChange={(v) => style({ [key]: v })} />;
   const choose = (key, label, options) => <Choice label={label} value={s[key]} options={options} onChange={(v) => style({ [key]: v })} />;
   return <div className="comp-editor">
-    <header className="comp-editor__intro"><Flower2 size={24} aria-hidden="true" /><div><h2>Complementos · Cristal floral</h2><p>Una imagen y un botón que abre la galería de esta categoría.</p></div></header>
+    <header className="comp-editor__intro"><Flower2 size={24} aria-hidden="true" /><div><h2>Complementos</h2><p>Una imagen y un botón que abre la galería de esta categoría.</p></div></header>
     <div className="comp-editor__preset"><Button kind="outline" onClick={() => commit({
       config: { ...COMPLEMENTOS_SECTION_DEFAULTS.config, linkHref: c.linkHref },
       style: { ...COMPLEMENTOS_SECTION_DEFAULTS.style },
-    })}>Aplicar diseño de mochila y lazo</Button><p className="comp-editor__hint">Carga la propuesta aprobada completa y conserva el enlace de tu galería.</p></div>
+    })}>Aplicar diseño predeterminado</Button><p className="comp-editor__hint">Restablece las imágenes y el diseño de la sección. Conserva el enlace de tu galería.</p></div>
     <SectionEditorSteps sectionName="Complementos" value={tab} onChange={setTab} items={[
       { value: 'contenido', label: 'Contenido', hint: 'Carga las imágenes, escribe los textos y elige la galería de destino.' },
       { value: 'estilos', label: 'Diseño', hint: 'Ajusta la composición y el cristal. Alterna Vista escritorio y Vista móvil en la vista previa.' },
@@ -53,11 +53,11 @@ export default function ComplementosSectionUI({ theme, setPath, uploadToCloudina
       <Card title="Visibilidad" hint="Los cambios se aplican a la tienda al pulsar Guardar cambios.">
         <Choice label="Sección en la tienda" value={section.enabled} options={[[true, 'Visible'], [false, 'Oculta']]} onChange={(enabled) => commit({ enabled })} />
       </Card>
-      <Card title="Imágenes del banner" icon={Image} hint="La mochila y el lazo están en la fotografía. Puedes sustituirla por cualquier imagen de tu colección.">
+      <Card title="Imágenes del banner" icon={Image} hint="Carga una imagen de tu colección para cada pantalla. Los textos y el botón se editan por separado.">
         <ComplementosImageField label="Imagen de escritorio" value={c.imageSrc} onChange={(imageSrc) => config({ imageSrc })} uploadToCloudinary={uploadToCloudinary} />
         <ComplementosImageField label="Imagen de móvil" value={c.mobileImageSrc} fallback={c.imageSrc} mobile onChange={(mobileImageSrc) => config({ mobileImageSrc })} uploadToCloudinary={uploadToCloudinary} />
         <Text label="Descripción de la imagen" value={c.imageAlt} onChange={(e) => config({ imageAlt: e.target.value })} />
-        <Button kind="outline" onClick={() => config({ imageSrc: COMPLEMENTOS_SECTION_DEFAULTS.config.imageSrc, mobileImageSrc: COMPLEMENTOS_SECTION_DEFAULTS.config.mobileImageSrc })}>Usar fotografía de mochila y lazo</Button>
+        <Button kind="outline" onClick={() => config({ imageSrc: COMPLEMENTOS_SECTION_DEFAULTS.config.imageSrc, mobileImageSrc: COMPLEMENTOS_SECTION_DEFAULTS.config.mobileImageSrc })}>Usar imágenes predeterminadas</Button>
       </Card>
       <Card title="Título y descripción" icon={Type} hint="Estos textos se editan aquí. Si tu imagen ya los incluye, puedes ocultarlos.">
         <Text label="Título" value={c.title} onChange={(e) => config({ title: e.target.value })} />
@@ -85,7 +85,12 @@ export default function ComplementosSectionUI({ theme, setPath, uploadToCloudina
           {range('contentWidthPercent', 'Espacio para el texto (%)', 25, 70)}
           {range('contentPaddingPx', 'Espacio interior (px)', 16, 80)}
           {range('contentGapPx', 'Separación entre elementos (px)', 4, 40)}
-          {range('sectionMarginTopPx', 'Separación superior (px)', 0, 200)}
+          {choose('sectionBackgroundMode', 'Fondo exterior de la sección', [['continuity', 'Continuar fondo de Looks'], ['global', 'Fondo general de la tienda'], ['custom', 'Imagen propia'], ['color', 'Color propio']])}
+          <p className="comp-editor__hint">El fondo cubre el espacio sobre el banner, los laterales y la parte inferior. Si cambias el fondo de Looks, la continuidad se actualiza automáticamente.</p>
+          {s.sectionBackgroundMode === 'custom' && <ComplementosImageField label="Fondo de la sección" value={c.sectionBackgroundImage} onChange={(sectionBackgroundImage) => config({ sectionBackgroundImage })} uploadToCloudinary={uploadToCloudinary} />}
+          {['custom', 'color'].includes(s.sectionBackgroundMode) && color('sectionBackgroundColor', 'Color del fondo exterior')}
+          {range('sectionMarginTopPx', 'Espacio superior con fondo (px)', 0, 200)}
+          {range('sectionPaddingBottomPx', 'Espacio inferior con fondo (px)', 0, 160)}
           {range('sectionPaddingXPx', 'Márgenes laterales de escritorio (px)', 0, 80)}
           {choose('imageObjectFit', 'Ajuste de la foto', [['cover', 'Llenar'], ['contain', 'Ver completa'], ['fill', 'Estirar']])}
           {range('imagePositionX', 'Encuadre horizontal (%)', 0, 100)}
@@ -144,7 +149,7 @@ export default function ComplementosSectionUI({ theme, setPath, uploadToCloudina
           <Button kind="outline" onClick={() => style({ buttonTintPercent: 8, buttonBlurPx: 2, buttonBg: '#ffffff', buttonBorderColor: '#fff4ee', buttonBorderPx: 1 })}>Restaurar cristal transparente</Button>
         </Card>
       </SectionEditorCardTabs>
-      <div className="comp-editor__restore"><Button kind="outline" onClick={() => style({ ...COMPLEMENTOS_SECTION_DEFAULTS.style })}>Restaurar diseño de cristal floral</Button><p>Conserva las imágenes, los textos y el enlace que elegiste.</p></div>
+      <div className="comp-editor__restore"><Button kind="outline" onClick={() => style({ ...COMPLEMENTOS_SECTION_DEFAULTS.style })}>Restaurar diseño predeterminado</Button><p>Conserva las imágenes, los textos y el enlace que elegiste.</p></div>
     </div>
   </div>;
 }

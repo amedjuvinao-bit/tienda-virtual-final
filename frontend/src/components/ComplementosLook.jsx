@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ArrowRight, ChevronRight, ChevronsRight, MoveRight, Sparkles, Flower2 } from 'lucide-react';
-import { COMPLEMENTOS_SECTION_DEFAULTS, normalizeComplementosSection, safeComplementosHref } from '../admin/appearance/sections/complementos/complementosSectionHelpers';
+import { COMPLEMENTOS_SECTION_DEFAULTS, normalizeComplementosSection, safeComplementosHref, resolveComplementosBackdrop } from '../admin/appearance/sections/complementos/complementosSectionHelpers';
 import './complementosLook.css';
 
 function Arrow({ variant }) {
@@ -24,7 +24,12 @@ export default function ComplementosLook({ theme, imageSrc }) {
   }, [theme, imageSrc]);
   const { config: c, style: s } = section;
   if (!section.enabled) return null;
+  const backdrop = resolveComplementosBackdrop(theme, section);
   const vars = {
+    "--comp-scene-color": backdrop.color,
+    "--comp-scene-image": backdrop.image ? `url(${JSON.stringify(backdrop.image)})` : "none",
+    "--comp-scene-wash": `${backdrop.wash}%`,
+    "--comp-bottom": `${s.sectionPaddingBottomPx}px`,
     '--comp-margin': `${s.sectionMarginTopPx}px`, '--comp-padding': `${s.sectionPaddingXPx}px`,
     '--comp-max': `${s.contentMaxWidthPx}px`, '--comp-width': `${s.imageWidthPercent}%`,
     '--comp-height': `${s.imageHeightPx}px`, '--comp-radius': `${s.imageRadiusPx}px`,

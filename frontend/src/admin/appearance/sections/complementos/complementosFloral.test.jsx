@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import ComplementosLook from '../../../../components/ComplementosLook';
 import ComplementosSectionUI from './ComplementosSectionUI';
 import StorefrontSectionPreview from '../ui/StorefrontSectionPreview';
-import { COMPLEMENTOS_SECTION_DEFAULTS as defaults, normalizeComplementosSection } from './complementosSectionHelpers';
+import { COMPLEMENTOS_SECTION_DEFAULTS as defaults, normalizeComplementosSection, resolveComplementosBackdrop } from './complementosSectionHelpers';
 afterEach(cleanup);
 function Harness({ onSave = () => {}, upload }) {
   const [theme, setTheme] = useState({ sections: [{ id: 'complementos', config: {} }, { id: 'look', config: { keep: true } }] });
@@ -57,7 +57,7 @@ describe('Complementos: banner floral editable', () => {
     const save = vi.fn(); render(<Harness onSave={save} />);
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi colección' } });
     design(); fireEvent.click(screen.getByRole('button', { name: 'Cristal flotante', exact: true }));
-    fireEvent.click(screen.getByRole('button', { name: 'Restaurar diseño de cristal floral' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar diseño predeterminado' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
     expect(save.mock.calls[0][0].sections[0]).toMatchObject({ config: { title: 'Mi colección' }, style: { layout: 'frame' } });
   });
@@ -91,4 +91,29 @@ describe('Complementos: banner floral editable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vista escritorio' }));
     await waitFor(() => expect(screen.getByText(/Escritorio 1280 px/)).toBeInTheDocument());
   });
+  it('actualiza el fondo exterior al cambiar el fondo de Looks', () => {
+    const section = normalizeComplementosSection({ style: { sectionMarginTopPx: 48 } });
+    const theme = (image) => ({ sections: [{ id: 'look', config: { editorialBackgroundImage: image }, style: { editorialBackgroundColor: '#ecc4cf' } }, section] });
+    const { container, rerender } = render(<ComplementosLook theme={theme('/fondo-original.webp')} />);
+    expect(container.querySelector('.complementos-look-section').style.getPropertyValue('--comp-scene-image')).toContain('/fondo-original.webp');
+    rerender(<ComplementosLook theme={theme('/fondo-actualizado.webp')} />);
+    expect(container.querySelector('.complementos-look-section').style.getPropertyValue('--comp-scene-image')).toContain('/fondo-actualizado.webp');
+    expect(container.querySelector('.complementos-look-section').style.getPropertyValue('--comp-scene-color')).toBe('#ecc4cf');
+  });
+  it('permite un fondo exterior propio o el fondo general sin modificar Looks', () => {
+    const theme = { colors: { background: '#e5aabc' }, sections: [{ id: 'look', config: { editorialBackgroundImage: '/looks.webp' } }] };
+    const snapshot = JSON.stringify(theme);
+    const own = normalizeComplementosSection({ config: { sectionBackgroundImage: '/propio.webp' }, style: { sectionBackgroundMode: 'custom', sectionBackgroundColor: '#aabbcc' } });
+    expect(resolveComplementosBackdrop(theme, own)).toEqual({ color: '#aabbcc', image: '/propio.webp', wash: 0 });
+    own.style.sectionBackgroundMode = 'global';
+    expect(resolveComplementosBackdrop(theme, own)).toEqual({ color: '#e5aabc', image: '', wash: 0 });
+    expect(JSON.stringify(theme)).toBe(snapshot);
+  });
+  it('ofrece controles genéricos para restablecer el diseño y sus imágenes', () => {
+    render(<Harness />);
+    expect(screen.getByRole('button', { name: 'Aplicar diseño predeterminado' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Usar imágenes predeterminadas' })).toBeInTheDocument();
+    expect(screen.queryByText(/mochila|lazo/i)).not.toBeInTheDocument();
+  });
+
 });
