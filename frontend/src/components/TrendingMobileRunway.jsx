@@ -129,6 +129,7 @@ export default function TrendingMobileRunway({ products, title, titleImage, pres
       {presentation.showDescription && fields.showDescription && !active.features?.length && active.description &&
         <p className="trending-runway__description">{active.description}</p>}
       <Link className="trending-runway__product-link trending-liquid-button" to={`/producto/${encodeURIComponent(active.id)}`}>
+        <span className="trending-liquid-button__glint" aria-hidden="true" />
         <ShoppingBag size={21} strokeWidth={1.5} aria-hidden="true" /><span>Ver producto</span>
       </Link>
     </div>

@@ -124,7 +124,7 @@ export default function TrendingMobileColorsEditor({ presentation, onChange, upl
       <span className="trending-mobile-colors__sample-meta">TALLAS Y COLORES <i>Talla</i></span>
       <span className="trending-mobile-colors__sample-description">Descripción del producto</span>
       <span className="trending-mobile-colors__sample-dots" aria-hidden="true"><i /><i /><i /></span>
-      <span className="trending-mobile-colors__sample-button trending-liquid-button"><ShoppingBag size={18} aria-hidden="true" />Ver producto</span>
+      <span className="trending-mobile-colors__sample-button trending-liquid-button"><span className="trending-liquid-button__glint" aria-hidden="true" /><ShoppingBag size={18} aria-hidden="true" />Ver producto</span>
     </div>
     <p className="trending-mobile-colors__note">Muestra de combinación. Para probar la sección completa con tus productos, pulsa «Vista móvil» en la vista previa.</p>
 
