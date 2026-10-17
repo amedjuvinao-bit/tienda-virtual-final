@@ -1,3 +1,4 @@
+import { normalizeComplementosSection } from './complementos/complementosSectionHelpers';
 // src/admin/appearance/sections/SectionsPanel.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CircleAlert, CircleCheck, CircleHelp, Eye, EyeOff, Heart, Images, Info, Music2, Pencil, Shirt, Sparkles } from 'lucide-react';
@@ -275,6 +276,8 @@ function normalizeSection(raw, index) {
   const type = inferTypeFromId(safe.type || id);
   const name = (typeof safe.name === "string" && safe.name.trim()) || inferNameFromId(id);
   const enabled = typeof safe.enabled === "boolean" ? safe.enabled : true;
+
+  if (type === "complementos") return normalizeComplementosSection({ ...safe, id, type, name, enabled });
 
   const style = {
     ...DEFAULT_STYLE,

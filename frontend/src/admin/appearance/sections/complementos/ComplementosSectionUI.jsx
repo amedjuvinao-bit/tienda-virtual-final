@@ -1,773 +1,150 @@
-// src/admin/appearance/sections/complementos/ComplementosSectionUI.jsx
-import React, { useMemo, useState } from "react";
-import {
-  ArrowRight,
-  ChevronRight,
-  ChevronsRight,
-  MoveRight,
-  Sparkles,
-} from "lucide-react";
-import { Button, Field, Input } from "../ui/UiComponents";
-import SectionEditorSteps from "../ui/SectionEditorSteps";
-import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
-import {
-  ColorField,
-  RangeNumberField,
-  ToggleChip,
-} from "../ui/SectionsPanelUI";
-import {
-  COMPLEMENTOS_SECTION_DEFAULTS,
-  normalizeComplementosSection,
-} from "./complementosSectionHelpers";
+import React, { useMemo, useRef, useState } from 'react';
+import { Flower2, Image, Type, Paintbrush, MousePointer2 } from 'lucide-react';
+import { Button, Input } from '../ui/UiComponents';
+import { ColorField, FontFamilyField } from '../ui/SectionsPanelUI';
+import SectionEditorSteps from '../ui/SectionEditorSteps';
+import SectionEditorCardTabs from '../ui/SectionEditorCardTabs';
+import ComplementosImageField from './ComplementosImageField';
+import { COMPLEMENTOS_SECTION_DEFAULTS, normalizeComplementosSection } from './complementosSectionHelpers';
+import './complementosEditor.css';
 
-function getComplementosSectionFromTheme(theme) {
-  const sections = Array.isArray(theme?.sections) ? theme.sections : [];
-  const found = sections.find((s) => {
-    const id = typeof s?.id === "string" ? s.id.trim().toLowerCase() : "";
-    const type = typeof s?.type === "string" ? s.type.trim().toLowerCase() : "";
-    return id === "complementos" || type === "complementos";
-  });
-
-  return normalizeComplementosSection(found || COMPLEMENTOS_SECTION_DEFAULTS);
+function Card({ title, icon: Icon, hint, children }) {
+  return <section className="comp-editor__card"><h3>{Icon && <Icon size={18} aria-hidden="true" />}{title}</h3>{hint && <p className="comp-editor__hint">{hint}</p>}<div className="comp-editor__fields">{children}</div></section>;
 }
-
-function updateSectionInTheme(theme, nextSection) {
-  const draft = structuredClone(theme || {});
-  if (!Array.isArray(draft.sections)) draft.sections = [];
-
-  const idx = draft.sections.findIndex((s) => {
-    const id = typeof s?.id === "string" ? s.id.trim().toLowerCase() : "";
-    const type = typeof s?.type === "string" ? s.type.trim().toLowerCase() : "";
-    return id === "complementos" || type === "complementos";
-  });
-
-  if (idx >= 0) {
-    draft.sections[idx] = normalizeComplementosSection(nextSection);
-  } else {
-    draft.sections.push(normalizeComplementosSection(nextSection));
-  }
-
-  return draft;
+function Text({ label, ...props }) { return <label className="comp-editor__field">{label}<Input {...props} /></label>; }
+function Slider({ label, value, onChange, min = 0, max = 100, step = 1 }) {
+  return <div className="comp-editor__field"><span>{label}</span><div className="comp-editor__range"><input type="range" aria-label={label} value={value} onChange={(e) => onChange(Number(e.target.value))} min={min} max={max} step={step} /><input type="number" aria-label={`${label} (valor)`} value={value} onChange={(e) => onChange(Number(e.target.value))} min={min} max={max} step={step} /></div></div>;
 }
-
-function getButtonAnimationPreviewStyle(animation) {
-  if (animation === "pulse") {
-    return { animation: "pulse 1.8s ease-in-out infinite" };
-  }
-
-  if (animation === "soft-float") {
-    return { animation: "floatY 3.2s ease-in-out infinite" };
-  }
-
-  return {};
+function Choice({ label, value, options, onChange }) {
+  return <div className="comp-editor__field"><span>{label}</span><div className="comp-editor__choices" role="group" aria-label={label}>{options.map(([id, name]) => <button type="button" key={String(id)} aria-pressed={value === id} onClick={() => onChange(id)}>{name}</button>)}</div></div>;
 }
+const yesNo = [[true, 'Mostrar'], [false, 'Ocultar']];
 
-function renderArrowPreview(styleName) {
-  switch (styleName) {
-    case "none":
-      return null;
-
-    case "chevron-right":
-      return <ChevronRight className="w-4 h-4 shrink-0" />;
-
-    case "double-chevron":
-      return <ChevronsRight className="w-4 h-4 shrink-0" />;
-
-    case "long-arrow":
-      return <MoveRight className="w-4 h-4 shrink-0" />;
-
-    case "spark-arrow":
-      return (
-        <span className="inline-flex items-center gap-1">
-          <Sparkles className="w-3.5 h-3.5 shrink-0" />
-          <ArrowRight className="w-4 h-4 shrink-0" />
-        </span>
-      );
-
-    case "minimal-line":
-      return <span className="text-[1em] leading-none">⟶</span>;
-
-    case "arrow-right":
-    default:
-      return <ArrowRight className="w-4 h-4 shrink-0" />;
-  }
-}
-
-export default function ComplementosSectionUI({
-  theme,
-  setPath,
-  uploadToCloudinary,
-}) {
-  const section = useMemo(() => getComplementosSectionFromTheme(theme), [theme]);
-  const [tab, setTab] = useState("contenido");
-  const [previewHover, setPreviewHover] = useState(false);
-
-  const config = section?.config || COMPLEMENTOS_SECTION_DEFAULTS.config;
-  const style = section?.style || COMPLEMENTOS_SECTION_DEFAULTS.style;
-
-  const setComplementosSection = (nextSection) => {
-    const safe = normalizeComplementosSection(nextSection);
-    const nextTheme = updateSectionInTheme(theme, safe);
-    setPath("sections", nextTheme.sections);
+export default function ComplementosSectionUI({ theme, setPath, uploadToCloudinary }) {
+  const section = useMemo(() => normalizeComplementosSection(theme?.sections?.find((s) => s.id === 'complementos' || s.type === 'complementos')), [theme]);
+  const latest = useRef({ theme, section });
+  latest.current = { theme, section };
+  const [tab, setTab] = useState('contenido');
+  const { config: c, style: s } = section;
+  const commit = (patch) => {
+    const { theme: currentTheme, section: current } = latest.current;
+    const next = normalizeComplementosSection({ ...current, ...patch, config: { ...current.config, ...patch.config }, style: { ...current.style, ...patch.style } });
+    const entries = [...(currentTheme?.sections || [])];
+    const index = entries.findIndex((item) => item.id === 'complementos' || item.type === 'complementos');
+    if (index < 0) entries.push(next); else entries[index] = next;
+    setPath('sections', entries);
   };
-
-  const patchConfig = (patch) => {
-    setComplementosSection({
-      ...section,
-      config: {
-        ...config,
-        ...patch,
-      },
-    });
-  };
-
-  const patchStyle = (patch) => {
-    setComplementosSection({
-      ...section,
-      style: {
-        ...style,
-        ...patch,
-      },
-    });
-  };
-
-  const resetComplementosDesign = () => {
-    setComplementosSection({
-      ...section,
-      style: structuredClone(COMPLEMENTOS_SECTION_DEFAULTS.style || {}),
-    });
-  };
-
-  const previewButtonStyle = {
-    left: `${style.buttonPosXPercent}%`,
-    top: `${style.buttonPosYPercent}%`,
-    background: previewHover ? style.buttonHoverBg : style.buttonBg,
-    color: previewHover ? style.buttonHoverTextColor : style.buttonTextColor,
-    borderRadius: style.buttonRadiusPx,
-    boxShadow: (() => {
-      if (previewHover && style.buttonHoverShadow) {
-        return "0 14px 30px rgba(0,0,0,0.20)";
-      }
-      return style.buttonShadow ? "0 10px 24px rgba(0,0,0,0.16)" : "none";
-    })(),
-    fontSize: style.buttonFontSizePx,
-    fontWeight: style.buttonFontWeight,
-    paddingLeft: style.buttonPx,
-    paddingRight: style.buttonPx,
-    paddingTop: style.buttonPy,
-    paddingBottom: style.buttonPy,
-    gap: style.buttonGapPx,
-    backdropFilter: "blur(4px)",
-    transform: previewHover
-      ? `translate(-50%, -50%) scale(${style.buttonHoverScale})`
-      : "translate(-50%, -50%) scale(1)",
-    transition:
-      "transform 220ms ease, background 220ms ease, color 220ms ease, box-shadow 220ms ease",
-    ...getButtonAnimationPreviewStyle(style.buttonAnimation),
-  };
-
-  return (
-    <div className="section-editor-workspace grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-4" data-tab={tab}>
-      <style>{`
-        @keyframes floatY {
-          0% { transform: translate(-50%, -50%) translateY(0px); }
-          50% { transform: translate(-50%, -50%) translateY(-6px); }
-          100% { transform: translate(-50%, -50%) translateY(0px); }
-        }
-      `}</style>
-
-      <div className="section-editor-workspace__controls space-y-4">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-base font-extrabold text-neutral-900">
-                Editor de sección Complementos
-              </div>
-              <div className="text-sm text-neutral-500 mt-1">
-                Configura imagen, botón, link, posición y estilos visuales del banner.
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <SectionEditorSteps value={tab} onChange={setTab} sectionName="Complementos" items={[
-                { value: "contenido", label: "Contenido", hint: "Carga la imagen, escribe el botón y define su destino." },
-                { value: "estilos", label: "Diseño", hint: "Ajusta posición, medidas, colores y efectos." },
-              ]} />
-
-              <Button
-                type="button"
-                kind="ghost"
-                onClick={resetComplementosDesign}
-                title="Restaurar solo el diseño original"
-              >
-                Reset
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {tab === "contenido" && (
-          <>
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-              <div className="text-sm font-extrabold text-neutral-900">
-                Datos principales
-              </div>
-
-              <Field label="Activa esta sección">
-                <div className="flex flex-wrap gap-2">
-                  <ToggleChip
-                    active={section.enabled !== false}
-                    onClick={() => setComplementosSection({ ...section, enabled: true })}
-                  >
-                    Activa
-                  </ToggleChip>
-                  <ToggleChip
-                    active={section.enabled === false}
-                    onClick={() => setComplementosSection({ ...section, enabled: false })}
-                  >
-                    Desactivada
-                  </ToggleChip>
-                </div>
-              </Field>
-
-              <Field
-                label="Imagen principal"
-                hint="Puedes usar una imagen subida o una ruta pública."
-              >
-                <div className="space-y-3">
-                  <Input
-                    value={config.imageSrc || ""}
-                    onChange={(e) => patchConfig({ imageSrc: e.target.value })}
-                    placeholder="/ImgComplementos/ComplementosBanner.png o https://..."
-                  />
-
-                  <div className="text-xs text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 rounded-xl px-3 py-2">
-                    {config.recommendedImageNote ||
-                      "Tamaño recomendado: 1600 x 500 px. Usa una imagen horizontal tipo banner."}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
-                      <span className="mr-1">Subir imagen</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file || !uploadToCloudinary) return;
-                          try {
-                            const url = await uploadToCloudinary(file);
-                            if (url) patchConfig({ imageSrc: url });
-                          } catch (err) {
-                            console.error("Error subiendo imagen de Complementos:", err);
-                          }
-                        }}
-                      />
-                    </label>
-
-                    {config.imageSrc ? (
-                      <div className="w-32 h-20 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-50">
-                        <img
-                          src={config.imageSrc}
-                          alt="Preview Complementos"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </Field>
-
-              <Field label="Texto de ayuda para la imagen">
-                <Input
-                  value={config.recommendedImageNote || ""}
-                  onChange={(e) =>
-                    patchConfig({ recommendedImageNote: e.target.value })
-                  }
-                  placeholder="Tamaño recomendado: 1600 x 500 px. Usa una imagen horizontal tipo banner."
-                />
-              </Field>
-
-              <Field label="Texto alternativo de la imagen">
-                <Input
-                  value={config.imageAlt || ""}
-                  onChange={(e) => patchConfig({ imageAlt: e.target.value })}
-                  placeholder="Complementos"
-                />
-              </Field>
-            </div>
-
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-              <div className="text-sm font-extrabold text-neutral-900">
-                Botón
-              </div>
-
-              <Field label="Mostrar botón">
-                <div className="flex flex-wrap gap-2">
-                  <ToggleChip
-                    active={config.buttonEnabled !== false}
-                    onClick={() => patchConfig({ buttonEnabled: true })}
-                  >
-                    Visible
-                  </ToggleChip>
-                  <ToggleChip
-                    active={config.buttonEnabled === false}
-                    onClick={() => patchConfig({ buttonEnabled: false })}
-                  >
-                    Oculto
-                  </ToggleChip>
-                </div>
-              </Field>
-
-              <Field label="Texto del botón">
-                <Input
-                  value={config.buttonText || ""}
-                  onChange={(e) => patchConfig({ buttonText: e.target.value })}
-                  placeholder="Conócelos"
-                />
-              </Field>
-
-              <Field label="Link del botón">
-                <Input
-                  value={config.linkHref || ""}
-                  onChange={(e) => patchConfig({ linkHref: e.target.value })}
-                  placeholder="/complementos"
-                />
-              </Field>
-            </div>
-          </>
-        )}
-
-        {tab === "estilos" && (
-          <SectionEditorCardTabs label="Diseño de Complementos" labels={['Espacio', 'Imagen', 'Botón y efectos']}>
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                Layout general
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-3">
-                <RangeNumberField
-                  label="Margen superior"
-                  min={0}
-                  max={200}
-                  step={1}
-                  value={style.sectionMarginTopPx}
-                  onChange={(v) => patchStyle({ sectionMarginTopPx: v })}
-                />
-
-                <RangeNumberField
-                  label="Padding horizontal"
-                  min={0}
-                  max={80}
-                  step={1}
-                  value={style.sectionPaddingXPx}
-                  onChange={(v) => patchStyle({ sectionPaddingXPx: v })}
-                />
-
-                <RangeNumberField
-                  label="Ancho máximo del bloque"
-                  min={320}
-                  max={1800}
-                  step={1}
-                  value={style.contentMaxWidthPx}
-                  onChange={(v) => patchStyle({ contentMaxWidthPx: v })}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                Imagen principal
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-3">
-                <RangeNumberField
-                  label="Ancho de imagen (%)"
-                  min={20}
-                  max={100}
-                  step={1}
-                  value={style.imageWidthPercent}
-                  onChange={(v) => patchStyle({ imageWidthPercent: v })}
-                />
-
-                <RangeNumberField
-                  label="Alto de imagen (px)"
-                  min={120}
-                  max={800}
-                  step={1}
-                  value={style.imageHeightPx}
-                  onChange={(v) => patchStyle({ imageHeightPx: v })}
-                />
-
-                <Field label="Ajuste de imagen">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleChip
-                      active={style.imageObjectFit === "cover"}
-                      onClick={() => patchStyle({ imageObjectFit: "cover" })}
-                    >
-                      Cover
-                    </ToggleChip>
-                    <ToggleChip
-                      active={style.imageObjectFit === "contain"}
-                      onClick={() => patchStyle({ imageObjectFit: "contain" })}
-                    >
-                      Contain
-                    </ToggleChip>
-                    <ToggleChip
-                      active={style.imageObjectFit === "fill"}
-                      onClick={() => patchStyle({ imageObjectFit: "fill" })}
-                    >
-                      Fill
-                    </ToggleChip>
-                  </div>
-                </Field>
-
-                <RangeNumberField
-                  label="Radio de bordes"
-                  min={0}
-                  max={48}
-                  step={1}
-                  value={style.imageRadiusPx}
-                  onChange={(v) => patchStyle({ imageRadiusPx: v })}
-                />
-
-                <RangeNumberField
-                  label="Grosor del borde"
-                  min={0}
-                  max={16}
-                  step={1}
-                  value={style.imageBorderPx}
-                  onChange={(v) => patchStyle({ imageBorderPx: v })}
-                />
-
-                <ColorField
-                  label="Color del borde"
-                  value={style.imageBorderColor}
-                  onChange={(v) => patchStyle({ imageBorderColor: v })}
-                />
-
-                <RangeNumberField
-                  label="Grosor del ring"
-                  min={0}
-                  max={16}
-                  step={1}
-                  value={style.ringWidthPx}
-                  onChange={(v) => patchStyle({ ringWidthPx: v })}
-                />
-
-                <ColorField
-                  label="Color del ring"
-                  value={style.ringColor}
-                  onChange={(v) => patchStyle({ ringColor: v })}
-                />
-
-                <Field label="Sombra">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleChip
-                      active={!!style.imageShadow}
-                      onClick={() => patchStyle({ imageShadow: true })}
-                    >
-                      Con sombra
-                    </ToggleChip>
-                    <ToggleChip
-                      active={!style.imageShadow}
-                      onClick={() => patchStyle({ imageShadow: false })}
-                    >
-                      Sin sombra
-                    </ToggleChip>
-                  </div>
-                </Field>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                Posición y estilo del botón
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-3">
-                <RangeNumberField
-                  label="Posición X (%)"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={style.buttonPosXPercent}
-                  onChange={(v) => patchStyle({ buttonPosXPercent: v })}
-                />
-
-                <RangeNumberField
-                  label="Posición Y (%)"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={style.buttonPosYPercent}
-                  onChange={(v) => patchStyle({ buttonPosYPercent: v })}
-                />
-
-                <ColorField
-                  label="Fondo botón"
-                  value={style.buttonBg}
-                  onChange={(v) => patchStyle({ buttonBg: v })}
-                />
-
-                <ColorField
-                  label="Texto botón"
-                  value={style.buttonTextColor}
-                  onChange={(v) => patchStyle({ buttonTextColor: v })}
-                />
-
-                <RangeNumberField
-                  label="Radio botón"
-                  min={0}
-                  max={32}
-                  step={1}
-                  value={style.buttonRadiusPx}
-                  onChange={(v) => patchStyle({ buttonRadiusPx: v })}
-                />
-
-                <Field label="Sombra botón">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleChip
-                      active={!!style.buttonShadow}
-                      onClick={() => patchStyle({ buttonShadow: true })}
-                    >
-                      Con sombra
-                    </ToggleChip>
-                    <ToggleChip
-                      active={!style.buttonShadow}
-                      onClick={() => patchStyle({ buttonShadow: false })}
-                    >
-                      Sin sombra
-                    </ToggleChip>
-                  </div>
-                </Field>
-
-                <RangeNumberField
-                  label="Tamaño texto botón"
-                  min={10}
-                  max={32}
-                  step={1}
-                  value={style.buttonFontSizePx}
-                  onChange={(v) => patchStyle({ buttonFontSizePx: v })}
-                />
-
-                <RangeNumberField
-                  label="Peso texto botón"
-                  min={100}
-                  max={900}
-                  step={100}
-                  value={style.buttonFontWeight}
-                  onChange={(v) => patchStyle({ buttonFontWeight: v })}
-                />
-
-                <RangeNumberField
-                  label="Padding horizontal botón"
-                  min={8}
-                  max={48}
-                  step={1}
-                  value={style.buttonPx}
-                  onChange={(v) => patchStyle({ buttonPx: v })}
-                />
-
-                <RangeNumberField
-                  label="Padding vertical botón"
-                  min={6}
-                  max={32}
-                  step={1}
-                  value={style.buttonPy}
-                  onChange={(v) => patchStyle({ buttonPy: v })}
-                />
-
-                <RangeNumberField
-                  label="Separación icono"
-                  min={0}
-                  max={24}
-                  step={1}
-                  value={style.buttonGapPx}
-                  onChange={(v) => patchStyle({ buttonGapPx: v })}
-                />
-
-                <ColorField
-                  label="Fondo botón hover"
-                  value={style.buttonHoverBg}
-                  onChange={(v) => patchStyle({ buttonHoverBg: v })}
-                />
-
-                <ColorField
-                  label="Texto botón hover"
-                  value={style.buttonHoverTextColor}
-                  onChange={(v) => patchStyle({ buttonHoverTextColor: v })}
-                />
-
-                <RangeNumberField
-                  label="Escala hover"
-                  min={1}
-                  max={1.3}
-                  step={0.01}
-                  value={style.buttonHoverScale}
-                  onChange={(v) => patchStyle({ buttonHoverScale: v })}
-                />
-
-                <Field label="Sombra hover">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleChip
-                      active={!!style.buttonHoverShadow}
-                      onClick={() => patchStyle({ buttonHoverShadow: true })}
-                    >
-                      Activa
-                    </ToggleChip>
-                    <ToggleChip
-                      active={!style.buttonHoverShadow}
-                      onClick={() => patchStyle({ buttonHoverShadow: false })}
-                    >
-                      Inactiva
-                    </ToggleChip>
-                  </div>
-                </Field>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                <Field label="Animación del botón">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleChip
-                      active={style.buttonAnimation === "none"}
-                      onClick={() => patchStyle({ buttonAnimation: "none" })}
-                    >
-                      Sin animación
-                    </ToggleChip>
-                    <ToggleChip
-                      active={style.buttonAnimation === "soft-float"}
-                      onClick={() => patchStyle({ buttonAnimation: "soft-float" })}
-                    >
-                      Flotación suave
-                    </ToggleChip>
-                    <ToggleChip
-                      active={style.buttonAnimation === "pulse"}
-                      onClick={() => patchStyle({ buttonAnimation: "pulse" })}
-                    >
-                      Pulse
-                    </ToggleChip>
-                  </div>
-                </Field>
-
-                <Field label="Estilo de flecha">
-                  <div className="flex flex-wrap gap-2">
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "none"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "none" })}
-                    >
-                      Sin flecha
-                    </ToggleChip>
-
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "arrow-right"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "arrow-right" })}
-                    >
-                      Clásica
-                    </ToggleChip>
-
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "long-arrow"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "long-arrow" })}
-                    >
-                      Larga
-                    </ToggleChip>
-
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "chevron-right"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "chevron-right" })}
-                    >
-                      Chevron
-                    </ToggleChip>
-
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "double-chevron"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "double-chevron" })}
-                    >
-                      Doble
-                    </ToggleChip>
-
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "spark-arrow"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "spark-arrow" })}
-                    >
-                      Elegante
-                    </ToggleChip>
-
-                    <ToggleChip
-                      active={style.buttonArrowStyle === "minimal-line"}
-                      onClick={() => patchStyle({ buttonArrowStyle: "minimal-line" })}
-                    >
-                      Minimal
-                    </ToggleChip>
-                  </div>
-                </Field>
-              </div>
-            </div>
-          </SectionEditorCardTabs>
-        )}
-      </div>
-
-      <div className="section-editor-workspace__preview space-y-4">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 sticky top-4">
-          <div className="text-base font-extrabold text-neutral-900 mb-3">
-            Vista previa Complementos
-          </div>
-
-          <div className="mb-3 text-xs text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 rounded-xl px-3 py-2">
-            {config.recommendedImageNote ||
-              "Tamaño recomendado: 1600 x 500 px. Usa una imagen horizontal tipo banner."}
-          </div>
-
-          <div
-            data-admin-storefront-preview="true"
-            className="mx-auto"
-            style={{
-              marginTop: style.sectionMarginTopPx,
-              paddingLeft: style.sectionPaddingXPx,
-              paddingRight: style.sectionPaddingXPx,
-              maxWidth: style.contentMaxWidthPx,
-            }}
-          >
-            <div className="relative">
-              <img
-                src={config.imageSrc}
-                alt={config.imageAlt || "Complementos"}
-                className="block mx-auto"
-                style={{
-                  width: `${style.imageWidthPercent}%`,
-                  height: `${style.imageHeightPx}px`,
-                  objectFit: style.imageObjectFit,
-                  borderRadius: style.imageRadiusPx,
-                  borderWidth: style.imageBorderPx,
-                  borderStyle: "solid",
-                  borderColor: style.imageBorderColor,
-                  boxShadow: style.imageShadow ? "0 25px 50px rgba(0,0,0,0.18)" : "none",
-                  outline: `${style.ringWidthPx}px solid ${style.ringColor}`,
-                  outlineOffset: "0px",
-                }}
-              />
-
-              {config.buttonEnabled ? (
-                <div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 inline-flex items-center uppercase"
-                  style={previewButtonStyle}
-                  onMouseEnter={() => setPreviewHover(true)}
-                  onMouseLeave={() => setPreviewHover(false)}
-                >
-                  <span>{config.buttonText || "Conócelos"}</span>
-                  {renderArrowPreview(style.buttonArrowStyle)}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-3 text-xs text-neutral-500">
-            Esta vista previa es referencial. Pasa el mouse sobre el botón para ver el hover.
-          </div>
-        </div>
-      </div>
+  const config = (patch) => commit({ config: patch });
+  const style = (patch) => commit({ style: patch });
+  const range = (key, label, min, max, step) => <Slider key={key} label={label} min={min} max={max} step={step} value={s[key]} onChange={(v) => style({ [key]: v })} />;
+  const color = (key, label) => <ColorField key={key} label={label} value={s[key]} onChange={(v) => style({ [key]: v })} />;
+  const choose = (key, label, options) => <Choice label={label} value={s[key]} options={options} onChange={(v) => style({ [key]: v })} />;
+  return <div className="comp-editor">
+    <header className="comp-editor__intro"><Flower2 size={24} aria-hidden="true" /><div><h2>Complementos · Cristal floral</h2><p>Una imagen y un botón que abre la galería de esta categoría.</p></div></header>
+    <div className="comp-editor__preset"><Button kind="outline" onClick={() => commit({
+      config: { ...COMPLEMENTOS_SECTION_DEFAULTS.config, linkHref: c.linkHref },
+      style: { ...COMPLEMENTOS_SECTION_DEFAULTS.style },
+    })}>Aplicar diseño de mochila y lazo</Button><p className="comp-editor__hint">Carga la propuesta aprobada completa y conserva el enlace de tu galería.</p></div>
+    <SectionEditorSteps sectionName="Complementos" value={tab} onChange={setTab} items={[
+      { value: 'contenido', label: 'Contenido', hint: 'Carga las imágenes, escribe los textos y elige la galería de destino.' },
+      { value: 'estilos', label: 'Diseño', hint: 'Ajusta la composición y el cristal. Alterna Vista escritorio y Vista móvil en la vista previa.' },
+    ]} />
+    <div hidden={tab !== 'contenido'} className="comp-editor__stack">
+      <Card title="Visibilidad" hint="Los cambios se aplican a la tienda al pulsar Guardar cambios.">
+        <Choice label="Sección en la tienda" value={section.enabled} options={[[true, 'Visible'], [false, 'Oculta']]} onChange={(enabled) => commit({ enabled })} />
+      </Card>
+      <Card title="Imágenes del banner" icon={Image} hint="La mochila y el lazo están en la fotografía. Puedes sustituirla por cualquier imagen de tu colección.">
+        <ComplementosImageField label="Imagen de escritorio" value={c.imageSrc} onChange={(imageSrc) => config({ imageSrc })} uploadToCloudinary={uploadToCloudinary} />
+        <ComplementosImageField label="Imagen de móvil" value={c.mobileImageSrc} fallback={c.imageSrc} mobile onChange={(mobileImageSrc) => config({ mobileImageSrc })} uploadToCloudinary={uploadToCloudinary} />
+        <Text label="Descripción de la imagen" value={c.imageAlt} onChange={(e) => config({ imageAlt: e.target.value })} />
+        <Button kind="outline" onClick={() => config({ imageSrc: COMPLEMENTOS_SECTION_DEFAULTS.config.imageSrc, mobileImageSrc: COMPLEMENTOS_SECTION_DEFAULTS.config.mobileImageSrc })}>Usar fotografía de mochila y lazo</Button>
+      </Card>
+      <Card title="Título y descripción" icon={Type} hint="Estos textos se editan aquí. Si tu imagen ya los incluye, puedes ocultarlos.">
+        <Text label="Título" value={c.title} onChange={(e) => config({ title: e.target.value })} />
+        <Choice label="Mostrar título" value={c.titleEnabled} options={yesNo} onChange={(titleEnabled) => config({ titleEnabled })} />
+        <label className="comp-editor__field">Descripción<textarea value={c.subtitle} onChange={(e) => config({ subtitle: e.target.value })} rows={3} /></label>
+        <Choice label="Mostrar descripción" value={c.subtitleEnabled} options={yesNo} onChange={(subtitleEnabled) => config({ subtitleEnabled })} />
+        <Choice label="Adorno floral" value={c.dividerEnabled} options={yesNo} onChange={(dividerEnabled) => config({ dividerEnabled })} />
+      </Card>
+      <Card title="Botón y galería" icon={MousePointer2}>
+        <Text label="Texto del botón" placeholder="Conócelos" value={c.buttonText} onChange={(e) => config({ buttonText: e.target.value })} />
+        <Text label="Enlace de la galería" placeholder="/complementos" value={c.linkHref} onChange={(e) => config({ linkHref: e.target.value })} />
+        <p className="comp-editor__hint">Usa /complementos para la galería actual o pega una dirección https:// completa.</p>
+        <Choice label="Mostrar botón" value={c.buttonEnabled} options={yesNo} onChange={(buttonEnabled) => config({ buttonEnabled })} />
+      </Card>
     </div>
-  );
+    <div hidden={tab !== 'estilos'}>
+      <SectionEditorCardTabs label="Diseño de Complementos" labels={['Composición', 'Textos y colores', 'Marco de cristal', 'Móvil', 'Botón y efectos']}>
+        <Card title="Composición de escritorio" icon={Paintbrush}>
+          {choose('layout', 'Presentación', [['frame', 'Marco de cristal'], ['immersive', 'Portada inmersiva'], ['floating', 'Cristal flotante']])}
+          {choose('contentPosition', 'Ubicación del texto', [['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']])}
+          {choose('contentAlign', 'Alineación del texto', [['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']])}
+          {range('imageHeightPx', 'Altura del banner (px)', 120, 800)}
+          {range('contentMaxWidthPx', 'Ancho máximo (px)', 320, 1800)}
+          {range('imageWidthPercent', 'Ancho del banner (%)', 20, 100)}
+          {range('contentWidthPercent', 'Espacio para el texto (%)', 25, 70)}
+          {range('contentPaddingPx', 'Espacio interior (px)', 16, 80)}
+          {range('contentGapPx', 'Separación entre elementos (px)', 4, 40)}
+          {range('sectionMarginTopPx', 'Separación superior (px)', 0, 200)}
+          {range('sectionPaddingXPx', 'Márgenes laterales de escritorio (px)', 0, 80)}
+          {choose('imageObjectFit', 'Ajuste de la foto', [['cover', 'Llenar'], ['contain', 'Ver completa'], ['fill', 'Estirar']])}
+          {range('imagePositionX', 'Encuadre horizontal (%)', 0, 100)}
+          {range('imagePositionY', 'Encuadre vertical (%)', 0, 100)}
+          {range('imageRadiusPx', 'Esquinas de escritorio (px)', 0, 48)}
+          {choose('imageShadow', 'Sombra del banner', [[true, 'Con sombra'], [false, 'Sin sombra']])}
+        </Card>
+        <Card title="Textos y colores" icon={Type}>
+          <FontFamilyField label="Tipografía del título y botón" value={s.titleFontFamily} onChange={(v) => style({ titleFontFamily: v })} />
+          {range('titleFontSizePx', 'Tamaño del título de escritorio (px)', 20, 100)}
+          {range('titleWeight', 'Grosor del título', 100, 900, 100)}
+          {range('subtitleFontSizePx', 'Tamaño de la descripción (px)', 10, 28)}
+          {range('subtitleLetterSpacingPx', 'Separación de letras (px)', 0, 6, .1)}
+          {color('titleColor', 'Color del título y adorno')}{color('subtitleColor', 'Color de la descripción')}
+          {color('bannerBg', 'Fondo detrás de la foto')}{color('overlayColor', 'Color sobre la foto')}
+          {range('overlayOpacity', 'Intensidad del color sobre la foto (%)', 0, 80)}
+        </Card>
+        <Card title="Marco de cristal">
+          {choose('frameEnabled', 'Marco interior', yesNo)}
+          {color('frameColor', 'Color del cristal')}{range('frameOpacity', 'Intensidad del marco (%)', 0, 100)}
+          {range('frameWidthPx', 'Grosor del marco (px)', 0, 4, .5)}{range('frameInsetPx', 'Distancia del marco al borde (px)', 0, 48)}
+          {range('imageBorderPx', 'Grosor del borde exterior (px)', 0, 16)}{color('imageBorderColor', 'Color del borde exterior')}
+          {range('ringWidthPx', 'Grosor del contorno exterior (px)', 0, 16)}{color('ringColor', 'Color del contorno exterior')}
+          <p className="comp-editor__hint">El panel de cristal se usa en la presentación Cristal flotante.</p>
+          {range('panelTintPercent', 'Tinte del panel flotante (%)', 0, 70)}{range('panelBlurPx', 'Desenfoque del panel flotante (px)', 0, 20)}
+        </Card>
+        <Card title="Diseño para móvil" hint="La imagen móvil se carga en Contenido → Imágenes del banner. Estos ajustes no cambian el escritorio.">
+          {range('mobileHeightPx', 'Altura móvil (px)', 360, 900)}
+          {choose('mobileContentPosition', 'Textos en móvil', [['bottom', 'Abajo'], ['top', 'Arriba']])}
+          {choose('mobileImageObjectFit', 'Ajuste de la foto móvil', [['cover', 'Llenar'], ['contain', 'Ver completa']])}
+          {range('mobileImagePositionX', 'Encuadre móvil horizontal (%)', 0, 100)}
+          {range('mobileImagePositionY', 'Encuadre móvil vertical (%)', 0, 100)}
+          {range('mobileTitleFontSizePx', 'Tamaño del título móvil (px)', 20, 64)}
+          {range('mobileSubtitleFontSizePx', 'Tamaño de la descripción móvil (px)', 10, 24)}
+          {range('mobileButtonFontSizePx', 'Tamaño del botón móvil (px)', 12, 24)}
+          {range('mobileContentPaddingPx', 'Espacio interior móvil (px)', 16, 48)}
+          {range('mobileSectionPaddingXPx', 'Márgenes laterales móviles (px)', 0, 32)}
+          {range('mobileImageRadiusPx', 'Esquinas móviles (px)', 0, 48)}
+        </Card>
+        <Card title="Botón de vidrio líquido" hint="Con un tinte bajo se ve la imagen a través del botón. El destello recorre el cristal automáticamente.">
+          {color('buttonBg', 'Color del tinte del botón')}{color('buttonTextColor', 'Color del texto del botón')}
+          {range('buttonTintPercent', 'Intensidad del tinte (%)', 0, 85)}{range('buttonBlurPx', 'Desenfoque del botón (px)', 0, 20)}
+          {color('buttonBorderColor', 'Color del borde del botón')}{range('buttonBorderPx', 'Grosor del borde del botón (px)', 0, 4, .5)}
+          {range('buttonRadiusPx', 'Redondeado del botón (px)', 0, 32)}
+          {range('buttonFontSizePx', 'Tamaño del texto del botón (px)', 10, 32)}{range('buttonFontWeight', 'Grosor del texto del botón', 100, 900, 100)}
+          {range('buttonPx', 'Espacio a los lados del botón (px)', 8, 48)}{range('buttonPy', 'Espacio arriba y abajo del botón (px)', 6, 32)}
+          {range('buttonGapPx', 'Separación de la flecha (px)', 0, 24)}
+          {choose('buttonArrowStyle', 'Flecha del botón', [['none', 'Sin flecha'], ['arrow-right', 'Clásica'], ['long-arrow', 'Larga'], ['chevron-right', 'Simple'], ['double-chevron', 'Doble'], ['spark-arrow', 'Con destello']])}
+          {choose('buttonAnimation', 'Animación del botón', [['none', 'Sin animación'], ['glint', 'Destello de cristal'], ['soft-float', 'Flotación suave'], ['pulse', 'Pulso']])}
+          {choose('buttonShadow', 'Sombra del botón', [[true, 'Con sombra'], [false, 'Sin sombra']])}
+          <details><summary>Al pasar el cursor</summary><div className="comp-editor__fields">
+            {color('buttonHoverBg', 'Tinte con el cursor')}{color('buttonHoverTextColor', 'Texto con el cursor')}
+            {range('buttonHoverScale', 'Ampliación con el cursor', 1, 1.3, .01)}
+            {choose('buttonHoverShadow', 'Sombra con el cursor', [[true, 'Con sombra'], [false, 'Sin sombra']])}
+          </div></details>
+          <Button kind="outline" onClick={() => style({ buttonTintPercent: 8, buttonBlurPx: 2, buttonBg: '#ffffff', buttonBorderColor: '#fff4ee', buttonBorderPx: 1 })}>Restaurar cristal transparente</Button>
+        </Card>
+      </SectionEditorCardTabs>
+      <div className="comp-editor__restore"><Button kind="outline" onClick={() => style({ ...COMPLEMENTOS_SECTION_DEFAULTS.style })}>Restaurar diseño de cristal floral</Button><p>Conserva las imágenes, los textos y el enlace que elegiste.</p></div>
+    </div>
+  </div>;
 }

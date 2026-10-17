@@ -1,3 +1,4 @@
+import { normalizeComplementosSection } from '../complementos/complementosSectionHelpers';
 import React, { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
 import { getSectionOverview } from '../sectionsOverviewModel';
 import './storefrontSectionPreview.css';
@@ -45,7 +46,8 @@ export default function StorefrontSectionPreview({ section, theme }) {
   const [viewMode, setViewMode] = useState('auto');
   const [frame, setFrame] = useState(() => ({ ...previewDevice(), scale: 1, height: 320 }));
   const sections = theme.sections || [];
-  const previewSections = sections.map((entry) => entry.id === section.id ? { ...entry, enabled: true } : entry);
+  const previewSections = sections.map((entry) => entry.id === section.id
+    ? { ...(section.id === 'complementos' ? normalizeComplementosSection(entry) : entry), enabled: true } : entry);
   const previewSection = previewSections.find((entry) => entry.id === section.id);
   const overview = getSectionOverview(previewSection, previewSections);
 
@@ -55,7 +57,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
     if (!viewport) return undefined;
 
     const measure = () => {
-      const device = previewDevice(section.id === 'tendencia' ? viewMode : 'auto');
+      const device = previewDevice(['tendencia', 'complementos'].includes(section.id) ? viewMode : 'auto');
       const availableWidth = viewport.clientWidth || device.width;
       const scale = Math.min(1, availableWidth / device.width);
       const height = Math.ceil(Math.max(260, canvas?.scrollHeight || 0) * scale);
@@ -105,7 +107,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
     <section className="section-real-preview" aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
         <div><span className="section-real-preview__eyebrow">Vista previa · {frame.label} {frame.width} px</span><h3>Así se verá en la tienda</h3></div>
-        {section.id === 'tendencia' && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
+        {['tendencia', 'complementos'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
           {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio']].map(([value, label]) =>
             <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)}>{label}</button>)}
         </div>}
