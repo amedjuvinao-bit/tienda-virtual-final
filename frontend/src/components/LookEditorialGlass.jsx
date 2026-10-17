@@ -19,8 +19,10 @@ function displayProductName(value) {
 export default function LookEditorialGlass({ config, style, products, mainImage, mainImageAlt, selectedId, onSelect,
   onCart, onFavorite, isFavorite, loading }) {
   const pausedRef = useRef(false);
+  const railShellRef = useRef(null);
   const [loadedHero, setLoadedHero] = useState({ src: "", ratio: "" });
   const [railIndex, setRailIndex] = useState(0);
+  const [railWidth, setRailWidth] = useState(() => typeof window === "undefined" ? 350 : Math.max(0, (window.innerWidth - 32) * .7));
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" &&
     Boolean(window.matchMedia?.("(max-width: 699px)").matches));
   const hasCover = config.heroMode === "custom" && Boolean(config.heroImage);
@@ -31,6 +33,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   // Keen needs more physical slides than the mobile viewport shows to keep a short loop filled.
   const mobileCopies = isMobile && canSlide ? Math.max(1, Math.ceil(8 / cardCount)) : 1;
   const visibleCards = Math.min(style.editorialVisibleCards === 2 ? 2 : 3, cardCount || 1);
+  const mobileVisibleCards = canSlide ? Math.min(2.5, Math.max(1.25, railWidth / 148)) : 1;
   const railOptions = useMemo(() => ({
     loop: canSlide,
     drag: canSlide,
@@ -38,12 +41,26 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
       "(max-width: 699px)": {
-        slides: { perView: canSlide ? 2.5 : 1, spacing: Math.max(8, Math.min(style.editorialCardGapPx, 12)) },
+        slides: { perView: mobileVisibleCards, spacing: Math.max(8, Math.min(style.editorialCardGapPx, 12)) },
       },
     },
     slideChanged(slider) { setRailIndex(slider.track.details.rel % Math.max(1, cardCount)); },
-  }), [canSlide, visibleCards, cardCount, style.editorialCardGapPx]);
+  }), [canSlide, visibleCards, mobileVisibleCards, cardCount, style.editorialCardGapPx]);
   const [railRef, railInstanceRef] = useKeenSlider(railOptions);
+
+  useEffect(() => {
+    const rail = railShellRef.current;
+    if (!rail) return undefined;
+    const updateWidth = () => {
+      const next = rail.getBoundingClientRect().width;
+      setRailWidth((current) => Math.abs(current - next) > .5 ? next : current);
+    };
+    updateWidth();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateWidth);
+    observer?.observe(rail);
+    window.addEventListener("resize", updateWidth);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", updateWidth); };
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 699px)");
@@ -66,7 +83,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   useEffect(() => {
     railInstanceRef.current?.update?.();
     setRailIndex((railInstanceRef.current?.track?.details?.rel || 0) % Math.max(1, cardCount));
-  }, [cardCount, isMobile, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
+  }, [cardCount, isMobile, railWidth, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
   const position = style.editorialRailPositionPercent;
@@ -178,7 +195,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
           fontWeight: style.descWeight }}>{config.description}</p>}
       </div>
 
-      <div className="look-editorial__rail" role="region" aria-roledescription="carrusel" aria-label="Productos del look" onMouseEnter={() => { pausedRef.current = true; }}
+      <div ref={railShellRef} className="look-editorial__rail" role="region" aria-roledescription="carrusel" aria-label="Productos del look" onMouseEnter={() => { pausedRef.current = true; }}
         onMouseLeave={() => { pausedRef.current = false; }} onFocusCapture={() => { pausedRef.current = true; }}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) pausedRef.current = false; }}>
         <div ref={railRef} className="look-editorial__cards keen-slider">
