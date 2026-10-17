@@ -5,6 +5,7 @@ export const CATEGORIAS_FAN_CONFIG = {
   useTitleImage: false, backgroundImage: '',
 };
 export const CATEGORIAS_FAN_STYLE = {
+  fanWidthMode: 'limited',
   fanColumns: 5, fanHeightPx: 380, fanGapPx: 12, fanSpreadDeg: 7, fanLiftPx: 22,
   fanHoverLiftPx: 20, fanExpand: 1.4, fanImageZoom: 1.06, fanRadiusPx: 24,
   fanMotionEnabled: true, fanParallax: true, fanGlint: true, fanShadow: true,
@@ -38,6 +39,7 @@ export function normalizeCategoriasFanStyle(input = {}) {
     else if (typeof fallback === 'boolean') next[key] = typeof value === 'boolean' ? value : fallback;
     else next[key] = typeof value === 'string' && value.trim() ? value : fallback;
   }
+  if (!['limited', 'full'].includes(next.fanWidthMode)) next.fanWidthMode = 'limited';
   next.fanColumns = Math.round(next.fanColumns);
   next.fanMobileColumns = Math.round(next.fanMobileColumns);
   if (!['continuity', 'custom', 'color', 'global'].includes(next.fanBackgroundMode)) next.fanBackgroundMode = 'continuity';

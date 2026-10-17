@@ -229,7 +229,7 @@ export function normalizeCategoriasSectionStyle(input = {}) {
     sectionMaxWidthPx: clampNumber(
       input?.sectionMaxWidthPx,
       480,
-      1800,
+      2560,
       base.sectionMaxWidthPx
     ),
     sectionPaddingTopPx: clampNumber(

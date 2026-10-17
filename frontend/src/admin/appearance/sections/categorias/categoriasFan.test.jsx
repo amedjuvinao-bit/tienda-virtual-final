@@ -197,7 +197,30 @@ describe('Categorías: Abanico vivo', () => {
     expect(screen.getByRole('slider', { name: 'Expansión al explorar' })).toBeVisible();
     expect(screen.queryByRole('slider', { name: 'Ancho máximo (px)' })).not.toBeInTheDocument();
     design('Espacios');
+    expect(screen.getByRole('slider', { name: 'Espacio superior (px)' })).toBeVisible();
+    design('Ancho');
     expect(screen.getByRole('slider', { name: 'Ancho máximo (px)' })).toBeVisible();
+  });
+  it('amplía la sección desde el panel y conserva el ancho personalizado al alternar modos', () => {
+    const save = vi.fn(); const { container } = render(<Harness save={save} />);
+    design('Ancho');
+    fireEvent.change(screen.getByRole('slider', { name: 'Ancho máximo (px)' }), { target: { value: '2200' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Espacio a los lados (px)' }), { target: { value: '0' } });
+    expect(container.querySelector('.categories-fan').style.getPropertyValue('--cat-max')).toBe('2200px');
+    fireEvent.click(screen.getByRole('button', { name: 'Ancho completo' }));
+    expect(screen.queryByRole('slider', { name: 'Ancho máximo (px)' })).not.toBeInTheDocument();
+    expect(container.querySelector('.categories-fan').style.getPropertyValue('--cat-max')).toBe('none');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    const saved = save.mock.calls[0][0];
+    expect(normalizeCategoriasSection(saved.sections[0]).style).toMatchObject({ fanWidthMode: 'full', sectionMaxWidthPx: 2200, sectionPaddingXPx: 0 });
+    fireEvent.click(screen.getByRole('button', { name: 'Ancho personalizado' }));
+    expect(screen.getByRole('slider', { name: 'Ancho máximo (px)' })).toHaveValue('2200');
+    expect(container.querySelector('.categories-fan').style.getPropertyValue('--cat-max')).toBe('2200px');
+    expect(saved.sections[0].config.slides).toEqual(normalizeCategoriasSection(makeTheme().sections[0]).config.slides);
+  });
+  it('mantiene los anchos guardados y descarta modos o límites inválidos', () => {
+    expect(normalizeCategoriasSection({ style: { sectionMaxWidthPx: 1600 } }).style).toMatchObject({ sectionMaxWidthPx: 1600, fanWidthMode: 'limited' });
+    expect(normalizeCategoriasSection({ style: { sectionMaxWidthPx: 10000, fanWidthMode: 'bad' } }).style).toMatchObject({ sectionMaxWidthPx: 2560, fanWidthMode: 'limited' });
   });
   it('permite comparar móvil y escritorio en la vista previa sin activar enlaces', async () => {
     const section = normalizeCategoriasSection(makeTheme().sections[0]);
@@ -207,6 +230,9 @@ describe('Categorías: Abanico vivo', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'Explorar Primera categoría' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Vista escritorio' }));
     expect(screen.getByText(/Escritorio 1280 px/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Vista escritorio amplio' }));
+    expect(screen.getByText(/Escritorio amplio 1920 px/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vista escritorio amplio' })).toHaveAttribute('aria-pressed', 'true');
   });
   it('muestra el título de texto si la imagen del título no carga', () => {
     const theme = makeTheme(); theme.sections[0].config.useTitleImage = true; theme.sections[0].config.titleImage = '/titulo-roto.png';

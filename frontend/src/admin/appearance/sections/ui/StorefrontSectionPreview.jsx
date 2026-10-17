@@ -33,6 +33,7 @@ class StorefrontPreviewBoundary extends React.Component {
 
 function previewDevice(mode = 'auto') {
   if (mode === 'mobile') return { width: 390, label: 'Móvil' };
+  if (mode === 'wide') return { width: 1920, label: 'Escritorio amplio' };
   if (mode === 'desktop') return { width: 1280, label: 'Escritorio' };
   if (typeof window === 'undefined') return { width: 1280, label: 'Escritorio' };
   if (window.innerWidth <= 767) return { width: 390, label: 'Móvil' };
@@ -108,7 +109,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
       <header className="section-real-preview__header">
         <div><span className="section-real-preview__eyebrow">Vista previa · {frame.label} {frame.width} px</span><h3>Así se verá en la tienda</h3></div>
         {['tendencia', 'complementos', 'categorias'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
-          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio']].map(([value, label]) =>
+          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio'], ...(section.id === 'categorias' ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
             <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)}>{label}</button>)}
         </div>}
       </header>

@@ -26,7 +26,7 @@ export default function CategoriasSection({ theme }) {
   for (let start = 0; start < visible.length; start += s.fanColumns) rows.push(visible.slice(start, start + s.fanColumns));
   const vars = {
     '--cat-scene-color': backdrop.color, '--cat-scene-image': backdrop.image ? `url(${JSON.stringify(backdrop.image)})` : 'none',
-    '--cat-scene-wash': `${s.fanBackgroundWash}%`, '--cat-max': `${s.sectionMaxWidthPx}px`,
+    '--cat-scene-wash': `${s.fanBackgroundWash}%`, '--cat-max': s.fanWidthMode === 'full' ? 'none' : `${s.sectionMaxWidthPx}px`,
     '--cat-padding-top': `${s.sectionPaddingTopPx}px`, '--cat-padding-bottom': `${s.sectionPaddingBottomPx}px`,
     '--cat-padding-x': `${s.sectionPaddingXPx}px`, '--cat-title': s.fanTitleColor, '--cat-text': s.fanTextColor,
     '--cat-font': s.fanTitleFont || 'var(--font-headings, Georgia, serif)', '--cat-title-size': `${s.fanTitleSizePx}px`, '--cat-title-weight': s.fanTitleWeight,

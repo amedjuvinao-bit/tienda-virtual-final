@@ -111,7 +111,13 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
       </SectionEditorCardTabs>
     </div>
     <div hidden={tab !== 'estilos'}>
-      <SectionEditorCardTabs label="Diseño de Categorías" labels={['Abanico', 'Movimiento', 'Espacios', 'Fondo', 'Textos', 'Cristal', 'Móvil', 'Textos móvil', 'Visibilidad']}>
+      <SectionEditorCardTabs label="Diseño de Categorías" labels={['Ancho', 'Abanico', 'Movimiento', 'Espacios', 'Fondo', 'Textos', 'Cristal', 'Móvil', 'Textos móvil', 'Visibilidad']}>
+        <DesignCard title="Ancho horizontal" hint="Amplía el contenido hacia ambos lados. El fondo siempre cubre toda la sección.">
+          {choice('fanWidthMode', 'Ancho de la sección', [['limited', 'Ancho personalizado'], ['full', 'Ancho completo']])}
+          {s.fanWidthMode === 'limited' && slider('sectionMaxWidthPx', 'Ancho máximo (px)', 480, 2560)}
+          {slider('sectionPaddingXPx', 'Espacio a los lados (px)', 0, 80)}
+          <p className="section-design-hint">Ancho completo aprovecha todo el espacio disponible. El ancho personalizado se adapta si la pantalla es más pequeña. Usa Vista escritorio amplio para comparar en una pantalla de 1920 px.</p>
+        </DesignCard>
         <DesignCard title="Forma del abanico" hint="Número de tarjetas, tamaño y apertura en escritorio.">
           {slider('fanColumns', 'Categorías por fila en escritorio', 2, 6)}
           {slider('fanHeightPx', 'Altura de las tarjetas (px)', 220, 580)}{slider('fanGapPx', 'Separación de tarjetas (px)', 4, 40)}
@@ -127,7 +133,6 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
         <DesignCard title="Tamaño y espacios" hint="Ajusta el contorno de las tarjetas y los márgenes de la sección.">
           {slider('fanRadiusPx', 'Redondeado de las tarjetas (px)', 0, 48)}
           {choice('imageObjectFit', 'Ajuste de imágenes cargadas', [['cover', 'Llenar tarjeta'], ['contain', 'Ver imagen completa']])}
-          {slider('sectionMaxWidthPx', 'Ancho máximo (px)', 480, 1800)}{slider('sectionPaddingXPx', 'Espacio a los lados (px)', 0, 80)}
           {slider('sectionPaddingTopPx', 'Espacio superior (px)', 0, 200)}{slider('sectionPaddingBottomPx', 'Espacio inferior (px)', 0, 160)}
         </DesignCard>
         <DesignCard title="Fondo de la sección" hint="El fondo cubre también los márgenes, para conservar la continuidad visual de la tienda.">
