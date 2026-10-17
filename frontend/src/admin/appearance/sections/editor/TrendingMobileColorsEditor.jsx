@@ -158,7 +158,18 @@ export default function TrendingMobileColorsEditor({ presentation, onChange, upl
       {GROUPS.map((item) => <button type="button" key={item.id} aria-pressed={groupId === item.id}
         onClick={() => setGroupId(item.id)}>{item.name}</button>)}
     </div>
-    {groupId === "button" && <p className="trending-mobile-colors__note">Vidrio líquido con transparencia, reflejos y desenfoque. El color de fondo tiñe el cristal; el otro color controla el texto y el icono.</p>}
+    {groupId === "button" && <div className="trending-mobile-colors__glass-controls">
+      <p className="trending-mobile-colors__note">El fondo se ve a través del cristal. Menos tinte y menos desenfoque conservan las ondas o los detalles de tu imagen.</p>
+      <label><span>Intensidad del tinte <strong>{Math.round(presentation.mobileButtonTintOpacity * 100)}%</strong></span>
+        <input type="range" aria-label="Intensidad del tinte del botón móvil" min="0" max="35" step="1"
+          value={Math.round(presentation.mobileButtonTintOpacity * 100)} onChange={(event) => onChange({ mobileButtonTintOpacity: Number(event.target.value) / 100 })} />
+      </label>
+      <label><span>Desenfoque del cristal <strong>{presentation.mobileButtonBlurPx} px</strong></span>
+        <input type="range" aria-label="Desenfoque del cristal del botón móvil" min="0" max="12" step="1"
+          value={presentation.mobileButtonBlurPx} onChange={(event) => onChange({ mobileButtonBlurPx: Number(event.target.value) })} />
+      </label>
+      <button type="button" className="trending-mobile-colors__reset" onClick={() => onChange({ mobileButtonTintOpacity: .08, mobileButtonBlurPx: 2 })}>Restaurar cristal transparente</button>
+    </div>}
     <div className="trending-mobile-colors__fields">{group.fields.map(colorField)}</div>
     {groupId === "text" && <p className="trending-mobile-colors__note">Las muestras de color de los productos conservan sus colores reales.
       {presentation.titleMode === "image" ? " El título es una imagen: su color se cambia editando esa imagen." : ""}</p>}

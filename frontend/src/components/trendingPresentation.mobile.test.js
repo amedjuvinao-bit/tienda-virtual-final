@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_TRENDING_MOBILE_COLORS, normalizeTrendingPresentation, trendingMobileColorsVars } from './trendingPresentation';
 
 describe('persistencia de colores de Pasarela', () => {
+  it('abre colores ya guardados con cristal transparente y limita el tinte para evitar un relleno opaco', () => {
+    const legacy = normalizeTrendingPresentation({ mobileButtonColor: '#ffffff' });
+    expect(trendingMobileColorsVars(legacy)).toMatchObject({ '--runway-button-rgb': '255, 255, 255', '--runway-button-tint': .08, '--runway-button-blur': '2px' });
+    const custom = normalizeTrendingPresentation({ mobileButtonTintOpacity: .15, mobileButtonBlurPx: 4 });
+    expect(normalizeTrendingPresentation(JSON.parse(JSON.stringify(custom)))).toMatchObject({ mobileButtonTintOpacity: .15, mobileButtonBlurPx: 4 });
+    expect(normalizeTrendingPresentation({ mobileButtonTintOpacity: 1, mobileButtonBlurPx: -2 })).toMatchObject({ mobileButtonTintOpacity: .35, mobileButtonBlurPx: 0 });
+  });
+
   it('preserva la imagen móvil al guardar y rechaza direcciones no admitidas', () => {
     const mobileBackgroundImage = 'https://res.cloudinary.com/tienda/image/upload/v1/movil.webp';
     const config = normalizeTrendingPresentation({ mobileBackgroundMode: 'custom', mobileBackgroundImage });

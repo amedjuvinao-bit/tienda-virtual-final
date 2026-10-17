@@ -32,6 +32,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('controles de colores móviles de Tendencia', () => {
+  it('permite ajustar el cristal con tinte blanco y recuperar la transparencia inicial', () => {
+    const save = vi.fn();
+    const panel = openColors(save);
+    fireEvent.click(within(panel).getByRole('button', { name: 'Botón', exact: true }));
+    change('Fondo del botón', '#ffffff');
+    fireEvent.change(screen.getByRole('slider', { name: 'Intensidad del tinte del botón móvil' }), { target: { value: '20' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Desenfoque del cristal del botón móvil' }), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(save.mock.lastCall[0].config.presentation).toMatchObject({ mobileButtonColor: '#ffffff', mobileButtonTintOpacity: .2, mobileButtonBlurPx: 6 });
+    expect(within(panel).getByRole('group', { name: 'Muestra de colores del móvil' })).toHaveStyle({ '--runway-button-tint': '0.2', '--runway-button-blur': '6px' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Restaurar cristal transparente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(save.mock.lastCall[0].config.presentation).toMatchObject({ mobileButtonColor: '#ffffff', mobileButtonTintOpacity: .08, mobileButtonBlurPx: 2 });
+  });
+
   it('carga, guarda y quita una imagen exclusiva del móvil sin perder cambios hechos durante la carga', async () => {
     const save = vi.fn();
     let finish;

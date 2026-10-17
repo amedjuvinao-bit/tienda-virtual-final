@@ -21,6 +21,8 @@ export const DEFAULT_TRENDING_PRESENTATION = Object.freeze({
   ...DEFAULT_TRENDING_MOBILE_COLORS,
   mobileBackgroundMode: "inherit",
   mobileBackgroundImage: "",
+  mobileButtonTintOpacity: 0.08,
+  mobileButtonBlurPx: 2,
   mode: "classic",
   backgroundColor: "#fff8f6",
   backgroundImage: "",
@@ -86,6 +88,7 @@ export function normalizeTrendingPresentation(raw) {
     ? input.mobileBackgroundImage : "";
   result.mobileBackgroundMode = ["color", "custom"].includes(input.mobileBackgroundMode) ? input.mobileBackgroundMode : "inherit";
   for (const [key, min, max] of [
+    ["mobileButtonTintOpacity", 0, 0.35], ["mobileButtonBlurPx", 0, 12],
     ["glowStrength", 0, 1], ["sceneDepth", 0, 1], ["sceneLight", 0, 1], ["sceneBlurPx", 0, 12],
     ["glassOpacity", 0.25, 1], ["blurPx", 0, 40],
     ["borderOpacity", 0, 1], ["borderWidthPx", 0, 4], ["shadowStrength", 0, 1],
@@ -123,6 +126,8 @@ export function trendingMobileColorsVars(value) {
     "--runway-description": config.mobileDescriptionColor,
     "--runway-button": config.mobileButtonColor,
     "--runway-button-rgb": hexToRgbTriplet(config.mobileButtonColor),
+    "--runway-button-tint": config.mobileButtonTintOpacity,
+    "--runway-button-blur": `${config.mobileButtonBlurPx}px`,
     "--runway-button-text": config.mobileButtonTextColor,
     "--runway-favorite": config.mobileFavoriteColor,
     "--runway-favorite-active": config.mobileFavoriteActiveColor,
