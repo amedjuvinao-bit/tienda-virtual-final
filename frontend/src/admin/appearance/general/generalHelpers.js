@@ -9,10 +9,12 @@ export const GLOBAL_DEFAULTS = {
     enabled: true,
     phone: "",
     message: "",
+    greeting: "¡Hola! ¿En qué podemos ayudarte?",
     position: "right", // right | left
     bottomPx: 24,
     sizePx: 56,
     bgColor: "#25D366",
+    showBackground: true,
 
     // ✅ personalización visual
     useCustomImage: false,
@@ -29,10 +31,11 @@ export const GLOBAL_DEFAULTS = {
     enabled: true,
     showUp: true,
     showDown: true,
-    offsetTopPx: 80, // 🔥 compensación header fijo
+    offsetTopPx: 80, // Reserva espacio para el encabezado solo al subir.
     behavior: "smooth", // smooth | auto
 
     // ✅ estilo general
+    visualStyle: "editorial", // editorial | crystal | contour | pearl
     position: "center", // left | center | right
     bottomPx: 24,
     gapPx: 16,
@@ -45,6 +48,7 @@ export const GLOBAL_DEFAULTS = {
     shadow: "soft", // none | soft | strong
 
     // ✅ animaciones
+    glassMotion: "", // vacío = sigue el efecto de la portada
     upAnimation: "moveUp", // none | moveUp | pulse | bounce
     downAnimation: "moveDown", // none | moveDown | pulse | bounce
 
@@ -204,4 +208,39 @@ export function getNextSectionIndex(currentIndex, sectionIds) {
 
 export function getPrevSectionIndex(currentIndex, sectionIds) {
   return (currentIndex - 1 + sectionIds.length) % sectionIds.length;
+}
+
+
+export const SECTION_CONTROL_STYLES = [
+  { value: "editorial", label: "Editorial", description: "Flechas finas sin fondo" },
+  { value: "crystal", label: "Cristal", description: "Vidrio configurable" },
+  { value: "contour", label: "Contorno", description: "Marco fino y transparente" },
+  { value: "pearl", label: "Perla", description: "Acabado suave y luminoso" },
+];
+
+export function resolveSectionControlStyle(value) {
+  return SECTION_CONTROL_STYLES.some((item) => item.value === value) ? value : "editorial";
+}
+
+export function getSectionControlPresetStyle(value, config = {}) {
+  const style = resolveSectionControlStyle(value);
+  const color = config.iconColor || "#D4AF37";
+  if (style === "editorial") return {
+    background: "transparent", border: "0", borderRadius: 0,
+    boxShadow: "none", backdropFilter: "none", WebkitBackdropFilter: "none", overflow: "visible",
+  };
+  if (style === "contour") return {
+    background: "rgba(255,255,255,.08)", border: `1px solid ${color}`,
+    borderRadius: 14, boxShadow: "inset 0 1px 0 rgba(255,255,255,.35)",
+  };
+  if (style === "pearl") return {
+    background: "linear-gradient(145deg, rgba(255,255,255,.94), rgba(255,233,242,.56))",
+    border: "1px solid rgba(255,255,255,.92)", borderRadius: 999,
+    boxShadow: "inset 0 2px 2px rgba(255,255,255,.92), 0 5px 15px rgba(96,39,79,.16)",
+  };
+  const shadow = config.shadow === "none" ? "none" : config.shadow === "strong" ? "0 12px 30px rgba(0,0,0,.28)" : "0 8px 20px rgba(0,0,0,.18)";
+  return {
+    border: `${Number(config.borderWidthPx ?? 2)}px solid ${config.borderColor || "#D4AF37"}`,
+    borderRadius: Number(config.borderRadiusPx ?? 999), boxShadow: shadow,
+  };
 }

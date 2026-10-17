@@ -1279,6 +1279,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/site-settings/appearance',
+    permission: 'appearance:view',
+    description: 'Consultar Apariencia con revisión para el editor.',
+  },
+  {
+    method: 'GET',
     path: '/api/admin/store-settings',
     permission: 'settings:store',
     description: 'Consultar los datos operativos del módulo Tienda.',

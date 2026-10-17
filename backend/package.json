@@ -46,6 +46,7 @@
     "migrate:admin-security-stage5-indexes": "node scripts/migrateAdminSecurityStage5Indexes.js",
     "migrate:admin-security-stage5-indexes:apply": "node scripts/migrateAdminSecurityStage5Indexes.js --apply",
     "test:configuration-level-plus-stage0": "node scripts/testConfigurationLevelPlusStage0.js",
+    "test:appearance-stage1": "node scripts/testAppearanceStage1.js",
     "test:admin-audit-logs-level-plus": "node scripts/testAdminAuditLogsLevelPlus.js",
     "test:configuration-level-plus-stage1": "node scripts/testConfigurationLevelPlusStage1.js",
     "test:configuration-level-plus-stage2": "node scripts/testConfigurationLevelPlusStage2.js",

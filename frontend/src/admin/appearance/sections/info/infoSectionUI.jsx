@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from "react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
 import { ColorField } from "../ui/SectionsPanelUI";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
 import {
   normalizeInfoSection,
   INFO_SECTION_ID,
@@ -34,31 +36,6 @@ function MiniStat({ label, value }) {
     <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
       <div className="text-[11px] uppercase tracking-wide text-neutral-500">{label}</div>
       <div className="text-sm font-semibold text-neutral-900 mt-1">{value}</div>
-    </div>
-  );
-}
-
-function SegmentedTabs({ value, onChange, items }) {
-  return (
-    <div className="inline-flex rounded-2xl border border-neutral-200 bg-white p-1 shadow-sm">
-      {items.map((item) => {
-        const active = value === item.value;
-        return (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => onChange(item.value)}
-            className={[
-              "px-4 py-2 rounded-xl text-sm font-medium transition",
-              active
-                ? "bg-neutral-900 text-white shadow-sm"
-                : "text-neutral-600 hover:bg-neutral-100",
-            ].join(" ")}
-          >
-            {item.label}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -110,7 +87,7 @@ function TextAreaField({ value, onChange, rows = 4, placeholder = "" }) {
 export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uploading }) {
   const sections = Array.isArray(theme?.sections) ? theme.sections : [];
 
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("contenido");
   const [openCardIndex, setOpenCardIndex] = useState(0);
 
   const selectedIndex = useMemo(() => {
@@ -198,23 +175,10 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
               <div className="text-lg font-semibold text-neutral-900 mt-1">
                 Información
               </div>
-              <div className="text-xs text-neutral-500 mt-1">
-                Editando: <b>{safeSection.id || INFO_SECTION_ID}</b> · Los cambios se guardan en{" "}
-                <code>theme.sections</code>
-              </div>
+              <div className="text-xs text-neutral-500 mt-1">Organiza textos, bloques y apariencia; revisa el resultado antes de guardar.</div>
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <SegmentedTabs
-                value={activeTab}
-                onChange={setActiveTab}
-                items={[
-                  { value: "general", label: "General" },
-                  { value: "contenido", label: "Contenido" },
-                  { value: "bloques", label: "Bloques" },
-                ]}
-              />
-
               <div className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2 min-w-[140px]">
                 <span className="text-sm font-medium text-neutral-700">Activa</span>
                 <Toggle
@@ -224,10 +188,27 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
               </div>
             </div>
           </div>
+          <div className="mt-3">
+            <SectionEditorSteps
+              value={activeTab === "bloques" ? "contenido" : activeTab}
+              onChange={setActiveTab}
+              sectionName="Información"
+              items={[
+                { value: "contenido", label: "Contenido", hint: "Escribe el título y configura los bloques de información." },
+                { value: "general", label: "Diseño", hint: "Ajusta dimensiones, tipografía, fondos e iconos." },
+              ]}
+            />
+            {["contenido", "bloques"].includes(activeTab) && (
+              <nav className="section-editor-substeps mt-2" aria-label="Opciones de contenido">
+                <button type="button" aria-pressed={activeTab === "contenido"} onClick={() => setActiveTab("contenido")}>Textos</button>
+                <button type="button" aria-pressed={activeTab === "bloques"} onClick={() => setActiveTab("bloques")}>Bloques</button>
+              </nav>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px,minmax(0,1fr)] gap-6 items-start">
+      <div className="section-info-editor grid grid-cols-1 xl:grid-cols-[minmax(380px,0.9fr)_minmax(0,1.1fr)] gap-4 items-start" data-tab={activeTab}>
         <div className="space-y-4 xl:sticky xl:top-28">
           <MiniStat label="Bloques" value={`${cards.length} configurados`} />
           <MiniStat label="Ancho" value={`${config.containerMaxWidth || 1200}px`} />
@@ -323,7 +304,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
 
         <div className="space-y-6">
           {activeTab === "general" ? (
-            <>
+            <SectionEditorCardTabs label="Diseño de Información" labels={['Contenedor', 'Fondo', 'Animación']}>
               <PanelCard
                 title="Contenedor"
                 subtitle="Medidas, borde, sombra y estructura general"
@@ -470,7 +451,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                   </div>
                 </div>
               </PanelCard>
-            </>
+            </SectionEditorCardTabs>
           ) : null}
 
           {activeTab === "contenido" ? (
@@ -541,7 +522,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                         className={[
                           "text-left rounded-2xl border px-4 py-3 transition shadow-sm",
                           active
-                            ? "border-neutral-900 bg-neutral-900 text-white"
+                            ? "section-editor-accent-border section-editor-accent text-white"
                             : "border-neutral-200 bg-white hover:border-neutral-400",
                         ].join(" ")}
                       >
@@ -573,7 +554,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                         className={[
                           "h-9 w-9 rounded-xl border text-sm font-semibold transition",
                           openCardIndex === index
-                            ? "bg-neutral-900 border-neutral-900 text-white"
+                            ? "section-editor-accent section-editor-accent-border text-white"
                             : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-400",
                         ].join(" ")}
                       >
@@ -614,7 +595,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                                 onChange={(e) => updateCard(openCardIndex, { iconUrl: e.target.value })}
                                 placeholder="https://..."
                               />
-                              <label className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl bg-neutral-900 text-white text-sm font-medium cursor-pointer hover:bg-neutral-800 transition shrink-0">
+                              <label className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl section-editor-accent text-white text-sm font-medium cursor-pointer section-editor-accent-hover transition shrink-0">
                                 <span>{uploading ? "Subiendo..." : "Subir imagen"}</span>
                                 <input
                                   type="file"
@@ -764,10 +745,6 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
             </>
           ) : null}
 
-          <div className="rounded-3xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-xs text-neutral-600">
-            Esta sección guarda sobre <code>theme.sections</code> usando el identificador real{" "}
-            <b>{INFO_SECTION_ID}</b>.
-          </div>
         </div>
       </div>
     </div>

@@ -25,6 +25,9 @@ import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAd
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
+import { mountStorefrontSectionMotion } from './lib/storefrontSectionMotion';
+import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
+import './storefrontSectionMotion.css';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
@@ -47,6 +50,7 @@ const DynamicPage = lazy(() => import('./pages/DynamicPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const Carrito = lazy(() => import('./pages/Carrito'));
 const Favoritos = lazy(() => import('./pages/Favoritos'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const Login = lazy(() => import('./admin/Login'));
@@ -116,24 +120,28 @@ function GlobalFloatingButtons({ theme }) {
   return (
     <>
       <WhatsAppButton config={theme?.global?.whatsapp} />
-      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} />}
+      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} buttonAnimation={theme?.banner?.templateConfigs?.[theme?.banner?.templateId]?.buttonAnimation} />}
     </>
   );
 }
 
 function Home({ theme }) {
+  const sectionsRef = useRef(null);
+
+  useEffect(() => mountStorefrontSectionMotion(sectionsRef.current), [theme]);
+
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div className="flex-grow">
+      <div ref={sectionsRef} className="storefront-sections min-w-0 max-w-full flex-grow overflow-x-clip">
         <section id="banner" className="w-full"><CarouselBanner /></section>
-        <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
-        <section id="look" className="w-full"><LookSection theme={theme} /></section>
-        <section id="complementos" className="w-full"><ComplementosLook theme={theme} imageSrc="/SeccionComplementos/Complementos.png" /></section>
-        <section id="categorias" className="w-full"><CategoriasSection theme={theme} /></section>
-        <section id="instagram" className="w-full"><InstagramSection theme={theme} posts={[]} /></section>
-        <section id="tiktok" className="w-full"><TiktokSection theme={theme} posts={[]} /></section>
-        <section id="informacion" className="w-full"><InformacionSection theme={theme} /></section>
+        {isStorefrontSectionVisible(theme, 'tendencia') && <section id="tendencia" className="storefront-section-shell w-full"><TrendingSection theme={theme} /></section>}
+        {isStorefrontSectionVisible(theme, 'look') && <section id="look" className="storefront-section-shell w-full"><LookSection theme={theme} /></section>}
+        {isStorefrontSectionVisible(theme, 'complementos') && <section id="complementos" className="storefront-section-shell w-full"><ComplementosLook theme={theme} imageSrc="/SeccionComplementos/Complementos.png" /></section>}
+        {isStorefrontSectionVisible(theme, 'categorias') && <section id="categorias" className="storefront-section-shell w-full"><CategoriasSection theme={theme} /></section>}
+        {isStorefrontSectionVisible(theme, 'instagram') && <section id="instagram" className="storefront-section-shell w-full"><InstagramSection theme={theme} posts={[]} /></section>}
+        {isStorefrontSectionVisible(theme, 'tiktok') && <section id="tiktok" className="storefront-section-shell w-full"><TiktokSection theme={theme} posts={[]} /></section>}
+        {isStorefrontSectionVisible(theme, 'informacion') && <section id="informacion" className="storefront-section-shell w-full"><InformacionSection theme={theme} /></section>}
         <section id="footer" className="w-full"><FooterSection theme={theme} /></section>
       </div>
     </div>
@@ -170,9 +178,7 @@ export default function App() {
           global: normalizeGlobalConfig(data.theme?.global),
         };
         setThemeFromServer(normalizedTheme);
-        console.log('theme.sections =', normalizedTheme?.sections);
         applyTheme(normalizedTheme);
-        console.log('Tema aplicado desde /api/site-settings');
       }
       succeeded = true;
       adminConnectionErrorLogged.current = false;
@@ -259,6 +265,7 @@ export default function App() {
                   <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/carrito" element={<Carrito />} />
                   <Route path="/favoritos" element={<Favoritos />} />
+                  <Route path="/buscar" element={<SearchResults theme={themeFromServer} />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
                   <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />

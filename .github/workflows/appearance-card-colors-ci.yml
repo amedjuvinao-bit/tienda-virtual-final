@@ -1,0 +1,40 @@
+name: Apariencia - persistencia de colores
+on:
+  push:
+    branches:
+      - feature/apariencia-nivel-plus
+  workflow_dispatch:
+
+jobs:
+  banner-card-colors:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:5000
+      - run: node scripts/testBannerCardColorPersistence.js
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://127.0.0.1:27017/appearance_ci

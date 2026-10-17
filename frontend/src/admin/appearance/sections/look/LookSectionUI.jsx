@@ -1,6 +1,6 @@
 // src/admin/appearance/sections/look/LookSectionUI.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Field, Input } from "../ui/UiComponents";
+import { Field, Input } from "../ui/UiComponents";
 import {
   ColorField,
   CardImageMover,
@@ -9,6 +9,8 @@ import {
   ToggleChip,
 } from "../ui/SectionsPanelUI";
 import LookProductPicker from "./LookProductPicker";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
 import {
   LOOK_MAX_PRODUCTS,
   LOOK_SECTION_DEFAULTS,
@@ -45,36 +47,6 @@ function updateSectionInTheme(theme, nextSection) {
   return draft;
 }
 
-function moneyCOP(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "$0";
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
-}
-
-function buildPreviewTextStyle(style, prefix, fallback = {}) {
-  const fontFamily =
-    typeof style?.[`${prefix}FontFamily`] === "string" && style[`${prefix}FontFamily`].trim()
-      ? style[`${prefix}FontFamily`].trim()
-      : fallback.fontFamily || "inherit";
-
-  const color =
-    typeof style?.[`${prefix}Color`] === "string" && style[`${prefix}Color`].trim()
-      ? style[`${prefix}Color`].trim()
-      : fallback.color || "inherit";
-
-  const sizePx = Number(style?.[`${prefix}SizePx`] ?? fallback.fontSize ?? 14);
-  const weight = Number(style?.[`${prefix}Weight`] ?? fallback.fontWeight ?? 400);
-
-  return {
-    fontFamily,
-    color,
-    fontSize: Number.isFinite(sizePx) ? sizePx : 14,
-    fontWeight: Number.isFinite(weight) ? weight : 400,
-    fontStyle: style?.[`${prefix}Italic`] ? "italic" : "normal",
-    textDecoration: style?.[`${prefix}Underline`] ? "underline" : "none",
-  };
-}
-
 export default function LookSectionUI({
   theme,
   setPath,
@@ -82,22 +54,16 @@ export default function LookSectionUI({
 }) {
   const section = useMemo(() => getLookSectionFromTheme(theme), [theme]);
   const [tab, setTab] = useState("contenido");
+  const [contentStep, setContentStep] = useState("principal");
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [heroError, setHeroError] = useState("");
 
   const style = section?.style || LOOK_SECTION_DEFAULTS.style;
   const config = section?.config || LOOK_SECTION_DEFAULTS.config;
 
   const selectedItems = Array.isArray(config.products) ? config.products : [];
   const selectedProductId = String(config.selectedProductId || "").trim();
-
-  const selectedPreviewItem = useMemo(() => {
-    if (!selectedItems.length) return null;
-
-    return (
-      selectedItems.find((p) => String(p?.productId || "").trim() === selectedProductId) ||
-      selectedItems[0] ||
-      null
-    );
-  }, [selectedItems, selectedProductId]);
 
   const safeThumbHeightPx = useMemo(() => {
     const n = Number(style?.thumbHeightPx);
@@ -146,12 +112,6 @@ export default function LookSectionUI({
     if (!Number.isFinite(n)) return 1;
     return Math.min(12, Math.max(0, n));
   }, [style?.mobileSliderControlSeparatorWidthPx]);
-
-  const safeAdminPreviewContentMaxWidth = useMemo(() => {
-    const n = Number(style?.contentMaxWidthPx);
-    if (!Number.isFinite(n)) return 680;
-    return Math.min(760, Math.max(320, n));
-  }, [style?.contentMaxWidthPx]);
 
   const setLookSection = (nextSection) => {
     const safe = normalizeLookSection(nextSection);
@@ -209,35 +169,47 @@ export default function LookSectionUI({
     setProducts(next);
   };
 
-  const titleTextStyle = useMemo(
-    () => buildPreviewTextStyle(style, "title", { fontSize: 28, fontWeight: 700, color: "#374151" }),
-    [style]
-  );
+  const uploadHero = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!uploadToCloudinary) {
+      setHeroError("No está disponible la carga de imágenes.");
+      return;
+    }
+    setUploadingHero(true);
+    setHeroError("");
+    try {
+      const url = await uploadToCloudinary(file);
+      if (!url || !normalizeLookSection({ config: { heroImage: url } }).config.heroImage) {
+        throw new Error("No se recibió una imagen válida. Inténtalo de nuevo.");
+      }
+      patchConfig({ heroImage: url, heroMode: "custom" });
+    } catch (error) {
+      setHeroError(error?.message || "No se pudo subir la imagen.");
+    } finally {
+      setUploadingHero(false);
+    }
+  };
 
-  const descTextStyle = useMemo(
-    () => buildPreviewTextStyle(style, "desc", { fontSize: 14, fontWeight: 400, color: "#374151" }),
-    [style]
-  );
-
-  const thumbTitleTextStyle = useMemo(
-    () =>
-      buildPreviewTextStyle(style, "thumbTitle", {
-        fontSize: 14,
-        fontWeight: 500,
-        color: "#1f2937",
-      }),
-    [style]
-  );
-
-  const thumbPriceTextStyle = useMemo(
-    () =>
-      buildPreviewTextStyle(style, "thumbPrice", {
-        fontSize: 14,
-        fontWeight: 500,
-        color: "#e11d48",
-      }),
-    [style]
-  );
+  const uploadBackground = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !uploadToCloudinary) return;
+    setUploadingBackground(true);
+    setHeroError("");
+    try {
+      const url = await uploadToCloudinary(file);
+      if (!normalizeLookSection({ config: { editorialBackgroundImage: url } }).config.editorialBackgroundImage) {
+        throw new Error("No se recibió una imagen de fondo válida.");
+      }
+      patchConfig({ editorialBackgroundImage: url });
+    } catch (error) {
+      setHeroError(error?.message || "No se pudo subir el fondo.");
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
 
   useEffect(() => {
     if (!selectedItems.length && config.selectedProductId) {
@@ -254,57 +226,99 @@ export default function LookSectionUI({
   }, [selectedItems, config.selectedProductId]);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.45fr)] gap-4">
-      <div className="space-y-4 min-w-0">
+    <div className="section-editor-workspace w-full min-w-0" data-tab={tab}>
+      <div className="section-editor-workspace__controls space-y-4 min-w-0">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-base font-extrabold text-neutral-900">Editor de sección LOOK</div>
               <div className="text-sm text-neutral-500 mt-1">
-                Configura título, descripción, productos, imagen principal dinámica y estilos visuales.
+                Elige la imagen grande, agrega productos y ajusta las fotos de sus tarjetas.
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                kind={tab === "contenido" ? "primary" : "ghost"}
-                onClick={() => setTab("contenido")}
-              >
-                Contenido
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "estilos" ? "primary" : "ghost"}
-                onClick={() => setTab("estilos")}
-              >
-                Estilos
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "slider-movil" ? "primary" : "ghost"}
-                onClick={() => setTab("slider-movil")}
-              >
-                Slider móvil
-              </Button>
-
-              <Button
-                type="button"
-                kind={tab === "acciones" ? "primary" : "ghost"}
-                onClick={() => setTab("acciones")}
-              >
-                Acciones
-              </Button>
-            </div>
+            <SectionEditorSteps value={["slider-movil", "acciones"].includes(tab) ? "estilos" : tab} onChange={setTab} sectionName="LOOK" items={[
+              { value: "contenido", label: "Contenido", hint: "Elige productos y define los textos e imágenes que mostrarás." },
+              { value: "estilos", label: "Diseño", hint: "Ajusta la apariencia, el slider móvil y los botones." },
+            ]} />
           </div>
         </div>
 
+        {["estilos", "slider-movil", "acciones"].includes(tab) && (
+          <nav className="section-editor-substeps" aria-label="Opciones de diseño">
+            {[{ value: "estilos", label: "Apariencia" }, ...(style.layoutPreset === "classic" ? [{ value: "slider-movil", label: "En móviles" }] : []), { value: "acciones", label: "Botones" }].map((item) => (
+              <button key={item.value} type="button" aria-pressed={tab === item.value} onClick={() => setTab(item.value)}>{item.label}</button>
+            ))}
+          </nav>
+        )}
+
         {tab === "contenido" && (
           <>
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">Datos principales</div>
+            <nav className="section-editor-substeps" aria-label="Editar contenido de Looks">
+              {[
+                { value: "principal", label: "1 · Imagen grande" },
+                { value: "products", label: `2 · Productos (${selectedItems.length})` },
+                { value: "photos", label: "3 · Fotos de tarjetas" },
+              ].map(({ value, label }) => (
+                <button key={value} type="button" aria-pressed={contentStep === value} onClick={() => setContentStep(value)}>{label}</button>
+              ))}
+            </nav>
+
+            {contentStep === "principal" && <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+              <div>
+                <h3 className="text-base font-extrabold text-neutral-900">Imagen grande al abrir Looks</h3>
+                <p className="mt-1 text-xs text-neutral-600">Puede ser una foto independiente del catálogo. También quedará como primera tarjeta de la galería para volver a verla al tocar una prenda.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Origen de la imagen grande">
+                <button type="button" aria-pressed={config.heroMode === "custom"} onClick={() => patchConfig({ heroMode: "custom" })}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${config.heroMode === "custom" ? "border-rose-500 bg-rose-50 text-rose-900" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                  Subir imagen propia
+                </button>
+                <button type="button" aria-pressed={config.heroMode !== "custom"} onClick={() => patchConfig({ heroMode: "product" })}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${config.heroMode !== "custom" ? "border-rose-500 bg-rose-50 text-rose-900" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                  Usar foto de producto
+                </button>
+              </div>
+              {config.heroMode === "custom" ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
+                  {config.heroImage ? <img src={config.heroImage} alt="Imagen principal elegida" className="h-24 w-20 rounded-lg object-cover" /> : <div className="flex h-24 w-20 items-center justify-center rounded-lg border border-dashed border-rose-200 text-xs text-neutral-500">Sin imagen</div>}
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <label className="inline-flex cursor-pointer rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700">
+                      {uploadingHero ? "Subiendo…" : config.heroImage ? "Cambiar imagen grande" : "Cargar imagen grande"}
+                      <input type="file" accept="image/*" aria-label="Cargar imagen grande" className="sr-only" disabled={uploadingHero} onChange={uploadHero} />
+                    </label>
+                    {config.heroImage ? <button type="button" onClick={() => patchConfig({ heroImage: "", heroMode: "product" })} className="ml-2 text-xs font-semibold text-rose-800 underline">Quitar imagen</button> : null}
+                    {heroError ? <p role="alert" className="text-xs text-red-700">{heroError}</p> : null}
+                    {!config.heroImage && !heroError ? <p className="text-xs text-neutral-600">Carga una foto para verla en la vista previa.</p> : null}
+                  </div>
+                </div>
+              ) : (
+                <Field label="Producto cuya foto se muestra al abrir">
+                  {selectedItems.length ? (
+                    <select className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm" value={selectedProductId}
+                      onChange={(event) => patchConfig({ selectedProductId: event.target.value })}>
+                      {selectedItems.map((item) => <option key={item.productId} value={item.productId}>{item.title || "Producto"}</option>)}
+                    </select>
+                  ) : <p className="text-sm text-neutral-600">Agrega productos en el paso 2 para elegir uno.</p>}
+                </Field>
+              )}
+            </div>}
+
+            {contentStep === "principal" && style.layoutPreset === "editorialGlass" && <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+              <h3 className="text-sm font-extrabold text-neutral-900">Mensaje junto a la foto</h3>
+              <Field label="Texto pequeño"><Input value={config.editorialEyebrow || ""} onChange={(e) => patchConfig({ editorialEyebrow: e.target.value })} /></Field>
+              <Field label="Título editorial"><Input value={config.editorialHeadline || ""} onChange={(e) => patchConfig({ editorialHeadline: e.target.value })} /></Field>
+              <Field label="Descripción de la sección"><textarea className="w-full min-h-[84px] rounded-xl border border-neutral-200 px-3 py-2 text-sm" value={config.description || ""}
+                onChange={(e) => patchConfig({ description: e.target.value })} placeholder="Texto descriptivo de la sección LOOK…" /></Field>
+              <Field label="Visibilidad"><div className="flex gap-2">
+                <ToggleChip active={section.enabled !== false} onClick={() => setLookSection({ ...section, enabled: true })}>Activa</ToggleChip>
+                <ToggleChip active={section.enabled === false} onClick={() => setLookSection({ ...section, enabled: false })}>Desactivada</ToggleChip>
+              </div></Field>
+            </div>}
+
+            {contentStep === "principal" && style.layoutPreset === "classic" && <details className="rounded-2xl border border-neutral-200 bg-white p-4">
+              <summary className="cursor-pointer text-sm font-extrabold text-neutral-900">Título, descripción y visibilidad</summary>
+              <div className="mt-4 space-y-3">
 
               <Field label="Activa esta sección">
                 <div className="flex flex-wrap gap-2">
@@ -335,7 +349,7 @@ export default function LookSectionUI({
                   />
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+                    <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
                       <span className="mr-1">Subir imagen</span>
                       <input
                         type="file"
@@ -386,9 +400,10 @@ export default function LookSectionUI({
                   placeholder="Texto descriptivo de la sección LOOK…"
                 />
               </Field>
-            </div>
+              </div>
+            </details>}
 
-            <LookProductPicker
+            {contentStep === "products" && <LookProductPicker
               title="Productos de la sección LOOK"
               value={selectedItems}
               maxItems={LOOK_MAX_PRODUCTS}
@@ -402,68 +417,18 @@ export default function LookSectionUI({
                   maxItems: LOOK_MAX_PRODUCTS,
                 });
               }}
-            />
+            />}
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                Producto inicial (imagen grande al cargar)
-              </div>
-
-              {!selectedItems.length ? (
-                <div className="text-sm text-neutral-500">
-                  Primero agrega productos arriba.
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {selectedItems.map((item, index) => {
-                    const pid = String(item?.productId || "").trim();
-                    const active = pid === selectedProductId;
-
-                    return (
-                      <button
-                        key={`${pid}_${index}`}
-                        type="button"
-                        onClick={() => patchConfig({ selectedProductId: pid })}
-                        className={[
-                          "rounded-xl border p-3 text-left transition",
-                          active
-                            ? "border-neutral-900 bg-neutral-900 text-white"
-                            : "border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900",
-                        ].join(" ")}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-14 h-14 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-50 shrink-0">
-                            {item?.mainImage ? (
-                              <img
-                                src={item.mainImage}
-                                alt={item.title || pid}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[10px] text-neutral-400">
-                                —
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold line-clamp-1">
-                              {item?.title || "Producto"}
-                            </div>
-                            <div className="text-xs opacity-80 line-clamp-1">{pid}</div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {!!selectedItems.length && (
+            {contentStep === "photos" && (selectedItems.length ? (
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                <div className="text-sm font-extrabold text-neutral-900 mb-3">
-                  Imágenes por producto
+                <h3 className="text-sm font-extrabold text-neutral-900">Fotos de las tarjetas</h3>
+                <p className="mb-3 mt-1 text-xs text-neutral-600">Selecciona una tarjeta y cambia su foto normal o la que aparece al pasar el cursor. La imagen grande independiente se edita en el paso 1.</p>
+                <div className="flex gap-2 overflow-x-auto pb-2" role="group" aria-label="Tarjeta para editar">
+                  {selectedItems.map((item) => <button key={item.productId} type="button" aria-pressed={item.productId === selectedProductId}
+                    onClick={() => patchConfig({ selectedProductId: item.productId })}
+                    className={`flex shrink-0 items-center gap-2 rounded-xl border p-2 text-left text-xs font-semibold ${item.productId === selectedProductId ? "border-rose-500 bg-rose-50 text-rose-950" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                    {item.mainImage ? <img src={item.mainImage} alt="" className="h-9 w-9 rounded-lg object-cover" /> : null}{item.title || "Producto"}
+                  </button>)}
                 </div>
 
                 <div className="space-y-4">
@@ -474,10 +439,10 @@ export default function LookSectionUI({
                       <div
                         key={`${pid}_${index}`}
                         className="rounded-xl border border-neutral-200 bg-neutral-50 p-3"
+                        hidden={pid !== selectedProductId}
                       >
-                        <div className="text-sm font-bold text-neutral-900 mb-2">
-                          {item?.title || "Producto"} · {pid}
-                        </div>
+                        <div className="text-sm font-bold text-neutral-900 mb-2">{item?.title || "Producto"}</div>
+                        {style.layoutPreset === "editorialGlass" && <p className="mb-2 text-xs text-neutral-600">Para que el producto flote sobre el cristal como en la referencia, carga aquí una imagen PNG o WebP con fondo transparente. La foto actual del catálogo se conserva hasta que la reemplaces.</p>}
 
                         <CardImageMover
                           productId={pid}
@@ -490,12 +455,63 @@ export default function LookSectionUI({
                   })}
                 </div>
               </div>
-            )}
+            ) : <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Agrega productos en el paso 2 para editar sus fotos.</div>)}
           </>
         )}
 
         {tab === "estilos" && (
-          <>
+          <SectionEditorCardTabs label="Diseño de Looks" labels={['Composición', 'Espacio', 'Textos', 'Imagen principal', 'Miniaturas']}>
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+              <div><h3 className="text-sm font-extrabold text-neutral-900">Composición de Looks</h3>
+                <p className="mt-1 text-xs text-neutral-600">El diseño editorial coloca la foto a la izquierda y las tarjetas en una franja de cristal que se superpone a su borde inferior. En móvil se apilan para conservar la lectura.</p></div>
+              <Field label="Diseño de la sección"><div className="flex flex-wrap gap-2">
+                <ToggleChip active={style.layoutPreset === "editorialGlass"} onClick={() => patchStyle({ layoutPreset: "editorialGlass" })}>Editorial de cristal</ToggleChip>
+                <ToggleChip active={style.layoutPreset === "classic"} onClick={() => patchStyle({ layoutPreset: "classic" })}>Diseño anterior</ToggleChip>
+              </div></Field>
+              {style.layoutPreset === "editorialGlass" && <>
+                <Field label="Imagen de fondo" hint="Puedes usar la textura incluida o cargar tu propio fondo en Cloudinary.">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900">
+                      {uploadingBackground ? "Subiendo…" : "Cargar fondo"}
+                      <input type="file" accept="image/*" aria-label="Cargar fondo de Looks" className="sr-only" disabled={uploadingBackground} onChange={uploadBackground} />
+                    </label>
+                    {config.editorialBackgroundImage && <button type="button" className="text-xs text-rose-900 underline" onClick={() => patchConfig({ editorialBackgroundImage: "" })}>Usar fondo incluido</button>}
+                    <img src={config.editorialBackgroundImage || "/looks-editorial-background.webp"} alt="Fondo seleccionado" className="h-12 w-24 rounded-lg object-cover" />
+                  </div>
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ColorField label="Color de fondo" value={style.editorialBackgroundColor} onChange={(v) => patchStyle({ editorialBackgroundColor: v })} />
+                  <ColorField label="Color del cristal" value={style.editorialGlassColor} onChange={(v) => patchStyle({ editorialGlassColor: v })} />
+                  <ColorField label="Texto editorial" value={style.editorialTextColor} onChange={(v) => patchStyle({ editorialTextColor: v })} />
+                  <ColorField label="Bordes e iconos" value={style.editorialAccentColor} onChange={(v) => patchStyle({ editorialAccentColor: v })} />
+                  <RangeNumberField label="Ancho máximo" min={1000} max={1800} step={10} value={style.editorialContentWidthPx} onChange={(v) => patchStyle({ editorialContentWidthPx: v })} />
+                  <RangeNumberField label="Tamaño del título" min={30} max={90} step={1} value={style.editorialHeadlineSizePx} onChange={(v) => patchStyle({ editorialHeadlineSizePx: v })} />
+                  <RangeNumberField label="Grosor del título" min={300} max={800} step={100} value={style.editorialTitleWeight} onChange={(v) => patchStyle({ editorialTitleWeight: v })} />
+                  <RangeNumberField label="Tamaño de la descripción" min={12} max={30} step={1} value={style.editorialDescriptionSizePx} onChange={(v) => patchStyle({ editorialDescriptionSizePx: v })} />
+                  <RangeNumberField label="Superposición de tarjetas (%)" min={0} max={22} step={1} value={style.editorialOverlapPercent} onChange={(v) => patchStyle({ editorialOverlapPercent: v })} />
+                  <RangeNumberField label="Posición horizontal del carrusel" hint="0 = izquierda · 100 = posición original · 150 = más a la derecha. En móvil se adapta al ancho." min={0} max={150} step={1} value={style.editorialRailPositionPercent} onChange={(v) => patchStyle({ editorialRailPositionPercent: v })} />
+                  <Field label="Tamaño de las tarjetas" hint="Equilibradas muestra más productos; amplias destaca cada foto sin ocupar toda la sección.">
+                    <div className="flex flex-wrap gap-2">
+                      <ToggleChip active={style.editorialVisibleCards === 3} onClick={() => patchStyle({ editorialVisibleCards: 3 })}>Equilibradas</ToggleChip>
+                      <ToggleChip active={style.editorialVisibleCards === 2} onClick={() => patchStyle({ editorialVisibleCards: 2 })}>Amplias</ToggleChip>
+                    </div>
+                  </Field>
+                  <RangeNumberField label="Espacio alrededor de cada producto" min={4} max={30} step={1} value={style.editorialCardGapPx} onChange={(v) => patchStyle({ editorialCardGapPx: v })} />
+                  <RangeNumberField label="Profundidad del cristal" min={0} max={100} step={1} value={style.editorialDepth} onChange={(v) => patchStyle({ editorialDepth: v })} />
+                  <RangeNumberField label="Opacidad del cristal (%)" min={0} max={90} step={1} value={style.editorialGlassOpacity} onChange={(v) => patchStyle({ editorialGlassOpacity: v })} />
+                  <RangeNumberField label="Desenfoque del cristal" min={0} max={40} step={1} value={style.editorialGlassBlurPx} onChange={(v) => patchStyle({ editorialGlassBlurPx: v })} />
+                </div>
+                <Field label="Encuadre de la foto grande" hint="Foto completa adapta el marco a cada imagen. Recortar llena la proporción elegida, pero puede ocultar bordes de la foto.">
+                  <div className="flex flex-wrap gap-2">
+                    <ToggleChip active={style.editorialHeroFit !== "crop"} onClick={() => patchStyle({ editorialHeroFit: "natural" })}>Foto completa</ToggleChip>
+                    <ToggleChip active={style.editorialHeroFit === "crop"} onClick={() => patchStyle({ editorialHeroFit: "crop" })}>Recortar</ToggleChip>
+                  </div>
+                  {style.editorialHeroFit === "crop" && <div className="mt-2 flex flex-wrap gap-2">{["1/1", "3/4", "4/5", "16/9"].map((aspect) =>
+                    <ToggleChip key={aspect} active={style.editorialHeroAspect === aspect} onClick={() => patchStyle({ editorialHeroAspect: aspect })}>{aspect}</ToggleChip>)}</div>}
+                </Field>
+              </>}
+              {heroError && <p role="alert" className="text-xs text-red-700">{heroError}</p>}
+            </div>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">Layout general</div>
 
@@ -527,7 +543,7 @@ export default function LookSectionUI({
                   onChange={(v) => patchStyle({ sectionPaddingXPx: v })}
                 />
 
-                <RangeNumberField
+                {style.layoutPreset === "classic" && <><RangeNumberField
                   label="Ancho máximo del bloque"
                   min={320}
                   max={1800}
@@ -561,14 +577,14 @@ export default function LookSectionUI({
                   step={0.1}
                   value={style.desktopRightRatio}
                   onChange={(v) => patchStyle({ desktopRightRatio: v })}
-                />
+                /></>}
               </div>
             </div>
 
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">Título y descripción</div>
 
-              <div className="grid md:grid-cols-2 gap-3 mb-4">
+              {style.layoutPreset === "classic" && <><div className="grid md:grid-cols-2 gap-3 mb-4">
                 <RangeNumberField
                   label="Ancho máximo imagen título"
                   min={80}
@@ -609,9 +625,12 @@ export default function LookSectionUI({
                     Derecha
                   </ToggleChip>
                 </div>
-              </Field>
+              </Field></>}
 
-              <div className="grid xl:grid-cols-2 gap-4 mt-4">
+              {style.layoutPreset === "editorialGlass" ? <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Fuente del título"><Input value={style.titleFontFamily || ""} onChange={(e) => patchStyle({ titleFontFamily: e.target.value })} placeholder="Georgia, serif" /></Field>
+                <Field label="Fuente de la descripción"><Input value={style.descFontFamily || ""} onChange={(e) => patchStyle({ descFontFamily: e.target.value })} placeholder="Fuente del tema" /></Field>
+              </div> : <div className="grid xl:grid-cols-2 gap-4 mt-4">
                 <TextStyleFields
                   title="Estilo del título"
                   prefix="title"
@@ -625,14 +644,14 @@ export default function LookSectionUI({
                   style={style}
                   onChange={patchStyle}
                 />
-              </div>
+              </div>}
             </div>
 
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">Imagen principal grande</div>
 
               <div className="grid md:grid-cols-2 gap-3">
-                <Field label="Proporción">
+                {style.layoutPreset === "classic" && <Field label="Proporción">
                   <div className="flex flex-wrap gap-2">
                     {["1/1", "3/4", "4/5", "16/9"].map((aspect) => (
                       <ToggleChip
@@ -644,7 +663,7 @@ export default function LookSectionUI({
                       </ToggleChip>
                     ))}
                   </div>
-                </Field>
+                </Field>}
 
                 <RangeNumberField
                   label="Radio de bordes"
@@ -692,7 +711,7 @@ export default function LookSectionUI({
             <div className="rounded-2xl border border-neutral-200 bg-white p-4">
               <div className="text-sm font-extrabold text-neutral-900 mb-3">Miniaturas y textos</div>
 
-              <div className="grid md:grid-cols-2 gap-3">
+              {style.layoutPreset === "classic" && <div className="grid md:grid-cols-2 gap-3">
                 <RangeNumberField
                   label="Columnas miniaturas (desktop)"
                   min={1}
@@ -796,25 +815,51 @@ export default function LookSectionUI({
                   value={style.colorDotBorderColor}
                   onChange={(v) => patchStyle({ colorDotBorderColor: v })}
                 />
-              </div>
+              </div>}
+
+              {style.layoutPreset === "editorialGlass" && <div className="grid gap-3 sm:grid-cols-2">
+                <RangeNumberField label="Radio de la vitrina de cristal" min={0} max={40} step={1} value={style.thumbRadiusPx} onChange={(v) => patchStyle({ thumbRadiusPx: v })} />
+                <RangeNumberField label="Ampliación de la foto al pasar" min={1} max={1.2} step={0.01} value={style.thumbHoverScale} onChange={(v) => patchStyle({ thumbHoverScale: v })} />
+                <Field label="Sombra de la vitrina"><div className="flex gap-2">
+                  <ToggleChip active={!!style.thumbShadow} onClick={() => patchStyle({ thumbShadow: true })}>Con sombra</ToggleChip>
+                  <ToggleChip active={!style.thumbShadow} onClick={() => patchStyle({ thumbShadow: false })}>Sin sombra</ToggleChip>
+                </div></Field>
+                <Field label="Transición de la foto grande" hint="Elige una opción y haz clic en una tarjeta de la vista previa para ver cómo entra su foto en el marco principal.">
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Transición de la foto grande">
+                    {[
+                      { value: "dissolve", label: "Fundido", detail: "Aparece suavemente" },
+                      { value: "float", label: "Deslizar", detail: "Entra desde abajo" },
+                      { value: "reveal", label: "Revelar", detail: "Se descubre de lado" },
+                      { value: "focus", label: "Enfoque", detail: "Se vuelve nítida" },
+                    ].map(({ value, label, detail }) => <button key={value} type="button"
+                      aria-pressed={style.editorialHeroTransition === value}
+                      onClick={() => patchStyle({ editorialHeroTransition: value })}
+                      className={`rounded-xl border px-3 py-2 text-left transition-colors ${style.editorialHeroTransition === value
+                        ? "border-rose-400 bg-rose-50 text-rose-950" : "border-neutral-200 bg-white text-neutral-700 hover:border-rose-200"}`}>
+                      <span className="block text-sm font-semibold">{label}</span>
+                      <span className="block text-xs opacity-75">{detail}</span>
+                    </button>)}
+                  </div>
+                </Field>
+              </div>}
 
               <div className="grid xl:grid-cols-2 gap-4 mt-4">
                 <TextStyleFields
-                  title="Texto nombre de miniatura"
+                  title="Nombre en las tarjetas"
                   prefix="thumbTitle"
                   style={style}
                   onChange={patchStyle}
                 />
 
                 <TextStyleFields
-                  title="Texto precio miniatura"
+                  title="Precio en las tarjetas"
                   prefix="thumbPrice"
                   style={style}
                   onChange={patchStyle}
                 />
               </div>
             </div>
-          </>
+          </SectionEditorCardTabs>
         )}
 
         {tab === "slider-movil" && (
@@ -1022,267 +1067,6 @@ export default function LookSectionUI({
         )}
       </div>
 
-      <div className="space-y-4 w-full xl:max-w-[560px] xl:ml-auto">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 sticky top-4">
-          <div className="text-base font-extrabold text-neutral-900 mb-3">Vista previa LOOK</div>
-
-          <div
-            data-admin-storefront-preview="true"
-            className="rounded-2xl border border-neutral-200 bg-white overflow-hidden"
-            style={{
-              paddingTop: style.sectionPaddingTopPx,
-              paddingBottom: style.sectionPaddingBottomPx,
-              paddingLeft: style.sectionPaddingXPx,
-              paddingRight: style.sectionPaddingXPx,
-            }}
-          >
-            <div
-              className="mx-auto grid grid-cols-1 md:grid-cols-[1.4fr_1fr] items-start"
-              style={{
-                maxWidth: safeAdminPreviewContentMaxWidth,
-                gap: style.contentGapPx,
-              }}
-            >
-              <div className="relative">
-                <div
-                  className={[
-                    style.mainImageAspect === "1/1"
-                      ? "aspect-square"
-                      : style.mainImageAspect === "4/5"
-                      ? "aspect-[4/5]"
-                      : style.mainImageAspect === "16/9"
-                      ? "aspect-video"
-                      : "aspect-[3/4]",
-                    "w-full overflow-hidden",
-                  ].join(" ")}
-                  style={{
-                    borderRadius: style.mainImageRadiusPx,
-                    borderWidth: style.mainImageBorderPx,
-                    borderStyle: "solid",
-                    borderColor: style.mainImageBorderColor,
-                    boxShadow: style.mainImageShadow ? "0 20px 40px rgba(0,0,0,0.12)" : "none",
-                  }}
-                >
-                  {selectedPreviewItem?.mainImage ? (
-                    <img
-                      src={selectedPreviewItem.mainImage}
-                      alt={selectedPreviewItem.title || "Producto seleccionado"}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-pink-50 flex items-center justify-center text-sm text-neutral-500">
-                      Selecciona un producto
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center w-full mt-6 md:mt-16">
-                <div
-                  className={`w-full mb-6 ${
-                    style.titleAlign === "left"
-                      ? "text-left"
-                      : style.titleAlign === "right"
-                      ? "text-right"
-                      : "text-center"
-                  }`}
-                >
-                  {config.titleImage ? (
-                    <div className="mb-2 px-1">
-                      <img
-                        src={config.titleImage}
-                        alt="Título look"
-                        className="mx-auto h-auto"
-                        style={{ maxWidth: style.titleImageWidthPx }}
-                      />
-                    </div>
-                  ) : config.titleText ? (
-                    <h2 style={titleTextStyle}>{config.titleText}</h2>
-                  ) : null}
-
-                  {config.description ? (
-                    <p className="max-w-xl mx-auto mt-2" style={descTextStyle}>
-                      {config.description}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div
-                  className="grid w-full"
-                  style={{
-                    gap: safeMobileSliderGapPx,
-                    gridTemplateColumns: `repeat(${style.thumbGridColsMobile}, minmax(0, 1fr))`,
-                    justifyItems: "center",
-                  }}
-                >
-                  {selectedItems.slice(0, LOOK_MAX_PRODUCTS).map((prod, i) => {
-                    const active =
-                      String(prod?.productId || "").trim() === String(selectedProductId || "").trim();
-
-                    return (
-                      <div
-                        key={`${prod?.productId || i}_${i}`}
-                        className="w-full"
-                        style={{ maxWidth: safeThumbCardMaxWidthPx }}
-                      >
-                        <div
-                          className="relative transition-transform duration-300"
-                          style={{
-                            transform: active
-                              ? `scale(${style.thumbHoverScale}) rotate(${style.thumbHoverRotateDeg}deg)`
-                              : "scale(1) rotate(0deg)",
-                          }}
-                        >
-                          <div
-                            className="w-full overflow-hidden"
-                            style={{
-                              height: safeThumbHeightPx,
-                              borderRadius: style.thumbRadiusPx,
-                              boxShadow: style.thumbShadow ? "0 10px 24px rgba(0,0,0,0.12)" : "none",
-                            }}
-                          >
-                            {prod?.mainImage ? (
-                              <img
-                                src={prod.mainImage}
-                                alt={prod.title || "Producto"}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-neutral-100 flex items-center justify-center text-[10px] text-neutral-400">
-                                Sin imagen
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="absolute top-2 right-2 flex flex-col items-center space-y-2 overflow-visible">
-                            {config?.actions?.favorite?.enabled !== false ? (
-                              <button
-                                type="button"
-                                className="relative group p-1 rounded-full shadow focus:outline-none"
-                                style={{
-                                  backgroundColor: style.actionButtonBg,
-                                  border: `1px solid ${style.actionButtonBorderColor}`,
-                                }}
-                              >
-                                <span
-                                  className="block w-5 h-5 rounded-full"
-                                  style={{ color: style.actionFavoriteColor }}
-                                >
-                                  ★
-                                </span>
-                              </button>
-                            ) : null}
-
-                            {config?.actions?.cart?.enabled !== false ? (
-                              <button
-                                type="button"
-                                className="relative group p-1 rounded-full shadow focus:outline-none"
-                                style={{
-                                  backgroundColor: style.actionButtonBg,
-                                  border: `1px solid ${style.actionButtonBorderColor}`,
-                                }}
-                              >
-                                <span
-                                  className="block w-5 h-5 rounded-full"
-                                  style={{ color: style.actionCartColor }}
-                                >
-                                  🛒
-                                </span>
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="mt-2 text-center">
-                          <p style={thumbTitleTextStyle}>{prod?.title || "Producto"}</p>
-
-                          <div className="flex justify-center space-x-2 mt-1">
-                            <span
-                              className="rounded-full border-2 border-neutral-300"
-                              style={{
-                                width: style.colorDotSizePx,
-                                height: style.colorDotSizePx,
-                                backgroundColor: "#ffffff",
-                              }}
-                            />
-                            <span
-                              className="rounded-full border-2"
-                              style={{
-                                width: style.colorDotSizePx,
-                                height: style.colorDotSizePx,
-                                backgroundColor: "#fce7f3",
-                                borderColor: style.colorDotBorderColor,
-                              }}
-                            />
-                          </div>
-
-                          <p className="mt-1" style={thumbPriceTextStyle}>
-                            {moneyCOP(0)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {selectedItems.length ? (
-                  <div
-                    className="inline-flex items-center overflow-hidden"
-                    style={{
-                      marginTop: safeMobileSliderControlMarginTopPx,
-                      backgroundColor: style.mobileSliderControlBg || "#ffffff",
-                      border: `1px solid ${style.mobileSliderControlBorderColor || "#d4d4d8"}`,
-                      borderRadius: safeMobileSliderControlRadiusPx,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="flex items-center justify-center text-sm font-semibold"
-                      style={{
-                        width: safeMobileSliderControlButtonWidthPx,
-                        height: safeMobileSliderControlButtonHeightPx,
-                        color: style.mobileSliderControlIconColor || "#111827",
-                      }}
-                    >
-                      ←
-                    </button>
-
-                    <div
-                      style={{
-                        width: safeMobileSliderControlSeparatorWidthPx,
-                        height: Math.max(16, safeMobileSliderControlButtonHeightPx - 10),
-                        backgroundColor: style.mobileSliderControlSeparatorColor || "#d4d4d8",
-                      }}
-                    />
-
-                    <button
-                      type="button"
-                      className="flex items-center justify-center text-sm font-semibold"
-                      style={{
-                        width: safeMobileSliderControlButtonWidthPx,
-                        height: safeMobileSliderControlButtonHeightPx,
-                        color: style.mobileSliderControlIconColor || "#111827",
-                      }}
-                    >
-                      →
-                    </button>
-                  </div>
-                ) : null}
-
-                {!selectedItems.length ? (
-                  <div className="mt-4 text-sm text-neutral-500 text-center">
-                    Agrega productos para ver la galería de LOOK.
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 text-xs text-neutral-500">
-            Esta vista previa es referencial. La imagen grande cambia según el producto inicial seleccionado.
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

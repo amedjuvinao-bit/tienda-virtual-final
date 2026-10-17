@@ -473,6 +473,31 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/catalog-categories', async (_req, res) => {
+  try {
+    const [catalog, facets] = await Promise.all([
+      listProductTaxonomies(),
+      listPublicProductFacets({ ProductModel: Product }),
+    ]);
+    const categories = catalog.categories.map((item) => ({
+      id: item._id,
+      name: item.name,
+      path: item.path,
+      image: item.image,
+    }));
+    const known = new Set(categories.map((item) => item.name.toLocaleLowerCase('es')));
+    for (const name of facets.categories) {
+      if (!known.has(name.toLocaleLowerCase('es'))) {
+        categories.push({ id: `legacy:${name}`, name, path: name, image: '' });
+      }
+    }
+    return res.json({ ok: true, categories });
+  } catch (error) {
+    console.error('Error al obtener categorías del catálogo:', error?.code || error?.name || 'CATALOG_CATEGORIES_FAILED');
+    return res.status(500).json({ ok: false, message: 'No se pudieron cargar las categorías del catálogo.' });
+  }
+});
+
 router.get('/meta', async (_req, res) => {
   try {
     const facets = await listPublicProductFacets({ ProductModel: Product });

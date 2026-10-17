@@ -141,6 +141,8 @@ function inMemoryFetchPage({ options, skip, limit }) {
   if (options.q) {
     rows = rows.filter((product) => [
       product.title,
+      product.category,
+      ...(product.categories || []),
       product.sku,
       product.barcode,
       ...(product.variants || []).flatMap((variant) => [variant.sku, variant.barcode]),
@@ -240,6 +242,13 @@ async function run() {
   await test('busqueda por nombre', async () => {
     const result = await page({ q: 'vestido' });
     assert.deepEqual(result.products.map((item) => item._id), ['02']);
+  });
+
+  await test('busqueda por categoria pública', async () => {
+    const result = await page({ q: 'calzado' });
+    assert.deepEqual(result.products.map((item) => item._id), ['03']);
+    const filter = buildPublicProductListFilter(parsePublicProductListQuery({ q: 'calzado' }));
+    assert.equal(filter.$and[0].$or.some((clause) => clause.category?.test?.('Calzado')), true);
   });
 
   await test('busqueda por SKU de producto', async () => {

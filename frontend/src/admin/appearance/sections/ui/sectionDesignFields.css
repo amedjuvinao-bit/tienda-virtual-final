@@ -1,0 +1,18 @@
+.section-design-card { min-width:0; padding:18px; border:1px solid var(--admin-card-border,#ebcbd9); border-radius:16px; color:var(--admin-card-text,#502b40); background:var(--admin-card-bg,#fff8fc); }
+.section-design-card h3 { margin:0; font-size:15px; font-weight:750; }
+.section-design-fields { display:grid; gap:18px; margin-top:18px; }
+.section-design-hint { font-size:12px; line-height:1.6; margin:6px 0 0; }
+.section-design-field { display:grid; gap:8px; min-width:0; font-size:13px; font-weight:600; }
+.section-design-range { display:grid; grid-template-columns:minmax(0,1fr) 82px; gap:14px; align-items:center; }
+.section-design-range input[type="range"] { width:100%; accent-color:var(--admin-primary,#a84e79); }
+.section-design-range input[type="number"] { width:100%; padding:8px; border:1px solid var(--admin-input-border,#e6cbd7); border-radius:9px; background:var(--admin-input-bg,#fff); color:var(--admin-input-text,#502b40); }
+.section-design-choices { display:flex; flex-wrap:wrap; gap:7px; }
+.section-design-choices button { min-height:40px; padding:8px 12px; border:1px solid var(--admin-card-border,#e6bfd1); border-radius:12px; color:var(--admin-card-text,#773653); background:var(--admin-card-bg,#fff6fa); font-size:12px; }
+.section-design-choices [aria-pressed="true"] { background:var(--admin-button-bg,#9c3c69); border-color:var(--admin-button-bg,#9c3c69); color:var(--admin-button-text,#fff); }
+.section-design-upload { display:grid; gap:12px; min-width:0; padding:14px; border:1px solid var(--admin-card-border,#ebcfdd); border-radius:14px; }
+.section-design-upload__preview { position:relative; width:150px; height:190px; overflow:hidden; border-radius:14px; margin-inline:auto; }
+.section-design-upload__preview>img { width:100%; height:100%; object-fit:cover; }
+.section-design-upload__button { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; min-height:44px; padding:10px; border:1px dashed var(--admin-primary,#c879a0); border-radius:12px; background:var(--admin-primary-soft-bg,#fff1f8); color:var(--admin-primary-soft-text,#86315b); font-size:13px; cursor:pointer; }
+.section-design-upload__button input { max-width:100%; font-size:11px; }
+.section-design-error { color:#a12743; font-size:12px; }
+.section-design-card button:focus-visible,.section-design-card input:focus-visible { outline:2px solid var(--admin-primary,#b14f81); outline-offset:3px; }

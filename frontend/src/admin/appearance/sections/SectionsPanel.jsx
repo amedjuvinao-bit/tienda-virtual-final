@@ -1,5 +1,8 @@
+import { normalizeCategoriasSection } from './categorias/categoriasSectionHelpers';
+import { normalizeComplementosSection } from './complementos/complementosSectionHelpers';
 // src/admin/appearance/sections/SectionsPanel.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { CircleAlert, CircleCheck, CircleHelp, Eye, EyeOff, Heart, Images, Info, Music2, Pencil, Shirt, Sparkles } from 'lucide-react';
 import api from "../../../lib/api";
 import LookSectionUI from "./look/LookSectionUI";
 import ComplementosSectionUI from "./complementos/ComplementosSectionUI";
@@ -7,6 +10,15 @@ import CategoriasSectionUI from "./categorias/CategoriasSectionUI";
 import InstagramSectionUI from "./instagram/InstagramSectionUI";
 import TiktokSectionUI from "./tiktok/TiktokSectionUI";
 import InfoSectionUI from "./info/infoSectionUI";
+import { getSectionOverview } from './sectionsOverviewModel';
+import './sectionsOverview.css';
+import SectionEditorSteps from './ui/SectionEditorSteps';
+import SectionEditorCardTabs from './ui/SectionEditorCardTabs';
+import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
+import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
+import { normalizeTrendingPresentation } from '../../../components/trendingPresentation';
+import boutiqueBackdrop from '../../../assets/trending-vitrine-boutique.webp';
+import TrendingMobileColorsEditor from './editor/TrendingMobileColorsEditor';
 
 import { Button, Field, Input, Toggle } from "./ui/UiComponents";
 import {
@@ -19,7 +31,6 @@ import {
 
 import {
   SectionBadge,
-  TabButton,
   ModalShell,
   ColorField,
   CardImageMover,
@@ -85,9 +96,30 @@ const SECTION_CATALOG = [
   { id: "instagram", label: "Instagram — instagram" },
   { id: "tiktok", label: "TikTok — tiktok" },
   { id: "informacion", label: "Información — informacion" },
-  { id: "separador1", label: "Separador 1 — separador1" },
-  { id: "separador2", label: "Separador 2 — separador2" },
-  { id: "newsletter", label: "Newsletter — newsletter" },
+];
+
+const OVERVIEW_ICONS = {
+  tendencia: Sparkles,
+  look: Shirt,
+  complementos: Heart,
+  categorias: Images,
+  instagram: Images,
+  tiktok: Music2,
+  informacion: Info,
+};
+
+const OVERVIEW_STATUS = {
+  ready: { label: 'Configurada', icon: CircleCheck },
+  'needs-content': { label: 'Falta contenido', icon: CircleAlert },
+  hidden: { label: 'Oculta', icon: EyeOff },
+  unsupported: { label: 'Sin editor', icon: CircleHelp },
+};
+
+const OVERVIEW_FILTERS = [
+  { id: 'all', label: 'Todas' },
+  { id: 'ready', label: 'Configuradas' },
+  { id: 'needs-content', label: 'Por completar' },
+  { id: 'hidden', label: 'Ocultas' },
 ];
 
 // -----------------------------------------------------------------------------
@@ -216,6 +248,7 @@ function normalizeTendenciaConfigPlus(raw) {
     watermarkPosXPct: clampNumber(watermarkPosXPct, 0, 100),
     watermarkPosYPct: clampNumber(watermarkPosYPct, 0, 100),
     watermarkRotateDeg: clampNumber(watermarkRotateDeg, -180, 180),
+    presentation: normalizeTrendingPresentation(src.presentation),
   };
 }
 
@@ -244,6 +277,9 @@ function normalizeSection(raw, index) {
   const type = inferTypeFromId(safe.type || id);
   const name = (typeof safe.name === "string" && safe.name.trim()) || inferNameFromId(id);
   const enabled = typeof safe.enabled === "boolean" ? safe.enabled : true;
+
+  if (type === "categorias") return normalizeCategoriasSection({ ...safe, id, type, name, enabled });
+  if (type === "complementos") return normalizeComplementosSection({ ...safe, id, type, name, enabled });
 
   const style = {
     ...DEFAULT_STYLE,
@@ -388,15 +424,6 @@ function buildTendenciaProductFromBackend(product) {
 function BasicTab({ section, onChange }) {
   const href = buildSectionHref(section.id);
 
-  const handleTypeChange = (value) => {
-    const found = SECTION_CATALOG.find((s) => s.id === value);
-    onChange({
-      type: value,
-      name: found ? found.label.split("—")[0].trim() : section.name,
-      config: value === "tendencia" ? normalizeTendenciaConfigPlus(section.config) : section.config || {},
-    });
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -410,18 +437,8 @@ function BasicTab({ section, onChange }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Tipo de sección" hint="Solo categorías diseñadas" name="type">
-          <select
-            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-            value={section.type}
-            onChange={(e) => handleTypeChange(e.target.value)}
-          >
-            {SECTION_CATALOG.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        <Field label="Tipo de sección" hint="Fijo para mantener el contenido de esta sección" name="type">
+          <Input value={section.type} readOnly />
         </Field>
 
         <Field label="Nombre interno" hint="Cómo lo ves en el panel" name="name">
@@ -629,7 +646,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
               onChange={(e) => patchConfig({ titleImage: e.target.value })}
               placeholder="https://..."
             />
-            <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+            <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
               <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
               <input
                 type="file"
@@ -665,7 +682,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
                 onChange={(e) => patchConfig({ watermarkImage: e.target.value })}
                 placeholder="https://..."
               />
-              <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+              <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
                 <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
                 <input
                   type="file"
@@ -877,8 +894,10 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
   );
 }
 
-function StylesTab({ section, onChange }) {
+function StylesTab({ section, onChange, uploadToCloudinary }) {
   const st = section.style || DEFAULT_STYLE;
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [backgroundError, setBackgroundError] = useState("");
 
   const patchStyle = (partial) => {
     onChange({ style: { ...st, ...partial } });
@@ -907,11 +926,14 @@ function StylesTab({ section, onChange }) {
   };
 
   const FieldStyleEditor = ({ title, prefix, defaultSize = 12, sizeMin = 10, sizeMax = 32, weightDefault = 700 }) => {
-    const inline = buildInlineStyle(prefix);
+    const floatingColorKey = { cardTitle: "cardTitleColor", cardPrice: "cardPriceColor", cardMeta: "cardMetaColor", cardDesc: "cardDescColor" }[prefix];
+    const floatingSizeKey = { cardTitle: "productTitleSizePx", cardPrice: "priceSizePx", cardMeta: "metaSizePx", cardDesc: "descSizePx" }[prefix];
+    const isFloating = presentation.mode === "floatingGlass";
+    const inline = { ...buildInlineStyle(prefix), ...(isFloating && floatingColorKey ? { color: presentation[floatingColorKey], fontSize: presentation[floatingSizeKey] } : {}) };
 
     const currentFont = typeof st?.[`${prefix}FontFamily`] === "string" ? st[`${prefix}FontFamily`] : "";
-    const currentColor = typeof st?.[`${prefix}Color`] === "string" ? st[`${prefix}Color`] : "";
-    const currentSize = Number.isFinite(Number(st?.[`${prefix}SizePx`])) ? Number(st[`${prefix}SizePx`]) : defaultSize;
+    const currentColor = isFloating && floatingColorKey ? presentation[floatingColorKey] : typeof st?.[`${prefix}Color`] === "string" ? st[`${prefix}Color`] : "";
+    const currentSize = isFloating && floatingSizeKey ? presentation[floatingSizeKey] : Number.isFinite(Number(st?.[`${prefix}SizePx`])) ? Number(st[`${prefix}SizePx`]) : defaultSize;
     const currentWeight = Number.isFinite(Number(st?.[`${prefix}Weight`])) ? Number(st[`${prefix}Weight`]) : weightDefault;
     const currentItalic = typeof st?.[`${prefix}Italic`] === "boolean" ? st[`${prefix}Italic`] : false;
     const currentUnderline = typeof st?.[`${prefix}Underline`] === "boolean" ? st[`${prefix}Underline`] : false;
@@ -941,11 +963,9 @@ function StylesTab({ section, onChange }) {
               min={sizeMin}
               max={sizeMax}
               value={currentSize}
-              onChange={(e) =>
-                patchStyle({
-                  [`${prefix}SizePx`]: clampNumber(Number(e.target.value) || defaultSize, sizeMin, sizeMax),
-                })
-              }
+              onChange={(e) => isFloating && floatingSizeKey
+                ? patchPresentation({ [floatingSizeKey]: clampNumber(Number(e.target.value) || defaultSize, sizeMin, sizeMax) })
+                : patchStyle({ [`${prefix}SizePx`]: clampNumber(Number(e.target.value) || defaultSize, sizeMin, sizeMax) })}
             />
           </Field>
 
@@ -968,7 +988,7 @@ function StylesTab({ section, onChange }) {
           <ColorField
             label="Color"
             value={currentColor || ""}
-            onChange={(value) => patchStyle({ [`${prefix}Color`]: value })}
+            onChange={(value) => isFloating && floatingColorKey ? patchPresentation({ [floatingColorKey]: value }) : patchStyle({ [`${prefix}Color`]: value })}
           />
 
           <div className="flex items-center gap-4">
@@ -1005,6 +1025,33 @@ function StylesTab({ section, onChange }) {
 
   const cfg = section.type === "tendencia" ? normalizeTendenciaConfigPlus(section.config) : section.config || {};
   const cardFields = cfg?.cardFields && typeof cfg.cardFields === "object" ? cfg.cardFields : {};
+  const presentation = normalizeTrendingPresentation(cfg.presentation);
+  const patchPresentation = (partial) => onChange({ config: { ...cfg, presentation: normalizeTrendingPresentation({ ...presentation, ...partial }) } });
+  const numericPresentationField = (key, label, min, max, step = 1) => (
+    <Field label={label} name={`config.presentation.${key}`} key={key}>
+      <Input type="number" aria-label={label} min={min} max={max} step={step} value={presentation[key]}
+        onChange={(event) => patchPresentation({ [key]: clampNumber(Number(event.target.value), min, max) })} />
+    </Field>
+  );
+  const colorPresentationField = (key, label) => (
+    <ColorField key={key} label={label} value={presentation[key]} onChange={(value) => patchPresentation({ [key]: value })} />
+  );
+  const uploadBackground = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !uploadToCloudinary) return;
+    setBackgroundError("");
+    setUploadingBackground(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      if (!url || !normalizeTrendingPresentation({ backgroundImage: url }).backgroundImage) throw new Error("No se recibió una imagen válida de Cloudinary.");
+      patchPresentation({ backgroundImage: url, backdropMode: "custom" });
+    } catch (error) {
+      setBackgroundError(error?.message || "No se pudo cargar el fondo.");
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
 
   const patchCardFields = (partial) => {
     if (section.type !== "tendencia") return;
@@ -1020,9 +1067,145 @@ function StylesTab({ section, onChange }) {
   };
 
   return (
-    <div className="space-y-6">
+    <SectionEditorCardTabs label="Diseño de Tendencia" labels={['Plantilla', 'Móvil', 'Texto general', 'Campos de la tarjeta', 'Datos visibles', 'Tarjetas y espacio']}>
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4">
+        <div>
+          <h3 className="text-sm font-semibold text-neutral-900">Elige cómo se muestran los productos</h3>
+          <p className="mt-1 text-xs text-neutral-600">La vista previa muestra la tienda con los productos que elegiste. Cambia de plantilla sin perder los ajustes de la otra.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { mode: "classic", label: "Tarjeta actual", hint: "Imagen y detalles en una sola tarjeta", preview: "rounded-t-xl rounded-b-xl" },
+            { mode: "floatingGlass", label: "Vitrina flotante", hint: "Foto protagonista y ficha de vidrio separada", preview: "rounded-2xl" },
+          ].map((option) => (
+            <button key={option.mode} type="button" aria-pressed={presentation.mode === option.mode}
+              onClick={() => patchPresentation({ mode: option.mode })}
+              className={`rounded-2xl border-2 p-3 text-left transition ${presentation.mode === option.mode ? "border-rose-500 bg-rose-50/50" : "border-neutral-200 hover:border-rose-200"}`}>
+              <span className="block text-sm font-semibold">{option.label}</span>
+              <span className="block text-xs text-neutral-600">{option.hint}</span>
+              <span aria-hidden="true" className="mt-3 flex h-16 max-w-28 flex-col gap-1">
+                <span className={`block flex-1 border border-rose-200 bg-gradient-to-br from-rose-100 via-white to-amber-100 ${option.preview}`} style={option.mode === "floatingGlass" ? { backgroundImage: `url(${boutiqueBackdrop})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined} />
+                {option.mode === "floatingGlass" ? <span className="block h-4 rounded-lg border border-amber-200 bg-white/70 shadow-sm" /> : null}
+              </span>
+            </button>
+          ))}
+        </div>
+        {presentation.mode === "floatingGlass" ? (
+          <div className="space-y-3">
+            <p className="text-xs text-neutral-600">Las fotos y los artículos se editan en Contenido → Productos. Los colores de Pasarela se ajustan en Móvil; las fichas de escritorio, en las opciones de esta pestaña.</p>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Título de la vitrina</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Mostrar título como" name="config.presentation.titleMode">
+                  <select className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" value={presentation.titleMode} onChange={(event) => patchPresentation({ titleMode: event.target.value })}>
+                    <option value="text">Texto editable</option><option value="image">Imagen del título</option>
+                  </select>
+                </Field>
+                {presentation.titleMode === "text" ? <>
+                  <Field label="Texto" name="config.title"><Input value={cfg.title || ""} placeholder="EN TENDENCIA" onChange={(event) => onChange({ config: { ...cfg, title: event.target.value } })} /></Field>
+                  {colorPresentationField("titleColor", "Color del título")}
+                  {numericPresentationField("titleSizePx", "Tamaño máximo del título (px)", 20, 80)}
+                  <Field label="Fuente del título" name="config.presentation.titleFontFamily">
+                    <select className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" value={presentation.titleFontFamily} onChange={(event) => patchPresentation({ titleFontFamily: event.target.value })}>
+                      {[{ label: "Clásica elegante", value: "Georgia, serif" }, ...CARD_FONT_OPTIONS.filter((item) => item.value)].map((item) => <option key={item.label} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </Field>
+                </> : <p className="text-xs text-neutral-600">Carga la imagen del título en Contenido → Imágenes.</p>}
+              </div>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3" open>
+              <summary className="cursor-pointer text-sm font-semibold">Fondo y luz</summary>
+              <p className="mt-2 text-xs text-neutral-600">El fondo floral ocupa el ancho completo de la sección. Puedes cambiarlo por un color o tu propia imagen.</p>
+              <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Tipo de fondo">
+                {[
+                  { value: "boutique", label: "Floral incluido" },
+                  { value: "color", label: "Color y luz" },
+                  { value: "custom", label: "Mi imagen" },
+                ].map((option) => (
+                  <button key={option.value} type="button" aria-pressed={presentation.backdropMode === option.value}
+                    onClick={() => patchPresentation({ backdropMode: option.value })}
+                    className={`rounded-xl border px-2 py-2 text-xs ${presentation.backdropMode === option.value ? "border-rose-500 bg-rose-50 text-rose-950" : "border-neutral-200 bg-white text-neutral-700"}`}>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {colorPresentationField("backgroundColor", "Color de fondo")}
+                {colorPresentationField("glowColor", "Color de la luz ambiental")}
+                {numericPresentationField("glowStrength", "Intensidad de luz (0–1)", 0, 1, .05)}
+                <Field label="Cargar mi imagen de fondo" name="config.presentation.backgroundImage">
+                  <input type="file" accept="image/*" aria-label="Cargar mi imagen de fondo" onChange={uploadBackground} disabled={uploadingBackground} className="block w-full text-xs" />
+                  {uploadingBackground ? <span role="status" className="text-xs">Cargando imagen…</span> : null}
+                  {backgroundError ? <span role="alert" className="text-xs text-red-700">{backgroundError}</span> : null}
+                  {presentation.backgroundImage ? <button type="button" onClick={() => patchPresentation({ backgroundImage: "", backdropMode: "boutique" })} className="mt-1 text-xs underline">Volver al floral incluido</button> : null}
+                  {presentation.backdropMode === "custom" && !presentation.backgroundImage ? <span className="block text-xs text-amber-800">Carga una imagen para verla en la vitrina.</span> : null}
+                </Field>
+              </div>
+              <div className="mt-3 rounded-xl border border-rose-200/70 bg-rose-50/40 p-3">
+                <div className="text-xs font-semibold text-rose-950">Profundidad del escenario</div>
+                <p className="mt-1 text-xs text-neutral-600">Separa visualmente la pared, ilumina los productos y da apoyo al suelo. Puedes llevar Profundidad a 0 para apagar el efecto.</p>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[["sceneDepth", "Profundidad", 1, "%"], ["sceneLight", "Luz detrás de las fotos", 1, "%"], ["sceneBlurPx", "Desenfoque de la pared", 12, "px"]].map(([key, label, max, unit]) => (
+                    <label key={key} className="block text-xs text-neutral-800">
+                      <span className="flex items-center justify-between gap-2"><span>{label}</span><strong>{unit === "%" ? `${Math.round(presentation[key] * 100)}%` : `${presentation[key]} px`}</strong></span>
+                      <input type="range" aria-label={label} min={0} max={max} step={unit === "%" ? .05 : 1} value={presentation[key]}
+                        onChange={(event) => patchPresentation({ [key]: Number(event.target.value) })} className="mt-2 w-full accent-rose-600" />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Vidrio y bordes</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {colorPresentationField("glassColor", "Color del vidrio")}
+                {colorPresentationField("borderColor", "Color del borde")}
+                {numericPresentationField("glassOpacity", "Opacidad del vidrio (0,25–1)", .25, 1, .05)}
+                {numericPresentationField("blurPx", "Desenfoque (px)", 0, 40)}
+                {numericPresentationField("borderOpacity", "Opacidad del borde (0–1)", 0, 1, .05)}
+                {numericPresentationField("borderWidthPx", "Grosor del borde (px)", 0, 4, .5)}
+                {numericPresentationField("shadowStrength", "Intensidad de sombra (0–1)", 0, 1, .05)}
+              </div>
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Letras de las fichas</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {colorPresentationField("cardTitleColor", "Nombre del producto")}
+                {colorPresentationField("cardPriceColor", "Precio")}
+                {colorPresentationField("cardMetaColor", "Tallas y colores")}
+                {colorPresentationField("cardDescColor", "Descripción y características")}
+                {colorPresentationField("cardMutedColor", "Precio anterior")}
+              </div>
+              <p className="mt-2 text-xs text-neutral-600">La tipografía y los tamaños siguen disponibles en «Campos de la tarjeta».</p>
+              {numericPresentationField("oldPriceSizePx", "Precio anterior (px)", 8, 15)}
+            </details>
+            <details className="rounded-xl border border-neutral-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Forma y botones</summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {numericPresentationField("imageHeightPx", "Alto de la foto (px)", 240, 600)}
+                {numericPresentationField("imageRadiusPx", "Redondeo de la foto (px)", 0, 60)}
+                {numericPresentationField("dockRadiusPx", "Redondeo de la ficha (px)", 0, 60)}
+                {numericPresentationField("dockGapPx", "Separación foto/ficha (px)", 0, 30)}
+                {numericPresentationField("dockPaddingPx", "Espacio interior de la ficha (px)", 8, 30)}
+                {numericPresentationField("hoverLiftPx", "Elevación al pasar el mouse (px)", 0, 18)}
+                {numericPresentationField("actionSizePx", "Tamaño de los botones (px)", 28, 52)}
+                {colorPresentationField("actionColor", "Color de los iconos")}
+                {colorPresentationField("actionBackgroundColor", "Fondo de los botones")}
+                <Toggle checked={presentation.ornamentEnabled} label="Decoración junto al título" onChange={(value) => patchPresentation({ ornamentEnabled: !!value })} />
+                <Toggle checked={presentation.showWatermark} label="Mostrar marca de agua en las fichas" onChange={(value) => patchPresentation({ showWatermark: !!value })} />
+                <Toggle checked={presentation.showDescription} label="Mostrar descripción y características" onChange={(value) => patchPresentation({ showDescription: !!value })} />
+              </div>
+            </details>
+          </div>
+        ) : null}
+      </div>
+      <div>
+        {presentation.mode === "floatingGlass"
+          ? <TrendingMobileColorsEditor presentation={presentation} onChange={patchPresentation} uploadToCloudinary={uploadToCloudinary} />
+          : <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Selecciona Vitrina flotante en Plantilla para personalizar los colores de Pasarela en móvil.</p>}
+      </div>
       <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-        <div className="text-sm font-semibold text-neutral-900 mb-2">Texto dentro de Cards (general)</div>
+        <div className="text-sm font-semibold text-neutral-900 mb-2">Texto de todas las tarjetas</div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Fuente (texto cards)" name="style.cardTextFontFamily">
@@ -1107,16 +1290,18 @@ function StylesTab({ section, onChange }) {
         </div>
       </div>
 
-      <FieldStyleEditor title="Título del producto (cardTitle*)" prefix="cardTitle" defaultSize={12} sizeMin={10} sizeMax={20} weightDefault={800} />
-      <FieldStyleEditor title="Precio (cardPrice*)" prefix="cardPrice" defaultSize={14} sizeMin={10} sizeMax={22} weightDefault={800} />
-      <FieldStyleEditor title="Atributos: Tallas / Colores (cardMeta*)" prefix="cardMeta" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={700} />
-      <FieldStyleEditor title="Descripción / Features (cardDesc*)" prefix="cardDesc" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={600} />
+      <div className="grid gap-3">
+        <FieldStyleEditor title="Título del producto" prefix="cardTitle" defaultSize={12} sizeMin={10} sizeMax={20} weightDefault={800} />
+        <FieldStyleEditor title="Precio" prefix="cardPrice" defaultSize={14} sizeMin={10} sizeMax={22} weightDefault={800} />
+        <FieldStyleEditor title="Tallas y colores" prefix="cardMeta" defaultSize={12} sizeMin={12} sizeMax={18} weightDefault={700} />
+        <FieldStyleEditor title="Descripción y características" prefix="cardDesc" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={600} />
+      </div>
 
       {section.type === "tendencia" ? (
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-3">
           <div className="text-sm font-semibold text-neutral-900">Qué mostrar en el card (Tendencia)</div>
           <div className="text-xs text-neutral-500">
-            Esto se guarda en <code>config.cardFields</code> y lo lee el frontend para mostrar/ocultar bloques.
+            Elige qué información verá el cliente en cada tarjeta.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1260,7 +1445,7 @@ function StylesTab({ section, onChange }) {
           </Field>
         </div>
       </div>
-    </div>
+    </SectionEditorCardTabs>
   );
 }
 
@@ -1273,6 +1458,7 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
   }, [cfgRaw]);
 
   const [search, setSearch] = useState("");
+  const [activeProductId, setActiveProductId] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [error, setError] = useState("");
@@ -1335,12 +1521,14 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
     patchConfig({
       products: [...existing, normalized].slice(0, cfg.maxItems || 4),
     });
+    setActiveProductId(normalized.productId);
   };
 
   const handleRemoveProduct = (productId) => {
     patchConfig({
       products: (cfg.products || []).filter((p) => p.productId !== productId),
     });
+    if (activeProductId === productId) setActiveProductId('');
   };
 
   const handleChangeImages = (productId, imagesPatch) => {
@@ -1368,18 +1556,19 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
     });
   };
 
+  const activeId = cfg.products?.some((item) => item.productId === activeProductId)
+    ? activeProductId : cfg.products?.[0]?.productId;
+
   return (
-    <div className="space-y-6">
+    <div className="section-product-editor space-y-4">
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-        <div className="text-sm font-semibold text-neutral-900">Productos en tendencia (desde BD)</div>
-        <div className="text-xs text-neutral-500">
-          Escribe las iniciales del producto y te aparecen resultados con vista previa. Luego eliges foto Principal y Hover.
-          <br />
-          ✅ Ahora también puedes <b>activar descuento</b> y poner el <b>%</b> por cada producto.
+        <div className="section-product-editor__heading">
+          <div><h3>Elige los productos</h3><p>Busca en el catálogo y personaliza las imágenes y el descuento de cada tarjeta.</p></div>
+          <span>{cfg.products?.length || 0} de {cfg.maxItems || 4}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Máximo de productos" hint="Ej: 4" name="config.maxItems">
+          <Field label="Cantidad máxima de tarjetas">
             <Input
               type="number"
               min={1}
@@ -1393,7 +1582,7 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
             />
           </Field>
 
-          <Field label="Buscar producto" hint="Escribe: vestido, zapato, etc." name="productSearch">
+          <Field label="Buscar en el catálogo" hint="Escribe el nombre de un producto.">
             <div className="flex gap-2">
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ej: vestido..." />
               <Button
@@ -1431,10 +1620,6 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-neutral-900 line-clamp-2">{p.name || "Producto sin nombre"}</div>
                   <div className="text-[11px] text-neutral-500 mt-1">
-                    ID: <span className="font-mono">{p.productId}</span>
-                  </div>
-
-                  <div className="text-[11px] text-neutral-500 mt-1">
                     {p.hasDiscount ? (
                       <>
                         <span className="font-mono">{moneyCOP(p.finalPrice)}</span>{" "}
@@ -1453,48 +1638,41 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
       )}
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-        <div className="text-xs font-semibold text-neutral-900">Productos seleccionados</div>
-        <div className="text-[11px] text-neutral-500">
-          Selecciona foto Principal y Hover. Se guarda en: <b> config.products[i].mainImage</b> y <b>config.products[i].hoverImage</b>
-          <br />
-          ✅ Descuento por producto: <b>config.products[i].hasDiscount</b> y <b>config.products[i].discountPercent</b> (y se calcula <b>finalPrice</b>).
-        </div>
+        <div className="section-product-editor__heading"><div><h3>Tarjetas seleccionadas</h3><p>Elige cuál foto aparece primero y cuál al pasar el cursor.</p></div></div>
 
         {!cfg.products?.length ? <div className="text-xs text-neutral-500">Aún no has seleccionado productos para esta sección.</div> : null}
+
+        <SectionEditorPostPicker posts={(cfg.products || []).map((item) => ({ id: item.productId, image: item.mainImage }))}
+          activeIndex={Math.max(0, (cfg.products || []).findIndex((item) => item.productId === activeId))}
+          onSelect={(index) => setActiveProductId(cfg.products[index]?.productId || '')}
+          label="Tendencia" itemName="tarjeta" />
 
         {cfg.products?.map((itemRaw) => {
           const item = normalizeDiscountFields(itemRaw);
 
           return (
-            <div key={item.productId} className="border border-neutral-200 rounded-xl p-3 bg-neutral-50">
+            <div key={item.productId} hidden={item.productId !== activeId} className="section-product-editor__card border border-neutral-200 rounded-xl p-3 bg-neutral-50">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-neutral-900 line-clamp-2">
-                    {item.name || "Producto"} <span className="text-[11px] text-neutral-500 font-mono">({item.productId})</span>
+                    {item.name || "Producto"}
                   </div>
 
                   <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[11px] text-neutral-600">
-                        <b>Precio base:</b> <span className="font-mono">{moneyCOP(item.price)}</span>
-                        {item.hasDiscount ? (
-                          <>
-                            {" "}
-                            — <b>Final:</b> <span className="font-mono">{moneyCOP(item.finalPrice)}</span>{" "}
-                            <span className="text-rose-700 font-semibold">(-{Number(item.discountPercent || 0)}%)</span>
-                          </>
-                        ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-xs text-neutral-700">
+                        <b>Precio:</b> {moneyCOP(item.price)}
+                        {item.hasDiscount ? <span className="ml-2 font-semibold text-rose-700">→ {moneyCOP(item.finalPrice)}</span> : null}
                       </div>
-
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-neutral-600">Descuento</span>
+                        <span className="text-xs text-neutral-600">Aplicar descuento</span>
                         <Toggle checked={!!item.hasDiscount} onChange={(v) => handleChangeDiscount(item.productId, { hasDiscount: !!v })} />
                       </div>
                     </div>
 
                     {item.hasDiscount ? (
-                      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <Field label="Descuento (%)" hint="1–95" name={`products.${item.productId}.discountPercent`}>
+                      <div className="mt-3 max-w-[180px]">
+                        <Field label="Porcentaje de descuento" hint="Entre 1 y 95 %">
                           <Input
                             type="number"
                             min={1}
@@ -1507,33 +1685,19 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
                             }
                           />
                         </Field>
-
-                        <Field label="Precio final (auto)" hint="Se calcula" name={`products.${item.productId}.finalPrice`}>
-                          <Input value={moneyCOP(item.finalPrice)} readOnly />
-                        </Field>
-
-                        <Field label="Precio tachado (auto)" hint="Es el precio base" name={`products.${item.productId}.price`}>
-                          <Input value={moneyCOP(item.price)} readOnly />
-                        </Field>
                       </div>
-                    ) : (
-                      <div className="mt-2 text-[11px] text-neutral-500">Descuento apagado: se mostrará solo el precio normal.</div>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-[auto,1fr] gap-3">
-                    <div className="flex flex-col gap-2">
-                      <div className="text-[11px] text-neutral-500">Principal (mainImage)</div>
-                      <div className="rounded-lg border border-neutral-300 overflow-hidden h-24 w-24 bg-white flex items-center justify-center">
-                        {item.mainImage ? <img src={item.mainImage} alt="Principal" className="h-full w-full object-cover" /> : <span className="text-[11px] text-neutral-400">Sin imagen</span>}
-                      </div>
-
-                      <div className="text-[11px] text-neutral-500">Hover (hoverImage)</div>
-                      <div className="rounded-lg border border-neutral-300 overflow-hidden h-24 w-24 bg-white flex items-center justify-center">
-                        {item.hoverImage ? <img src={item.hoverImage} alt="Hover" className="h-full w-full object-cover" /> : <span className="text-[11px] text-neutral-400">Sin imagen</span>}
-                      </div>
+                  <div className="mt-3 space-y-3">
+                    <div className="section-product-editor__photos">
+                      {[{ label: 'Foto principal', src: item.mainImage }, { label: 'Al pasar el cursor', src: item.hoverImage }].map(({ label, src }) => (
+                        <div className="section-product-editor__photo" key={label}>
+                          {src ? <img src={src} alt={label} /> : <span>Sin imagen</span>}
+                          <strong>{label}</strong>
+                        </div>
+                      ))}
                     </div>
-
                     <CardImageMover
                       item={item}
                       uploadToCloudinary={uploadToCloudinary}
@@ -1676,8 +1840,8 @@ function PreviewTab({ section }) {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm font-semibold text-neutral-900">Vista previa (admin)</div>
-      <div className="text-xs text-neutral-500 mb-2">Esta preview es solo del panel admin. ✅ Aquí ya debe verse el <b>descuento</b> si lo activas.</div>
+      <div className="text-base font-semibold text-neutral-900">Así se verá En tendencia</div>
+      <div className="text-sm text-neutral-600 mb-2">Revisa imágenes, textos y precios antes de guardar.</div>
 
       <div
         data-admin-storefront-preview="true"
@@ -1785,27 +1949,19 @@ function PreviewTab({ section }) {
 // -----------------------------------------------------------------------------
 // Componente principal
 // -----------------------------------------------------------------------------
-export default function SectionsPanel({ theme, setPath, uploading, setUploading, uploadToCloudinary }) {
+export default function SectionsPanel({ theme, setPath, disabled = false, uploading, setUploading, uploadToCloudinary }) {
   const initialSections = useMemo(() => normalizeSectionsArray(theme || {}), [theme]);
 
   const [sections, setSections] = useState(() => cloneSections(initialSections));
   const [editingId, setEditingId] = useState(null);
   const [activeTab, setActiveTab] = useState("basic");
+  const [overviewFilter, setOverviewFilter] = useState('all');
 
-  const pushTimerRef = useRef(null);
   const lastIncomingFromThemeRef = useRef(JSON.stringify(initialSections));
   const lastPushedToParentRef = useRef(JSON.stringify(initialSections));
 
   useEffect(() => {
     ensureGoogleFontsLoaded();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (pushTimerRef.current) {
-        clearTimeout(pushTimerRef.current);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -1831,24 +1987,19 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
 
     if (serialized === lastPushedToParentRef.current) return;
 
-    if (pushTimerRef.current) {
-      clearTimeout(pushTimerRef.current);
-    }
-
-    pushTimerRef.current = setTimeout(() => {
-      lastPushedToParentRef.current = serialized;
-      lastIncomingFromThemeRef.current = serialized;
-      setPath("sections", normalizedForParent);
-    }, 120);
-
-    return () => {
-      if (pushTimerRef.current) {
-        clearTimeout(pushTimerRef.current);
-      }
-    };
+    lastPushedToParentRef.current = serialized;
+    lastIncomingFromThemeRef.current = serialized;
+    setPath("sections", normalizedForParent);
   }, [sections, setPath]);
 
   const selected = useMemo(() => sections.find((s) => s.id === editingId) || null, [sections, editingId]);
+  const overview = useMemo(() => sections.map((section) => ({
+    section,
+    ...getSectionOverview(section, sections),
+  })), [sections]);
+  const visibleOverview = overviewFilter === 'all'
+    ? overview
+    : overview.filter((item) => item.status === overviewFilter);
 
   const isLookSection = useMemo(() => {
     if (!selected) return false;
@@ -1935,72 +2086,73 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-        <div className="flex items-center justify-between gap-4 mb-3">
+      <section className="sections-overview" aria-label="Vista general de secciones">
+        <div className="sections-overview__head">
           <div>
-            <div className="text-sm font-semibold text-neutral-900">Secciones de la página</div>
-            <div className="text-xs text-neutral-500">
-              Aquí configuras cada bloque. Se guarda en <code>theme.sections</code>.
-            </div>
+            <h2>Secciones de la tienda</h2>
+            <p>Elige un bloque para editarlo. Guarda los cambios con el botón lateral.</p>
+          </div>
+          <div className="sections-overview__stats" role="group" aria-label="Resumen de secciones">
+            <span className="sections-overview__stat"><strong>{overview.filter((item) => item.status === 'ready').length}</strong> configuradas</span>
+            <span className="sections-overview__stat"><strong>{overview.filter((item) => item.status === 'needs-content').length}</strong> por completar</span>
+            <span className="sections-overview__stat"><strong>{overview.filter((item) => item.status === 'hidden').length}</strong> ocultas</span>
           </div>
         </div>
-
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="border-b border-neutral-200 text-neutral-500">
-                <th className="py-2 px-4 text-left font-medium">ID</th>
-                <th className="py-2 px-4 text-left font-medium">Nombre interno</th>
-                <th className="py-2 px-4 text-left font-medium">Tipo</th>
-                <th className="py-2 px-4 text-left font-medium">Link</th>
-                <th className="py-2 px-4 text-left font-medium">Estado</th>
-                <th className="py-2 px-4 text-right font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sections.map((sec) => {
-                const isSupported =
-                  sec.type === "tendencia" ||
-                  sec.type === "look" ||
-                  sec.id === "look" ||
-                  sec.type === "complementos" ||
-                  sec.id === "complementos" ||
-                  sec.type === "categorias" ||
-                  sec.id === "categorias"||
-                  sec.type === "instagram" ||
-                  sec.id === "instagram"||
-                  sec.type === "tiktok" ||
-                  sec.id === "tiktok"||
-                  sec.type === "informacion" ||
-                  sec.id === "informacion";
-
-                return (
-                  <tr key={sec.id} className="border-b border-neutral-100 last:border-0">
-                    <td className="py-2 px-4 font-mono text-[11px]">{sec.id}</td>
-                    <td className="py-2 px-4 text-xs text-neutral-900">{sec.name}</td>
-                    <td className="py-2 px-4 text-[11px] text-neutral-600">{inferTypeFromId(sec.type)}</td>
-                    <td className="py-2 px-4 text-[11px] text-neutral-500">{buildSectionHref(sec.id)}</td>
-                    <td className="py-2 px-4">
-                      <SectionBadge enabled={sec.enabled} supported={isSupported} />
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <Button size="sm" type="button" onClick={() => openEditor(sec.id)}>
-                        Editar
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="sections-overview__filters" role="group" aria-label="Filtrar secciones">
+          {OVERVIEW_FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              className="sections-overview__filter"
+              aria-pressed={overviewFilter === filter.id}
+              onClick={() => setOverviewFilter(filter.id)}
+            >{filter.label}</button>
+          ))}
         </div>
-      </div>
+        <div className="sections-overview__grid">
+          {visibleOverview.map(({ section, label, status, detail }) => {
+            const Icon = OVERVIEW_ICONS[section.id] || CircleHelp;
+            const StatusIcon = OVERVIEW_STATUS[status].icon;
+            return (
+              <article className="sections-overview__card" data-status={status} key={section.id}>
+                <span className="sections-overview__icon" aria-hidden="true"><Icon /></span>
+                <div className="sections-overview__content">
+                  <h3 title={section.name}>{label}</h3>
+                  <p>{detail}</p>
+                  <span className="sections-overview__status" data-status={status}><StatusIcon aria-hidden="true" />{OVERVIEW_STATUS[status].label}</span>
+                </div>
+                {status !== 'unsupported' && <div className="sections-overview__actions">
+                  <button
+                    type="button"
+                    role="switch"
+                    className="sections-overview__toggle"
+                    aria-label={`Mostrar ${label} en la tienda`}
+                    aria-checked={section.enabled !== false}
+                    title={section.enabled === false ? `Mostrar ${label}` : `Ocultar ${label}`}
+                    onClick={() => patchSection(section.id, { enabled: section.enabled === false })}
+                  >{section.enabled === false ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button>
+                  <button
+                    type="button"
+                    className="sections-overview__edit"
+                    aria-label={`Editar ${label}`}
+                    title={`Editar ${label}`}
+                    onClick={() => openEditor(section.id)}
+                  ><Pencil aria-hidden="true" /></button>
+                </div>}
+              </article>
+            );
+          })}
+        </div>
+        {!visibleOverview.length && <p className="sections-overview__empty">No hay secciones en este estado.</p>}
+      </section>
 
       {selected ? (
-      <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`}>
+      <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
+        <div className="section-editor-layout">
+        <div className="section-editor-layout__form">
         {isLookSection ? (
           <LookSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2012,7 +2164,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
         ) : isComplementosSection ? (
           <ComplementosSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2024,7 +2176,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
         ) : isCategoriasSection ? (
           <CategoriasSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2036,7 +2188,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
         ) : isInstagramSection ? (
           <InstagramSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2048,7 +2200,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
           ) : isTiktokSection ? (
           <TiktokSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2060,7 +2212,7 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
           ) : isInfoSection ? (
           <InfoSectionUI
-            theme={{ sections }}
+            theme={{ ...theme, sections }}
             setPath={(path, value) => {
               if (path !== "sections") return;
               const nextSections = Array.isArray(value)
@@ -2073,41 +2225,19 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
           />
         ) : (
           <>
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <div className="text-sm font-semibold text-neutral-900">Editar sección: {selected.name}</div>
-                <div className="text-xs text-neutral-500">
-                  Editando: <b>{selected.id}</b> — Cambios se guardan en <code>theme.sections</code>
-                </div>
-              </div>
-              <button type="button" onClick={closeEditor} className="text-xs text-neutral-500 hover:text-neutral-800">
-                Cerrar
-              </button>
-            </div>
+            <SectionEditorSteps value={["image", "products"].includes(activeTab) ? "basic" : activeTab} onChange={setActiveTab} sectionName="En tendencia" items={[
+              { value: "basic", label: "Contenido", hint: "Define el título, las imágenes y los productos de la sección." },
+              { value: "styles", label: "Diseño", hint: "Ajusta colores, tarjetas, tipografía y efectos." },
+            ]} />
+            {["basic", "image", "products"].includes(activeTab) && (
+              <nav className="section-editor-substeps mt-3" aria-label="Opciones de contenido">
+                {[{ value: "basic", label: "Textos" }, { value: "image", label: "Imágenes" }, { value: "products", label: "Productos" }].map((item) => (
+                  <button key={item.value} type="button" aria-pressed={activeTab === item.value} onClick={() => setActiveTab(item.value)}>{item.label}</button>
+                ))}
+              </nav>
+            )}
 
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div className="flex flex-wrap gap-2">
-                <TabButton active={activeTab === "basic"} onClick={() => setActiveTab("basic")}>
-                  Básico
-                </TabButton>
-                <TabButton active={activeTab === "image"} onClick={() => setActiveTab("image")}>
-                  Imagen
-                </TabButton>
-                <TabButton active={activeTab === "styles"} onClick={() => setActiveTab("styles")}>
-                  Estilos
-                </TabButton>
-                <TabButton active={activeTab === "products"} onClick={() => setActiveTab("products")}>
-                  Productos
-                </TabButton>
-                <TabButton active={activeTab === "preview"} onClick={() => setActiveTab("preview")}>
-                  Preview
-                </TabButton>
-              </div>
-
-              <SectionBadge enabled={selected.enabled} supported />
-            </div>
-
-            <div className="border-t border-neutral-200 pt-4">
+            <div className="pt-4">
               {activeTab === "basic" ? <BasicTab section={selected} onChange={handleChangeSelected} /> : null}
 
               {activeTab === "image" && selected.type === "tendencia" ? (
@@ -2119,16 +2249,20 @@ export default function SectionsPanel({ theme, setPath, uploading, setUploading,
                 />
               ) : null}
 
-              {activeTab === "styles" ? <StylesTab section={selected} onChange={handleChangeSelected} /> : null}
+              {activeTab === "styles" ? <StylesTab section={selected} onChange={handleChangeSelected} uploadToCloudinary={uploadToCloudinary} /> : null}
 
               {activeTab === "products" && selected.type === "tendencia" ? (
                 <ProductsTab section={selected} onChange={handleChangeSelected} uploadToCloudinary={uploadToCloudinary} />
               ) : null}
 
-              {activeTab === "preview" ? <PreviewTab section={selected} /> : null}
             </div>
           </>
         )}
+        </div>
+        <aside className="section-editor-layout__preview">
+          <StorefrontSectionPreview section={selected} theme={{ ...theme, sections }} />
+        </aside>
+        </div>
       </ModalShell>
       ) : null}
     </div>

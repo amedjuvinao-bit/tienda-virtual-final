@@ -233,6 +233,7 @@ describe('Finanzas Nivel Plus · Etapa 2', () => {
   it('configura centros y presupuestos en un modal centrado', async () => {
     render(<AdminFinancePage />);
     fireEvent.click(screen.getByRole('button', { name: 'Presupuesto: Límites y centros' }));
+    fireEvent.change(await screen.findByLabelText('Mes presupuestal'), { target: { value: '2026-09' } });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Configurar' }));
     expect(screen.getByRole('dialog', { name: 'Configurar presupuesto' })).toBeInTheDocument();

@@ -58,10 +58,16 @@ const ButtonSchema = new Schema(
 const BannerSlideSchema = new Schema(
   {
     image: { type: String, default: "" },
+    imageTablet: { type: String, default: "" },
+    imageMobile: { type: String, default: "" },
     link: { type: String, default: "" },
 
     posX: { type: Number, default: 50 },
     posY: { type: Number, default: 50 },
+    tabletPosX: { type: Number, min: 0, max: 100, default: 50 },
+    tabletPosY: { type: Number, min: 0, max: 100, default: 50 },
+    mobilePosX: { type: Number, min: 0, max: 100, default: 50 },
+    mobilePosY: { type: Number, min: 0, max: 100, default: 50 },
 
     fit: { type: String, enum: ["cover", "contain"], default: "cover" },
 
@@ -70,6 +76,86 @@ const BannerSlideSchema = new Schema(
   },
   { _id: false }
 );
+
+const BannerTemplateActionSchema = new Schema({
+  enabled: { type: Boolean, default: true },
+  text: { type: String, default: "" },
+  link: { type: String, default: "" },
+}, { _id: false });
+
+const BannerCardPositionSchema = new Schema({
+  x: { type: Number, min: 0, max: 100 },
+  y: { type: Number, min: 0, max: 100 },
+}, { _id: false });
+
+const BannerTemplateCardSchema = new Schema({
+  enabled: { type: Boolean, default: true },
+  categoryId: { type: String, default: "" },
+  destinationType: { type: String, enum: ["category", "catalogCategory", "product"], default: undefined },
+  catalogCategoryId: { type: String, default: "" },
+  catalogCategoryName: { type: String, default: "" },
+  catalogCategoryImage: { type: String, default: "" },
+  featuredProductId: { type: String, default: "" },
+  featuredProductTitle: { type: String, default: "" },
+  featuredProductImage: { type: String, default: "" },
+  label: { type: String, default: "" },
+  text: { type: String, default: "" },
+  titleColor: { type: String, default: "", validate: { validator: (value) => !value || /^#[0-9a-f]{6}$/i.test(value), message: "Color de título inválido" } },
+  labelColor: { type: String, default: "", validate: { validator: (value) => !value || /^#[0-9a-f]{6}$/i.test(value), message: "Color de etiqueta inválido" } },
+  titleSizePx: { type: Number, min: 10, max: 24, default: undefined },
+  labelSizePx: { type: Number, min: 8, max: 18, default: undefined },
+  image: { type: String, default: "" },
+  imageSource: { type: String, enum: ["custom", "catalog"], default: "custom" },
+  decorationMode: { type: String, enum: ["preset", "custom", "none"], default: "none" },
+  decorationImage: { type: String, default: "" },
+  decorationX: { type: Number, min: 0, max: 100, default: 50 },
+  decorationY: { type: Number, min: 0, max: 100, default: 50 },
+  decorationSize: { type: Number, min: 30, max: 180, default: 100 },
+  decorationOpacity: { type: Number, min: 0, max: 100, default: 75 },
+  link: { type: String, default: "" },
+  x: { type: Number, min: 0, max: 100, default: 70 },
+  y: { type: Number, min: 0, max: 100, default: 55 },
+  lineColor: { type: String, match: /^#[0-9a-f]{6}$/i, default: "#ffffff" },
+  position: {
+    desktop: { type: BannerCardPositionSchema, default: undefined },
+    tablet: { type: BannerCardPositionSchema, default: undefined },
+    mobile: { type: BannerCardPositionSchema, default: undefined },
+  },
+}, { _id: false });
+
+const BannerTemplateTrustSchema = new Schema({
+  text: { type: String, default: "" },
+  image: { type: String, default: "" },
+}, { _id: false });
+
+const BannerCardTextStyleSchema = new Schema({
+  titleColor: { type: String, match: /^#[0-9a-f]{6}$/i },
+  labelColor: { type: String, match: /^#[0-9a-f]{6}$/i },
+  titleSizePx: { type: Number, min: 10, max: 24 },
+  labelSizePx: { type: Number, min: 8, max: 18 },
+  metallicTitle: { type: Boolean, default: false },
+}, { _id: false });
+
+const BannerTemplateConfigSchema = new Schema({
+  eyebrow: String,
+  eyebrowLink: String,
+  title: String,
+  titleLink: String,
+  description: String,
+  descriptionLink: String,
+  footerText: String,
+  footerTextLink: String,
+  primary: { type: BannerTemplateActionSchema, default: undefined },
+  secondary: { type: BannerTemplateActionSchema, default: undefined },
+  cards: { type: [BannerTemplateCardSchema], default: [] },
+  cardTextStyle: { type: BannerCardTextStyleSchema, default: undefined },
+  trustItems: { type: [BannerTemplateTrustSchema], default: [] },
+  textColor: String,
+  accentColor: String,
+  glassColor: String,
+  buttonAnimation: { type: String, enum: ["prism", "pearl", "aurora", "rose"], default: "prism" },
+  overlayOpacity: { type: Number, min: 0, max: 70 },
+}, { _id: false });
 
 const BannerSchema = new Schema(
   {
@@ -80,14 +166,33 @@ const BannerSchema = new Schema(
     },
 
     slides: { type: [BannerSlideSchema], default: [] },
+    templateId: { type: String, enum: ["plain", "classic", "discovery", "editorial", "atelier"], default: "classic" },
+    templateConfigs: {
+      discovery: { type: BannerTemplateConfigSchema, default: undefined },
+      editorial: { type: BannerTemplateConfigSchema, default: undefined },
+      atelier: { type: BannerTemplateConfigSchema, default: undefined },
+    },
 
     autoplayMs: { type: Number, default: 4500 },
+    sliderShowProgress: { type: Boolean, default: true },
+    sliderShowCounter: { type: Boolean, default: false },
+    sliderShowControls: { type: Boolean, default: true },
+    sliderControlColor: { type: String, default: "#ffffff", match: /^#[0-9a-fA-F]{6}$/ },
+    sliderControlTheme: { type: String, enum: ["minimal", "petal", "orbit", "editorial"], default: "minimal" },
+    sliderControlPosition: { type: String, enum: ["right", "left", "bottom"], default: "right" },
+    sliderControlSize: { type: Number, min: 80, max: 140, default: 100 },
 
     imageUrl: { type: String, default: "" },
+    imageTabletUrl: { type: String, default: "" },
+    imageMobileUrl: { type: String, default: "" },
     imageLink: { type: String, default: "" },
 
     imagePosX: { type: Number, default: 50 },
     imagePosY: { type: Number, default: 50 },
+    imageTabletPosX: { type: Number, min: 0, max: 100, default: 50 },
+    imageTabletPosY: { type: Number, min: 0, max: 100, default: 50 },
+    imageMobilePosX: { type: Number, min: 0, max: 100, default: 50 },
+    imageMobilePosY: { type: Number, min: 0, max: 100, default: 50 },
     imageFit: { type: String, enum: ["cover", "contain"], default: "cover" },
 
     imageButton: { type: ButtonSchema, default: () => ({}) },
@@ -108,6 +213,10 @@ const BannerSchema = new Schema(
     },
 
     heightPx: { type: Number, default: 520 },
+    tabletHeightMode: { type: String, enum: ["auto", "fullscreen"], default: "fullscreen" },
+    tabletHeightPx: { type: Number, min: 240, max: 1200, default: 1180 },
+    mobileHeightMode: { type: String, enum: ["auto", "fullscreen"], default: "fullscreen" },
+    mobileHeightPx: { type: Number, min: 240, max: 1200, default: 844 },
   },
   { _id: false }
 );
@@ -286,9 +395,23 @@ const ThemeSchema = new Schema(
       bgOpacity: Number,
       textColor: String,
       linkColor: String,
+      metallicMenuText: { type: Boolean, default: false },
+      searchBgColor: String,
+      searchTextColor: String,
+      searchAccentColor: String,
+      searchBorderColor: String,
 
       iconColor: String,
       iconHoverColor: String,
+      iconSet: { type: String, enum: ['classic', 'boutique', 'atelier', 'silk', 'editorial', 'essence', 'rose', 'noir', 'custom', 'gold', 'wine', 'satin', 'porcelain'], default: 'gold' },
+      iconImages: { account: String, search: String, favorites: String, cart: String },
+      iconOverrides: {
+        gold: { account: String, search: String, favorites: String, cart: String },
+        wine: { account: String, search: String, favorites: String, cart: String },
+        satin: { account: String, search: String, favorites: String, cart: String },
+        porcelain: { account: String, search: String, favorites: String, cart: String },
+      },
+      iconSizePx: { type: Number, min: 28, max: 40, default: 34 },
 
       menuAnimation: String,
       iconAnimation: String,
@@ -299,8 +422,14 @@ const ThemeSchema = new Schema(
 
       logoLight: String,
       logoDark: String,
+      logoMode: { type: String, enum: ["auto", "light", "dark"], default: "auto" },
 
       logoHeightPx: Number,
+      surfaceShape: { type: String, enum: ["attached", "floating"], default: "attached" },
+      cornerRadiusPx: { type: Number, min: 0, max: 48, default: 16 },
+      liquidGlassEnabled: { type: Boolean, default: false },
+      glassStrength: { type: Number, min: 0, max: 100, default: 75 },
+      glassMotion: { type: String, enum: ['', 'prism', 'pearl', 'aurora', 'rose', 'halo', 'comet', 'facet'], default: '' },
     },
 
     home: {
@@ -394,6 +523,12 @@ const MenuItemSchema = new Schema(
     title: { type: String, required: true, trim: true },
     type: { type: String, enum: ["page", "category", "url"], default: "url" },
     ref: { type: String, default: "" },
+    icon: {
+      type: String,
+      enum: ["grid", "home", "new", "collection", "offer", "gift", "shop", "favorites", "books", "food", "technology", "services", "nature", "dress", "jeans", "blouse", "heels", "shoes", "gown", "skirt", "jacket", "sneakers"],
+      default: "grid",
+    },
+    iconColor: { type: String, default: "" },
   },
   { _id: true }
 );
@@ -566,6 +701,7 @@ const SiteSettingsSchema = new Schema(
     shippingRatesRevision: { type: Number, min: 0, default: 0 },
 
     theme: ThemeSchema,
+    appearanceRevision: { type: Number, min: 0, default: 0 },
 
     admin: {
       type: AdminAppearanceSchema,

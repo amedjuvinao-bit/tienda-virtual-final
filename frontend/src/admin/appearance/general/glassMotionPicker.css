@@ -1,0 +1,12 @@
+.appearance-glass-motion { grid-column: 1 / -1; min-width: 0; }
+.appearance-glass-motion__intro { display: grid; gap: 3px; margin-bottom: 12px; color: #402439; }
+.appearance-glass-motion__intro small { font-size: 12px; color: #725f6c; }
+.appearance-glass-motion__grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,155px),1fr)); gap: 9px; }
+.appearance-glass-motion__choice.storefront-liquid-icon { min-height: 102px; padding: 13px; display: grid; justify-items: start; align-content: center; gap: 3px; text-align: left; cursor: pointer; border-radius: 18px; border: 1px solid #e5d4df; color: #42233c; }
+.appearance-glass-motion__choice[aria-pressed='true'] { border-color: #9d4f7a; box-shadow: inset 0 1px 1px #fff,0 0 0 2px #a4547b,0 8px 19px #6d355333; }
+.appearance-glass-motion__choice .appearance-glass-motion__gem { font-size: 23px; line-height: 1; color: #a34880; }
+.appearance-glass-motion__choice strong,.appearance-glass-motion__choice small { position: relative; z-index: 1; }
+.appearance-glass-motion__choice small { font-size: 11px; line-height: 1.25; color: #6b5365; }
+.appearance-glass-motion__choice:is(:hover,:focus-visible) > .rb-chrome-hover__surface::before,
+.appearance-glass-motion__choice:is(:hover,:focus-visible) > .rb-chrome-hover__surface::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .appearance-glass-motion__choice .rb-chrome-hover__surface::before,.appearance-glass-motion__choice .rb-chrome-hover__surface::after { transition: none; } }

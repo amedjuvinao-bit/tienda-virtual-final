@@ -1,0 +1,18 @@
+.section-real-preview { margin: 0; overflow: hidden; border: 1px solid var(--admin-card-border, #eadce6); border-radius: 18px; background: var(--admin-card-bg, #fff); box-shadow: 0 14px 30px color-mix(in srgb, var(--admin-primary, #a83368) 10%, transparent); }
+.section-real-preview__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; padding: 14px 20px; border-bottom: 1px solid var(--admin-card-border, #eee3eb); }
+.section-real-preview__header h3 { color: var(--admin-card-text, #332139); font-size: 18px; font-weight: 750; }
+.section-real-preview__header p { max-width: 450px; color: #715d6c; font-size: 12px; line-height: 1.5; }
+.section-real-preview__eyebrow { color: var(--admin-primary, #a3396d); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.section-real-preview__notice { margin: 12px 20px 0; padding: 9px 12px; border-radius: 9px; background: #fff3e0; color: #704616; font-size: 12px; }
+.section-real-preview__viewport { min-height: 320px; max-height: calc(96dvh - 210px); overflow: auto; background: var(--color-bg, #fff); isolation: isolate; scrollbar-width: thin; }
+.section-real-preview__stage { width: 100%; position: relative; overflow: hidden; }
+.section-real-preview__canvas { position: absolute; top: 0; left: 0; transform-origin: top left; }
+.section-real-preview__empty { display: flex; min-height: 260px; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; color: #765e6d; text-align: center; }
+.section-real-preview__empty strong { color: #392339; font-size: 16px; }
+.section-real-preview__empty span { max-width: 440px; font-size: 13px; }
+.section-real-preview__loading { padding: 48px 20px; color: #765e6d; text-align: center; }
+.section-real-preview__footnote { padding: 10px 20px 14px; color: var(--admin-card-muted-text, #866f7f); font-size: 11px; }
+
+.section-real-preview__devices { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.section-real-preview__devices button { min-height: 34px; padding: 6px 9px; border: 1px solid #e5ceda; border-radius: 9px; background: #fff; color: #785269; font-size: 11px; cursor: pointer; }
+.section-real-preview__devices [aria-pressed="true"] { border-color: #c9779d; color: #812c57; background: #fff0f7; }

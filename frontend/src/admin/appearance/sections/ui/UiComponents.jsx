@@ -8,7 +8,7 @@ const baseBtn =
   "inline-flex items-center justify-center rounded-lg border text-sm font-semibold px-3 py-2 transition focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed";
 
 const variants = {
-  solid: "bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800",
+  solid: "section-editor-accent text-white section-editor-accent-border section-editor-accent-hover",
   outline: "bg-white text-neutral-900 border-neutral-300 hover:bg-neutral-50",
   ghost: "bg-transparent text-neutral-700 border-transparent hover:bg-neutral-100",
 };

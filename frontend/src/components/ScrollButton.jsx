@@ -1,11 +1,14 @@
 // src/components/ScrollButton.jsx
-import React from "react";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ArrowUp, ArrowDown, ChevronUp, ChevronDown } from "lucide-react";
+import "./storefrontLiquidGlass.css";
+import './storefrontChromeGlassHover.css';
+import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
+import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import {
   DEFAULT_SECTION_IDS,
-  getCurrentSectionIndex,
-  getNextSectionIndex,
-  getPrevSectionIndex,
+  resolveSectionControlStyle,
+  getSectionControlPresetStyle,
 } from "../admin/appearance/general/generalHelpers";
 
 function getShadowValue(shadow) {
@@ -16,32 +19,42 @@ function getShadowValue(shadow) {
 
 function getButtonAnimation(name, fallback) {
   if (name === "none") return "none";
-  if (name === "pulse") return "rbScrollPulse 2s ease-in-out infinite";
-  if (name === "bounce") return "rbScrollBounce 2s ease-in-out infinite";
-  if (name === "moveUp") return "rbScrollMoveUp 2s ease-in-out infinite";
-  if (name === "moveDown") return "rbScrollMoveDown 2s ease-in-out infinite";
+  if (name === "pulse") return "rbScrollPulse 450ms ease-in-out 1";
+  if (name === "bounce") return "rbScrollBounce 550ms ease-in-out 1";
+  if (name === "moveUp") return "rbScrollMoveUp 450ms ease-in-out 1";
+  if (name === "moveDown") return "rbScrollMoveDown 450ms ease-in-out 1";
   return fallback;
 }
 
-function scrollExactlyToSection(id, options = {}) {
-  const el = document.getElementById(id);
-  if (!el) return;
+function getLayoutTop(element) {
+  let top = 0;
+  for (let node = element; node; node = node.offsetParent) top += node.offsetTop;
+  return top;
+}
 
-  const extraOffsetPx = Number.isFinite(Number(options.offsetTopPx))
-    ? Number(options.offsetTopPx)
-    : 0;
+function getSectionTargets(sectionIds) {
+  return sectionIds
+    .map((id) => document.getElementById(id))
+    .filter((element) => element && !element.matches('.storefront-section-shell:empty'))
+    .map((element) => ({
+      id: element.id,
+      top: getLayoutTop(element),
+    }))
+    .sort((a, b) => a.top - b.top);
+}
 
-  const behavior = options.behavior === "auto" ? "auto" : "smooth";
-
-  const y = el.getBoundingClientRect().top + window.pageYOffset - extraOffsetPx;
-
+function scrollExactlyToSection(target, options = {}) {
+  if (!target) return;
+  const offset = Math.max(0, Number(options.offsetTopPx) || 0);
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   window.scrollTo({
-    top: Math.max(0, y),
-    behavior,
+    top: Math.max(0, target.top - offset),
+    behavior: reducedMotion || options.behavior === "auto" ? "auto" : "smooth",
   });
 }
 
-export default function ScrollButton({ config }) {
+export default function ScrollButton({ config, buttonAnimation }) {
+  const [activeAnimation, setActiveAnimation] = useState(null);
   const safeConfig = config && typeof config === "object" ? config : {};
 
   const sectionIds =
@@ -50,6 +63,7 @@ export default function ScrollButton({ config }) {
       : DEFAULT_SECTION_IDS;
 
   const enabled = safeConfig.enabled !== false;
+  const visualStyle = resolveSectionControlStyle(safeConfig.visualStyle);
   const showUp = safeConfig.showUp !== false;
   const showDown = safeConfig.showDown !== false;
 
@@ -103,26 +117,39 @@ export default function ScrollButton({ config }) {
     ? Number(safeConfig.downImageSizePercent)
     : 70;
 
-  const scrollToIndex = (index) => {
-    const id = sectionIds[index];
-    if (!id) return;
+  useEffect(() => {
+    document.documentElement.classList.toggle("rb-section-dock-enabled", enabled);
+    document.documentElement.style.setProperty(
+      "--rb-scroll-dock-height",
+      `${Math.max(0, bottomPx + buttonSizePx + 48)}px`
+    );
+    return () => {
+      document.documentElement.classList.remove("rb-section-dock-enabled");
+      document.documentElement.style.removeProperty("--rb-scroll-dock-height");
+    };
+  }, [enabled, bottomPx, buttonSizePx]);
 
-    scrollExactlyToSection(id, {
-      offsetTopPx,
-      behavior,
-    });
+  const navigate = (direction) => {
+    const targets = getSectionTargets(sectionIds);
+    if (!targets.length) return;
+    const headerOffset = Math.max(0, offsetTopPx);
+    const currentTop = window.scrollY + headerOffset + 4;
+    const currentIndex = targets.reduce((index, item, nextIndex) => item.top <= currentTop ? nextIndex : index, 0);
+    const targetIndex = direction === "next"
+      ? (currentIndex + 1) % targets.length
+      : (currentIndex - 1 + targets.length) % targets.length;
+    const target = targets[targetIndex];
+    scrollExactlyToSection(target, { offsetTopPx: direction === "next" ? 0 : headerOffset, behavior });
   };
 
   const handlePrev = () => {
-    const currentIndex = getCurrentSectionIndex(sectionIds);
-    const prevIndex = getPrevSectionIndex(currentIndex, sectionIds);
-    scrollToIndex(prevIndex);
+    setActiveAnimation("up");
+    navigate("prev");
   };
 
   const handleNext = () => {
-    const currentIndex = getCurrentSectionIndex(sectionIds);
-    const nextIndex = getNextSectionIndex(currentIndex, sectionIds);
-    scrollToIndex(nextIndex);
+    setActiveAnimation("down");
+    navigate("next");
   };
 
   if (!enabled) return null;
@@ -137,11 +164,12 @@ export default function ScrollButton({ config }) {
   const baseButtonStyle = {
     width: `${buttonSizePx}px`,
     height: `${buttonSizePx}px`,
-    background: bgColor,
+    "--liquid-tint": bgColor,
     border: `${borderWidthPx}px solid ${borderColor}`,
     borderRadius: `${borderRadiusPx}px`,
     boxShadow: getShadowValue(shadow),
     overflow: "hidden",
+    ...getSectionControlPresetStyle(visualStyle, safeConfig),
   };
 
   const upImageSizePx = (buttonSizePx * upImageSizePercent) / 100;
@@ -176,21 +204,27 @@ export default function ScrollButton({ config }) {
         className="hidden md:flex fixed z-50 items-center"
         style={{
           bottom: `${bottomPx}px`,
-          gap: `${gapPx}px`,
+          gap: `${visualStyle === "editorial" ? Math.max(gapPx, 22) : gapPx}px`,
           ...wrapperPositionStyle,
         }}
       >
         {showUp && (
           <button
             onClick={handlePrev}
-            className="flex items-center justify-center transition-transform duration-200 hover:scale-105"
+            onPointerMove={moveChromeGlassLight}
+            data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
+            data-click-animation={activeAnimation === 'up'}
+            onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
+            className="storefront-liquid-icon"
+            data-scroll-style={visualStyle}
             style={{
               ...baseButtonStyle,
-              animation: getButtonAnimation(upAnimation, "rbScrollMoveUp 2s ease-in-out infinite"),
+              animation: activeAnimation === 'up' ? getButtonAnimation(upAnimation, "rbScrollMoveUp 450ms ease-in-out 1") : 'none',
             }}
             aria-label="Sección anterior"
             type="button"
           >
+            <span className="rb-chrome-hover__surface" aria-hidden="true" />
             {upUseCustomImage && upImageUrl ? (
               <img
                 src={upImageUrl}
@@ -202,31 +236,41 @@ export default function ScrollButton({ config }) {
                 }}
               />
             ) : (
-              <ArrowUp
+              visualStyle === "editorial" ? <ChevronUp
                 style={{
                   width: `${buttonSizePx * 0.55}px`,
                   height: `${buttonSizePx * 0.55}px`,
                   color: iconColor,
                 }}
+              /> : <ArrowUp
+                style={{ width: `${buttonSizePx * 0.55}px`, height: `${buttonSizePx * 0.55}px`, color: iconColor }}
               />
             )}
           </button>
         )}
 
+        {visualStyle === "editorial" && showUp && showDown && <span aria-hidden="true" style={{ width: "1px", height: `${Math.round(buttonSizePx * .55)}px`, background: iconColor, opacity: .55 }} />}
+
         {showDown && (
           <button
             onClick={handleNext}
-            className="flex items-center justify-center transition-transform duration-200 hover:scale-105"
+            onPointerMove={moveChromeGlassLight}
+            data-button-animation={resolveChromeGlassMotion(safeConfig.glassMotion, safeBannerButtonAnimation(buttonAnimation))}
+            data-click-animation={activeAnimation === 'down'}
+            onAnimationEnd={(event) => { if (event.animationName === 'rb-chrome-edge') setActiveAnimation(null); }}
+            className="storefront-liquid-icon"
+            data-scroll-style={visualStyle}
             style={{
               ...baseButtonStyle,
-              animation: getButtonAnimation(
+              animation: activeAnimation === 'down' ? getButtonAnimation(
                 downAnimation,
-                "rbScrollMoveDown 2s ease-in-out infinite"
-              ),
+                "rbScrollMoveDown 450ms ease-in-out 1"
+              ) : 'none',
             }}
             aria-label="Siguiente sección"
             type="button"
           >
+            <span className="rb-chrome-hover__surface" aria-hidden="true" />
             {downUseCustomImage && downImageUrl ? (
               <img
                 src={downImageUrl}
@@ -238,12 +282,14 @@ export default function ScrollButton({ config }) {
                 }}
               />
             ) : (
-              <ArrowDown
+              visualStyle === "editorial" ? <ChevronDown
                 style={{
                   width: `${buttonSizePx * 0.55}px`,
                   height: `${buttonSizePx * 0.55}px`,
                   color: iconColor,
                 }}
+              /> : <ArrowDown
+                style={{ width: `${buttonSizePx * 0.55}px`, height: `${buttonSizePx * 0.55}px`, color: iconColor }}
               />
             )}
           </button>
