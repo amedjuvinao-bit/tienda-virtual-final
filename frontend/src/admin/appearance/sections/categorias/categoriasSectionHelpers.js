@@ -1,3 +1,4 @@
+import { CATEGORIAS_FAN_CONFIG, CATEGORIAS_FAN_STYLE, normalizeCategoriasFanConfig, normalizeCategoriasFanStyle, normalizeCategoryPhoto } from './categoriasFanHelpers';
 // src/admin/appearance/sections/categorias/categoriasSectionHelpers.js
 
 export const CATEGORIAS_SECTION_ID = "categorias";
@@ -10,8 +11,9 @@ export const CATEGORIAS_SECTION_DEFAULTS = {
   enabled: true,
 
   config: {
+    ...CATEGORIAS_FAN_CONFIG,
     titleImage: "/SeccionCategoria/TituloCate.png",
-    titleText: "Categorías",
+    titleText: "Cada detalle, una historia",
     titleAlt: "Título de categorías",
 
     slides: [
@@ -79,6 +81,7 @@ export const CATEGORIAS_SECTION_DEFAULTS = {
   },
 
   style: {
+    ...CATEGORIAS_FAN_STYLE,
     sectionMaxWidthPx: 1280,
     sectionPaddingTopPx: 64,
     sectionPaddingBottomPx: 24,
@@ -191,15 +194,16 @@ function normalizeSlide(raw = {}, index = 0) {
     };
 
   return {
+    ...normalizeCategoryPhoto(raw),
     id: asString(raw?.id, base.id).trim() || base.id,
     image: asString(raw?.image, base.image).trim(),
-    title: asString(raw?.title, base.title).trim(),
-    subtitle: asString(raw?.subtitle, base.subtitle).trim(),
-    review: asString(raw?.review, base.review).trim(),
-    badge: asString(raw?.badge, base.badge).trim(),
+    title: asString(raw?.title, base.title),
+    subtitle: asString(raw?.subtitle, base.subtitle),
+    review: asString(raw?.review, base.review),
+    badge: asString(raw?.badge, base.badge),
     buttonImg: asString(raw?.buttonImg, base.buttonImg).trim(),
-    buttonText: asString(raw?.buttonText, base.buttonText).trim() || "Ver más",
-    href: asString(raw?.href, base.href).trim() || "/",
+    buttonText: asString(raw?.buttonText, base.buttonText),
+    href: asString(raw?.href, base.href),
     enabled: asBool(raw?.enabled, base.enabled),
   };
 }
@@ -209,9 +213,10 @@ export function normalizeCategoriasSectionConfig(input = {}) {
   const rawSlides = Array.isArray(input?.slides) ? input.slides : base.slides;
 
   return {
+    ...normalizeCategoriasFanConfig(input),
     titleImage: asString(input?.titleImage, base.titleImage).trim(),
-    titleText: asString(input?.titleText, base.titleText).trim() || base.titleText,
-    titleAlt: asString(input?.titleAlt, base.titleAlt).trim() || base.titleAlt,
+    titleText: input?.titleText === "Categorías" ? base.titleText : asString(input?.titleText, base.titleText),
+    titleAlt: asString(input?.titleAlt, base.titleAlt),
     slides: rawSlides.map((slide, index) => normalizeSlide(slide, index)),
   };
 }
@@ -220,6 +225,7 @@ export function normalizeCategoriasSectionStyle(input = {}) {
   const base = CATEGORIAS_SECTION_DEFAULTS.style;
 
   return {
+    ...normalizeCategoriasFanStyle(input),
     sectionMaxWidthPx: clampNumber(
       input?.sectionMaxWidthPx,
       480,

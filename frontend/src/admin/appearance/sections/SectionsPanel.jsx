@@ -1,3 +1,4 @@
+import { normalizeCategoriasSection } from './categorias/categoriasSectionHelpers';
 import { normalizeComplementosSection } from './complementos/complementosSectionHelpers';
 // src/admin/appearance/sections/SectionsPanel.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -277,6 +278,7 @@ function normalizeSection(raw, index) {
   const name = (typeof safe.name === "string" && safe.name.trim()) || inferNameFromId(id);
   const enabled = typeof safe.enabled === "boolean" ? safe.enabled : true;
 
+  if (type === "categorias") return normalizeCategoriasSection({ ...safe, id, type, name, enabled });
   if (type === "complementos") return normalizeComplementosSection({ ...safe, id, type, name, enabled });
 
   const style = {
