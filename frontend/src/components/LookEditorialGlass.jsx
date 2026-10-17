@@ -16,9 +16,34 @@ function displayProductName(value) {
     (_, separator, letter) => separator + letter.toLocaleUpperCase("es-CO"));
 }
 
+const CARD_CLICK_ANIMATIONS = {
+  lift: [
+    { transform: "translateY(0) scale(1)", offset: 0 },
+    { transform: "translateY(-5px) scale(1.015)", offset: .45 },
+    { transform: "translateY(0) scale(1)", offset: 1 },
+  ],
+  tilt: [
+    { transform: "perspective(900px) rotateY(0deg) rotateX(0deg)", offset: 0 },
+    { transform: "perspective(900px) rotateY(-4deg) rotateX(2deg)", offset: .42 },
+    { transform: "perspective(900px) rotateY(0deg) rotateX(0deg)", offset: 1 },
+  ],
+  glow: [
+    { filter: "brightness(1)", offset: 0 },
+    { filter: "brightness(1.12)", offset: .48 },
+    { filter: "brightness(1)", offset: 1 },
+  ],
+  press: [
+    { transform: "scale(1)", offset: 0 },
+    { transform: "scale(.965)", offset: .28 },
+    { transform: "scale(1.008)", offset: .65 },
+    { transform: "scale(1)", offset: 1 },
+  ],
+};
+
 export default function LookEditorialGlass({ config, style, products, mainImage, mainImageAlt, selectedId, onSelect,
   onCart, onFavorite, isFavorite, loading }) {
   const pausedRef = useRef(false);
+  const cardAnimationsRef = useRef(new WeakMap());
   const [loadedHero, setLoadedHero] = useState({ src: "", ratio: "" });
   const [railIndex, setRailIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" &&
@@ -130,12 +155,12 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     onSelect(id);
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
     // Keen moves the slide itself. Animate its inner surface so the click never fights that movement.
-    event.currentTarget.closest(".look-editorial__card-surface")?.animate?.([
-      { transform: "perspective(850px) translateY(-3px) scale(1)" },
-      { transform: "perspective(850px) translateY(1px) scale(.97)", offset: .18 },
-      { transform: "perspective(850px) translateY(-12px) scale(1.045)", offset: .56 },
-      { transform: "perspective(850px) translateY(-7px) scale(1.015)" },
-    ], { duration: 520, easing: "cubic-bezier(.22, 1, .36, 1)" });
+    const surface = event.currentTarget.closest(".look-editorial__card-surface");
+    if (!surface?.animate) return;
+    cardAnimationsRef.current.get(surface)?.cancel?.();
+    const frames = CARD_CLICK_ANIMATIONS[style.editorialCardClickAnimation] || CARD_CLICK_ANIMATIONS.lift;
+    cardAnimationsRef.current.set(surface, surface.animate(frames,
+      { duration: 420, easing: "cubic-bezier(.22, 1, .36, 1)" }));
   };
 
   const coverCard = <article key="cover"

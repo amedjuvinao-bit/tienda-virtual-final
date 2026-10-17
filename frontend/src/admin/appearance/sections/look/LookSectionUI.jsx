@@ -824,6 +824,23 @@ export default function LookSectionUI({
                   <ToggleChip active={!!style.thumbShadow} onClick={() => patchStyle({ thumbShadow: true })}>Con sombra</ToggleChip>
                   <ToggleChip active={!style.thumbShadow} onClick={() => patchStyle({ thumbShadow: false })}>Sin sombra</ToggleChip>
                 </div></Field>
+                <Field label="Animación al elegir una tarjeta" hint="Elige una opción y haz clic en una tarjeta de la vista previa para probarla.">
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Animación al elegir una tarjeta">
+                    {[
+                      { value: "lift", label: "Elevación", detail: "Sube suavemente" },
+                      { value: "tilt", label: "Perspectiva", detail: "Gira con sutileza" },
+                      { value: "glow", label: "Luz", detail: "Ilumina el cristal" },
+                      { value: "press", label: "Toque", detail: "Responde al pulsar" },
+                    ].map(({ value, label, detail }) => <button key={value} type="button"
+                      aria-pressed={style.editorialCardClickAnimation === value}
+                      onClick={() => patchStyle({ editorialCardClickAnimation: value })}
+                      className={`rounded-xl border px-3 py-2 text-left transition-colors ${style.editorialCardClickAnimation === value
+                        ? "border-rose-400 bg-rose-50 text-rose-950" : "border-neutral-200 bg-white text-neutral-700 hover:border-rose-200"}`}>
+                      <span className="block text-sm font-semibold">{label}</span>
+                      <span className="block text-xs opacity-75">{detail}</span>
+                    </button>)}
+                  </div>
+                </Field>
               </div>}
 
               <div className="grid xl:grid-cols-2 gap-4 mt-4">

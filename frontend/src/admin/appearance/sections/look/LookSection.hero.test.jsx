@@ -98,6 +98,39 @@ describe('imagen principal independiente de Looks', () => {
     expect(normalizeLookSection({ style: { editorialVisibleCards: 4 } }).style.editorialVisibleCards).toBe(3);
   });
 
+  it('ofrece cuatro animaciones, guarda la elección y la aplica al pulsar la tarjeta', () => {
+    const onSave = vi.fn();
+    const { unmount } = render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Miniaturas' }));
+    const choices = [
+      ['Elevación', 'lift'], ['Perspectiva', 'tilt'], ['Luz', 'glow'], ['Toque', 'press'],
+    ];
+    for (const [label, value] of choices) {
+      const option = screen.getByRole('button', { name: new RegExp(label) });
+      fireEvent.click(option);
+      expect(option).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+      expect(onSave.mock.lastCall[0].style.editorialCardClickAnimation).toBe(value);
+    }
+    unmount();
+
+    const keyframes = [];
+    for (const [label, value] of choices) {
+      const section = normalizeLookSection({ config: { products }, style: { editorialCardClickAnimation: value } });
+      const view = render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
+      const surface = screen.getByRole('button', { name: 'Mostrar Vestido azul' }).closest('.look-editorial__card-surface');
+      surface.animate = vi.fn();
+      fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
+      expect(surface.animate).toHaveBeenCalledTimes(1);
+      keyframes.push(JSON.stringify(surface.animate.mock.calls[0][0]));
+      expect(surface.animate.mock.calls[0][1].duration).toBe(420);
+      view.unmount();
+    }
+    expect(new Set(keyframes).size).toBe(4);
+    expect(normalizeLookSection({ style: { editorialCardClickAnimation: 'unknown' } }).style.editorialCardClickAnimation).toBe('lift');
+  });
+
   it('migra la tipografía antigua de la vitrina y conserva una elección posterior del usuario', () => {
     const migrated = normalizeLookSection({ style: {
       layoutPreset: 'editorialGlass', thumbTitleColor: '#1f2937', thumbPriceColor: '#e11d48',
