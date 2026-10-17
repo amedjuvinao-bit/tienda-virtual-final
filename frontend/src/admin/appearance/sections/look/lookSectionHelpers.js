@@ -74,7 +74,7 @@ export const LOOK_SECTION_DEFAULTS = {
     editorialTitleWeight: 400,
     editorialVisibleCards: 3,
     editorialCardGapPx: 12,
-    editorialCardClickAnimation: "lift",
+    editorialHeroTransition: "dissolve",
 
     titleAlign: "center",
     titleImageWidthPx: 520,
@@ -334,8 +334,8 @@ export function normalizeLookSectionStyle(input = {}) {
     editorialTitleWeight: clampNumber(input?.editorialTitleWeight, 300, 800, base.editorialTitleWeight),
     editorialVisibleCards: clampNumber(input?.editorialVisibleCards, 2, 3, base.editorialVisibleCards),
     editorialCardGapPx: clampNumber(input?.editorialCardGapPx, 4, 30, base.editorialCardGapPx),
-    editorialCardClickAnimation: ["lift", "tilt", "glow", "press"].includes(input?.editorialCardClickAnimation)
-      ? input.editorialCardClickAnimation : base.editorialCardClickAnimation,
+    editorialHeroTransition: ["dissolve", "float", "reveal", "focus"].includes(input?.editorialHeroTransition)
+      ? input.editorialHeroTransition : base.editorialHeroTransition,
 
     titleAlign: ["left", "center", "right"].includes(input?.titleAlign)
       ? input.titleAlign

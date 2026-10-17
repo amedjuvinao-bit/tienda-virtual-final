@@ -2,6 +2,14 @@
 .look-editorial__scene { position: relative; width: 100%; min-height: 590px; margin: auto; display: grid; grid-template-columns: 52% 48%; align-items: start; }
 .look-editorial__hero { position: relative; z-index: 1; min-width: 0; aspect-ratio: var(--look-hero-aspect); border-radius: var(--look-hero-radius); background: color-mix(in srgb, var(--look-background) 65%, white); box-shadow: var(--look-hero-shadow), 0 17px 28px rgba(64,27,39,.2); overflow: hidden; }
 .look-editorial__hero-photo { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; border-radius: inherit; }
+.look-editorial__hero-photo--dissolve { animation: look-hero-dissolve .48s ease-out both; }
+.look-editorial__hero-photo--float { animation: look-hero-float .52s cubic-bezier(.22, 1, .36, 1) both; }
+.look-editorial__hero-photo--reveal { animation: look-hero-reveal .55s cubic-bezier(.22, 1, .36, 1) both; }
+.look-editorial__hero-photo--focus { animation: look-hero-focus .56s ease-out both; }
+@keyframes look-hero-dissolve { from { opacity: .12; } to { opacity: 1; } }
+@keyframes look-hero-float { from { opacity: .2; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
+@keyframes look-hero-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes look-hero-focus { from { opacity: .45; filter: blur(7px); } to { opacity: 1; filter: blur(0); } }
 .look-editorial__hero--crop .look-editorial__hero-photo { object-fit: cover; }
 .look-editorial__empty { display: grid; place-items: center; height: 100%; background: rgba(255,255,255,.28); }
 .look-editorial__hero-controls { position: absolute; bottom: 22px; left: 22px; z-index: 6; display: flex; gap: 10px; }

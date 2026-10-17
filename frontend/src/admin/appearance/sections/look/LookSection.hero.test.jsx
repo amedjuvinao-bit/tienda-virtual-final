@@ -49,7 +49,7 @@ describe('imagen principal independiente de Looks', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ products: [
       { _id: 'p1', title: 'Vestido azul', image: '/vestido.jpg', price: 100000 },
     ] }) }));
-    render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
+    const view = render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
     expect(document.querySelector('.look-editorial__hero-photo')).toHaveAttribute('src', imageUrl);
     const hero = document.querySelector('.look-editorial__hero');
@@ -60,14 +60,19 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
     expect(interval).toHaveBeenCalledWith(expect.any(Function), 5200);
-    const productSurface = screen.getByRole('button', { name: 'Mostrar Vestido azul' }).closest('.look-editorial__card-surface');
-    const animate = vi.fn();
-    productSurface.animate = animate;
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
     expect(document.querySelector('.look-editorial__hero img')).toHaveAttribute('src', '/vestido.jpg');
-    expect(animate).toHaveBeenCalledTimes(1);
+    expect(hero.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '800 / 1000' });
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
+
+    const replacementCover = '/portada-horizontal.jpg';
+    view.rerender(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: replacementCover } }] }} previewProducts={products} />);
+    const updatedPhoto = screen.getByAltText('Imagen principal de Looks');
+    expect(updatedPhoto).toHaveAttribute('src', replacementCover);
+    Object.defineProperties(updatedPhoto, { naturalWidth: { value: 1200 }, naturalHeight: { value: 800 } });
+    fireEvent.load(updatedPhoto);
+    expect(hero.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '1200 / 800' });
   });
 
   it('en móvil mantiene llena la transición y la portada accesible con pocos productos', () => {
@@ -98,37 +103,42 @@ describe('imagen principal independiente de Looks', () => {
     expect(normalizeLookSection({ style: { editorialVisibleCards: 4 } }).style.editorialVisibleCards).toBe(3);
   });
 
-  it('ofrece cuatro animaciones, guarda la elección y la aplica al pulsar la tarjeta', () => {
+  it('ofrece cuatro transiciones de la foto grande sin contraer la sección', () => {
     const onSave = vi.fn();
     const { unmount } = render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Miniaturas' }));
     const choices = [
-      ['Elevación', 'lift'], ['Perspectiva', 'tilt'], ['Luz', 'glow'], ['Toque', 'press'],
+      ['Fundido', 'dissolve'], ['Deslizar', 'float'], ['Revelar', 'reveal'], ['Enfoque', 'focus'],
     ];
     for (const [label, value] of choices) {
       const option = screen.getByRole('button', { name: new RegExp(label) });
       fireEvent.click(option);
       expect(option).toHaveAttribute('aria-pressed', 'true');
       fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
-      expect(onSave.mock.lastCall[0].style.editorialCardClickAnimation).toBe(value);
+      expect(onSave.mock.lastCall[0].style.editorialHeroTransition).toBe(value);
     }
     unmount();
 
-    const keyframes = [];
-    for (const [label, value] of choices) {
-      const section = normalizeLookSection({ config: { products }, style: { editorialCardClickAnimation: value } });
+    for (const [, value] of choices) {
+      const section = normalizeLookSection({ config: { products, heroMode: 'custom', heroImage: imageUrl },
+        style: { editorialHeroTransition: value } });
       const view = render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
-      const surface = screen.getByRole('button', { name: 'Mostrar Vestido azul' }).closest('.look-editorial__card-surface');
-      surface.animate = vi.fn();
+      const firstPhoto = screen.getByAltText('Imagen principal de Looks');
+      Object.defineProperties(firstPhoto, { naturalWidth: { value: 800 }, naturalHeight: { value: 1000 } });
+      fireEvent.load(firstPhoto);
+      const scene = document.querySelector('.look-editorial__scene');
+      expect(scene.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '800 / 1000' });
       fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
-      expect(surface.animate).toHaveBeenCalledTimes(1);
-      keyframes.push(JSON.stringify(surface.animate.mock.calls[0][0]));
-      expect(surface.animate.mock.calls[0][1].duration).toBe(420);
+      const newPhoto = document.querySelector('.look-editorial__hero-photo');
+      expect(newPhoto).toHaveClass(`look-editorial__hero-photo--${value}`);
+      expect(newPhoto).toHaveAttribute('src', '/vestido.jpg');
+      Object.defineProperties(newPhoto, { naturalWidth: { value: 1200 }, naturalHeight: { value: 800 } });
+      fireEvent.load(newPhoto);
+      expect(scene.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '800 / 1000' });
       view.unmount();
     }
-    expect(new Set(keyframes).size).toBe(4);
-    expect(normalizeLookSection({ style: { editorialCardClickAnimation: 'unknown' } }).style.editorialCardClickAnimation).toBe('lift');
+    expect(normalizeLookSection({ style: { editorialHeroTransition: 'unknown' } }).style.editorialHeroTransition).toBe('dissolve');
   });
 
   it('migra la tipografía antigua de la vitrina y conserva una elección posterior del usuario', () => {

@@ -16,39 +16,16 @@ function displayProductName(value) {
     (_, separator, letter) => separator + letter.toLocaleUpperCase("es-CO"));
 }
 
-const CARD_CLICK_ANIMATIONS = {
-  lift: [
-    { transform: "translateY(0) scale(1)", offset: 0 },
-    { transform: "translateY(-5px) scale(1.015)", offset: .45 },
-    { transform: "translateY(0) scale(1)", offset: 1 },
-  ],
-  tilt: [
-    { transform: "perspective(900px) rotateY(0deg) rotateX(0deg)", offset: 0 },
-    { transform: "perspective(900px) rotateY(-4deg) rotateX(2deg)", offset: .42 },
-    { transform: "perspective(900px) rotateY(0deg) rotateX(0deg)", offset: 1 },
-  ],
-  glow: [
-    { filter: "brightness(1)", offset: 0 },
-    { filter: "brightness(1.12)", offset: .48 },
-    { filter: "brightness(1)", offset: 1 },
-  ],
-  press: [
-    { transform: "scale(1)", offset: 0 },
-    { transform: "scale(.965)", offset: .28 },
-    { transform: "scale(1.008)", offset: .65 },
-    { transform: "scale(1)", offset: 1 },
-  ],
-};
-
 export default function LookEditorialGlass({ config, style, products, mainImage, mainImageAlt, selectedId, onSelect,
   onCart, onFavorite, isFavorite, loading }) {
   const pausedRef = useRef(false);
-  const cardAnimationsRef = useRef(new WeakMap());
   const [loadedHero, setLoadedHero] = useState({ src: "", ratio: "" });
   const [railIndex, setRailIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" &&
     Boolean(window.matchMedia?.("(max-width: 699px)").matches));
   const hasCover = config.heroMode === "custom" && Boolean(config.heroImage);
+  const frameSource = hasCover ? config.heroImage : products[0]?.image || "";
+  const frameRatio = loadedHero.src === frameSource ? loadedHero.ratio : "";
   const options = [hasCover ? { id: "", image: config.heroImage } : null, ...products].filter(Boolean);
   const mobileOptions = [...products, ...(hasCover ? [{ id: "", image: config.heroImage }] : [])];
   const cardCount = products.length + Number(hasCover);
@@ -120,8 +97,9 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     "--look-button-border": style.actionButtonBorderColor,
     "--look-favorite-color": style.actionFavoriteColor,
     "--look-cart-color": style.actionCartColor,
-    "--look-hero-aspect": style.editorialHeroFit !== "crop" && loadedHero.src === mainImage
-      ? loadedHero.ratio : style.editorialHeroAspect.replace("/", " / "),
+    // Card selection keeps the frame stable; replacing the cover can establish a new ratio.
+    "--look-hero-aspect": style.editorialHeroFit !== "crop" && frameRatio
+      ? frameRatio : style.editorialHeroAspect.replace("/", " / "),
     "--look-shadow": style.thumbShadow ? `0 ${Math.round(16 + depth * 26)}px ${Math.round(28 + depth * 46)}px rgba(72, 29, 46, ${(.17 + depth * .22).toFixed(2)}), 0 ${Math.round(7 + depth * 10)}px ${Math.round(10 + depth * 15)}px rgba(94, 45, 44, ${(.11 + depth * .17).toFixed(2)})` : "none",
     "--look-hero-shadow": style.mainImageShadow ? `0 ${Math.round(16 + depth * 26)}px ${Math.round(28 + depth * 46)}px rgba(72, 29, 46, ${(.17 + depth * .22).toFixed(2)}), 0 9px 16px rgba(94,45,44,.16)` : "none",
     "--look-padding-top": `${style.sectionPaddingTopPx}px`,
@@ -151,22 +129,10 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     textDecoration: style.thumbPriceUnderline ? "underline" : undefined,
   };
 
-  const selectCard = (event, id) => {
-    onSelect(id);
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
-    // Keen moves the slide itself. Animate its inner surface so the click never fights that movement.
-    const surface = event.currentTarget.closest(".look-editorial__card-surface");
-    if (!surface?.animate) return;
-    cardAnimationsRef.current.get(surface)?.cancel?.();
-    const frames = CARD_CLICK_ANIMATIONS[style.editorialCardClickAnimation] || CARD_CLICK_ANIMATIONS.lift;
-    cardAnimationsRef.current.set(surface, surface.animate(frames,
-      { duration: 420, easing: "cubic-bezier(.22, 1, .36, 1)" }));
-  };
-
   const coverCard = <article key="cover"
     className={`look-editorial__card look-editorial__card--cover keen-slider__slide ${!selectedId ? "is-selected" : ""}`}>
     <div className="look-editorial__card-surface">
-      <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={(event) => selectCard(event, "")}>
+      <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={() => onSelect("")}>
         <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
         <span className="look-editorial__cover-badge" aria-hidden="true">Portada</span>
       </button>
@@ -180,10 +146,13 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   return <section className="look-editorial" style={css} aria-label="Looks">
     <div className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
       <div className={`look-editorial__hero ${style.editorialHeroFit === "crop" ? "look-editorial__hero--crop" : ""}`}>
-        {mainImage ? <img className="look-editorial__hero-photo" src={mainImage} alt={mainImageAlt || "Imagen principal de Looks"}
+        {mainImage ? <img key={mainImage} className={`look-editorial__hero-photo look-editorial__hero-photo--${style.editorialHeroTransition}`}
+          src={mainImage} alt={mainImageAlt || "Imagen principal de Looks"}
           onLoad={(event) => {
             const { naturalWidth, naturalHeight } = event.currentTarget;
-            if (naturalWidth && naturalHeight) setLoadedHero({ src: mainImage, ratio: `${naturalWidth} / ${naturalHeight}` });
+            if (!frameRatio && naturalWidth && naturalHeight) {
+              setLoadedHero({ src: frameSource, ratio: `${naturalWidth} / ${naturalHeight}` });
+            }
           }} />
           : <div className="look-editorial__empty">{loading ? "Cargando looks…" : "Selecciona una portada o un producto"}</div>}
         <div className="look-editorial__hero-controls">
@@ -212,7 +181,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
             {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
               <div className="look-editorial__card-surface">
                 <img className="look-editorial__card-backdrop" src={product.image} alt="" aria-hidden="true" loading="lazy" />
-                <button type="button" className="look-editorial__card-image" onClick={(event) => selectCard(event, product.id)} aria-label={`Mostrar ${product.subtitle}`}>
+                <button type="button" className="look-editorial__card-image" onClick={() => onSelect(product.id)} aria-label={`Mostrar ${product.subtitle}`}>
                   <img src={product.image} alt={product.subtitle} loading="lazy" />
                 </button>
                 {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
