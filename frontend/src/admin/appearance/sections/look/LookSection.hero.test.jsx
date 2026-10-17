@@ -70,15 +70,20 @@ describe('imagen principal independiente de Looks', () => {
     expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
   });
 
-  it('en móvil muestra primero los productos y mantiene la portada accesible al final', () => {
+  it('en móvil mantiene llena la transición y la portada accesible con pocos productos', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
-    render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
+    const mobileProducts = [...products, { productId: 'p2', title: 'Body blanco', mainImage: '/body.jpg', price: 80000 }];
+    render(<LookSection theme={{ sections: [{ id: 'look', config: { products: mobileProducts, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={mobileProducts} />);
     const cards = [...document.querySelectorAll('.look-editorial__cards .look-editorial__card')];
-    expect(cards).toHaveLength(2);
-    expect(cards[0].querySelector('[aria-label="Mostrar Vestido azul"]')).toBeInTheDocument();
-    expect(cards[1].querySelector('[aria-label="Mostrar imagen principal"]')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
+    expect(cards).toHaveLength(9);
+    for (let offset = 0; offset < cards.length; offset += 3) {
+      expect(cards[offset].querySelector('[aria-label="Mostrar Vestido azul"]')).toBeInTheDocument();
+      expect(cards[offset + 1].querySelector('[aria-label="Mostrar Body blanco"]')).toBeInTheDocument();
+      expect(cards[offset + 2].querySelector('[aria-label="Mostrar imagen principal"]')).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole('button', { name: /Mostrar tarjeta/ })).toHaveLength(3);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Mostrar Vestido azul' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Mostrar imagen principal' })[0]);
     expect(document.querySelector('.look-editorial__hero-photo')).toHaveAttribute('src', imageUrl);
   });
 

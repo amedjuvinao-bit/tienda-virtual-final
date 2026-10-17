@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Heart, ShoppingBag } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
 import LookGlassRim from "./LookGlassRim";
@@ -28,19 +28,22 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
   const mobileOptions = [...products, ...(hasCover ? [{ id: "", image: config.heroImage }] : [])];
   const cardCount = products.length + Number(hasCover);
   const canSlide = cardCount > 1;
+  // Keen needs more physical slides than the mobile viewport shows to keep a short loop filled.
+  const mobileCopies = isMobile && canSlide ? Math.max(1, Math.ceil(8 / cardCount)) : 1;
   const visibleCards = Math.min(style.editorialVisibleCards === 2 ? 2 : 3, cardCount || 1);
-  const [railRef, railInstanceRef] = useKeenSlider({
+  const railOptions = useMemo(() => ({
     loop: canSlide,
     drag: canSlide,
     defaultAnimation: { duration: 320, easing: (progress) => 1 - (1 - progress) ** 3 },
     slides: { perView: visibleCards || 1, spacing: style.editorialCardGapPx },
     breakpoints: {
       "(max-width: 699px)": {
-        slides: { perView: Math.min(cardCount || 1, 2.5), spacing: Math.min(style.editorialCardGapPx, 8) },
+        slides: { perView: canSlide ? 2.5 : 1, spacing: Math.max(8, Math.min(style.editorialCardGapPx, 12)) },
       },
     },
-    slideChanged(slider) { setRailIndex(slider.track.details.rel); },
-  });
+    slideChanged(slider) { setRailIndex(slider.track.details.rel % Math.max(1, cardCount)); },
+  }), [canSlide, visibleCards, cardCount, style.editorialCardGapPx]);
+  const [railRef, railInstanceRef] = useKeenSlider(railOptions);
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 699px)");
@@ -62,7 +65,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
 
   useEffect(() => {
     railInstanceRef.current?.update?.();
-    setRailIndex(railInstanceRef.current?.track?.details?.rel || 0);
+    setRailIndex((railInstanceRef.current?.track?.details?.rel || 0) % Math.max(1, cardCount));
   }, [cardCount, isMobile, style.editorialVisibleCards, style.editorialCardGapPx, railInstanceRef]);
   const currentIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const depth = style.editorialDepth / 100;
@@ -179,29 +182,31 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
         onMouseLeave={() => { pausedRef.current = false; }} onFocusCapture={() => { pausedRef.current = true; }}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) pausedRef.current = false; }}>
         <div ref={railRef} className="look-editorial__cards keen-slider">
-          {hasCover && !isMobile && coverCard}
-          {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
-            <div className="look-editorial__card-surface">
-              <img className="look-editorial__card-backdrop" src={product.image} alt="" aria-hidden="true" loading="lazy" />
-              <button type="button" className="look-editorial__card-image" onClick={(event) => selectCard(event, product.id)} aria-label={`Mostrar ${product.subtitle}`}>
-                <img src={product.image} alt={product.subtitle} loading="lazy" />
-              </button>
-              {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
-                aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
-                onClick={() => onFavorite(product)}><Heart size={23} strokeWidth={1.7} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
-              <div className="look-editorial__card-details">
-                <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={cardNameStyle}>
-                  {displayProductName(product.subtitle)}</a>
-                <div className="look-editorial__card-foot">
-                  <span style={cardPriceStyle}>{moneyCOP(product.price)}</span>
-                  {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
-                    <ShoppingBag size={22} strokeWidth={1.7} /></button>}
+          {Array.from({ length: mobileCopies }, (_, copy) => <Fragment key={copy}>
+            {hasCover && !isMobile && coverCard}
+            {products.map((product) => <article key={product.id} className={`look-editorial__card keen-slider__slide ${selectedId === product.id ? "is-selected" : ""}`}>
+              <div className="look-editorial__card-surface">
+                <img className="look-editorial__card-backdrop" src={product.image} alt="" aria-hidden="true" loading="lazy" />
+                <button type="button" className="look-editorial__card-image" onClick={(event) => selectCard(event, product.id)} aria-label={`Mostrar ${product.subtitle}`}>
+                  <img src={product.image} alt={product.subtitle} loading="lazy" />
+                </button>
+                {config.actions?.favorite?.enabled !== false && <button type="button" className="look-editorial__favorite"
+                  aria-label={`${isFavorite(product) ? "Quitar de" : "Agregar a"} favoritos: ${product.subtitle}`}
+                  onClick={() => onFavorite(product)}><Heart size={23} strokeWidth={1.7} fill={isFavorite(product) ? "currentColor" : "none"} /></button>}
+                <div className="look-editorial__card-details">
+                  <a href={`/producto/${encodeURIComponent(product.id)}`} className="look-editorial__card-name" style={cardNameStyle}>
+                    {displayProductName(product.subtitle)}</a>
+                  <div className="look-editorial__card-foot">
+                    <span style={cardPriceStyle}>{moneyCOP(product.price)}</span>
+                    {config.actions?.cart?.enabled !== false && <button type="button" aria-label={`Agregar al carrito: ${product.subtitle}`} onClick={() => onCart(product)}>
+                      <ShoppingBag size={22} strokeWidth={1.7} /></button>}
+                  </div>
                 </div>
+                <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
               </div>
-              <LookGlassRim variant="card" radius={style.thumbRadiusPx} />
-            </div>
-          </article>)}
-          {hasCover && isMobile && coverCard}
+            </article>)}
+            {hasCover && isMobile && coverCard}
+          </Fragment>)}
         </div>
         {canSlide && <div className="look-editorial__rail-controls">
           <button type="button" aria-label="Tarjeta anterior" onClick={() => railInstanceRef.current?.prev()}><ChevronLeft size={17} /></button>
