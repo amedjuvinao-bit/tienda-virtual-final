@@ -39,7 +39,7 @@
 .trending-runway__color { display: inline-block; flex: none; width: 19px; height: 19px; border: 1px solid rgba(255,255,255,.95); border-radius: 50%; box-shadow: 0 1px 2px rgba(118,67,80,.1); }
 .trending-runway__more { font: 11px/1.3 system-ui, sans-serif; }
 .trending-runway__description { max-width: 400px; margin: 12px auto 0; color: var(--runway-description, #764652); font: 12px/1.5 system-ui, sans-serif; overflow-wrap: anywhere; }
-.trending-runway__product-link { display: flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 340px); min-height: 47px; margin: 20px auto 0; padding: 10px 18px; border: 1px solid rgba(255,255,255,.8); border-radius: 99px; color: var(--runway-button-text, #fffaf8); background: linear-gradient(155deg, color-mix(in srgb, var(--runway-button, #90002e) 72%, #ffe8e8), var(--runway-button, #90002e) 62%, color-mix(in srgb, var(--runway-button, #90002e) 85%, #170013)); box-shadow: inset 0 1px rgba(255,255,255,.2), 0 7px 15px rgba(130,18,58,.14); font: 17px/1.25 Georgia, serif; text-decoration: none; }
+.trending-runway__product-link { display: flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 340px); min-height: 47px; margin: 20px auto 0; padding: 10px 18px; font: 17px/1.25 Georgia, serif; text-decoration: none; }
 .trending-runway__product-link svg { flex: none; }
 .trending-runway button:focus-visible, .trending-runway a:focus-visible, .trending-runway__gallery:focus-visible { outline: 2px solid var(--runway-title, #800028); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {

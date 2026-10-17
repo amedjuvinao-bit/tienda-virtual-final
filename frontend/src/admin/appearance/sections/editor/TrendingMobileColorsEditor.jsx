@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { ArrowRight, Heart, RotateCcw, ShoppingBag } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { ArrowRight, Heart, RotateCcw, ShoppingBag, Upload } from "lucide-react";
 import SectionColorPicker from "../ui/SectionColorPicker";
-import { DEFAULT_TRENDING_MOBILE_COLORS, trendingMobileColorsVars } from "../../../../components/trendingPresentation";
+import { DEFAULT_TRENDING_MOBILE_COLORS, normalizeTrendingPresentation, trendingMobileColorsVars } from "../../../../components/trendingPresentation";
 import runwayBackdrop from "../../../../assets/trending-runway-mobile.webp";
 import "./trendingMobileColorsEditor.css";
+import "../../../../components/trendingLiquidButton.css";
 
 const COLOR = /^#(?:[a-f\d]{3}|[a-f\d]{6})$/i;
 const PALETTES = [
@@ -55,14 +56,43 @@ function MobileColorControl({ label, value, onChange }) {
   </div>;
 }
 
-export default function TrendingMobileColorsEditor({ presentation, onChange }) {
+export default function TrendingMobileColorsEditor({ presentation, onChange, uploadToCloudinary }) {
   const [groupId, setGroupId] = useState("text");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const uploadBackground = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !uploadToCloudinary || uploading) return;
+    setUploadError("");
+    if (!/^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type)) {
+      setUploadError("Selecciona una imagen JPG, PNG, WebP, GIF o AVIF.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("La imagen debe pesar como máximo 10 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      if (!normalizeTrendingPresentation({ mobileBackgroundImage: url }).mobileBackgroundImage) throw new Error("No se recibió una imagen válida. Intenta cargarla de nuevo.");
+      onChangeRef.current({ mobileBackgroundImage: url, mobileBackgroundMode: "custom" });
+    } catch (error) {
+      setUploadError(error?.message || "No se pudo cargar la imagen. Inténtalo de nuevo.");
+    } finally {
+      setUploading(false);
+    }
+  };
   const group = GROUPS.find((item) => item.id === groupId);
   const colorField = ([key, label]) => <MobileColorControl key={key} label={label} value={presentation[key]}
     onChange={(value) => onChange({ [key]: value })} />;
   const image = presentation.mobileBackgroundMode === "color" ? ""
-    : presentation.backdropMode === "custom" ? presentation.backgroundImage
-      : presentation.backdropMode === "boutique" ? runwayBackdrop : "";
+    : (presentation.mobileBackgroundMode === "custom" && presentation.mobileBackgroundImage)
+      || (presentation.backdropMode === "custom" ? presentation.backgroundImage
+        : presentation.backdropMode === "boutique" ? runwayBackdrop : "");
   const background = presentation.mobileBackgroundMode === "color" ? presentation.mobileBackgroundColor : presentation.backgroundColor;
 
   return <section className="trending-mobile-colors" aria-label="Colores del móvil">
@@ -94,23 +124,41 @@ export default function TrendingMobileColorsEditor({ presentation, onChange }) {
       <span className="trending-mobile-colors__sample-meta">TALLAS Y COLORES <i>Talla</i></span>
       <span className="trending-mobile-colors__sample-description">Descripción del producto</span>
       <span className="trending-mobile-colors__sample-dots" aria-hidden="true"><i /><i /><i /></span>
-      <span className="trending-mobile-colors__sample-button"><ShoppingBag size={18} aria-hidden="true" />Ver producto</span>
+      <span className="trending-mobile-colors__sample-button trending-liquid-button"><ShoppingBag size={18} aria-hidden="true" />Ver producto</span>
     </div>
     <p className="trending-mobile-colors__note">Muestra de combinación. Para probar la sección completa con tus productos, pulsa «Vista móvil» en la vista previa.</p>
+
+    <section className="trending-mobile-colors__background" aria-label="Fondo exclusivo del móvil">
+      <h4>Fondo del móvil</h4>
+      <p className="trending-mobile-colors__note">Elige el fondo actual, un color o tu propia imagen. La imagen se ajusta para cubrir la sección; una composición vertical funciona mejor.</p>
+      <div className="trending-mobile-colors__groups" role="group" aria-label="Fondo del móvil">
+        {[["inherit", "Fondo actual"], ["color", "Color liso"], ["custom", "Mi imagen"]].map(([value, label]) => <button type="button" key={value}
+          disabled={uploading} aria-pressed={presentation.mobileBackgroundMode === value}
+          onClick={() => { setUploadError(""); onChange({ mobileBackgroundMode: value }); }}>{label}</button>)}
+      </div>
+      {presentation.mobileBackgroundMode === "color" && colorField(["mobileBackgroundColor", "Fondo de la sección"])}
+      <label className="trending-mobile-colors__upload">
+        <span><Upload size={16} aria-hidden="true" />{presentation.mobileBackgroundImage ? "Cambiar imagen de fondo móvil" : "Cargar imagen de fondo móvil"}</span>
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+          aria-label="Cargar imagen de fondo móvil" disabled={uploading || !uploadToCloudinary} onChange={uploadBackground} />
+      </label>
+      {!uploadToCloudinary && <p className="trending-mobile-colors__note">La carga de imágenes no está disponible en este momento.</p>}
+      {uploading && <p className="trending-mobile-colors__note" role="status">Cargando imagen…</p>}
+      {uploadError && <p className="trending-mobile-colors__error" role="alert">{uploadError}</p>}
+      {presentation.mobileBackgroundImage && <div className="trending-mobile-colors__uploaded">
+        <img src={presentation.mobileBackgroundImage} alt="Imagen elegida para el fondo móvil" />
+        <div><p className="trending-mobile-colors__note">{presentation.mobileBackgroundMode === "custom" ? "Imagen lista. Pulsa Guardar cambios para aplicarla en la tienda." : "Imagen guardada. Pulsa Mi imagen para volver a usarla."}</p>
+          <button type="button" disabled={uploading} onClick={() => onChange({ mobileBackgroundImage: "", ...(presentation.mobileBackgroundMode === "custom" ? { mobileBackgroundMode: "inherit" } : {}) })}>Quitar imagen móvil</button>
+        </div>
+      </div>}
+      {presentation.mobileBackgroundMode === "custom" && !presentation.mobileBackgroundImage && !uploading && <p className="trending-mobile-colors__note">Carga una imagen para activar tu fondo móvil. Mientras tanto se muestra el fondo actual.</p>}
+    </section>
 
     <div className="trending-mobile-colors__groups" role="group" aria-label="Partes del diseño móvil">
       {GROUPS.map((item) => <button type="button" key={item.id} aria-pressed={groupId === item.id}
         onClick={() => setGroupId(item.id)}>{item.name}</button>)}
     </div>
-    {groupId === "background" && <div className="trending-mobile-colors__background">
-      <span className="trending-mobile-colors__label">Fondo de la sección en móvil</span>
-      <div className="trending-mobile-colors__groups" role="group" aria-label="Fondo del móvil">
-        {[['inherit', 'Fondo actual'], ['color', 'Color liso']].map(([value, label]) => <button type="button" key={value}
-          aria-pressed={presentation.mobileBackgroundMode === value} onClick={() => onChange({ mobileBackgroundMode: value })}>{label}</button>)}
-      </div>
-      {presentation.mobileBackgroundMode === "color" ? colorField(["mobileBackgroundColor", "Fondo de la sección"])
-        : <p className="trending-mobile-colors__note">Conserva la seda rosa o la imagen elegida en Plantilla → Fondo y luz. Elige Color liso para usar un color solo en móvil.</p>}
-    </div>}
+    {groupId === "button" && <p className="trending-mobile-colors__note">Vidrio líquido con transparencia, reflejos y desenfoque. El color de fondo tiñe el cristal; el otro color controla el texto y el icono.</p>}
     <div className="trending-mobile-colors__fields">{group.fields.map(colorField)}</div>
     {groupId === "text" && <p className="trending-mobile-colors__note">Las muestras de color de los productos conservan sus colores reales.
       {presentation.titleMode === "image" ? " El título es una imagen: su color se cambia editando esa imagen." : ""}</p>}

@@ -20,6 +20,7 @@ export const DEFAULT_TRENDING_MOBILE_COLORS = Object.freeze({
 export const DEFAULT_TRENDING_PRESENTATION = Object.freeze({
   ...DEFAULT_TRENDING_MOBILE_COLORS,
   mobileBackgroundMode: "inherit",
+  mobileBackgroundImage: "",
   mode: "classic",
   backgroundColor: "#fff8f6",
   backgroundImage: "",
@@ -81,7 +82,9 @@ export function normalizeTrendingPresentation(raw) {
   result.backgroundImage = typeof input.backgroundImage === "string" && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(input.backgroundImage)
     ? input.backgroundImage : "";
   result.backdropMode = ["boutique", "color", "custom"].includes(input.backdropMode) ? input.backdropMode : result.backgroundImage ? "custom" : defaults.backdropMode;
-  result.mobileBackgroundMode = input.mobileBackgroundMode === "color" ? "color" : "inherit";
+  result.mobileBackgroundImage = typeof input.mobileBackgroundImage === "string" && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(input.mobileBackgroundImage)
+    ? input.mobileBackgroundImage : "";
+  result.mobileBackgroundMode = ["color", "custom"].includes(input.mobileBackgroundMode) ? input.mobileBackgroundMode : "inherit";
   for (const [key, min, max] of [
     ["glowStrength", 0, 1], ["sceneDepth", 0, 1], ["sceneLight", 0, 1], ["sceneBlurPx", 0, 12],
     ["glassOpacity", 0.25, 1], ["blurPx", 0, 40],
@@ -119,6 +122,7 @@ export function trendingMobileColorsVars(value) {
     "--runway-muted": config.mobileMutedColor,
     "--runway-description": config.mobileDescriptionColor,
     "--runway-button": config.mobileButtonColor,
+    "--runway-button-rgb": hexToRgbTriplet(config.mobileButtonColor),
     "--runway-button-text": config.mobileButtonTextColor,
     "--runway-favorite": config.mobileFavoriteColor,
     "--runway-favorite-active": config.mobileFavoriteActiveColor,

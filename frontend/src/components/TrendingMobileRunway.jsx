@@ -5,6 +5,7 @@ import { useKeenSlider } from "keen-slider/react";
 import { trendingMobileColorsVars } from "./trendingPresentation";
 import "keen-slider/keen-slider.min.css";
 import "./trendingMobileRunway.css";
+import "./trendingLiquidButton.css";
 
 const money = (value) => `$${Math.round(Number(value) || 0).toLocaleString("es-CO")}`;
 const unique = (values) => [...new Set(values.filter(Boolean).map(String))];
@@ -127,7 +128,7 @@ export default function TrendingMobileRunway({ products, title, titleImage, pres
         <p className="trending-runway__description">{active.features.slice(0, 2).join(" · ")}</p>}
       {presentation.showDescription && fields.showDescription && !active.features?.length && active.description &&
         <p className="trending-runway__description">{active.description}</p>}
-      <Link className="trending-runway__product-link" to={`/producto/${encodeURIComponent(active.id)}`}>
+      <Link className="trending-runway__product-link trending-liquid-button" to={`/producto/${encodeURIComponent(active.id)}`}>
         <ShoppingBag size={21} strokeWidth={1.5} aria-hidden="true" /><span>Ver producto</span>
       </Link>
     </div>

@@ -1196,7 +1196,7 @@ function StylesTab({ section, onChange, uploadToCloudinary }) {
       </div>
       <div>
         {presentation.mode === "floatingGlass"
-          ? <TrendingMobileColorsEditor presentation={presentation} onChange={patchPresentation} />
+          ? <TrendingMobileColorsEditor presentation={presentation} onChange={patchPresentation} uploadToCloudinary={uploadToCloudinary} />
           : <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Selecciona Vitrina flotante en Plantilla para personalizar los colores de Pasarela en móvil.</p>}
       </div>
       <div className="rounded-2xl border border-neutral-200 bg-white p-4">

@@ -23,7 +23,7 @@
 .trending-mobile-colors__sample-dots { display: flex; gap: 5px; margin-top: 12px; }
 .trending-mobile-colors__sample-dots i { width: 20px; height: 3px; border-radius: 10px; background: rgba(var(--runway-indicator-inactive-rgb),.35); }
 .trending-mobile-colors__sample-dots i:first-child { background: var(--runway-indicator); }
-.trending-mobile-colors__sample-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 40px; margin-top: 12px; border: 1px solid rgba(255,255,255,.8); border-radius: 99px; color: var(--runway-button-text); background: linear-gradient(155deg,color-mix(in srgb,var(--runway-button) 72%,#ffe8e8),var(--runway-button) 62%,color-mix(in srgb,var(--runway-button) 85%,#170013)); font-size: 15px; }
+.trending-mobile-colors__sample-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 40px; margin-top: 12px; font-size: 15px; }
 .trending-mobile-colors__groups { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
 .trending-mobile-colors__groups button { min-height: 36px; padding: 7px 10px; border: 1px solid #eadce2; border-radius: 10px; color: #79586b; background: #fff; font-size: 12px; cursor: pointer; }
 .trending-mobile-colors__groups [aria-pressed="true"] { color: #802e56; border-color: #dc95b3; background: #fff0f6; }
@@ -31,5 +31,15 @@
 .trending-mobile-colors__field { min-width: 0; }
 .trending-mobile-colors__label { display: block; margin-bottom: 7px; color: #59404f; font-size: 12px; font-weight: 600; }
 .trending-mobile-colors__background { margin-top: 16px; padding: 12px; border: 1px solid #f0dce5; border-radius: 12px; background: #fff9fb; }
-.trending-mobile-colors__background .trending-mobile-colors__groups { margin: 0 0 12px; }
+.trending-mobile-colors__background h4 { margin: 0; color: #59404f; font-size: 14px; }
+.trending-mobile-colors__background .trending-mobile-colors__groups { margin: 12px 0; }
+.trending-mobile-colors__upload { display: grid; gap: 10px; margin-top: 12px; padding: 14px; border: 1px dashed #ce93ae; border-radius: 12px; background: #fff; }
+.trending-mobile-colors__upload > span { display: flex; align-items: center; gap: 7px; color: #7c3858; font-size: 12px; font-weight: 600; }
+.trending-mobile-colors__upload input { width: 100%; min-width: 0; font-size: 12px; color: #59404f; }
+.trending-mobile-colors__upload input::file-selector-button { margin-right: 8px; padding: 8px 10px; border: 1px solid #eadce2; border-radius: 8px; color: #7c3858; background: #fff3f8; cursor: pointer; }
+.trending-mobile-colors__uploaded { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.trending-mobile-colors__uploaded img { flex: none; width: 64px; height: 86px; object-fit: cover; border: 1px solid #eadce2; border-radius: 10px; }
+.trending-mobile-colors__uploaded button { margin-top: 7px; border: 0; padding: 4px 0; background: transparent; color: #8b3259; text-decoration: underline; font-size: 12px; cursor: pointer; }
+.trending-mobile-colors__error { margin-top: 8px; color: #a32142; font-size: 12px; }
+.trending-mobile-colors button:disabled, .trending-mobile-colors input:disabled { opacity: .55; cursor: wait; }
 .trending-mobile-colors button:focus-visible { outline: 2px solid #9b426b; outline-offset: 3px; }

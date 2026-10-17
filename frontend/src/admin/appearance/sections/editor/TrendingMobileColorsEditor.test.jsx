@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SectionsPanel from '../SectionsPanel';
@@ -9,15 +9,15 @@ vi.mock('../../../../context/CartContext', () => ({ useCart: () => ({ addToCart:
 vi.mock('../../../../context/FavoritesContext', () => ({ useFavorites: () => ({ toggleFavorite: vi.fn(), isFavorite: () => false }) }));
 
 const desktop = { titleColor: '#008811', cardPriceColor: '#553300', actionColor: '#020202', backgroundColor: '#abcdef', dockGapPx: 17 };
-function Harness({ onSave }) {
+function Harness({ onSave, uploadToCloudinary }) {
   const [theme, setTheme] = useState({ sections: [{ id: 'tendencia', type: 'tendencia', enabled: true,
     config: { products: [], presentation: { mode: 'floatingGlass', ...desktop } },
   }] });
-  return <MemoryRouter><SectionsPanel theme={theme} setPath={(_, sections) => setTheme({ sections })} />
+  return <MemoryRouter><SectionsPanel theme={theme} setPath={(_, sections) => setTheme({ sections })} uploadToCloudinary={uploadToCloudinary} />
     <button onClick={() => onSave(theme.sections[0])}>Guardar prueba</button></MemoryRouter>;
 }
-function openColors(onSave = vi.fn()) {
-  render(<Harness onSave={onSave} />);
+function openColors(onSave = vi.fn(), uploadToCloudinary) {
+  render(<Harness onSave={onSave} uploadToCloudinary={uploadToCloudinary} />);
   fireEvent.click(screen.getByRole('button', { name: 'Editar En tendencia' }));
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Diseño de Tendencia' })).getByRole('button', { name: 'Móvil', exact: true }));
@@ -32,6 +32,63 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('controles de colores móviles de Tendencia', () => {
+  it('carga, guarda y quita una imagen exclusiva del móvil sin perder cambios hechos durante la carga', async () => {
+    const save = vi.fn();
+    let finish;
+    const upload = vi.fn().mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const panel = openColors(save, upload);
+    const url = 'https://res.cloudinary.com/tienda/image/upload/v2/fondo-movil.webp';
+    const input = within(panel).getByLabelText('Cargar imagen de fondo móvil');
+    const file = new File(['photo'], 'fondo.webp', { type: 'image/webp' });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(upload).toHaveBeenCalledWith(file);
+    expect(screen.getByText('Cargando imagen…')).toBeInTheDocument();
+    expect(input).toBeDisabled();
+    change('Título de la sección', '#123456');
+    finish(url);
+    const thumbnail = await screen.findByRole('img', { name: 'Imagen elegida para el fondo móvil' });
+    expect(thumbnail).toHaveAttribute('src', url);
+    expect(within(panel).getByRole('button', { name: 'Mi imagen', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(panel).getByRole('group', { name: 'Muestra de colores del móvil' }).style.backgroundImage).toContain(url);
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(save.mock.lastCall[0].config.presentation).toMatchObject({ ...desktop, mobileTitleColor: '#123456', mobileBackgroundImage: url, mobileBackgroundMode: 'custom' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Quitar imagen móvil' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(save.mock.lastCall[0].config.presentation).toMatchObject({ ...desktop, mobileBackgroundImage: '', mobileBackgroundMode: 'inherit' });
+    expect(screen.queryByRole('img', { name: 'Imagen elegida para el fondo móvil' })).not.toBeInTheDocument();
+  });
+
+  it('informa de un fallo de carga, conserva el fondo y permite volver a intentarlo', async () => {
+    const save = vi.fn();
+    const upload = vi.fn().mockRejectedValueOnce(new Error('No se pudo cargar la imagen.')).mockResolvedValueOnce('https://res.cloudinary.com/tienda/image/upload/fondo.png');
+    const panel = openColors(save, upload);
+    const input = within(panel).getByLabelText('Cargar imagen de fondo móvil');
+    const file = new File(['photo'], 'fondo.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar la imagen.');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(normalizeTrendingPresentation(save.mock.lastCall[0].config.presentation).mobileBackgroundMode).toBe('inherit');
+    expect(input).not.toBeDisabled();
+    fireEvent.change(input, { target: { files: [file] } });
+    await screen.findByRole('img', { name: 'Imagen elegida para el fondo móvil' });
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('rechaza archivos incompatibles y respuestas inválidas sin activar un fondo roto', async () => {
+    const save = vi.fn();
+    const upload = vi.fn().mockResolvedValue('javascript:alert(1)');
+    const panel = openColors(save, upload);
+    const input = within(panel).getByLabelText('Cargar imagen de fondo móvil');
+    fireEvent.change(input, { target: { files: [new File(['x'], 'documento.pdf', { type: 'application/pdf' })] } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Selecciona una imagen');
+    expect(upload).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { files: [new File(['x'], 'fondo.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se recibió una imagen válida'));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(normalizeTrendingPresentation(save.mock.lastCall[0].config.presentation).mobileBackgroundImage).toBe('');
+  });
+
   it('guarda cambios de cada grupo y mantiene los colores de escritorio', () => {
     const save = vi.fn();
     const panel = openColors(save);

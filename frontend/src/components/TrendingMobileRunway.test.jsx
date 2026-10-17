@@ -66,6 +66,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('Pasarela móvil de En tendencia', () => {
+  it('usa la imagen móvil guardada y recupera la imagen de escritorio al ampliar', async () => {
+    const backgroundImage = 'https://res.cloudinary.com/tienda/image/upload/escritorio.jpg';
+    const mobileBackgroundImage = 'https://res.cloudinary.com/tienda/image/upload/movil.jpg';
+    const { container } = render(view(theme({ presentation: { mode: 'floatingGlass', backdropMode: 'custom', backgroundImage,
+      mobileBackgroundMode: 'custom', mobileBackgroundImage },
+    })));
+    const link = await screen.findByRole('link', { name: 'Ver producto' });
+    expect(link).toHaveClass('trending-liquid-button');
+    expect(container.querySelector('section').style.backgroundImage).toContain(mobileBackgroundImage);
+    act(() => resize(1280));
+    expect(container.querySelector('section').style.backgroundImage).toContain(backgroundImage);
+    expect(container.querySelector('section').style.backgroundImage).not.toContain(mobileBackgroundImage);
+    act(() => resize(390));
+    expect(container.querySelector('section').style.backgroundImage).toContain(mobileBackgroundImage);
+  });
+
   it('sincroniza la foto, precio, talla, favoritos y enlace al navegar entre productos', async () => {
     render(view(theme()));
     const link = await screen.findByRole('link', { name: 'Ver producto' });

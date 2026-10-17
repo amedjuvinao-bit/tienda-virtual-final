@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_TRENDING_MOBILE_COLORS, normalizeTrendingPresentation, trendingMobileColorsVars } from './trendingPresentation';
 
 describe('persistencia de colores de Pasarela', () => {
+  it('preserva la imagen móvil al guardar y rechaza direcciones no admitidas', () => {
+    const mobileBackgroundImage = 'https://res.cloudinary.com/tienda/image/upload/v1/movil.webp';
+    const config = normalizeTrendingPresentation({ mobileBackgroundMode: 'custom', mobileBackgroundImage });
+    expect(normalizeTrendingPresentation(JSON.parse(JSON.stringify(config)))).toMatchObject({ mobileBackgroundMode: 'custom', mobileBackgroundImage });
+    expect(normalizeTrendingPresentation({ mobileBackgroundImage: 'javascript:alert(1)' }).mobileBackgroundImage).toBe('');
+    expect(normalizeTrendingPresentation({ mobileBackgroundImage: 'https://otro.test/fondo.png' }).mobileBackgroundImage).toBe('');
+  });
+
   it('conserva la apariencia original al abrir configuraciones anteriores', () => {
     const presentation = normalizeTrendingPresentation({ mode: 'floatingGlass', titleColor: '#113355', cardPriceColor: '#442211' });
     expect(presentation).toMatchObject({ ...DEFAULT_TRENDING_MOBILE_COLORS, mobileBackgroundMode: 'inherit', titleColor: '#113355', cardPriceColor: '#442211' });
