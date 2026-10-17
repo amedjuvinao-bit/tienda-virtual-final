@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ComplementosLook from '../../../../components/ComplementosLook';
 import ComplementosSectionUI from './ComplementosSectionUI';
@@ -11,7 +11,11 @@ function Harness({ onSave = () => {}, upload }) {
   return <><ComplementosSectionUI theme={theme} setPath={(path, value) => setTheme({ ...theme, [path]: value })} uploadToCloudinary={upload} />
     <ComplementosLook theme={theme} /><button onClick={() => onSave(JSON.parse(JSON.stringify(theme)))}>Guardar prueba</button></>;
 }
-const design = () => fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
+const design = () => fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
+const content = (group) => {
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Contenido/ }));
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Complementos' })).getByRole('button', { name: group, exact: true }));
+};
 describe('Complementos: banner floral editable', () => {
   it('migra solo imágenes predeterminadas y conserva las personalizadas', () => {
     expect(normalizeComplementosSection({ config: { imageSrc: '/SeccionComplementos/Complementos.png' } }).config.imageSrc).toBe(defaults.config.imageSrc);
@@ -44,6 +48,7 @@ describe('Complementos: banner floral editable', () => {
   it('guarda textos, enlace y ajustes móviles sin alterar otras secciones', () => {
     const save = vi.fn(); render(<Harness onSave={save} />);
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Nueva colección' } });
+    content('Botón y galería');
     fireEvent.change(screen.getByLabelText('Texto del botón'), { target: { value: 'Ver mi colección' } });
     fireEvent.change(screen.getByLabelText('Enlace de la galería'), { target: { value: '/coleccion' } });
     design(); fireEvent.click(screen.getByRole('button', { name: 'Móvil', exact: true }));
@@ -64,24 +69,46 @@ describe('Complementos: banner floral editable', () => {
   it('carga móvil sin perder ediciones realizadas durante la carga', async () => {
     let resolve; const upload = vi.fn(() => new Promise((r) => { resolve = r; }));
     const save = vi.fn(); render(<Harness upload={upload} onSave={save} />);
+    content('Imagen móvil');
     fireEvent.change(screen.getByLabelText('Cargar imagen de móvil'), { target: { files: [new File(['image'], 'mobile.png', { type: 'image/png' })] } });
+    content('Textos');
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Título actualizado' } });
     await act(async () => resolve('https://images.example/mobile.png'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
     expect(save.mock.calls[0][0].sections[0].config).toMatchObject({ title: 'Título actualizado', mobileImageSrc: 'https://images.example/mobile.png' });
+    content('Imagen móvil');
     fireEvent.click(screen.getByRole('button', { name: 'Usar imagen de escritorio' }));
     expect(screen.getByAltText('Complementos (móvil)')).toHaveAttribute('src', defaults.config.imageSrc);
   });
   it('avisa una carga fallida y conserva la imagen vigente', async () => {
     render(<Harness upload={vi.fn().mockRejectedValue(new Error('offline'))} />);
+    content('Imagen escritorio');
     fireEvent.change(screen.getByLabelText('Cargar imagen de escritorio'), { target: { files: [new File(['x'], 'photo.png', { type: 'image/png' })] } });
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar'));
     expect(screen.getByAltText('Complementos')).toHaveAttribute('src', defaults.config.imageSrc);
   });
   it('rechaza archivos ajenos a imágenes antes de subirlos', () => {
     const upload = vi.fn(); render(<Harness upload={upload} />);
+    content('Imagen escritorio');
     fireEvent.change(screen.getByLabelText('Cargar imagen de escritorio'), { target: { files: [new File(['x'], 'doc.pdf', { type: 'application/pdf' })] } });
     expect(screen.getByRole('alert')).toHaveTextContent('Elige una imagen'); expect(upload).not.toHaveBeenCalled();
+  });
+  it('divide los formularios de diseño y recuerda los ajustes al volver a un grupo', () => {
+    const save = vi.fn(); render(<Harness onSave={save} />);
+    expect(screen.getByLabelText('Título')).toBeVisible();
+    expect(screen.getByLabelText('Cargar imagen de escritorio')).not.toBeVisible();
+    design();
+    expect(screen.queryByRole('slider', { name: 'Altura del banner (px)' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Qué ajustar en la composición' }), { target: { value: '1' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Altura del banner (px)' }), { target: { value: '420' } });
+    expect(screen.queryByRole('slider', { name: 'Encuadre horizontal (%)' })).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Diseño de Complementos' })).getByRole('button', { name: 'Botón y efectos' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Qué ajustar: Botón de vidrio líquido' }), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Ampliación con el cursor' }), { target: { value: '1.15' } });
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Diseño de Complementos' })).getByRole('button', { name: 'Composición' }));
+    expect(screen.getByRole('slider', { name: 'Altura del banner (px)' })).toHaveValue('420');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(save.mock.calls[0][0].sections[0].style).toMatchObject({ imageHeightPx: 420, buttonHoverScale: 1.15 });
   });
   it('cambia de dispositivo en la vista previa sin necesitar productos', async () => {
     const section = normalizeComplementosSection({});
@@ -111,7 +138,9 @@ describe('Complementos: banner floral editable', () => {
   });
   it('ofrece controles genéricos para restablecer el diseño y sus imágenes', () => {
     render(<Harness />);
+    fireEvent.click(screen.getByText('Restablecer toda la sección'));
     expect(screen.getByRole('button', { name: 'Aplicar diseño predeterminado' })).toBeInTheDocument();
+    content('Imagen escritorio');
     expect(screen.getByRole('button', { name: 'Usar imágenes predeterminadas' })).toBeInTheDocument();
     expect(screen.queryByText(/mochila|lazo/i)).not.toBeInTheDocument();
   });

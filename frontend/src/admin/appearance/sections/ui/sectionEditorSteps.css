@@ -114,3 +114,9 @@
 .section-product-editor__image-picker > :first-child { flex-wrap: wrap; }
 .section-product-editor__image-picker > :first-child > :last-child { flex-wrap: wrap; }
 @media (max-width: 580px) { .section-product-editor__photos { grid-template-columns: 1fr; } }
+
+.section-editor-subgroups { display: grid; gap: 12px; min-width: 0; }
+.section-editor-subgroups > [hidden] { display: none !important; }
+.section-editor-subgroups__select { display: grid; gap: 7px; color: var(--admin-card-text, #502b40); font-size: 12px; font-weight: 700; }
+.section-editor-subgroups__select select { width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid var(--admin-card-border, #ebcbd9); border-radius: 10px; background: var(--admin-input-bg, #fff); color: var(--admin-input-text, #502b40); font: inherit; }
+.section-editor-subgroups__select select:focus-visible { outline: 2px solid var(--admin-primary, #b14f81); outline-offset: 3px; }

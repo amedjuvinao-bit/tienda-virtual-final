@@ -19,6 +19,11 @@ function Harness({ save = () => {}, upload }) {
   const [theme, setTheme] = useState({ sections: [...makeTheme().sections, { id: 'otra', config: { keep: true } }] });
   return <><CategoriasSectionUI theme={theme} setPath={(path, value) => setTheme({ ...theme, [path]: value })} uploadToCloudinary={upload} /><CategoriasSection theme={theme} /><button onClick={() => save(JSON.parse(JSON.stringify(theme)))}>Guardar prueba</button></>;
 }
+function content(group) {
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Contenido/ }));
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Categorías' })).getByRole('button', { name: group, exact: true }));
+}
+function category(id) { fireEvent.change(screen.getByRole('combobox', { name: 'Categoría que estás editando' }), { target: { value: id } }); }
 function design(group) {
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
   if (group) fireEvent.click(within(screen.getByRole('navigation', { name: 'Diseño de Categorías' })).getByRole('button', { name: group, exact: true }));
@@ -109,7 +114,7 @@ describe('Categorías: Abanico vivo', () => {
   });
   it('edita una categoría, la reordena y entrega sus datos sin alterar las demás secciones', () => {
     const save = vi.fn(); render(<Harness save={save} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Editar categoría 2' }));
+    content('Nombre y enlace'); category('two');
     fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: 'Categoría renovada' } });
     fireEvent.change(screen.getByLabelText('Enlace de la galería'), { target: { value: '/renovada' } });
     fireEvent.click(screen.getByRole('button', { name: 'Subir categoría' }));
@@ -122,6 +127,7 @@ describe('Categorías: Abanico vivo', () => {
   });
   it('añade categorías sin sobrescribir ni eliminar las existentes', () => {
     const save = vi.fn(); render(<Harness save={save} />);
+    content('Nombre y enlace');
     fireEvent.click(screen.getByRole('button', { name: 'Agregar categoría' }));
     fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: 'Nueva colección' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
@@ -139,7 +145,7 @@ describe('Categorías: Abanico vivo', () => {
   });
   it('guarda los controles de movimiento y móvil con vista pública conectada', () => {
     const save = vi.fn(); const { container } = render(<Harness save={save} />);
-    design('Abanico'); fireEvent.change(screen.getByRole('slider', { name: 'Expansión al explorar' }), { target: { value: '1.6' } });
+    design('Movimiento'); fireEvent.change(screen.getByRole('slider', { name: 'Expansión al explorar' }), { target: { value: '1.6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sin movimiento' }));
     design('Móvil'); fireEvent.click(screen.getByRole('button', { name: 'Una columna' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
@@ -149,20 +155,49 @@ describe('Categorías: Abanico vivo', () => {
   it('conserva las ediciones durante la carga e impide cambiar de categoría hasta terminar', async () => {
     let resolve; const upload = vi.fn(() => new Promise((r) => { resolve = r; }));
     const save = vi.fn(); render(<Harness save={save} upload={upload} />);
+    content('Imagen principal');
     fireEvent.change(screen.getByLabelText('Cargar imagen de la categoría'), { target: { files: [new File(['image'], 'foto.png', { type: 'image/png' })] } });
-    expect(screen.getByRole('button', { name: 'Editar categoría 2' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Categoría que estás editando' })).toBeDisabled();
+    content('Nombre y enlace');
     fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: 'Nombre actualizado' } });
     await act(async () => resolve('https://images.example/new.webp'));
-    expect(screen.getByRole('button', { name: 'Editar categoría 2' })).not.toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Categoría que estás editando' })).not.toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
     expect(save.mock.calls[0][0].sections[0].config.slides[0]).toMatchObject({ title: 'Nombre actualizado', image: 'https://images.example/new.webp' });
   });
   it('avisa una carga fallida sin perder la imagen vigente', async () => {
     const save = vi.fn(); render(<Harness save={save} upload={vi.fn().mockRejectedValue(new Error('offline'))} />);
+    content('Imagen principal');
     fireEvent.change(screen.getByLabelText('Cargar imagen de la categoría'), { target: { files: [new File(['image'], 'foto.png', { type: 'image/png' })] } });
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
     expect(save.mock.calls[0][0].sections[0].config.slides[0].image).toBe('/uno.jpg');
+  });
+  it('muestra solo los ajustes elegidos y conserva la categoría al cambiar de grupo', () => {
+    const save = vi.fn(); render(<Harness save={save} />);
+    expect(screen.getByLabelText('Título de la sección')).toBeVisible();
+    expect(screen.getByLabelText('Nombre de la categoría')).not.toBeVisible();
+    content('Nombre y enlace'); category('two');
+    fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: 'Mi selección' } });
+    content('Encuadre');
+    expect(screen.getByLabelText('Nombre de la categoría')).not.toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Categoría que estás editando' })).toHaveValue('two');
+    fireEvent.change(screen.getByRole('slider', { name: 'Ampliación de la foto' }), { target: { value: '1.3' } });
+    content('Imagen móvil'); category('one'); category('two');
+    content('Nombre y enlace');
+    expect(screen.getByLabelText('Nombre de la categoría')).toHaveValue('Mi selección');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    expect(save.mock.calls[0][0].sections[0].config.slides[1]).toMatchObject({ title: 'Mi selección', imageScale: 1.3 });
+  });
+  it('separa composición, movimiento y espacios sin ocultar sus ajustes', () => {
+    render(<Harness />); design('Abanico');
+    expect(screen.getByRole('slider', { name: 'Categorías por fila en escritorio' })).toBeVisible();
+    expect(screen.queryByRole('slider', { name: 'Expansión al explorar' })).not.toBeInTheDocument();
+    design('Movimiento');
+    expect(screen.getByRole('slider', { name: 'Expansión al explorar' })).toBeVisible();
+    expect(screen.queryByRole('slider', { name: 'Ancho máximo (px)' })).not.toBeInTheDocument();
+    design('Espacios');
+    expect(screen.getByRole('slider', { name: 'Ancho máximo (px)' })).toBeVisible();
   });
   it('permite comparar móvil y escritorio en la vista previa sin activar enlaces', async () => {
     const section = normalizeCategoriasSection(makeTheme().sections[0]);

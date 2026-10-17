@@ -189,7 +189,7 @@ describe('editor de secciones, etapa 3', () => {
     ['tendencia', 'En tendencia', 'Diseño de Tendencia', 'Tarjetas y espacio'],
     ['look', 'Looks', 'Diseño de Looks', 'Miniaturas'],
     ['complementos', 'Complementos', 'Diseño de Complementos', 'Botón y efectos'],
-    ['categorias', 'Categorías', 'Diseño de Categorías', 'Navegación'],
+    ['categorias', 'Categorías', 'Diseño de Categorías', 'Visibilidad'],
     ['informacion', 'Información', 'Diseño de Información', 'Animación'],
   ])('agrupa los controles de diseño de %s y deja seleccionar el último grupo', (id, name, navLabel, lastGroup) => {
     render(<Harness id={id} onSave={vi.fn()} />);
