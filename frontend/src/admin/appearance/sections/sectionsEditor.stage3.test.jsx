@@ -77,11 +77,11 @@ describe('editor de secciones, etapa 3', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar Instagram' }));
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Pasos de edición' })).getByRole('button', { name: /Diseño/ }));
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Diseño de Instagram' })).getByRole('button', { name: 'Botones' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir paleta de Color del texto del distintivo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir paleta de Color del texto del botón' }));
     fireEvent.click(screen.getByRole('button', { name: 'Usar color #3b82f6' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      config: expect.objectContaining({ editorialFollowTextColor: '#3b82f6' }),
+      config: expect.objectContaining({ journalButtonTextColor: '#3b82f6' }),
     }));
   });
 

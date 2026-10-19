@@ -9,7 +9,7 @@ afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 const config=()=>normalizeEditorial({});
 function media(reduced=false){vi.stubGlobal('matchMedia',vi.fn(query=>({matches:query.includes('prefers-reduced')?reduced:true})));}
 function card(){const el=document.createElement('a');el.getBoundingClientRect=vi.fn(()=>({left:0,top:0,width:200,height:300}));return el;}
-const theme={sections:[{id:'instagram',enabled:true,config:{posts:[{id:'one',image:'/one.jpg',link:'https://instagram.com/p/one/'}]}}]};
+const theme={sections:[{id:'instagram',enabled:true,config:{instagramLayout:'editorial',posts:[{id:'one',image:'/one.jpg',link:'https://instagram.com/p/one/'}]}}]};
 describe('profundidad de Instagram',()=>{
  it('crea planos distintos con perspectiva incluso sin interacción y conserva el tamaño nominal',()=>{
   const back=instagramDepthStyle({layer:1},0,config());const front=instagramDepthStyle({layer:4},3,config());

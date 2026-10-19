@@ -24,6 +24,7 @@ const themeFor = (posts, config = {}) => ({
     enabled: true,
     config: {
       posts,
+      instagramLayout: 'editorial',
       profileLink: 'https://instagram.com/rosa',
       ...config
     }
@@ -113,7 +114,7 @@ describe('Instagram editorial', () => {
     })))} posts={posts} />);
     expect(container).toBeEmptyDOMElement();
     rerender(<InstagramSection theme={{
-      sections: []
+      sections: [{id: 'instagram', config: {instagramLayout: 'editorial'}}]
     }} posts={posts} />);
     expect(container.querySelectorAll('.ig-editorial__photo')).toHaveLength(2);
   });
