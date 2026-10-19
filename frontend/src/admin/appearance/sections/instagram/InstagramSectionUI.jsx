@@ -6,7 +6,7 @@ import SectionEditorSubgroups from '../ui/SectionEditorSubgroups';
 import SectionEditorPostPicker from '../ui/SectionEditorPostPicker';
 import SectionColorPicker from '../ui/SectionColorPicker';
 import { normalizeInstagramSection } from './instagramSectionHelpers';
-import { normalizeEditorial, photoLayout, photoCrop, bounded, safeInstagramLink } from './instagramEditorialHelpers';
+import { normalizeEditorial, photoLayout, photoCrop, bounded, safeInstagramLink, editorialPhotoSlot } from './instagramEditorialHelpers';
 const findSection = theme => normalizeInstagramSection(theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram'));
 const box = 'rounded-2xl border border-neutral-200 bg-white p-4 space-y-4';
 function Text({
@@ -147,7 +147,7 @@ export default function InstagramSectionUI({
     setActive(index + delta);
   }
   return <div className="space-y-4">
-    <p className="text-sm text-neutral-600">Muro editorial · Cada foto abre su propia publicación. Las primeras cinco forman la composición; las demás aparecen debajo.</p>
+    <p className="text-sm text-neutral-600">Muro editorial · Cada foto abre su propia publicación. El diseño muestra cinco fotos por defecto; cambia la cantidad en Diseño → Distribución. Todas tus publicaciones se conservan.</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <SectionEditorSteps value={step} onChange={setStep} sectionName="Instagram" items={[{
       value: 'content',
@@ -183,7 +183,8 @@ export default function InstagramSectionUI({
           <SectionEditorPostPicker posts={posts} activeIndex={Math.max(0, Math.min(active, posts.length - 1))} onSelect={setActive} label="Instagram" />
           {!posts.length && <p>Agrega una foto y el enlace de su publicación para comenzar.</p>}
           {posts.map((p, index) => {
-            const slot = posts.slice(0, index).filter(post => post.enabled !== false && post.image).length;
+            const visible = posts.filter(post => post.enabled !== false && post.image).slice(0, e.editorialVisibleCount);
+            const slot = visible.includes(p) ? editorialPhotoSlot(visible, p, e) : index;
             const l = photoLayout(p, slot);
             const crop = photoCrop(p);
             return <div key={p.id} className="rounded-2xl bg-neutral-50 p-3 space-y-3" hidden={index !== Math.max(0, Math.min(active, posts.length - 1))}>
@@ -200,7 +201,7 @@ export default function InstagramSectionUI({
                 <Text label="Descripción de la foto" value={p.alt || ''} onChange={v => patchPost(p.id, 'alt', v)} />
                 <Check label="Mostrar publicación" value={p.enabled !== false} onChange={v => patchPost(p.id, 'enabled', v)} />
               </div>
-              <div className="space-y-3">{imageField('Imagen alternativa para móvil', 'mobileImage', p.mobileImage, p.id)}
+              <div className="space-y-3"><Select label="Ajuste de la foto" value={p.imageFit || e.editorialImageFit} onChange={v => patchPost(p.id, 'imageFit', v)} options={[['contain', 'Ver foto completa'], ['cover', 'Llenar marco y recortar']]} />{imageField('Imagen alternativa para móvil', 'mobileImage', p.mobileImage, p.id)}
                 {[['Encuadre horizontal (%)', 'imagePositionX', crop.x, 0, 100, 1], ['Encuadre vertical (%)', 'imagePositionY', crop.y, 0, 100, 1], ['Acercamiento', 'imageScale', crop.zoom, 1, 2, .01]].map(([label, key, value, min, max, step]) => <NumberField key={key} {...{
                     label,
                     value,
@@ -236,6 +237,8 @@ export default function InstagramSectionUI({
           </SectionEditorSubgroups>
         </div>
         <div className={box}>
+          {num('Fotos visibles', 'editorialVisibleCount', 1, 12)}
+          <Select label="Foto principal del centro" value={e.editorialFeaturedPostId} onChange={v => patch('editorialFeaturedPostId', v)} options={[["", "Automática (última de las cinco fotos)"], ...posts.filter(p => p.enabled !== false && p.image).slice(0, e.editorialVisibleCount).map((p, i) => [p.id, p.alt || `Publicación ${i + 1}`])]} />
           <Select label="Ancho de la sección" value={e.editorialWidthMode} onChange={v => patch('editorialWidthMode', v)} options={[["full", "Todo el ancho"], ["limited", "Ancho máximo personalizado"]]} />
           {e.editorialWidthMode === 'limited' && num('Ancho máximo (px)', 'editorialMaxWidth', 800, 2560)}{num('Alto de escritorio a 1600 px de ancho', 'editorialHeight', 600, 1600)}
           {num('Margen interior horizontal (px)', 'editorialPaddingX', 0, 120)}{num('Margen interior vertical (px)', 'editorialPaddingY', 0, 120)}
@@ -244,7 +247,7 @@ export default function InstagramSectionUI({
         <div className={box}>
           <SectionEditorSubgroups label="Editar tipografía" labels={['Título', 'Usuario y frase', 'Posición del usuario']}>
             <div className="space-y-3">{color('Color del título', 'editorialTitleColor')}
-              <Select label="Tipografía" value={e.editorialFont} onChange={v => patch('editorialFont', v)} options={[["Georgia, serif", "Georgia"], ['"Playfair Display", Georgia, serif', 'Playfair Display'], ['"Cormorant Garamond", Georgia, serif', 'Cormorant Garamond'], ['Arial, sans-serif', 'Arial']]} />
+              <Select label="Tipografía" value={e.editorialFont} onChange={v => patch('editorialFont', v)} options={[['"Bodoni Moda", Georgia, serif', "Bodoni · diseño original"], ["Georgia, serif", "Georgia"], ['"Playfair Display", Georgia, serif', 'Playfair Display'], ['"Cormorant Garamond", Georgia, serif', 'Cormorant Garamond'], ['Arial, sans-serif', 'Arial']]} />
               {num('Tamaño del título en escritorio', 'editorialTitleSize', 70, 420)}{num('Grosor del título', 'editorialTitleWeight', 100, 900, 100)}{num('Posición superior del título (%)', 'editorialTitleTop', 0, 20)}
             </div>
             <div className="space-y-3">{color('Color del texto', 'editorialTextColor')}{num('Tamaño del usuario (px)', 'editorialProfileSize', 12, 40)}{num('Tamaño del logo (px)', 'editorialLogoSize', 16, 80)}{num('Tamaño de la frase inferior (px)', 'editorialSubtitleSize', 12, 36)}</div>
@@ -262,7 +265,7 @@ export default function InstagramSectionUI({
         <div className={box}>
           <SectionEditorSubgroups label="Editar botones" labels={['Seguir en Instagram', 'Ver publicación', 'Posición del botón del perfil']}>
             <div className="space-y-3">{color('Color del botón del perfil', 'editorialButtonColor')}
-              <Field label="Color del texto del distintivo"><SectionColorPicker label="Color del texto del distintivo" value={c.profileBadgeTextColor === '#111111' ? e.editorialTextColor : c.profileBadgeTextColor} onChange={v => patch('profileBadgeTextColor', v)} /></Field>
+              <Field label="Color del texto del distintivo"><SectionColorPicker label="Color del texto del distintivo" value={e.editorialFollowTextColor} onChange={v => patch('editorialFollowTextColor', v)} /></Field>
               {num('Tamaño del texto del botón (px)', 'editorialButtonSize', 12, 40)}{num('Redondeado del botón (px)', 'editorialButtonRadius', 0, 100)}{num('Desenfoque del cristal (px)', 'editorialButtonBlur', 0, 30)}</div>
             <div className="space-y-3">{color('Color del botón de publicación', 'editorialActionColor')}{color('Color de texto de publicación', 'editorialActionTextColor')}{num('Tamaño del botón de publicación (px)', 'editorialActionSize', 60, 180)}</div>
             <div className="space-y-3">{num('Posición horizontal del botón (%)', 'editorialFooterX', 0, 70)}{num('Separación inferior del botón (%)', 'editorialFooterY', 0, 40)}{num('Ancho máximo del botón (%)', 'editorialFooterWidth', 18, 70)}</div>

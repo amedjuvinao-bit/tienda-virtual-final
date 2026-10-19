@@ -95,7 +95,9 @@ describe('Instagram editorial', () => {
     }));
     const {
       container
-    } = render(<InstagramSection theme={themeFor(list)} />);
+    } = render(<InstagramSection theme={themeFor(list, {
+      editorialVisibleCount: 8
+    })} />);
     expect(container.querySelectorAll('.ig-editorial__photo')).toHaveLength(6);
     expect(container.querySelectorAll('.ig-editorial__extra .ig-editorial__photo')).toHaveLength(1);
   });
@@ -196,5 +198,53 @@ describe('Instagram editorial', () => {
         image: '/new.jpg'
       }, posts[1]]
     });
+  });
+  it('corrige los valores predeterminados anteriores sin sustituir ajustes personalizados', () => {
+    const migrated = normalizeEditorial({
+      editorialFont: 'Georgia, serif',
+      editorialTitleSize: 290,
+      editorialTitleTop: 0
+    });
+    expect(migrated.editorialFont).toContain('Bodoni Moda');
+    expect(normalizeEditorial({
+      editorialFont: 'Arial, sans-serif',
+      editorialTitleSize: 180
+    })).toMatchObject({
+      editorialFont: 'Arial, sans-serif',
+      editorialTitleSize: 180
+    });
+    expect(normalizeEditorial({
+      editorialRevision: 2,
+      editorialFont: 'Georgia, serif'
+    }).editorialFont).toBe('Georgia, serif');
+  });
+  it('muestra cinco fotos sin eliminar las demás y permite elegir la principal', () => {
+    const list = Array.from({
+      length: 6
+    }, (_, i) => ({
+      ...posts[0],
+      id: String(i)
+    }));
+    const theme = themeFor(list);
+    const {
+      container,
+      rerender
+    } = render(<InstagramSection theme={theme} />);
+    expect(container.querySelectorAll('.ig-editorial__photo')).toHaveLength(5);
+    expect(theme.sections[0].config.posts).toHaveLength(6);
+    expect(container.querySelector('[data-post-id="4"]').style.getPropertyValue('--photo-x')).toBe('41%');
+    rerender(<InstagramSection theme={themeFor(list, {
+      editorialFeaturedPostId: '0'
+    })} />);
+    expect(container.querySelector('[data-post-id="0"]').style.getPropertyValue('--photo-x')).toBe('41%');
+    expect(container.querySelector('[data-post-id="0"]').getAttribute('href')).toBe(posts[0].link);
+  });
+  it('el color antiguo del distintivo no contamina el botón del nuevo diseño', () => {
+    const {
+      container
+    } = render(<InstagramSection theme={themeFor(posts, {
+      profileBadgeTextColor: '#ff00ff'
+    })} />);
+    expect(container.querySelector('.ig-editorial').style.getPropertyValue('--ig-button-text')).toBe('#790d2d');
   });
 });

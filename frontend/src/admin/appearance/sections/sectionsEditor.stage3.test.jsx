@@ -81,7 +81,7 @@ describe('editor de secciones, etapa 3', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Usar color #3b82f6' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar ahora' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      config: expect.objectContaining({ profileBadgeTextColor: '#3b82f6' }),
+      config: expect.objectContaining({ editorialFollowTextColor: '#3b82f6' }),
     }));
   });
 

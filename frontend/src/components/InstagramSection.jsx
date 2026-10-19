@@ -1,7 +1,7 @@
 import React from 'react';
 import { Instagram, ArrowUpRight } from 'lucide-react';
 import { normalizeInstagramSection } from '../admin/appearance/sections/instagram/instagramSectionHelpers';
-import { normalizeEditorial, photoLayout, photoCrop, safeInstagramLink } from '../admin/appearance/sections/instagram/instagramEditorialHelpers';
+import { normalizeEditorial, photoLayout, photoCrop, safeInstagramLink, editorialPhotoSlot } from '../admin/appearance/sections/instagram/instagramEditorialHelpers';
 import { categoriasBackdrop } from '../admin/appearance/sections/categorias/categoriasFanHelpers';
 import './instagramEditorial.css';
 export default function InstagramSection({
@@ -19,7 +19,7 @@ export default function InstagramSection({
     ...p,
     image: p.image || p.thumb,
     index
-  })).filter(p => p.enabled !== false && p.image);
+  })).filter(p => p.enabled !== false && p.image).slice(0, e.editorialVisibleCount);
   if (!section.enabled || !visible.length) return null;
   let background = e.editorialBackgroundMode === 'included' ? '/instagram/editorial-satin.webp' : e.editorialBackgroundImage;
   let color = e.editorialBackgroundColor;
@@ -60,6 +60,7 @@ export default function InstagramSection({
     '--ig-title-top': `${e.editorialTitleTop}%`,
     '--ig-max': e.editorialWidthMode === 'full' ? 'none' : `${e.editorialMaxWidth}px`,
     '--ig-height': e.editorialHeight / 1600,
+    '--ig-aspect': 1600 / e.editorialHeight,
     '--ig-px': `${e.editorialPaddingX}px`,
     '--ig-py': `${e.editorialPaddingY}px`,
     '--ig-radius': `${e.editorialRadius}px`,
@@ -73,7 +74,7 @@ export default function InstagramSection({
     '--ig-action': e.editorialActionColor,
     '--ig-action-text': e.editorialActionTextColor,
     '--ig-button': e.editorialButtonColor,
-    '--ig-button-text': c.profileBadgeTextColor && c.profileBadgeTextColor !== '#111111' ? c.profileBadgeTextColor : e.editorialTextColor,
+    '--ig-button-text': e.editorialFollowTextColor,
     '--ig-button-radius': `${e.editorialButtonRadius}px`,
     '--ig-button-blur': `${e.editorialButtonBlur}px`,
     '--ig-mobile-columns': e.editorialMobileColumns,
@@ -83,7 +84,7 @@ export default function InstagramSection({
     '--ig-mobile-ratio': e.editorialMobilePhotoRatio
   };
   const renderPhoto = (post, visibleIndex) => {
-    const layout = photoLayout(post, visibleIndex);
+    const layout = photoLayout(post, editorialPhotoSlot(visible, post, e));
     const crop = photoCrop(post);
     const href = safeInstagramLink(post.link);
     const Tag = href ? 'a' : 'div';
@@ -100,11 +101,13 @@ export default function InstagramSection({
       '--photo-rotate': `${e.editorialTilt ? layout.rotate : 0}deg`,
       '--photo-layer': layout.layer,
       '--photo-position': `${crop.x}% ${crop.y}%`,
-      '--photo-zoom': crop.zoom
+      '--photo-zoom': crop.zoom,
+      '--photo-fit': post.imageFit === 'cover' || post.imageFit === 'contain' ? post.imageFit : e.editorialImageFit
     }}>
       <picture>
-        <img className={post.mobileImage ? "ig-editorial__desktop-image" : undefined} src={post.image} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />
-        {post.mobileImage && <img className="ig-editorial__mobile-image" src={post.mobileImage} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />}
+        <img className="ig-editorial__image-backdrop" src={post.image} alt="" aria-hidden="true" loading="lazy" decoding="async" />
+        <img className={post.mobileImage ? "ig-editorial__image ig-editorial__desktop-image" : "ig-editorial__image"} src={post.image} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />
+        {post.mobileImage && <img className="ig-editorial__image ig-editorial__mobile-image" src={post.mobileImage} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />}
       </picture>
       {href && e.editorialShowPostAction && <span className="ig-editorial__post-action" aria-hidden="true">{e.editorialPostText}<ArrowUpRight size={22} /></span>}
     </Tag>;

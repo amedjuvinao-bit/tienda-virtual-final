@@ -1,4 +1,9 @@
 export const EDITORIAL_DEFAULTS = {
+  editorialRevision: 2,
+  editorialVisibleCount: 5,
+  editorialFeaturedPostId: '',
+  editorialImageFit: 'cover',
+  editorialFollowTextColor: '#790d2d',
   editorialTitle: 'Instagram',
   editorialSubtitle: 'Momentos que enamoran',
   editorialUseTitleImage: false,
@@ -20,8 +25,8 @@ export const EDITORIAL_DEFAULTS = {
   editorialButtonColor: '#f1b6ae',
   editorialActionColor: '#790d2d',
   editorialActionTextColor: '#fff5ec',
-  editorialFont: 'Georgia, serif',
-  editorialTitleSize: 290,
+  editorialFont: '"Bodoni Moda", Georgia, serif',
+  editorialTitleSize: 300,
   editorialTitleWeight: 400,
   editorialProfileX: 18,
   editorialProfileY: 0,
@@ -36,7 +41,7 @@ export const EDITORIAL_DEFAULTS = {
   editorialMobilePaddingY: 24,
   editorialProfileSize: 24,
   editorialButtonSize: 24,
-  editorialTitleTop: 0,
+  editorialTitleTop: 1,
   editorialMaxWidth: 1920,
   editorialWidthMode: 'full',
   editorialHeight: 900,
@@ -60,6 +65,8 @@ export const EDITORIAL_DEFAULTS = {
   editorialMobilePhotoRatio: 0.75
 };
 const ranges = {
+  editorialRevision: [2, 2],
+  editorialVisibleCount: [1, 12],
   editorialBackgroundWash: [0, 100],
   editorialTitleSize: [70, 420],
   editorialTitleWeight: [100, 900],
@@ -102,12 +109,21 @@ export function bounded(value, min, max, fallback) {
 export function normalizeEditorial(config = {}) {
   const next = {};
   for (const [key, fallback] of Object.entries(EDITORIAL_DEFAULTS)) {
-    const v = config[key];
+    let v = config[key];
+    // Correct the first release's defaults without replacing deliberate custom settings.
+    const oldDefaults = {
+      editorialFont: 'Georgia, serif',
+      editorialTitleSize: 290,
+      editorialTitleTop: 0
+    };
+    if (config.editorialRevision !== 2 && v === oldDefaults[key]) v = fallback;
     next[key] = ranges[key] ? bounded(v, ...ranges[key], fallback) : typeof v === typeof fallback ? v : fallback;
   }
   if (!['included', 'continuity', 'custom', 'color', 'global'].includes(next.editorialBackgroundMode)) next.editorialBackgroundMode = 'included';
   if (!['full', 'limited'].includes(next.editorialWidthMode)) next.editorialWidthMode = 'full';
   if (!['none', 'lift', 'zoom', 'lift-zoom'].includes(next.editorialMotion)) next.editorialMotion = 'lift';
+  if (!['contain', 'cover'].includes(next.editorialImageFit)) next.editorialImageFit = 'cover';
+  next.editorialVisibleCount = Math.round(next.editorialVisibleCount);
   next.editorialMobileColumns = Math.round(next.editorialMobileColumns);
   return next;
 }
@@ -174,4 +190,14 @@ export function safeInstagramLink(value) {
   } catch {
     return '';
   }
+}
+
+// Assign the chosen publication to the tall central frame without reordering or editing saved records.
+export function editorialPhotoSlot(visiblePosts, post, config) {
+  const index = visiblePosts.indexOf(post);
+  const chosen = visiblePosts.findIndex(item => item.id && item.id === config.editorialFeaturedPostId);
+  const featured = chosen >= 0 ? chosen : visiblePosts.length >= 5 ? 4 : Math.min(1, visiblePosts.length - 1);
+  if (index === featured) return Math.min(1, visiblePosts.length - 1);
+  if (index === 1) return featured;
+  return index;
 }
