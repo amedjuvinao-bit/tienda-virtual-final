@@ -14,7 +14,7 @@
   transform: translateZ(calc(var(--photo-depth) + var(--photo-hover-depth))) rotateX(calc(var(--photo-tilt-x) + var(--photo-pointer-x))) rotateY(calc(var(--photo-tilt-y) + var(--photo-pointer-y))) rotateZ(var(--photo-rotate)) scale(var(--photo-rest-scale));
   transform-style: preserve-3d;
   transform-origin: center;
-  box-shadow: 0 3px 5px #642c332e, 0 19px 23px rgb(74 20 32 / var(--ig-shadow)), 0 40px 52px rgb(74 20 32 / calc(var(--ig-shadow) * .7));
+  box-shadow: 0 2px 4px #642c3320, 0 16px 22px rgb(74 20 32 / var(--ig-shadow)), 0 28px 40px rgb(74 20 32 / calc(var(--ig-shadow) * .7));
   transition: transform var(--ig-duration) cubic-bezier(.2,.7,.2,1), box-shadow var(--ig-duration) ease;
 }
 /* The back sits behind the printed face. The illuminated rim gives the edge visible thickness. */
@@ -34,7 +34,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 1px solid #fff8;
+  border: 1px solid #fff6;
   background: radial-gradient(ellipse at var(--photo-light-x) var(--photo-light-y), #fff9 0%, #fff0 58%), linear-gradient(120deg, #fff5 0%, #fff0 30%, #fff0 65%, #55203935 100%);
   opacity: var(--ig-lighting);
   transform: translateZ(1px);

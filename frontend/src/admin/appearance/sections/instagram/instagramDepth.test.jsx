@@ -41,7 +41,7 @@ describe('profundidad de Instagram',()=>{
   render(<Harness/>);
   fireEvent.click(within(screen.getByRole('navigation',{name:'Pasos de edición'})).getByRole('button',{name:/Diseño/}));
   fireEvent.click(within(screen.getByRole('navigation',{name:'Diseño de Instagram'})).getByRole('button',{name:'Fotos y efectos'}));
-  fireEvent.change(screen.getByLabelText('Editar fotos y efectos'),{target:{value:'1'}});
+  fireEvent.change(screen.getByLabelText('Editar fotos y efectos'),{target:{value:'2'}});
   fireEvent.change(screen.getByLabelText('Separación entre capas (px)'),{target:{value:'130'}});
   fireEvent.change(screen.getByLabelText('Perspectiva de la cámara (px)'),{target:{value:'1000'}});
   fireEvent.click(screen.getByRole('button',{name:'Guardar prueba'}));

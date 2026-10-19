@@ -139,7 +139,12 @@ export default function ScrollButton({ config, buttonAnimation }) {
       ? (currentIndex + 1) % targets.length
       : (currentIndex - 1 + targets.length) % targets.length;
     const target = targets[targetIndex];
-    scrollExactlyToSection(target, { offsetTopPx: direction === "next" ? 0 : headerOffset, behavior });
+    // On upward navigation the fixed header returns. Honor the section's
+    // scroll margin without adding empty space inside its composition.
+    const sectionMargin = direction === "prev"
+      ? parseFloat(window.getComputedStyle(document.getElementById(target.id)).scrollMarginTop) || 0
+      : 0;
+    scrollExactlyToSection(target, { offsetTopPx: direction === "next" ? 0 : Math.max(headerOffset, sectionMargin), behavior });
   };
 
   const handlePrev = () => {

@@ -59,6 +59,11 @@ export default function InstagramSection({
     '--ig-mobile-py': `${e.editorialMobilePaddingY}px`,
     '--ig-profile-size': `${e.editorialProfileSize}px`,
     '--ig-button-size': `${e.editorialButtonSize}px`,
+    '--ig-title-x': `${e.editorialTitleX}%`,
+    '--ig-title-height': e.editorialTitleHeight / 100,
+    '--ig-photo-brightness': e.editorialPhotoBrightness,
+    '--ig-photo-contrast': e.editorialPhotoContrast,
+    '--ig-photo-warmth': e.editorialPhotoWarmth / 100,
     '--ig-title-top': `${e.editorialTitleTop}%`,
     '--ig-max': e.editorialWidthMode === 'full' ? 'none' : `${e.editorialMaxWidth}px`,
     '--ig-height': e.editorialHeight / 1600,
@@ -110,7 +115,7 @@ export default function InstagramSection({
       '--photo-layer': layout.layer,
       '--photo-position': `${crop.x}% ${crop.y}%`,
       '--photo-zoom': crop.zoom,
-      '--photo-fit': post.imageFit === 'cover' || post.imageFit === 'contain' ? post.imageFit : e.editorialImageFit
+      '--photo-fit': post.imageFit === 'cover' || post.imageFit === 'contain' ? post.imageFit : slot === 1 ? e.editorialFeaturedFit : e.editorialImageFit
     }}>
       <picture>
         <img className="ig-editorial__image-backdrop" src={post.image} alt="" aria-hidden="true" loading="lazy" decoding="async" />
@@ -124,7 +129,7 @@ export default function InstagramSection({
     <div className="ig-editorial__canvas">
       <div className="ig-editorial__scene">
         {e.editorialShowProfile && <div className="ig-editorial__profile">{profile ? <a href={profile} target="_blank" rel="noopener noreferrer">{e.editorialUseProfileLogo && c.instagramLogo ? <img className="ig-editorial__profile-logo" src={c.instagramLogo} alt="" /> : <Instagram aria-hidden="true" />}<span>{c.profileUser || '@rosaboutique33'}</span></a> : <span>{c.profileUser || '@rosaboutique33'}</span>}</div>}
-        {e.editorialShowTitle && <h2 className="ig-editorial__title">{e.editorialUseTitleImage && c.titleImage ? <img src={c.titleImage} alt={c.titleAlt || e.editorialTitle} /> : e.editorialTitle}</h2>}
+        {e.editorialShowTitle && <h2 className="ig-editorial__title" data-title-image={e.editorialUseTitleImage && c.titleImage ? 'true' : undefined}>{e.editorialUseTitleImage && c.titleImage ? <img src={c.titleImage} alt={c.titleAlt || e.editorialTitle} /> : e.editorialTitle}</h2>}
         <div className="ig-editorial__photos">{visible.slice(0, 5).map(renderPhoto)}</div>
         <div className="ig-editorial__footer">
           {e.editorialShowFollow && profile && <a className="ig-editorial__follow" href={profile} target="_blank" rel="noopener noreferrer">{e.editorialFollowText}<ArrowUpRight aria-hidden="true" /></a>}

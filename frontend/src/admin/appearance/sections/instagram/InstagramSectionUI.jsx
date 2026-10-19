@@ -245,18 +245,26 @@ export default function InstagramSectionUI({
           <p className="text-xs">Para mover una foto: Contenido → Publicaciones → Posición en escritorio.</p>
         </div>
         <div className={box}>
-          <SectionEditorSubgroups label="Editar tipografía" labels={['Título', 'Usuario y frase', 'Posición del usuario']}>
+          <SectionEditorSubgroups label="Editar tipografía" labels={['Título', 'Posición del título', 'Usuario y frase', 'Posición del usuario']}>
             <div className="space-y-3">{color('Color del título', 'editorialTitleColor')}
               <Select label="Tipografía" value={e.editorialFont} onChange={v => patch('editorialFont', v)} options={[['"Bodoni Moda", Georgia, serif', "Bodoni · diseño original"], ["Georgia, serif", "Georgia"], ['"Playfair Display", Georgia, serif', 'Playfair Display'], ['"Cormorant Garamond", Georgia, serif', 'Cormorant Garamond'], ['Arial, sans-serif', 'Arial']]} />
-              {num('Tamaño del título en escritorio', 'editorialTitleSize', 70, 420)}{num('Grosor del título', 'editorialTitleWeight', 100, 900, 100)}{num('Posición superior del título (%)', 'editorialTitleTop', 0, 20)}
+              {num('Tamaño del título en escritorio', 'editorialTitleSize', 70, 420)}{num('Grosor del título', 'editorialTitleWeight', 100, 900, 100)}
             </div>
+            <div className="space-y-3">{num('Posición superior del título (%)', 'editorialTitleTop', 0, 20)}{num('Posición horizontal del título (%)', 'editorialTitleX', -10, 10)}{num('Altura visual del título (%)', 'editorialTitleHeight', 60, 120)}</div>
             <div className="space-y-3">{color('Color del texto', 'editorialTextColor')}{num('Tamaño del usuario (px)', 'editorialProfileSize', 12, 40)}{num('Tamaño del logo (px)', 'editorialLogoSize', 16, 80)}{num('Tamaño de la frase inferior (px)', 'editorialSubtitleSize', 12, 36)}</div>
             <div className="space-y-3">{num('Posición horizontal del usuario (%)', 'editorialProfileX', 0, 80)}{num('Posición vertical del usuario (%)', 'editorialProfileY', 0, 40)}</div>
           </SectionEditorSubgroups>
         </div>
         <div className={box}>
-          <SectionEditorSubgroups label="Editar fotos y efectos" labels={['Marcos', 'Profundidad 3D', 'Cristal y luz', 'Movimiento 3D', 'Interacción']}>
+          <SectionEditorSubgroups label="Editar fotos y efectos" labels={['Marcos', 'Encuadre y luz', 'Profundidad 3D', 'Cristal y luz', 'Movimiento 3D', 'Interacción']}>
             <div className="space-y-3">{color('Color del borde', 'editorialBorderColor')}{num('Grosor del borde (px)', 'editorialBorderWidth', 0, 10)}{num('Esquinas redondeadas (px)', 'editorialRadius', 0, 80)}{num('Intensidad de sombra (%)', 'editorialShadow', 0, 80)}{check('Inclinar las fotos', 'editorialTilt')}</div>
+            <div className="space-y-3">
+              <Select label="Encuadre de la foto central" value={e.editorialFeaturedFit} onChange={v => patch('editorialFeaturedFit', v)} options={[["contain", "Ver la foto completa"], ["cover", "Llenar marco y recortar"]]} />
+              {num('Luminosidad de las fotografías', 'editorialPhotoBrightness', .8, 1.2, .01)}
+              {num('Contraste de las fotografías', 'editorialPhotoContrast', .8, 1.2, .01)}
+              {num('Calidez de las fotografías (%)', 'editorialPhotoWarmth', 0, 20)}
+              <p className="text-xs">El encuadre individual de una publicación tiene prioridad. Estos ajustes no modifican los archivos originales.</p>
+            </div>
             <div className="space-y-3">
               {check('Activar profundidad 3D', 'editorialDepthEnabled')}
               {num('Separación entre capas (px)', 'editorialDepth', 0, 160)}

@@ -232,11 +232,11 @@ describe('Instagram editorial', () => {
     } = render(<InstagramSection theme={theme} />);
     expect(container.querySelectorAll('.ig-editorial__photo')).toHaveLength(5);
     expect(theme.sections[0].config.posts).toHaveLength(6);
-    expect(container.querySelector('[data-post-id="4"]').style.getPropertyValue('--photo-x')).toBe('41%');
+    expect(container.querySelector('[data-post-id="4"]').style.getPropertyValue('--photo-x')).toBe('42%');
     rerender(<InstagramSection theme={themeFor(list, {
       editorialFeaturedPostId: '0'
     })} />);
-    expect(container.querySelector('[data-post-id="0"]').style.getPropertyValue('--photo-x')).toBe('41%');
+    expect(container.querySelector('[data-post-id="0"]').style.getPropertyValue('--photo-x')).toBe('42%');
     expect(container.querySelector('[data-post-id="0"]').getAttribute('href')).toBe(posts[0].link);
   });
   it('el color antiguo del distintivo no contamina el botón del nuevo diseño', () => {
@@ -246,5 +246,79 @@ describe('Instagram editorial', () => {
       profileBadgeTextColor: '#ff00ff'
     })} />);
     expect(container.querySelector('.ig-editorial').style.getPropertyValue('--ig-button-text')).toBe('#790d2d');
+  });
+  it('actualiza el acabado de versiones anteriores y conserva elecciones personalizadas', () => {
+    const corrected = normalizeEditorial({
+      editorialRevision: 2,
+      editorialTitleSize: 300,
+      editorialBorderWidth: 2,
+      editorialThickness: 7,
+      editorialShadow: 35
+    });
+    expect(corrected).toMatchObject({
+      editorialRevision: 3,
+      editorialTitleSize: 330,
+      editorialBorderWidth: 1,
+      editorialThickness: 2,
+      editorialShadow: 24
+    });
+    expect(normalizeEditorial({
+      editorialRevision: 2,
+      editorialTitleSize: 215,
+      editorialThickness: 4
+    })).toMatchObject({
+      editorialTitleSize: 215,
+      editorialThickness: 4
+    });
+  });
+  it('respeta la foto central completa y permite elegir su propio recorte', () => {
+    const list = Array.from({
+      length: 5
+    }, (_, i) => ({
+      ...posts[0],
+      id: String(i)
+    }));
+    const {
+      container,
+      rerender
+    } = render(<InstagramSection theme={themeFor(list)} />);
+    expect(container.querySelector('[data-post-id="4"]').style.getPropertyValue('--photo-fit')).toBe('contain');
+    expect(container.querySelector('[data-post-id="0"]').style.getPropertyValue('--photo-fit')).toBe('cover');
+    rerender(<InstagramSection theme={themeFor(list.map(p => p.id === '4' ? {
+      ...p,
+      imageFit: 'cover'
+    } : p))} />);
+    expect(container.querySelector('[data-post-id="4"]').style.getPropertyValue('--photo-fit')).toBe('cover');
+  });
+  it('guarda los controles de tratamiento fotográfico sin cambiar las imágenes ni los enlaces', () => {
+    const save = vi.fn();
+    render(<Harness save={save} />);
+    fireEvent.click(within(screen.getByRole('navigation', {
+      name: 'Pasos de edición'
+    })).getByRole('button', {
+      name: /Diseño/
+    }));
+    fireEvent.click(within(screen.getByRole('navigation', {
+      name: 'Diseño de Instagram'
+    })).getByRole('button', {
+      name: 'Fotos y efectos'
+    }));
+    fireEvent.change(screen.getByLabelText('Editar fotos y efectos'), {
+      target: {
+        value: '1'
+      }
+    });
+    fireEvent.change(screen.getByLabelText('Luminosidad de las fotografías'), {
+      target: {
+        value: '1.05'
+      }
+    });
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Guardar'
+    }));
+    expect(save.mock.calls[0][0].sections[0].config).toMatchObject({
+      editorialPhotoBrightness: 1.05,
+      posts
+    });
   });
 });

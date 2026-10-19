@@ -1,8 +1,14 @@
 export const EDITORIAL_DEFAULTS = {
-  editorialRevision: 2,
+  editorialRevision: 3,
   editorialVisibleCount: 5,
   editorialFeaturedPostId: '',
   editorialImageFit: 'cover',
+  editorialFeaturedFit: 'contain',
+  editorialTitleX: 4,
+  editorialTitleHeight: 82,
+  editorialPhotoBrightness: 1.02,
+  editorialPhotoContrast: 0.98,
+  editorialPhotoWarmth: 3,
   editorialFollowTextColor: '#790d2d',
   editorialTitle: 'Instagram',
   editorialSubtitle: 'Momentos que enamoran',
@@ -26,7 +32,7 @@ export const EDITORIAL_DEFAULTS = {
   editorialActionColor: '#790d2d',
   editorialActionTextColor: '#fff5ec',
   editorialFont: '"Bodoni Moda", Georgia, serif',
-  editorialTitleSize: 300,
+  editorialTitleSize: 330,
   editorialTitleWeight: 400,
   editorialProfileX: 18,
   editorialProfileY: 0,
@@ -34,29 +40,29 @@ export const EDITORIAL_DEFAULTS = {
   editorialUseProfileLogo: false,
   editorialFooterX: 1,
   editorialFooterY: 2,
-  editorialFooterWidth: 32,
+  editorialFooterWidth: 28,
   editorialSubtitleSize: 20,
   editorialBackgroundX: 50,
   editorialBackgroundY: 50,
   editorialMobilePaddingY: 24,
-  editorialProfileSize: 24,
-  editorialButtonSize: 24,
-  editorialTitleTop: 1,
+  editorialProfileSize: 26,
+  editorialButtonSize: 28,
+  editorialTitleTop: 0,
   editorialMaxWidth: 1920,
   editorialWidthMode: 'full',
   editorialHeight: 900,
   editorialPaddingX: 32,
   editorialPaddingY: 20,
   editorialRadius: 24,
-  editorialBorderWidth: 2,
-  editorialShadow: 35,
+  editorialBorderWidth: 1,
+  editorialShadow: 24,
   editorialTilt: true,
   editorialDepthEnabled: true,
   editorialPerspective: 1400,
-  editorialDepth: 90,
-  editorialTilt3D: 10,
-  editorialThickness: 7,
-  editorialLighting: 32,
+  editorialDepth: 65,
+  editorialTilt3D: 6,
+  editorialThickness: 2,
+  editorialLighting: 18,
   editorialPointer3D: true,
   editorialParallax: 7,
   editorialHoverDepth: 70,
@@ -74,8 +80,13 @@ export const EDITORIAL_DEFAULTS = {
   editorialMobilePhotoRatio: 0.75
 };
 const ranges = {
-  editorialRevision: [2, 2],
+  editorialRevision: [3, 3],
   editorialVisibleCount: [1, 12],
+  editorialTitleX: [-10, 10],
+  editorialTitleHeight: [60, 120],
+  editorialPhotoBrightness: [0.8, 1.2],
+  editorialPhotoContrast: [0.8, 1.2],
+  editorialPhotoWarmth: [0, 20],
   editorialBackgroundWash: [0, 100],
   editorialTitleSize: [70, 420],
   editorialTitleWeight: [100, 900],
@@ -132,48 +143,63 @@ export function normalizeEditorial(config = {}) {
       editorialTitleSize: 290,
       editorialTitleTop: 0
     };
-    if (config.editorialRevision !== 2 && v === oldDefaults[key]) v = fallback;
+    if ((config.editorialRevision ?? 0) < 2 && v === oldDefaults[key]) v = fallback;
+    const previous = {
+      editorialTitleSize: 300,
+      editorialTitleTop: 1,
+      editorialProfileSize: 24,
+      editorialButtonSize: 24,
+      editorialFooterWidth: 32,
+      editorialBorderWidth: 2,
+      editorialShadow: 35,
+      editorialDepth: 90,
+      editorialTilt3D: 10,
+      editorialThickness: 7,
+      editorialLighting: 32
+    };
+    if ((config.editorialRevision ?? 0) < 3 && v === previous[key]) v = fallback;
     next[key] = ranges[key] ? bounded(v, ...ranges[key], fallback) : typeof v === typeof fallback ? v : fallback;
   }
   if (!['included', 'continuity', 'custom', 'color', 'global'].includes(next.editorialBackgroundMode)) next.editorialBackgroundMode = 'included';
   if (!['full', 'limited'].includes(next.editorialWidthMode)) next.editorialWidthMode = 'full';
   if (!['none', 'lift', 'zoom', 'lift-zoom'].includes(next.editorialMotion)) next.editorialMotion = 'lift';
+  if (!['contain', 'cover'].includes(next.editorialFeaturedFit)) next.editorialFeaturedFit = 'contain';
   if (!['contain', 'cover'].includes(next.editorialImageFit)) next.editorialImageFit = 'cover';
   next.editorialVisibleCount = Math.round(next.editorialVisibleCount);
   next.editorialMobileColumns = Math.round(next.editorialMobileColumns);
   return next;
 }
 const positions = [{
-  x: 5,
-  y: 23,
-  width: 32,
-  height: 59,
-  rotate: 8,
+  x: 3.2,
+  y: 18.5,
+  width: 31.5,
+  height: 65,
+  rotate: 10,
   layer: 1
 }, {
-  x: 41,
-  y: 17,
-  width: 30,
-  height: 77,
+  x: 42,
+  y: 15,
+  width: 29,
+  height: 80.5,
   rotate: -5,
   layer: 3
 }, {
   x: 72,
-  y: 19,
+  y: 17,
   width: 25,
   height: 40,
   rotate: -9,
   layer: 2
 }, {
   x: 26,
-  y: 54,
+  y: 51.5,
   width: 19,
-  height: 33,
+  height: 35.5,
   rotate: -6,
   layer: 4
 }, {
-  x: 72,
-  y: 57,
+  x: 69,
+  y: 53,
   width: 23,
   height: 34,
   rotate: 6,
