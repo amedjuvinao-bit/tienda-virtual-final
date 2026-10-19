@@ -7,12 +7,15 @@ export const JOURNAL_DEFAULTS = {
   journalLimit: 24, journalPageSize: 2,
   journalBackgroundMode: 'included', journalBackgroundImage: '', journalMobileBackgroundImage: '',
   journalBackgroundColor: '#f5ded8', journalBackgroundWash: 0,
-  journalInk: '#790d2d', journalAccent: '#b9935b', journalCardColor: '#fff8f3', journalCardOpacity: 78,
+  journalInk: '#790d2d', journalAccent: '#b9935b', journalCardColor: '#fff8f3', journalCardOpacity: 52,
   journalButtonColor: '#790d2d', journalButtonTextColor: '#fff8f3',
   journalFont: '"Bodoni Moda", Georgia, serif', journalTitleSize: 52, journalTextSize: 17, journalMobileTitleSize: 32,
   journalMaxWidth: 1540, journalPaddingX: 32, journalPaddingY: 26, journalGap: 28, journalMainWidth: 61,
-  journalImageRatio: 1.34, journalMobileImageRatio: 1, journalRadius: 20, journalShadow: 20,
-  journalBlur: 14, journalHoverLift: 3, journalMobilePadding: 16,
+  journalImageRatio: 1.34, journalMobileImageRatio: 1, journalRadius: 20, journalShadow: 28,
+  journalBlur: 18, journalHoverLift: 3, journalMobilePadding: 16,
+  journalMaterialRevision: 1, journalGlassEnabled: true, journalGlassDepth: 8,
+  journalGlassTexture: 26, journalGlassReflection: 48,
+  journalGlassInteractive: true, journalGlassTilt: 1.2,
   journalShowProfile: true, journalShowTitle: true, journalShowFollow: true, journalShowSubtitle: true,
   journalShowHighlights: true, journalShowActions: true, journalShowCaptions: true, journalShowFilters: true, journalShowSidebar: true
 };
@@ -23,12 +26,16 @@ const ranges = {
   journalPaddingX: [0, 100], journalPaddingY: [0, 100], journalGap: [12, 60],
   journalMainWidth: [50, 70], journalImageRatio: [.65, 1.8], journalMobileImageRatio: [.65, 1.5],
   journalRadius: [0, 40], journalShadow: [0, 50], journalBlur: [0, 30],
-  journalHoverLift: [0, 8], journalMobilePadding: [8, 32]
+  journalHoverLift: [0, 8], journalMobilePadding: [8, 32],
+  journalMaterialRevision: [1, 1], journalGlassDepth: [0, 16],
+  journalGlassTexture: [0, 60], journalGlassReflection: [0, 80], journalGlassTilt: [0, 3]
 };
 export function normalizeJournal(config = {}) {
   const next = {};
   for (const [key, fallback] of Object.entries(JOURNAL_DEFAULTS)) {
-    const value = config[key];
+    let value = config[key];
+    const previousMaterial = { journalCardOpacity: 78, journalShadow: 20, journalBlur: 14 };
+    if ((config.journalMaterialRevision ?? 0) < 1 && value === previousMaterial[key]) value = fallback;
     next[key] = ranges[key] ? bounded(value, ...ranges[key], fallback)
       : typeof value === typeof fallback ? value : fallback;
   }

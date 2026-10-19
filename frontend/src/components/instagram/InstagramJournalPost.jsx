@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { ArrowUpRight, Bookmark, Clapperboard, Heart, MessageCircle, MoreHorizontal, Send, Copy, Maximize2 } from 'lucide-react';
 import { photoCrop, safeInstagramLink } from '../../admin/appearance/sections/instagram/instagramEditorialHelpers';
 import { safeJournalVideo } from '../../admin/appearance/sections/instagram/instagramJournalHelpers';
+import { moveJournalGlass, resetJournalGlass } from './journalGlass';
 
 export function JournalAvatar({ settings, small = false }) {
   return <span className={`ig-journal__avatar${small ? ' ig-journal__avatar--small' : ''}`} aria-hidden="true">
@@ -23,7 +24,7 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
     <img className={post.mobileImage ? "ig-journal__desktop-image" : undefined} src={post.image} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />
     {post.mobileImage && <img className="ig-journal__mobile-image" src={post.mobileImage} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />}
   </picture>;
-  return <article className={`ig-journal__post${compact ? ' ig-journal__post--compact' : ' ig-journal__post--featured'}`} data-post-id={post.id} aria-label={description}>
+  return <article className={`ig-journal__post${compact ? ' ig-journal__post--compact' : ' ig-journal__post--featured'}`} data-igj-glass={compact ? 'preview' : 'featured'} onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} data-post-id={post.id} aria-label={description}>
     <div className="ig-journal__post-header">
       <JournalAvatar settings={j} small={compact} />
       <div className="ig-journal__identity"><strong>{user.replace(/^@/, '')}</strong>{!compact && <span>{j.journalName}</span>}</div>

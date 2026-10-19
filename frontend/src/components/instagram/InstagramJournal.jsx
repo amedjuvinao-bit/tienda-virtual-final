@@ -6,7 +6,9 @@ import { safeInstagramLink } from '../../admin/appearance/sections/instagram/ins
 import { categoriasBackdrop } from '../../admin/appearance/sections/categorias/categoriasFanHelpers';
 import InstagramJournalPost from './InstagramJournalPost';
 import useJournalSaved from './useJournalSaved';
+import { moveJournalGlass, resetJournalGlass } from './journalGlass';
 import './instagramJournal.css';
+import './instagramJournalGlass.css';
 
 export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const raw = theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram');
@@ -58,7 +60,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   if (j.journalBackgroundMode === 'color') background = '';
   if (j.journalBackgroundMode === 'global') { background = ''; color = theme?.colors?.background || '#fff'; }
   const common = { settings: j, user, onSave: id => setNotice(toggle(id)), onShare: share, onSelect: select };
-  return <section className="ig-journal" aria-label="Instagram de la tienda" style={{
+  return <section className="ig-journal" aria-label="Instagram de la tienda" data-glass={j.journalGlassEnabled ? 'true' : 'false'} style={{
     '--igj-background': color, '--igj-backdrop': background ? `url(${JSON.stringify(background)})` : 'none',
     '--igj-mobile-backdrop': j.journalMobileBackgroundImage ? `url(${JSON.stringify(j.journalMobileBackgroundImage)})` : background ? `url(${JSON.stringify(background)})` : 'none',
     '--igj-wash': j.journalBackgroundWash / 100, '--igj-ink': j.journalInk, '--igj-accent': j.journalAccent,
@@ -70,6 +72,8 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
     '--igj-main': `${j.journalMainWidth}fr`, '--igj-rest': `${100 - j.journalMainWidth}fr`, '--igj-ratio': j.journalImageRatio,
     '--igj-mobile-ratio': j.journalMobileImageRatio, '--igj-radius': `${j.journalRadius}px`,
     '--igj-shadow': j.journalShadow / 100, '--igj-blur': `${j.journalBlur}px`, '--igj-lift': `${j.journalHoverLift}px`,
+    '--igj-glass-depth': `${j.journalGlassDepth}px`, '--igj-texture': j.journalGlassTexture / 100,
+    '--igj-reflection': j.journalGlassReflection / 100,
     '--igj-mobile-padding': `${j.journalMobilePadding}px`
   }}>
     <div className="ig-journal__inner">
@@ -80,7 +84,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
       </header>
       <div className="ig-journal__layout" data-sidebar={j.journalShowSidebar ? 'true' : 'false'}>
         <div className="ig-journal__main" ref={main} tabIndex={-1} aria-label="Publicación principal"><InstagramJournalPost key={featured.id} post={featured} saved={saved.includes(featured.id)} {...common} /></div>
-        {j.journalShowSidebar && <aside className="ig-journal__sidebar" aria-label={j.journalSidebarTitle || 'Más publicaciones'}>
+        {j.journalShowSidebar && <aside className="ig-journal__sidebar" data-igj-glass="sidebar" onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} aria-label={j.journalSidebarTitle || 'Más publicaciones'}>
           <h3>{j.journalSidebarTitle}</h3>
           {j.journalShowHighlights && highlights.length > 0 && <div className="ig-journal__highlights" aria-label="Destacados de Instagram">{highlights.map(h => <button type="button" key={h.id} onClick={() => select(h.postId)} aria-pressed={featured.id === h.postId} aria-label={`Destacado ${h.title}`}><span><img src={h.image} alt="" loading="lazy" /></span><strong>{h.title}</strong></button>)}</div>}
           {j.journalShowFilters && <div className="ig-journal__filters" role="group" aria-label="Filtrar publicaciones">{[['all', 'Todas'], ['reels', 'Reels'], ['saved', 'Guardadas']].map(([value, label]) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setView(value)}>{label}</button>)}</div>}
