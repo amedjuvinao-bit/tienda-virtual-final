@@ -255,8 +255,24 @@ export default function InstagramSectionUI({
           </SectionEditorSubgroups>
         </div>
         <div className={box}>
-          <SectionEditorSubgroups label="Editar fotos y efectos" labels={['Marcos', 'Interacción']}>
+          <SectionEditorSubgroups label="Editar fotos y efectos" labels={['Marcos', 'Profundidad 3D', 'Cristal y luz', 'Movimiento 3D', 'Interacción']}>
             <div className="space-y-3">{color('Color del borde', 'editorialBorderColor')}{num('Grosor del borde (px)', 'editorialBorderWidth', 0, 10)}{num('Esquinas redondeadas (px)', 'editorialRadius', 0, 80)}{num('Intensidad de sombra (%)', 'editorialShadow', 0, 80)}{check('Inclinar las fotos', 'editorialTilt')}</div>
+            <div className="space-y-3">
+              {check('Activar profundidad 3D', 'editorialDepthEnabled')}
+              {num('Separación entre capas (px)', 'editorialDepth', 0, 160)}
+              {num('Perspectiva de la cámara (px)', 'editorialPerspective', 600, 2600)}
+              {num('Inclinación en perspectiva (grados)', 'editorialTilt3D', 0, 18)}
+              <p className="text-xs">La profundidad se ve incluso sin mover el cursor. Una perspectiva menor acentúa el volumen.</p>
+            </div>
+            <div className="space-y-3">
+              {num('Grosor del cristal (px)', 'editorialThickness', 0, 16)}
+              {num('Intensidad de reflejos (%)', 'editorialLighting', 0, 70)}
+            </div>
+            <div className="space-y-3">
+              {check('Seguir el cursor con perspectiva', 'editorialPointer3D')}
+              {num('Respuesta al cursor (grados)', 'editorialParallax', 0, 14)}
+              {num('Acercamiento de la foto al pasar el cursor (px)', 'editorialHoverDepth', 0, 140)}
+            </div>
             <div className="space-y-3"><Select label="Efecto al pasar el cursor" value={e.editorialMotion} onChange={v => patch('editorialMotion', v)} options={[["none", "Sin movimiento"], ["lift", "Elevar foto"], ["zoom", "Acercar imagen"], ["lift-zoom", "Elevar y acercar"]]} />
               {num('Elevación (px)', 'editorialLift', 0, 40)}{num('Acercamiento al pasar el cursor', 'editorialZoom', 1, 1.2, .01)}{num('Duración del efecto (ms)', 'editorialDuration', 100, 1200)}
             </div>

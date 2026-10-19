@@ -4,6 +4,8 @@ import { normalizeInstagramSection } from '../admin/appearance/sections/instagra
 import { normalizeEditorial, photoLayout, photoCrop, safeInstagramLink, editorialPhotoSlot } from '../admin/appearance/sections/instagram/instagramEditorialHelpers';
 import { categoriasBackdrop } from '../admin/appearance/sections/categorias/categoriasFanHelpers';
 import './instagramEditorial.css';
+import './instagramDepth.css';
+import { instagramDepthStyle, moveInstagramDepth, resetInstagramDepth } from './instagramDepth';
 export default function InstagramSection({
   theme,
   posts = []
@@ -67,6 +69,10 @@ export default function InstagramSection({
     '--ig-border': e.editorialBorderColor,
     '--ig-border-width': `${e.editorialBorderWidth}px`,
     '--ig-shadow': e.editorialShadow / 100,
+    '--ig-perspective': `${e.editorialPerspective}px`,
+    '--ig-thickness': `${e.editorialThickness}px`,
+    '--ig-lighting': e.editorialLighting / 100,
+    '--ig-hover-depth': `${e.editorialHoverDepth}px`,
     '--ig-lift': `${e.editorialLift}px`,
     '--ig-zoom': e.editorialZoom,
     '--ig-duration': `${e.editorialDuration}ms`,
@@ -84,16 +90,18 @@ export default function InstagramSection({
     '--ig-mobile-ratio': e.editorialMobilePhotoRatio
   };
   const renderPhoto = (post, visibleIndex) => {
-    const layout = photoLayout(post, editorialPhotoSlot(visible, post, e));
+    const slot = editorialPhotoSlot(visible, post, e);
+    const layout = photoLayout(post, slot);
     const crop = photoCrop(post);
     const href = safeInstagramLink(post.link);
     const Tag = href ? 'a' : 'div';
-    return <Tag key={post.id || post.index} className="ig-editorial__photo" data-extra={visibleIndex >= 5 ? 'true' : undefined} data-post-id={post.id} {...href ? {
+    return <Tag key={post.id || post.index} className="ig-editorial__photo" data-extra={visibleIndex >= 5 ? 'true' : undefined} data-post-id={post.id} onPointerMove={event => moveInstagramDepth(event, e)} onPointerLeave={resetInstagramDepth} onPointerCancel={resetInstagramDepth} {...href ? {
       href,
       target: '_blank',
       rel: 'noopener noreferrer',
       'aria-label': `${e.editorialPostText}: ${post.alt || `Publicación ${post.index + 1}`}`
     } : {}} style={{
+      ...instagramDepthStyle(layout, slot, e),
       '--photo-x': `${Math.min(layout.x, 100 - layout.width)}%`,
       '--photo-y': `${Math.min(layout.y, 100 - layout.height)}%`,
       '--photo-w': `${layout.width}%`,
@@ -112,7 +120,7 @@ export default function InstagramSection({
       {href && e.editorialShowPostAction && <span className="ig-editorial__post-action" aria-hidden="true">{e.editorialPostText}<ArrowUpRight size={22} /></span>}
     </Tag>;
   };
-  return <section className="ig-editorial" aria-label="Instagram de la tienda" style={vars} data-motion={e.editorialMotion} data-mobile-wide-last={e.editorialMobileColumns === 2 && visible.length % 2 === 1 ? 'true' : undefined}>
+  return <section className="ig-editorial" aria-label="Instagram de la tienda" style={vars} data-depth3d={e.editorialDepthEnabled ? 'true' : 'false'} data-motion={e.editorialMotion} data-mobile-wide-last={e.editorialMobileColumns === 2 && visible.length % 2 === 1 ? 'true' : undefined}>
     <div className="ig-editorial__canvas">
       <div className="ig-editorial__scene">
         {e.editorialShowProfile && <div className="ig-editorial__profile">{profile ? <a href={profile} target="_blank" rel="noopener noreferrer">{e.editorialUseProfileLogo && c.instagramLogo ? <img className="ig-editorial__profile-logo" src={c.instagramLogo} alt="" /> : <Instagram aria-hidden="true" />}<span>{c.profileUser || '@rosaboutique33'}</span></a> : <span>{c.profileUser || '@rosaboutique33'}</span>}</div>}
