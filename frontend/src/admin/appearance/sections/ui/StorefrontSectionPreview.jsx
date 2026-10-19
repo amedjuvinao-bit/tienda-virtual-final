@@ -58,7 +58,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
     if (!viewport) return undefined;
 
     const measure = () => {
-      const device = previewDevice(['tendencia', 'complementos', 'categorias'].includes(section.id) ? viewMode : 'auto');
+      const device = previewDevice(['tendencia', 'complementos', 'categorias', 'instagram'].includes(section.id) ? viewMode : 'auto');
       const availableWidth = viewport.clientWidth || device.width;
       const scale = Math.min(1, availableWidth / device.width);
       const height = Math.ceil(Math.max(260, canvas?.scrollHeight || 0) * scale);
@@ -108,8 +108,8 @@ export default function StorefrontSectionPreview({ section, theme }) {
     <section className="section-real-preview" aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
         <div><span className="section-real-preview__eyebrow">Vista previa · {frame.label} {frame.width} px</span><h3>Así se verá en la tienda</h3></div>
-        {['tendencia', 'complementos', 'categorias'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
-          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio'], ...(section.id === 'categorias' ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
+        {['tendencia', 'complementos', 'categorias', 'instagram'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
+          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio'], ...(['categorias', 'instagram'].includes(section.id) ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
             <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)}>{label}</button>)}
         </div>}
       </header>

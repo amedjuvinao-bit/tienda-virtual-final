@@ -553,6 +553,7 @@ export function normalizeInstagramSection(section) {
 
       posts: Array.isArray(cfg.posts)
         ? cfg.posts.map((p, i) => ({
+            ...p,
             id: p?.id || `post_${i + 1}`,
             image: p?.image || "",
             link: p?.link || "",
