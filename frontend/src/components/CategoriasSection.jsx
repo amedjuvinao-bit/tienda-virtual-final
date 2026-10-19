@@ -27,6 +27,7 @@ export default function CategoriasSection({ theme }) {
   const vars = {
     '--cat-scene-color': backdrop.color, '--cat-scene-image': backdrop.image ? `url(${JSON.stringify(backdrop.image)})` : 'none',
     '--cat-scene-wash': `${s.fanBackgroundWash}%`, '--cat-max': s.fanWidthMode === 'full' ? 'none' : `${s.sectionMaxWidthPx}px`,
+    '--cat-section-min-height': s.fanSectionHeightMode === 'screen' ? '100vh' : s.fanSectionHeightMode === 'custom' ? `${s.fanSectionMinHeightPx}px` : '0px',
     '--cat-padding-top': `${s.sectionPaddingTopPx}px`, '--cat-padding-bottom': `${s.sectionPaddingBottomPx}px`,
     '--cat-padding-x': `${s.sectionPaddingXPx}px`, '--cat-title': s.fanTitleColor, '--cat-text': s.fanTextColor,
     '--cat-font': s.fanTitleFont || 'var(--font-headings, Georgia, serif)', '--cat-title-size': `${s.fanTitleSizePx}px`, '--cat-title-weight': s.fanTitleWeight,
@@ -50,7 +51,7 @@ export default function CategoriasSection({ theme }) {
   const resetPointer = () => {
     root.current?.style.setProperty('--cat-pointer-x', '0px'); root.current?.style.setProperty('--cat-pointer-y', '0px');
   };
-  return <section ref={root} className="categories-fan" aria-label="Categorías" style={vars} data-motion={s.fanMotionEnabled ? 'on' : 'off'} data-glint={s.fanGlint ? 'on' : 'off'} onPointerMove={parallax} onPointerLeave={resetPointer}>
+  return <section ref={root} className="categories-fan" aria-label="Categorías" style={vars} data-height-mode={s.fanSectionHeightMode} data-motion={s.fanMotionEnabled ? 'on' : 'off'} data-glint={s.fanGlint ? 'on' : 'off'} onPointerMove={parallax} onPointerLeave={resetPointer}>
     <div className="categories-fan__background" aria-hidden="true" />
     <div className="categories-fan__inner">
       <header className="categories-fan__header">

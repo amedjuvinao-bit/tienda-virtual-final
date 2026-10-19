@@ -6,6 +6,7 @@ export const CATEGORIAS_FAN_CONFIG = {
 };
 export const CATEGORIAS_FAN_STYLE = {
   fanWidthMode: 'limited',
+  fanSectionHeightMode: 'screen', fanSectionMinHeightPx: 800,
   fanColumns: 5, fanHeightPx: 380, fanGapPx: 12, fanSpreadDeg: 7, fanLiftPx: 22,
   fanHoverLiftPx: 20, fanExpand: 1.4, fanImageZoom: 1.06, fanRadiusPx: 24,
   fanMotionEnabled: true, fanParallax: true, fanGlint: true, fanShadow: true,
@@ -20,6 +21,7 @@ export const CATEGORIAS_FAN_STYLE = {
   fanMobilePaddingXPx: 16,
 };
 const ranges = {
+  fanSectionMinHeightPx: [400, 2000],
   fanColumns: [2, 6], fanHeightPx: [220, 580], fanGapPx: [4, 40], fanSpreadDeg: [0, 12],
   fanLiftPx: [0, 50], fanHoverLiftPx: [0, 40], fanExpand: [1, 1.8], fanImageZoom: [1, 1.2],
   fanRadiusPx: [0, 48], fanTitleSizePx: [24, 80], fanLabelSizePx: [12, 28],
@@ -40,6 +42,7 @@ export function normalizeCategoriasFanStyle(input = {}) {
     else next[key] = typeof value === 'string' && value.trim() ? value : fallback;
   }
   if (!['limited', 'full'].includes(next.fanWidthMode)) next.fanWidthMode = 'limited';
+  if (!['auto', 'screen', 'custom'].includes(next.fanSectionHeightMode)) next.fanSectionHeightMode = 'screen';
   next.fanColumns = Math.round(next.fanColumns);
   next.fanMobileColumns = Math.round(next.fanMobileColumns);
   if (!['continuity', 'custom', 'color', 'global'].includes(next.fanBackgroundMode)) next.fanBackgroundMode = 'continuity';

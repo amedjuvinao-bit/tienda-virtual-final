@@ -222,6 +222,34 @@ describe('Categorías: Abanico vivo', () => {
     expect(normalizeCategoriasSection({ style: { sectionMaxWidthPx: 1600 } }).style).toMatchObject({ sectionMaxWidthPx: 1600, fanWidthMode: 'limited' });
     expect(normalizeCategoriasSection({ style: { sectionMaxWidthPx: 10000, fanWidthMode: 'bad' } }).style).toMatchObject({ sectionMaxWidthPx: 2560, fanWidthMode: 'limited' });
   });
+  it('ocupa una pantalla de alto por defecto y permite ajustar la sección sin cambiar las fotos', () => {
+    const save = vi.fn(); const { container } = render(<Harness save={save} />);
+    const scene = container.querySelector('.categories-fan');
+    expect(scene).toHaveAttribute('data-height-mode', 'screen');
+    expect(scene.style.getPropertyValue('--cat-section-min-height')).toBe('100vh');
+    design('Alto');
+    expect(screen.getByRole('button', { name: 'Pantalla completa' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Altura personalizada' }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Altura mínima de la sección (px)' }), { target: { value: '1100' } });
+    expect(scene.style.getPropertyValue('--cat-section-min-height')).toBe('1100px');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    const saved = normalizeCategoriasSection(save.mock.calls[0][0].sections[0]);
+    expect(saved.style).toMatchObject({ fanSectionHeightMode: 'custom', fanSectionMinHeightPx: 1100, fanHeightPx: 380, fanMobileHeightPx: 240 });
+    expect(saved.config.slides).toEqual(normalizeCategoriasSection(makeTheme().sections[0]).config.slides);
+    fireEvent.click(screen.getByRole('button', { name: 'Según el contenido' }));
+    expect(scene.style.getPropertyValue('--cat-section-min-height')).toBe('0px');
+    fireEvent.click(screen.getByRole('button', { name: 'Altura personalizada' }));
+    expect(screen.getByRole('slider', { name: 'Altura mínima de la sección (px)' })).toHaveValue('1100');
+  });
+  it('conserva los modos de altura al recargar y acota alturas inválidas', () => {
+    for (const mode of ['screen', 'auto', 'custom']) {
+      const saved = normalizeCategoriasSection({ style: { fanSectionHeightMode: mode, fanSectionMinHeightPx: 950 } });
+      expect(normalizeCategoriasSection(JSON.parse(JSON.stringify(saved))).style).toMatchObject({ fanSectionHeightMode: mode, fanSectionMinHeightPx: 950 });
+    }
+    expect(normalizeCategoriasSection({ style: { fanSectionHeightMode: 'bad', fanSectionMinHeightPx: NaN } }).style).toMatchObject({ fanSectionHeightMode: 'screen', fanSectionMinHeightPx: 800 });
+    expect(normalizeCategoriasFanStyle({ fanSectionMinHeightPx: -1 }).fanSectionMinHeightPx).toBe(400);
+    expect(normalizeCategoriasFanStyle({ fanSectionMinHeightPx: 3000 }).fanSectionMinHeightPx).toBe(2000);
+  });
   it('permite comparar móvil y escritorio en la vista previa sin activar enlaces', async () => {
     const section = normalizeCategoriasSection(makeTheme().sections[0]);
     render(<StorefrontSectionPreview section={section} theme={{ sections: [section] }} />);

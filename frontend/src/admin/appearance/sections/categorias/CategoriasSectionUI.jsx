@@ -111,7 +111,12 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
       </SectionEditorCardTabs>
     </div>
     <div hidden={tab !== 'estilos'}>
-      <SectionEditorCardTabs label="Diseño de Categorías" labels={['Ancho', 'Abanico', 'Movimiento', 'Espacios', 'Fondo', 'Textos', 'Cristal', 'Móvil', 'Textos móvil', 'Visibilidad']}>
+      <SectionEditorCardTabs label="Diseño de Categorías" labels={['Alto', 'Ancho', 'Abanico', 'Movimiento', 'Espacios', 'Fondo', 'Textos', 'Cristal', 'Móvil', 'Textos móvil', 'Visibilidad']}>
+        <DesignCard title="Altura de toda la sección" hint="Aumenta el espacio vertical de Categorías para que la sección siguiente quede más abajo.">
+          {choice('fanSectionHeightMode', 'Altura de la sección', [['screen', 'Pantalla completa'], ['custom', 'Altura personalizada'], ['auto', 'Según el contenido']])}
+          {s.fanSectionHeightMode === 'custom' && slider('fanSectionMinHeightPx', 'Altura mínima de la sección (px)', 400, 2000, 10)}
+          <p className="section-design-hint">Pantalla completa ocupa al menos una pantalla de alto. Si el contenido necesita más espacio, la sección sigue creciendo. El tamaño de las fotos se ajusta por separado en Abanico.</p>
+        </DesignCard>
         <DesignCard title="Ancho horizontal" hint="Amplía el contenido hacia ambos lados. El fondo siempre cubre toda la sección.">
           {choice('fanWidthMode', 'Ancho de la sección', [['limited', 'Ancho personalizado'], ['full', 'Ancho completo']])}
           {s.fanWidthMode === 'limited' && slider('sectionMaxWidthPx', 'Ancho máximo (px)', 480, 2560)}
