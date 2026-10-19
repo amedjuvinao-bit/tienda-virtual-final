@@ -157,7 +157,7 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
           {slider('fanGlassBlurPx', 'Desenfoque del cristal (px)', 0, 20)}{color('fanGlassBorder', 'Color del borde del cristal')}
           {choice('fanGlint', 'Reflejo en los botones', [[true, 'Destello suave'], [false, 'Sin destello']])}
         </DesignCard>
-        <DesignCard title="Diseño para móvil" hint="Las categorías se acomodan en filas. No hay desplazamiento horizontal.">
+        <DesignCard title="Diseño para móvil" hint="Las categorías se acomodan en filas. En dos columnas, si la última queda sola, ocupa todo el ancho con formato vertical.">
           {choice('fanMobileColumns', 'Columnas en móvil', [[2, 'Dos columnas'], [1, 'Una columna']])}
           {slider('fanMobileHeightPx', 'Altura móvil de las tarjetas (px)', 180, 440)}
           {slider('fanMobileGapPx', 'Separación móvil (px)', 6, 32)}{slider('fanMobileTiltDeg', 'Inclinación móvil (grados)', 0, 5)}

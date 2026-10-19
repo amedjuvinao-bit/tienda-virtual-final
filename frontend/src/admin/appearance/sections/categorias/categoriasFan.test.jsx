@@ -41,6 +41,22 @@ describe('Categorías: Abanico vivo', () => {
     expect(screen.queryByRole('button', { name: /siguiente|anterior/i })).not.toBeInTheDocument();
     expect(interval).not.toHaveBeenCalled(); interval.mockRestore();
   });
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])('adapta la última categoría según las %i categorías visibles', (count) => {
+    const slides = Array.from({ length: count }, (_, i) => ({ id: `c${i}`, title: `Colección ${i}`, href: `/coleccion/${i}` }));
+    const { container, rerender } = render(<CategoriasSection theme={makeTheme(slides)} />);
+    const collections = () => container.querySelector('.categories-fan__collections');
+    expect(collections().getAttribute('data-mobile-wide-last')).toBe(count % 2 ? 'true' : null);
+    expect(screen.getAllByRole('link')).toHaveLength(count);
+    rerender(<CategoriasSection theme={makeTheme(slides, { fanMobileColumns: 1 })} />);
+    expect(collections()).not.toHaveAttribute('data-mobile-wide-last');
+  });
+  it('calcula la última tarjeta con las categorías visibles al ocultar una', () => {
+    const { container, rerender } = render(<CategoriasSection theme={makeTheme()} />);
+    expect(container.querySelector('.categories-fan__collections')).toHaveAttribute('data-mobile-wide-last', 'true');
+    rerender(<CategoriasSection theme={makeTheme(records.map((r, i) => ({ ...r, enabled: i !== 1 })))} />);
+    expect(container.querySelector('.categories-fan__collections')).not.toHaveAttribute('data-mobile-wide-last');
+    expect(screen.getByRole('link', { name: 'Explorar Tercera categoría' })).toHaveAttribute('href', '/coleccion/tres');
+  });
   it('eleva la tarjeta explorada y muestra su descripción con cursor o teclado', () => {
     const { container } = render(<CategoriasSection theme={makeTheme()} />);
     const first = screen.getByRole('link', { name: 'Explorar Primera categoría' });

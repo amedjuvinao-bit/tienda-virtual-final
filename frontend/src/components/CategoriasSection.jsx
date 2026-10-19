@@ -59,7 +59,7 @@ export default function CategoriasSection({ theme }) {
         {s.fanShowTitle && <h2 className="categories-fan__title">{c.useTitleImage ? <TitleImage key={c.titleImage} src={c.titleImage} alt={c.titleAlt} text={c.titleText} /> : c.titleText}</h2>}
         {s.fanShowSubtitle && c.subtitleText && <p className="categories-fan__subtitle">{c.subtitleText}</p>}
       </header>
-      <div className="categories-fan__collections" onMouseLeave={() => setActiveId(null)}>
+      <div className="categories-fan__collections" data-mobile-wide-last={s.fanMobileColumns === 2 && visible.length % 2 === 1 ? "true" : undefined} onMouseLeave={() => setActiveId(null)}>
         {rows.map((row, rowIndex) => <div className="categories-fan__row" key={rowIndex}>
           {row.map((slide, index) => {
             const position = row.length === 1 ? 0 : index / (row.length - 1) * 2 - 1;
