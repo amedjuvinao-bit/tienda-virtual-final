@@ -33,15 +33,17 @@ Los HTML generados contienen todo el texto y funcionan sin JavaScript. Usan enla
 
 La rama dedicada `gh-pages` debe contener únicamente esos cinco archivos en la raíz. La rama de trabajo mantiene las fuentes y la copia local de las páginas. `main` y el backend no se despliegan.
 
-GitHub debe tener activado **Settings → Pages → Build and deployment → Deploy from a branch → gh-pages → /(root) → Save**. Crear la rama no activa Pages por sí solo. La conexión de GitHub de este entorno permite commits y ramas, pero no configurar Pages; el acceso inicial a esa opción requiere una sesión de administrador del repositorio. No se solicitan tokens personales nuevos ni se guardan credenciales de GitHub en el proyecto.
+GitHub debe publicar desde **Settings → Pages → Build and deployment → Deploy from a branch → gh-pages → /(root) → Save**. La publicación se confirma con el despliegue y una petición al sitio, independientemente de cómo GitHub haya activado la fuente. La conexión de GitHub de este entorno permite commits y ramas, pero no cambiar los ajustes de Pages; si hiciera falta modificarlos, se requiere una sesión de administrador del repositorio. No se guardan credenciales de GitHub en el proyecto.
 
-Cuando GitHub confirme la publicación, las direcciones esperadas son:
+Publicación confirmada: el despliegue [pages build and deployment 39512954858](https://github.com/amedjuvinao-bit/tienda-virtual-final/actions/runs/39512954858) terminó correctamente para `dadaaa0d`. Las tres direcciones siguientes respondieron HTTP 200 por HTTPS y su contenido coincidió exactamente con los archivos generados:
 
 - Sitio: `https://amedjuvinao-bit.github.io/tienda-virtual-final/`
 - Términos: `https://amedjuvinao-bit.github.io/tienda-virtual-final/terminos.html`
 - Privacidad: `https://amedjuvinao-bit.github.io/tienda-virtual-final/privacidad.html`
 
-Estas direcciones solo deben darse por activas después de comprobar una respuesta HTTP 200 y el contenido servido. No contienen credenciales, no usan túneles ni tienen una caducidad automática configurada.
+No contienen credenciales, no usan túneles ni tienen una caducidad automática configurada. Mantener la rama y GitHub Pages activos para conservar los enlaces.
+
+La comprobación local cubrió las tres páginas con JavaScript deshabilitado, navegación y anclas en anchos 320, 390, 768 y 1440, y ausencia de peticiones externas automáticas. La compilación de Vite terminó correctamente e incluyó los mismos HTML en `dist/legal`. Dos flujos generales de CI del repositorio señalaron fallos en sus pasos de auditoría de dependencias (Configuración y Productos); la publicación de Pages y los trabajos funcionales de Productos terminaron correctamente. En este cambio no se modificaron dependencias ni sus archivos de bloqueo.
 
 Después, en TikTok Sandbox: plataforma Web, dirección del sitio y enlaces legales; añadir Login Kit y Display API, permisos `user.info.basic` y `video.list`, aplicar cambios y registrar la cuenta en Target users. Las credenciales del panel deben corresponder a ese Sandbox. La conexión real y los permisos de la app siguen pendientes de la autorización del titular en TikTok.
 
