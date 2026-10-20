@@ -33,7 +33,8 @@ export function getSectionOverview(section, sections) {
   } else if (id === 'instagram' || id === 'tiktok') {
     const total = count(config.posts, (post) => post?.enabled !== false &&
       (id === 'instagram' ? post?.image : post?.image || post?.thumb));
-    detail = `${total} ${total === 1 ? 'publicación lista' : 'publicaciones listas'}`;
+    detail = id === 'instagram' && config.journalSource === 'connected'
+      ? 'Publicaciones de la cuenta conectada' : `${total} ${total === 1 ? 'publicación lista' : 'publicaciones listas'}`;
   } else if (id === 'informacion') {
     const cards = Array.isArray(config.cards) ? config.cards : INFO_SECTION_DEFAULTS.config.cards;
     detail = `${cards.length} ${cards.length === 1 ? 'bloque informativo' : 'bloques informativos'}`;

@@ -2,6 +2,8 @@
 const crypto = require('crypto');
 const Settings = require('../models/InstagramSettings');
 const Pages = require('../models/InstagramFeedPage');
+const SiteSettings = require('../models/SiteSettings');
+const { visiblePosts, selectionFor } = require('../../shared/instagramSelection.cjs');
 const { key, protect, reveal, digest, signCursor, readCursor } = require('../lib/instagram/credentials');
 const HOUR = 3600000;
 const busy = new Map();
@@ -83,7 +85,12 @@ function validateRedirect(value) {
     return url.href;
   } catch { throw new InstagramError('Usa la URL HTTPS del backend seguida de /api/instagram/callback (HTTP solo en localhost).'); }
 }
-function createInstagramService({ Model = Settings, PageModel = Pages, fetchFn = fetch } = {}) {
+async function readPublishedConfig() {
+  const site = await SiteSettings.findOne().select('theme.sections').lean();
+  const section = site?.theme?.sections?.find(s => s.id === 'instagram' || s.type === 'instagram');
+  return { ...section?.config, sectionEnabled: section?.enabled !== false };
+}
+function createInstagramService({ Model = Settings, PageModel = Pages, fetchFn = fetch, readConfig = readPublishedConfig } = {}) {
   async function getSettings() { return safeSettings(await Model.getSingleton()); }
   async function save(input) {
     const s = await Model.getSingleton(); assertRevision(s, input);
@@ -200,19 +207,36 @@ function createInstagramService({ Model = Settings, PageModel = Pages, fetchFn =
       throw new InstagramError(s.lastError, error.status || 503);
     }
   }
-  async function feed(cursor = '', force = false) {
+  async function feedPage(cursor = '', force = false, adminPreview = false) {
     const s = await Model.getSingleton();
-    if (!s.enabled || !s.account || !s.tokenEncrypted) return { ok: true, connected: false, posts: [], nextCursor: '' };
+    if ((!adminPreview && !s.enabled) || !s.account || !s.tokenEncrypted) return { ok: true, connected: false, posts: [], nextCursor: '' };
     let after; try { after = readCursor(cursor, s.connectionId); } catch (e) { throw new InstagramError(e.message, 400); }
     const pendingKey = `${s.connectionId}:${digest(after)}`;
     if (!busy.has(pendingKey)) busy.set(pendingKey, fetchPage(s, after, force).finally(() => busy.delete(pendingKey)));
     const page = await busy.get(pendingKey);
     // A disconnect during a provider request must never publish the old account.
     const current = await Model.getSingleton();
-    if (!current.enabled || current.connectionId !== s.connectionId) return { ok: true, connected: false, posts: [], nextCursor: '' };
-    return { ok: true, connected: true, account: current.account, posts: page.posts,
-      nextCursor: signCursor(page.after, s.connectionId), fetchedAt: page.fetchedAt,
+    if ((!adminPreview && !current.enabled) || current.connectionId !== s.connectionId) return { ok: true, connected: false, posts: [], nextCursor: '' };
+    // Filter after the cache lookup. Saving Appearance takes effect on every page immediately.
+    const config = adminPreview ? null : await readConfig();
+    const posts = adminPreview ? page.posts : config?.sectionEnabled === false ? [] : visiblePosts(page.posts, config, current.account.id);
+    const selection = selectionFor(config || {}, current.account.id);
+    const noSelection = !adminPreview && (config?.sectionEnabled === false || selection.mode === 'selected' && !selection.included.size);
+    return { ok: true, connected: true, account: current.account, posts,
+      nextCursor: noSelection ? '' : signCursor(page.after, s.connectionId), fetchedAt: page.fetchedAt,
       stale: Date.now() - +new Date(page.fetchedAt) >= HOUR };
+  }
+  async function feed(cursor = '', force = false, adminPreview = false) {
+    const started = Date.now(), seen = new Set();
+    let result;
+    // Skip wholly hidden pages so an older approved post can appear on initial load.
+    // Bound work per request; the signed cursor can continue a large account safely.
+    for (let page = 0; page < 8; page += 1) {
+      result = await feedPage(cursor, force, adminPreview);
+      if (adminPreview || !result.connected || result.posts.length || !result.nextCursor || seen.has(result.nextCursor) || Date.now() - started > 8000) break;
+      seen.add(result.nextCursor); cursor = result.nextCursor; force = false;
+    }
+    return result;
   }
   return { getSettings, save, connectToken, authorize, start, callback, disconnect, feed };
 }

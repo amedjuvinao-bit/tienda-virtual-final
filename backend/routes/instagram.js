@@ -26,6 +26,12 @@ admin.post('/authorize', handle(async (req, res) => {
 admin.post('/disconnect', handle(async (req, res) => res.json(await service.disconnect(req.body || {}))));
 admin.post('/sync', handle(async (_req, res) => { await service.feed('', true); return res.json(await service.getSettings()); }));
 publicRouter.use(noStore);
+// Appearance editors may read media (including hidden posts), never connection credentials.
+publicRouter.get('/admin/feed', requireAdmin, requirePermission('appearance:view'),
+  rateLimit({ windowMs: 60000, limit: 60, standardHeaders: true, legacyHeaders: false }),
+  handle(async (req, res) => res.json(await service.feed(req.query.cursor || '', false, true))));
+publicRouter.post('/admin/refresh', requireAdmin, requirePermission('appearance:view'), actionLimit,
+  handle(async (_req, res) => res.json(await service.feed('', true, true))));
 publicRouter.get('/feed', rateLimit({ windowMs: 60000, limit: 60, standardHeaders: true, legacyHeaders: false,
   message: { ok: false, message: 'Espera un momento antes de cargar más publicaciones.' } }), handle(async (req, res) => res.json(await service.feed(req.query.cursor || ''))));
 publicRouter.get('/start', handle(async (req, res) => {

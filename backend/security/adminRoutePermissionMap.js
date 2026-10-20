@@ -16,6 +16,8 @@ const {
 const { requiredUserWritePermissions } = require('./adminUserWritePolicy');
 
 const ADMIN_ROUTE_PERMISSION_RULES = [
+  { method: 'GET', path: '/api/instagram/admin/feed', permission: 'appearance:view', description: 'Consultar publicaciones para la selección de Apariencia.' },
+  { method: 'POST', path: '/api/instagram/admin/refresh', permission: 'appearance:view', description: 'Actualizar publicaciones para la selección de Apariencia.' },
   ...['GET', 'PUT'].map(method => ({ method, path: '/api/admin/instagram-settings', permission: 'settings:instagram', audit: method !== 'GET', danger: method !== 'GET', description: 'Administrar la conexión privada de Instagram.' })),
   ...['authorize', 'connect-token', 'sync', 'disconnect'].map(action => ({ method: 'POST', path: `/api/admin/instagram-settings/${action}`, permission: 'settings:instagram', audit: true, danger: true, description: 'Gestionar la cuenta conectada de Instagram.' })),
 

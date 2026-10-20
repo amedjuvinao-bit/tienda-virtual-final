@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Instagram, ChevronLeft, ChevronRight } from 'lucide-react';
 import { normalizeInstagramSection } from '../../admin/appearance/sections/instagram/instagramSectionHelpers';
 import { normalizeJournal, journalPosts, journalHighlights, journalFeaturedId } from '../../admin/appearance/sections/instagram/instagramJournalHelpers';
@@ -10,6 +10,8 @@ import { moveJournalGlass, resetJournalGlass } from './journalGlass';
 import JournalLiquidLens from './JournalLiquidLens';
 import JournalLightbox from './JournalLightbox';
 import useInstagramFeed from './useInstagramFeed';
+import { InstagramEditorFeed } from './InstagramEditorFeed';
+import selectionHelpers from '@shared/instagram-selection';
 import './instagramJournal.css';
 import './instagramJournalGlass.css';
 import './instagramJournalLiquid.css';
@@ -19,7 +21,9 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const section = normalizeInstagramSection(raw);
   const c = section.config;
   const connectedMode = c.journalSource === 'connected';
-  const feed = useInstagramFeed(section.enabled && connectedMode);
+  const editorFeed = useContext(InstagramEditorFeed);
+  const publicFeed = useInstagramFeed(section.enabled && connectedMode && !editorFeed);
+  const feed = editorFeed || publicFeed;
   const account = connectedMode && feed.connected ? feed.account : null;
   const resolved = { ...c,
     ...(account && c.journalUseAccountIdentity !== false ? { profileUser: `@${account.username}`, profileLink: account.url, journalName: account.name } : {}),
@@ -27,7 +31,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   };
   const j = normalizeJournal(resolved);
   const manualPosts = journalPosts(Array.isArray(raw?.config?.posts) ? c.posts : fallback, j.journalLimit);
-  const posts = connectedMode && feed.connected ? feed.posts : manualPosts;
+  const posts = connectedMode && feed.connected ? selectionHelpers.visiblePosts(feed.posts, c, feed.account?.id) : manualPosts;
   const preferred = connectedMode && feed.connected ? (posts.find(p => p.id === c.journalFeaturedPostId)?.id || posts[0]?.id) : journalFeaturedId(posts, c);
   const main = useRef(null);
   const [selection, setSelection] = useState(null);
@@ -40,6 +44,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const [notice, setNotice] = useState('');
   const user = resolved.profileUser || '@rosaboutique33';
   const { ids: saved, toggle } = useJournalSaved(resolved.profileLink || user);
+  useEffect(() => { if (lightbox && !posts.some(post => post.id === lightbox.id)) setLightbox(null); }, [lightbox, posts]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   if (!section.enabled) return null;
   if (!featured) return connectedMode ? <section className="ig-journal__connection-state" aria-label="Instagram de la tienda"><p role="status">{feed.loading ? 'Cargando publicaciones de Instagram…' : feed.error || (feed.connected ? 'Pronto compartiremos nuevas publicaciones.' : 'Pronto podrás ver aquí nuestras publicaciones de Instagram.')}</p>{feed.nextCursor && <button type="button" disabled={feed.loading} onClick={feed.loadMore}>{feed.loading ? 'Cargando…' : 'Cargar más publicaciones'}</button>}{feed.error && <button type="button" onClick={feed.retry}>Volver a intentar</button>}</section> : null;

@@ -7,13 +7,14 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@shared/instagram-selection': fileURLToPath(new URL('../shared/instagramSelection.cjs', import.meta.url)),
       '@shared/variant-key-authority': fileURLToPath(
         new URL('../shared/variantKeyAuthority.cjs', import.meta.url),
       ),
     },
   },
   optimizeDeps: {
-    include: ['@shared/variant-key-authority'],
+    include: ['@shared/variant-key-authority', '@shared/instagram-selection'],
   },
   test: {
     environment: 'jsdom',

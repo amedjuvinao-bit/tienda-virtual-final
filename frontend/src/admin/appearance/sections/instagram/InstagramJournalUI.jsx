@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { InstagramEditorFeed } from '../../../../components/instagram/InstagramEditorFeed';
+import InstagramConnectedPosts from './InstagramConnectedPosts';
+import selectionHelpers from '@shared/instagram-selection';
 import { Button } from '../ui/UiComponents';
 import SectionEditorSteps from '../ui/SectionEditorSteps';
 import SectionEditorCardTabs from '../ui/SectionEditorCardTabs';
@@ -22,7 +25,9 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
   const [error, setError] = useState('');
   const latest = useRef(); latest.current = { theme, setPath };
   const section = find(theme), c = section.config, j = normalizeJournal(c), posts = c.posts;
-  const available = journalPosts(posts, j.journalLimit);
+  const connectedFeed = useContext(InstagramEditorFeed);
+  const available = c.journalSource === 'connected' && connectedFeed?.connected
+    ? selectionHelpers.visiblePosts(connectedFeed.posts, c, connectedFeed.account?.id) : journalPosts(posts, j.journalLimit);
   const highlightsFor = config => Array.isArray(config.journalHighlights) ? config.journalHighlights : journalHighlights(config, journalPosts(config.posts, normalizeJournal(config).journalLimit));
   const highlights = highlightsFor(c);
   function mutate(edit) {
@@ -100,6 +105,8 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
           <div className="space-y-3">{text('Texto del botón del perfil', 'journalFollowText')}{text('Texto del enlace de publicación', 'journalPostText')}</div>
         </SectionEditorSubgroups></div>
         <div className={box}>
+          <InstagramConnectedPosts config={c} onChange={partial => mutate(s => ({ ...s, config: { ...s.config, ...partial } }))} />
+          <div hidden={c.journalSource === 'connected'} className="space-y-4">
           <div className="flex items-center justify-between gap-2"><strong>Publicaciones</strong><Button onClick={addPost} disabled={pending || uploading}>Agregar publicación</Button></div>
           <SectionEditorPostPicker posts={posts} activeIndex={Math.max(0, Math.min(active, posts.length - 1))} onSelect={setActive} label="Instagram" />
           {posts.map((p, index) => { const crop = photoCrop(p); return <div key={p.id} className="rounded-2xl bg-neutral-50 p-3 space-y-3" hidden={index !== Math.max(0, Math.min(active, posts.length - 1))}>
@@ -126,6 +133,7 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
               </div>
             </SectionEditorSubgroups>
           </div>; })}
+          </div>
         </div>
         <div className={box}>
           <div className="flex items-center justify-between gap-2"><strong>Destacados</strong><Button disabled={highlights.length >= 8 || pending} onClick={() => { patch('journalHighlights', [...highlights, { id: uid('highlight'), title: '', image: '', postId: available[0]?.id || '', enabled: true }]); setActiveHighlight(highlights.length); }}>Agregar destacado</Button></div>
@@ -148,7 +156,7 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
           {j.journalBackgroundMode === 'custom' && image('Imagen de fondo', 'journalBackgroundImage', j.journalBackgroundImage)}
           {color('Color de fondo', 'journalBackgroundColor')}{num('Velo de color (%)', 'journalBackgroundWash', 0, 100)}</div>
         <div className={box}><SectionEditorSubgroups label="Editar distribución" labels={['Publicaciones', 'Ancho y espacios', 'Fotografía principal']}>
-          <div className="space-y-3"><Select label="Publicación principal" value={j.journalFeaturedPostId} onChange={v => patch('journalFeaturedPostId', v)} options={postOptions} />{num('Publicaciones disponibles en el diario', 'journalLimit', 1, 48)}{num('Miniaturas por página lateral', 'journalPageSize', 1, 6)}<p className="text-xs">Las demás publicaciones se recorren con los botones del panel lateral. Todos los registros guardados se conservan.</p></div>
+          <div className="space-y-3"><Select label="Publicación principal" value={j.journalFeaturedPostId} onChange={v => patch('journalFeaturedPostId', v)} options={postOptions} />{c.journalSource !== 'connected' && num('Publicaciones disponibles en el diario', 'journalLimit', 1, 48)}{num('Miniaturas por página lateral', 'journalPageSize', 1, 6)}<p className="text-xs">Las demás publicaciones se recorren con los botones del panel lateral. Todos los registros guardados se conservan.</p></div>
           <div className="space-y-3">{num('Ancho máximo (px)', 'journalMaxWidth', 800, 2000)}{num('Margen interior horizontal (px)', 'journalPaddingX', 0, 100)}{num('Margen interior vertical (px)', 'journalPaddingY', 0, 100)}{num('Separación entre paneles (px)', 'journalGap', 12, 60)}{num('Ancho del panel principal (%)', 'journalMainWidth', 50, 70)}</div>
           <div className="space-y-3">{num('Proporción ancho/alto de la imagen principal', 'journalImageRatio', .65, 1.8, .01)}<p className="text-xs">Para ajustar una prenda: Contenido → Publicaciones → Encuadre. El diseño calcula su altura automáticamente.</p></div>
         </SectionEditorSubgroups></div>

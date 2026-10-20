@@ -11,6 +11,16 @@ La integración lee una cuenta profesional (empresa o creador) mediante **Instag
 5. Como alternativa, conecta un token generado por la app de Meta en el desplegable de Credenciales. Debe ser un token de **Instagram Login**, con acceso a la cuenta y permiso básico. Se verifica antes de reemplazar la conexión actual. Este método no conoce la fecha de vencimiento del token; hay que reconectarlo cuando caduque o sea revocado.
 6. En **Apariencia → Instagram → Contenido → Perfil → Cuenta**, elige **Cuenta de Instagram conectada**. Decide si usar la identidad, foto de perfil y estadísticas de la cuenta; guarda Apariencia. El diseño y las fotos manuales se conservan.
 
+## Seleccionar publicaciones desde Apariencia
+
+En **Contenido → Publicaciones**, elige **Publicaciones de la cuenta de Instagram**. El editor muestra fotos, álbumes y reels de la cuenta, con texto, fecha, enlace original y un control **Visible/Oculta en tienda** por publicación. Puedes buscar entre las cargadas, filtrar visibles/ocultas/reels, aplicar mostrar u ocultar al resultado y cargar más páginas. El listado presenta doce tarjetas por página para mantener corto el editor.
+
+Las decisiones se guardan por identificador de publicación y cuenta dentro de la configuración de Apariencia. Cambian la vista previa al instante y se publican con **Guardar cambios**; actualizar o cargar más contenido no publica el borrador. Las fotografías manuales se conservan al alternar de origen.
+
+**Al recibir publicaciones nuevas** permite mostrarlas automáticamente (respetando las ocultas) o esperar selección. Al pasar a selección se conservan las publicaciones cargadas que ya eran visibles; las nuevas o aún no cargadas esperan aprobación. En selección, una lista vacía deja la sección sin publicaciones visibles.
+
+El feed público aplica la selección publicada en cada lectura, después de recuperar la caché y también al paginar. Salta páginas totalmente ocultas con un límite de ocho páginas y un presupuesto de ocho segundos entre páginas; si quedan resultados, devuelve un cursor para continuar. Las rutas `/api/instagram/admin/feed` y `/api/instagram/admin/refresh` requieren autenticación y permiso `appearance:view`; permiten consultar las ocultas para editar sin acceder a las credenciales privadas. El editor y su vista previa comparten el feed administrativo para mostrar cambios aún no publicados y selecciones de páginas posteriores.
+
 ## Comportamiento
 
 - Feed paginado de 12 publicaciones por petición. “Cargar más publicaciones” recorre las páginas disponibles en la API, sin aplicar el límite de la selección manual ni prometer publicaciones que Meta no exponga.

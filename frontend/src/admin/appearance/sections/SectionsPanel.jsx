@@ -16,6 +16,7 @@ import SectionEditorSteps from './ui/SectionEditorSteps';
 import SectionEditorCardTabs from './ui/SectionEditorCardTabs';
 import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
+import { InstagramEditorFeedProvider } from '../../../components/instagram/InstagramEditorFeed';
 import { normalizeTrendingPresentation } from '../../../components/trendingPresentation';
 import boutiqueBackdrop from '../../../assets/trending-vitrine-boutique.webp';
 import TrendingMobileColorsEditor from './editor/TrendingMobileColorsEditor';
@@ -2148,6 +2149,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
 
       {selected ? (
       <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
+        <InstagramEditorFeedProvider enabled={isInstagramSection}>
         <div className="section-editor-layout">
         <div className="section-editor-layout__form">
         {isLookSection ? (
@@ -2263,6 +2265,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           <StorefrontSectionPreview section={selected} theme={{ ...theme, sections }} />
         </aside>
         </div>
+        </InstagramEditorFeedProvider>
       </ModalShell>
       ) : null}
     </div>

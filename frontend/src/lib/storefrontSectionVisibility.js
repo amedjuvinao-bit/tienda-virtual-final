@@ -29,6 +29,7 @@ export function isStorefrontSectionVisible(theme, id) {
   }
 
   if (id === 'instagram' || id === 'tiktok') {
+    if (id === 'instagram' && config.journalSource === 'connected') return true;
     return Array.isArray(config.posts) && config.posts.some((post) =>
       post?.enabled !== false && (id === 'instagram' ? post?.image : post?.image || post?.thumb)
     );

@@ -7,7 +7,7 @@ const { createInstagramService, normalizeMedia, safeSettings, validateRedirect, 
 const token = 'test-private-instagram-token-123456789';
 const response = value => ({ ok: true, json: async () => value });
 const media = id => ({ id, media_type: 'IMAGE', media_url: `https://cdn.example.com/${id}.jpg`, permalink: `https://www.instagram.com/p/${id}/`, caption: `Publicación ${id}` });
-function fixture() {
+function fixture(publishedConfig = {}) {
   let store = { revision: 0, appId: '', apiVersion: 'v24.0', redirectUri: '', enabled: false, connectionId: '', __v: 0 };
   const pages = new Map(), requests = [];
   const doc = value => Object.assign(structuredClone(value), { save: async function () {
@@ -38,8 +38,9 @@ function fixture() {
     if (u.searchParams.get('after')) return response({ data: [media('two')] });
     return response({ data: [media('one')], paging: { cursors: { after: 'next-cursor' }, next: `https://evil.invalid/?access_token=${token}` } });
   };
-  return { service: createInstagramService({ Model, PageModel, fetchFn }), requests, pages,
-    current: () => store, mutate: fields => Object.assign(store, fields), reject: () => { rejectMeta = true; } };
+  let config = publishedConfig;
+  return { service: createInstagramService({ Model, PageModel, fetchFn, readConfig: async () => config }), requests, pages,
+    publish: value => { config = value; }, current: () => store, mutate: fields => Object.assign(store, fields), reject: () => { rejectMeta = true; } };
 }
 test('AES-GCM protects credentials, detects tampering and never uses a default key', () => {
   const encrypted = credentials.protect(token);
@@ -140,10 +141,52 @@ test('HTTP routes deny unauthenticated administration and serve only the public 
     for (const [method,path] of [['GET',''],['PUT',''],['POST','/connect-token'],['POST','/authorize'],['POST','/disconnect']]) {
       const r = await fetch(base + '/api/admin/instagram-settings' + path, { method }); assert.equal(r.status, 401);
     }
+    for (const [method, path] of [['GET', '/admin/feed'], ['POST', '/admin/refresh']]) {
+      const r = await fetch(base + '/api/instagram' + path, { method }); assert.equal(r.status, 401);
+    }
     const r = await fetch(base + '/api/instagram/feed'); assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'no-store');
     const data = await r.json(); assert.equal(data.account.username, 'rosa'); assert.ok(!JSON.stringify(data).includes(token));
     const bad = await fetch(base + '/api/instagram/feed?cursor=forged'); assert.equal(bad.status, 400);
   } finally { exported.feed = original; await new Promise(resolve => server.close(resolve)); }
+});
+test('published visibility filters cached posts immediately, including subsequent pages', async () => {
+  const f = fixture(); await f.service.connectToken({ revision: 0, accessToken: token });
+  const first = await f.service.feed(); await f.service.feed(first.nextCursor); const requests = f.requests.length;
+  f.publish({ journalConnectedSelection: { accountId: '1234567', mode: 'all', excluded: ['ig_one'] } });
+  const hidden = await f.service.feed(); assert.deepEqual(hidden.posts.map(p => p.id), ['ig_two']);
+  assert.equal(f.requests.length, requests);
+  const next = await f.service.feed(first.nextCursor); assert.equal(next.posts[0].id, 'ig_two');
+  const editor = await f.service.feed('', false, true); assert.equal(editor.posts[0].id, 'ig_one');
+  f.publish({ journalConnectedSelection: { accountId: '1234567', mode: 'selected', included: ['ig_two'] } });
+  assert.equal((await f.service.feed()).posts[0].id, 'ig_two');
+  assert.equal((await f.service.feed(first.nextCursor)).posts[0].id, 'ig_two');
+  f.publish({ journalConnectedSelection: { accountId: '1234567', mode: 'selected', included: [] } });
+  assert.deepEqual((await f.service.feed(first.nextCursor)).posts, []);
+});
+test('approval decisions survive reconnecting the same account and do not affect another account', async () => {
+  const f = fixture({ journalConnectedSelection: { accountId: '1234567', mode: 'selected', included: ['ig_two'] } });
+  await f.service.connectToken({ revision: 0, accessToken: token });
+  await f.service.connectToken({ revision: 1, accessToken: token });
+  assert.equal((await f.service.feed()).posts[0].id, 'ig_two');
+  f.publish({ journalConnectedSelection: { accountId: 'other', mode: 'selected', included: [] } });
+  assert.equal((await f.service.feed()).posts[0].id, 'ig_one');
+  f.mutate({ enabled: false }); assert.equal((await f.service.feed()).connected, false);
+  assert.equal((await f.service.feed('', false, true)).posts[0].id, 'ig_one');
+});
+test('public query flags cannot bypass the published visibility filter', async () => {
+  const f = fixture({ journalConnectedSelection: { accountId: '1234567', mode: 'selected', included: [] } });
+  await f.service.connectToken({ revision: 0, accessToken: token });
+  const service = require('../services/instagramService'), original = service.feed;
+  service.feed = f.service.feed;
+  const express = require('express'), app = express(); app.use('/api/instagram', require('../routes/instagram').publicRouter);
+  const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/instagram/feed?adminPreview=true&includeHidden=true`);
+    const result = await response.json(); assert.deepEqual(result.posts, []); assert.ok(!JSON.stringify(result).includes(token));
+  } finally { service.feed = original; await new Promise(resolve => server.close(resolve)); }
+  const { findAdminRoutePermission } = require('../security/adminRoutePermissionMap');
+  assert.equal(findAdminRoutePermission('GET', '/api/instagram/admin/feed').permission, 'appearance:view');
+  assert.equal(findAdminRoutePermission('POST', '/api/instagram/admin/refresh').permission, 'appearance:view');
 });
 test('index migration defaults to a non-mutating plan and requires production confirmation', async () => {
   const { main } = require('../scripts/migrateInstagramIndexes');
