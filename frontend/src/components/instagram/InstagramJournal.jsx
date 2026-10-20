@@ -16,6 +16,7 @@ import './instagramJournal.css';
 import './instagramJournalGlass.css';
 import './instagramJournalLiquid.css';
 import './journalReel.css';
+import './instagramJournalDepth.css';
 
 export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const raw = theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram');

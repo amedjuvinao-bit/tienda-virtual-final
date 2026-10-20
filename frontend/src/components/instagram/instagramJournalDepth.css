@@ -1,0 +1,93 @@
+/* Relief uses the existing depth, reflection, shadow and colour settings. */
+.ig-journal[data-glass=true]{
+  --igj-relief:var(--igj-glass-depth);
+  --igj-rim:color-mix(in srgb,var(--igj-accent) 48%,#f7d9cc);
+  --igj-edge:color-mix(in srgb,var(--igj-ink) 32%,var(--igj-accent));
+}
+.ig-journal[data-glass=true][data-finish=liquid] :is(.ig-journal__post--compact,.ig-journal__post--featured:not([data-video=true]),.ig-journal__sidebar){
+  border-color:color-mix(in srgb,var(--igj-accent) 34%,#fff8ee);
+  box-shadow:inset 0 2px 2px #ffff,inset 2px 0 3px #fff9,
+    inset -2px -3px 5px color-mix(in srgb,var(--igj-ink) 16%,transparent),
+    0 1px 0 #fff9,
+    1px calc(var(--igj-relief)*.32) 0 var(--igj-rim),
+    2px calc(var(--igj-relief)*.7) 0 color-mix(in srgb,var(--igj-rim) 78%,var(--igj-edge)),
+    2px var(--igj-relief) 1px color-mix(in srgb,var(--igj-edge) 54%,var(--igj-rim)),
+    0 calc(var(--igj-relief) + 12px) 24px rgb(91 31 50 / calc(var(--igj-shadow)*.85)),
+    0 calc(var(--igj-relief) + 28px) 55px rgb(91 31 50 / calc(var(--igj-shadow)*.55));
+}
+.ig-journal[data-glass=true][data-finish=liquid] :is(.ig-journal__post--compact,.ig-journal__post--featured:not([data-video=true]),.ig-journal__sidebar)::after{
+  inset:0;padding:2px;border:0;
+  background:linear-gradient(125deg,#fffef5 0%,#fff9 14%,#fff1 35%,var(--igj-rim) 62%,#fff7 76%,#fffef5 90%,#fff3);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;
+  opacity:calc(.45 + var(--igj-reflection)*.55);box-shadow:none;
+}
+.ig-journal[data-glass=true][data-finish=liquid] .ig-journal__post--compact{
+  --igj-relief:calc(var(--igj-glass-depth)*.4);
+  background:linear-gradient(135deg,#fff5,#fff0 48%,color-mix(in srgb,var(--igj-accent) 9%,transparent)),color-mix(in srgb,var(--igj-card) var(--igj-liquid-tint),transparent);
+}
+.ig-journal[data-glass=true][data-finish=liquid] .ig-journal__post--featured:not([data-video=true])>.ig-journal__media{
+  outline:1px solid color-mix(in srgb,var(--igj-accent) 45%,#fff);
+  box-shadow:0 2px 1px #fff8,0 6px 16px rgb(91 31 50 / calc(var(--igj-shadow)*.6));
+}
+.ig-journal[data-glass=true][data-finish=liquid] .ig-journal__post--featured:not([data-video=true])>.ig-journal__post-bottom{
+  background:linear-gradient(120deg,#fff9,#fff2 60%,color-mix(in srgb,var(--igj-accent) 12%,transparent)),color-mix(in srgb,var(--igj-card) 48%,transparent);
+  border:1px solid #fff9;
+  box-shadow:inset 0 2px 2px #fffc,inset 0 -2px 3px #77314824,
+    0 calc(var(--igj-relief)*.3) 0 var(--igj-rim),
+    0 calc(var(--igj-relief)*.5) 1px color-mix(in srgb,var(--igj-edge) 60%,transparent),
+    0 16px 30px rgb(57 12 35 / calc(var(--igj-shadow)*1.1));
+}
+.ig-journal[data-glass=true] .ig-journal__highlights button>span{
+  background:linear-gradient(140deg,#fffbe9,#fff2 34%,color-mix(in srgb,var(--igj-accent) 50%,#ffe8df) 70%,#fff9);
+  box-shadow:inset 1px 2px 3px #fff,inset -2px -3px 4px color-mix(in srgb,var(--igj-ink) 24%,transparent),
+    0 2px 0 #fff8,0 calc(var(--igj-glass-depth)*.5) 0 var(--igj-rim),
+    0 calc(var(--igj-glass-depth)*.7) 1px color-mix(in srgb,var(--igj-edge) 65%,transparent),0 10px 16px #6f2b422e;
+}
+.ig-journal[data-glass=true] .ig-journal__highlights button[aria-pressed=true]>span{
+  outline:1px solid var(--igj-ink);outline-offset:4px;
+  box-shadow:inset 1px 2px 3px #fff,inset -2px -3px 4px #7e3a4938,0 3px 0 var(--igj-rim),0 12px 22px #6f2b4242;
+}
+.ig-journal[data-glass=true] .ig-journal__actions :is(a,button){
+  background:linear-gradient(135deg,#fffc,#fff1 62%,color-mix(in srgb,var(--igj-accent) 14%,transparent));
+  box-shadow:inset 0 2px 2px #fff,inset 0 -2px 2px #83425326,
+    0 calc(var(--igj-glass-depth)*.25) 0 var(--igj-rim),0 6px 12px #6f2b4226;
+}
+.ig-journal[data-glass=true] .ig-journal__follow{
+  box-shadow:inset 0 2px 3px #fff9,inset 0 -3px 4px #29061961,
+    0 2px 0 var(--igj-rim),0 calc(var(--igj-glass-depth)*.65) 0 color-mix(in srgb,var(--igj-ink) 65%,var(--igj-accent)),0 14px 25px #6f2b4238;
+}
+/* Reels keep the open layout; only the media and its controls gain thickness. */
+.ig-journal[data-glass=true] .ig-journal__post--featured>.ig-journal__media--reel{
+  box-shadow:0 1px 0 #fff9,1px calc(var(--igj-glass-depth)*.4) 0 var(--igj-rim),
+    2px var(--igj-glass-depth) 0 color-mix(in srgb,var(--igj-edge) 65%,#cea49c),
+    0 calc(var(--igj-glass-depth) + 16px) 30px rgb(57 12 35 / calc(var(--igj-shadow)*1.05)),
+    0 calc(var(--igj-glass-depth) + 34px) 65px rgb(57 12 35 / calc(var(--igj-shadow)*.6));
+}
+.ig-journal[data-glass=true] .ig-reel::after{
+  padding:3px;border:0;
+  background:linear-gradient(125deg,#fff9,#fff1 34%,var(--igj-rim) 68%,#fff7 87%,#fff1);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;
+  box-shadow:none;
+}
+.ig-journal[data-glass=true] .ig-reel .ig-reel__start{
+  background:radial-gradient(ellipse at 26% 12%,#fffa,#fff1 52%),linear-gradient(135deg,#ffffff52,#84475e40);
+  box-shadow:inset 0 3px 4px #fffd,inset -2px -4px 7px #42243a7a,
+    0 2px 0 #ffe8d79c,0 calc(var(--igj-glass-depth)*.6) 0 #694653c7,0 15px 32px #240e3c66;
+}
+.ig-journal[data-glass=true] .ig-reel__start::before{content:'';position:absolute;inset:-7px;border:1px solid #ffe8d38c;border-radius:inherit;box-shadow:0 0 0 3px #fff1;pointer-events:none}
+.ig-journal[data-glass=true] .ig-reel__controls{
+  border-color:#ffe9d586;
+  box-shadow:inset 0 2px 2px #fff8,inset 0 -2px 3px #230c374d,
+    0 2px 0 #dfb6a869,0 calc(var(--igj-glass-depth)*.5) 1px #452337b3,0 14px 28px #230c3757;
+}
+@media(hover:hover) and (pointer:fine){
+  .ig-journal[data-glass=true][data-finish=liquid] :is(.ig-journal__post--compact,.ig-journal__post--featured:not([data-video=true]),.ig-journal__sidebar):hover{
+    box-shadow:inset 0 2px 3px #fff,inset 2px 0 3px #fff9,inset -2px -3px 5px #7c354433,
+      0 1px 0 #fff9,1px calc(var(--igj-relief)*.32) 0 var(--igj-rim),2px calc(var(--igj-relief)*.7) 0 var(--igj-rim),
+      2px var(--igj-relief) 1px var(--igj-edge),0 calc(var(--igj-relief) + 18px) 30px rgb(91 31 50 / var(--igj-shadow)),
+      0 calc(var(--igj-relief) + 34px) 60px rgb(91 31 50 / calc(var(--igj-shadow)*.6));
+  }
+}
+@container(max-width:767px){.ig-journal[data-glass=true]{--igj-relief:calc(var(--igj-glass-depth)*.65)}}
