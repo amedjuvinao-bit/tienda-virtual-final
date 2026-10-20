@@ -4,6 +4,7 @@ import { photoCrop, safeInstagramLink } from '../../admin/appearance/sections/in
 import { safeJournalVideo } from '../../admin/appearance/sections/instagram/instagramJournalHelpers';
 import { moveJournalGlass, resetJournalGlass } from './journalGlass';
 import JournalLiquidLens from './JournalLiquidLens';
+import JournalReelPlayer from './JournalReelPlayer';
 
 export function JournalAvatar({ settings, small = false }) {
   const [failed, setFailed] = useState('');
@@ -38,9 +39,9 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
           <button type="button" onClick={() => { menu.current.open = false; onShare(post, true); }}>{href ? 'Copiar enlace' : 'Copiar enlace de esta foto'} <Copy size={16} /></button></div>
       </details>
     </div>
-    <div className="ig-journal__media">
+    <div className={`ig-journal__media${!compact && video ? ' ig-journal__media--reel' : ''}`}>
       {compact ? <button type="button" className="ig-journal__image-button" onClick={() => onSelect(post.id)} aria-label={`Ver en grande: ${description}`}>{picture}<span className="ig-journal__expand"><Maximize2 size={16} /> Ver en grande</span></button>
-        : video ? <video key={`${post.id}:${video}`} src={video} poster={post.image} controls playsInline preload="none" aria-label={`Reel: ${description}`} /> : <button type="button" className="ig-journal__image-button" onClick={() => onExpand(post)} aria-label={`Ampliar foto: ${description}`}>{picture}<span className="ig-journal__expand"><Maximize2 size={16} /> Ver foto completa{post.album?.length > 1 ? ` · ${post.album.length} fotos` : ''}</span></button>}
+        : video ? <JournalReelPlayer key={`${post.id}:${video}`} post={post} src={video} onExpand={onExpand} /> : <button type="button" className="ig-journal__image-button" onClick={() => onExpand(post)} aria-label={`Ampliar foto: ${description}`}>{picture}<span className="ig-journal__expand"><Maximize2 size={16} /> Ver foto completa{post.album?.length > 1 ? ` · ${post.album.length} fotos` : ''}</span></button>}
       {post.album?.length > 1 && <button type="button" className="ig-journal__album-count" onClick={() => onExpand(post)} aria-label={`Ver las ${post.album.length} fotos de esta publicación`}>{post.album.length} fotos</button>}
       {post.kind === 'reel' && (compact || !video) && <span className="ig-journal__reel"><Clapperboard size={18} aria-hidden="true" /> Reel</span>}
     </div>

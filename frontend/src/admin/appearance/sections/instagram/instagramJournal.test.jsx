@@ -52,7 +52,8 @@ describe('Diario social público', () => {
     expect(featured().querySelector('video')).toBeNull();
     rerender(<InstagramSection theme={themeFor({ journalFeaturedPostId: 'p2' }, posts.map(p => p.id === 'p2' ? { ...p, videoUrl: '/video.mp4' } : p))} />);
     expect(featured().querySelector('video')).toHaveAttribute('src', '/video.mp4');
-    expect(featured().querySelector('video')).toHaveAttribute('controls');
+    expect(within(featured()).getByRole('group', { name: 'Controles del reel' })).toBeInTheDocument();
+    expect(within(featured()).getByRole('button', { name: 'Reproducir reel', exact: true })).toBeInTheDocument();
   });
   it('guarda en este navegador, persiste al remontar y filtra las guardadas', () => {
     const view = render(<InstagramSection theme={themeFor()} />);
