@@ -36,7 +36,7 @@ describe('selección visual de la cuenta conectada', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar publicación: Prenda 1' }));
     expect(container.querySelector('.ig-journal [data-post-id="ig_1"]')).not.toBeNull();
     expect(api.get).toHaveBeenCalledTimes(1);
-    expect(api.get.mock.calls[0][0]).toBe('/api/instagram/admin/feed');
+    expect(api.get.mock.calls[0][0]).toBe('/api/admin/instagram-settings/feed');
   });
   it('carga más páginas, evita duplicados y deja las publicaciones nuevas pendientes de selección', async () => {
     api.get.mockResolvedValueOnce({ data: { connected: true, account, posts: records, nextCursor: 'signed' } })
@@ -70,7 +70,7 @@ describe('selección visual de la cuenta conectada', () => {
     await screen.findByRole('alert');
     expect(screen.getByLabelText('Borrador guardable').textContent).toContain('ig_1');
     expect(screen.getByRole('button', { name: 'Mostrar publicación: Prenda 1' })).toBeInTheDocument();
-    expect(api.post).toHaveBeenCalledWith('/api/instagram/admin/refresh', {}, expect.any(Object));
+    expect(api.post).toHaveBeenCalledWith('/api/admin/instagram-settings/refresh-feed', {}, expect.any(Object));
   });
   it('activa la vista previa real y la sección pública sin necesitar fotos manuales', async () => {
     api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });
@@ -99,4 +99,21 @@ describe('selección visual de la cuenta conectada', () => {
     fireEvent.change(screen.getByLabelText('Al recibir publicaciones nuevas'), { target: { value: 'selected' } });
     expect(screen.getByRole('button', { name: 'Mostrar publicación: Prenda 1' })).toBeInTheDocument();
   });
+  it.each([
+    [{ response: { status: 404, data: '<html>Cannot GET</html>' } }, /HTTP 404/],
+    [{ code: 'ECONNABORTED' }, /tardó demasiado/],
+    [{ response: { status: 403 } }, /permiso de consultar Apariencia/],
+  ])('identifica el error de carga sin dejar un mensaje genérico', async (error, message) => {
+    api.get.mockRejectedValue(error);
+    render(<Harness />); openPosts();
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(api.get.mock.calls[0][0]).toBe('/api/admin/instagram-settings/feed');
+    expect(api.get.mock.calls[0][1].timeout).toBe(45000);
+  });
+  it('rechaza HTML devuelto como éxito en lugar de simular una cuenta vacía', async () => {
+    api.get.mockResolvedValue({ data: '<html>Not found</html>' });
+    render(<Harness />); openPosts();
+    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no devolvió una lista válida');
+  });
+
 });

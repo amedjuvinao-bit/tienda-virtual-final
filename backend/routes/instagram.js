@@ -14,6 +14,13 @@ const handle = fn => async (req, res) => {
       message: conflict ? 'La configuración cambió. Recarga antes de continuar.' : error instanceof service.InstagramError ? error.message : 'No se pudo completar la conexión de Instagram. Comprueba el cifrado del servidor y vuelve a intentar.' });
   }
 };
+// Media belongs to the existing administrative connection mount, with Appearance access.
+// Register before settings-only middleware so editors never need credential permissions.
+const mediaRead = handle(async (req, res) => res.json(await service.feed(req.query.cursor || '', false, true)));
+const mediaRefresh = handle(async (_req, res) => res.json(await service.feed('', true, true)));
+const mediaLimit = rateLimit({ windowMs: 60000, limit: 60, standardHeaders: true, legacyHeaders: false });
+admin.get('/feed', noStore, requireAdmin, requirePermission('appearance:view'), mediaLimit, mediaRead);
+admin.post('/refresh-feed', noStore, requireAdmin, requirePermission('appearance:view'), mediaLimit, mediaRefresh);
 admin.use(noStore, requireAdmin, requirePermission('settings:instagram'));
 admin.get('/', handle(async (_req, res) => res.json(await service.getSettings())));
 admin.put('/', handle(async (req, res) => res.json(await service.save(req.body || {}))));
@@ -28,10 +35,8 @@ admin.post('/sync', handle(async (_req, res) => { await service.feed('', true); 
 publicRouter.use(noStore);
 // Appearance editors may read media (including hidden posts), never connection credentials.
 publicRouter.get('/admin/feed', requireAdmin, requirePermission('appearance:view'),
-  rateLimit({ windowMs: 60000, limit: 60, standardHeaders: true, legacyHeaders: false }),
-  handle(async (req, res) => res.json(await service.feed(req.query.cursor || '', false, true))));
-publicRouter.post('/admin/refresh', requireAdmin, requirePermission('appearance:view'), actionLimit,
-  handle(async (_req, res) => res.json(await service.feed('', true, true))));
+  mediaLimit, mediaRead);
+publicRouter.post('/admin/refresh', requireAdmin, requirePermission('appearance:view'), actionLimit, mediaRefresh);
 publicRouter.get('/feed', rateLimit({ windowMs: 60000, limit: 60, standardHeaders: true, legacyHeaders: false,
   message: { ok: false, message: 'Espera un momento antes de cargar más publicaciones.' } }), handle(async (req, res) => res.json(await service.feed(req.query.cursor || ''))));
 publicRouter.get('/start', handle(async (req, res) => {

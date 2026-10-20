@@ -123,6 +123,10 @@ test('all protected routes are registered in the permission catalog', () => {
     const rule = findAdminRoutePermission(path ? 'POST' : 'GET', '/api/admin/instagram-settings' + path);
     assert.equal(rule.permission, 'settings:instagram'); assert.equal(rule.knownPermission, true);
   }
+  for (const [method, path] of [['GET', '/feed'], ['POST', '/refresh-feed']]) {
+    const rule = findAdminRoutePermission(method, '/api/admin/instagram-settings' + path);
+    assert.equal(rule.permission, 'appearance:view'); assert.equal(rule.knownPermission, true);
+  }
   const sanitize = require('../middleware/adminAccessGate').sanitizeValue;
   assert.equal(sanitize({ accessToken: token, appSecret: 'private' }).accessToken, '[REDACTED]');
   assert.equal(sanitize({ appSecret: 'private' }).appSecret, '[REDACTED]');
@@ -138,7 +142,7 @@ test('HTTP routes deny unauthenticated administration and serve only the public 
   const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
-    for (const [method,path] of [['GET',''],['PUT',''],['POST','/connect-token'],['POST','/authorize'],['POST','/disconnect']]) {
+    for (const [method,path] of [['GET',''],['PUT',''],['POST','/connect-token'],['POST','/authorize'],['POST','/disconnect'],['GET','/feed'],['POST','/refresh-feed']]) {
       const r = await fetch(base + '/api/admin/instagram-settings' + path, { method }); assert.equal(r.status, 401);
     }
     for (const [method, path] of [['GET', '/admin/feed'], ['POST', '/admin/refresh']]) {

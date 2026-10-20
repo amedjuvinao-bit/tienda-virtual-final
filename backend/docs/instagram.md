@@ -19,7 +19,7 @@ Las decisiones se guardan por identificador de publicación y cuenta dentro de l
 
 **Al recibir publicaciones nuevas** permite mostrarlas automáticamente (respetando las ocultas) o esperar selección. Al pasar a selección se conservan las publicaciones cargadas que ya eran visibles; las nuevas o aún no cargadas esperan aprobación. En selección, una lista vacía deja la sección sin publicaciones visibles.
 
-El feed público aplica la selección publicada en cada lectura, después de recuperar la caché y también al paginar. Salta páginas totalmente ocultas con un límite de ocho páginas y un presupuesto de ocho segundos entre páginas; si quedan resultados, devuelve un cursor para continuar. Las rutas `/api/instagram/admin/feed` y `/api/instagram/admin/refresh` requieren autenticación y permiso `appearance:view`; permiten consultar las ocultas para editar sin acceder a las credenciales privadas. El editor y su vista previa comparten el feed administrativo para mostrar cambios aún no publicados y selecciones de páginas posteriores.
+El feed público aplica la selección publicada en cada lectura, después de recuperar la caché y también al paginar. Salta páginas totalmente ocultas con un límite de ocho páginas y un presupuesto de ocho segundos entre páginas; si quedan resultados, devuelve un cursor para continuar. Las rutas `/api/admin/instagram-settings/feed` y `/api/admin/instagram-settings/refresh-feed` requieren autenticación y permiso `appearance:view`; permiten consultar las ocultas para editar sin acceder a las credenciales privadas. El editor y su vista previa comparten el feed administrativo para mostrar cambios aún no publicados y selecciones de páginas posteriores.
 
 ## Comportamiento
 
@@ -43,3 +43,5 @@ Documentación oficial: https://developers.facebook.com/documentation/instagram-
 ### Índices de producción
 
 Con la conexión MongoDB del backend configurada, revisa primero `node backend/scripts/migrateInstagramIndexes.js` (solo muestra el plan). Para crear los índices sin eliminar otros: `node backend/scripts/migrateInstagramIndexes.js --apply-instagram-index-migration`. En producción añade `--confirm-production-instagram-index-migration`, siguiendo la política de migraciones del proyecto. En desarrollo se crean automáticamente.
+
+La consulta de Apariencia usa el mismo montaje administrativo de la conexión: GET `/api/admin/instagram-settings/feed` y POST `/api/admin/instagram-settings/refresh-feed`. Ambas exigen `appearance:view`; las credenciales siguen reservadas a `settings:instagram`. Las direcciones anteriores se conservan como alias protegidos. El editor espera hasta 45 segundos para permitir las consultas de perfil y medios y distingue errores de ruta, sesión, permisos, tiempo de espera y respuestas inválidas.
