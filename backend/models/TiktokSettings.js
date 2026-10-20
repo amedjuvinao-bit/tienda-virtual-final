@@ -20,9 +20,12 @@ const schema = new mongoose.Schema({
   lastError: { type: String, default: '' },
   oauthHash: { type: String, select: false },
   oauthExpiresAt: Date,
+  qrHash: { type: String, default: '', select: false },
+  qrSessionEncrypted: { type: String, default: '', select: false },
+  qrExpiresAt: Date,
 }, { timestamps: true, optimisticConcurrency: true });
 schema.statics.getSingleton = async function () {
   await this.updateOne({ key: 'main' }, { $setOnInsert: { key: 'main' } }, { upsert: true });
-  return this.findOne({ key: 'main' }).select('+clientSecretEncrypted +tokenEncrypted +refreshTokenEncrypted +oauthHash');
+  return this.findOne({ key: 'main' }).select('+clientSecretEncrypted +tokenEncrypted +refreshTokenEncrypted +oauthHash +qrHash +qrSessionEncrypted');
 };
 module.exports = mongoose.model('TiktokSettings', schema);

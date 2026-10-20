@@ -5,6 +5,7 @@ const Pages = require('../models/TiktokFeedPage');
 const SiteSettings = require('../models/SiteSettings');
 const { visiblePosts, selectionFor } = require('../../shared/tiktokSelection.cjs');
 const { key, protect, reveal, digest, signCursor, readCursor } = require('../lib/tiktok/credentials');
+const { createQrService, clearQr } = require('./tiktokQrService');
 const HOUR = 3600000, SCOPES = 'user.info.basic,video.list';
 const VIDEO_FIELDS = 'id,title,video_description,cover_image_url,share_url,duration,create_time';
 class TiktokError extends Error {
@@ -38,7 +39,14 @@ async function request(path, { token, form, body, fields, fetchFn = fetch } = {}
   const code = typeof data.error === 'string' ? data.error : data.error?.code;
   if (!response.ok || code && code !== 'ok') {
     const expired = ['access_token_invalid', 'invalid_grant', 'invalid_token'].includes(code);
-    throw new TiktokError(expired ? 'El acceso a TikTok caducó o fue revocado. Vuelve a conectar la cuenta.' : 'TikTok rechazó la solicitud. Comprueba Login Kit, Display API y los permisos user.info.basic y video.list.');
+    const messages = {
+      invalid_client: 'TikTok no reconoce las credenciales. Comprueba Client Key y Client Secret de la misma app y entorno.',
+      invalid_client_key: 'TikTok no reconoce el Client Key. Comprueba la app y el entorno de prueba o producción.',
+      invalid_scope: 'Activa y autoriza user.info.basic y video.list en tu app de TikTok.',
+      unauthorized_client: 'TikTok no ha autorizado este acceso para tu app. Revisa Login Kit y la cuenta de prueba o la aprobación de la app.',
+      rate_limit_exceeded: 'TikTok ha limitado las solicitudes. Espera un minuto y vuelve a intentar.',
+    };
+    throw new TiktokError(expired ? 'El acceso a TikTok caducó o fue revocado. Vuelve a conectar la cuenta.' : messages[code] || 'TikTok rechazó la solicitud. Comprueba Login Kit, Display API y los permisos user.info.basic y video.list.');
   }
   return data;
 }
@@ -79,6 +87,7 @@ function createTiktokService({ Model = Settings, PageModel = Pages, fetchFn = fe
     if (input.clientSecret?.trim()) s.clientSecretEncrypted = protect(String(input.clientSecret).trim());
     s.clientKey = clientKey; s.redirectUri = redirectUri; s.enabled = input.enabled === true;
     if (changed) { s.oauthHash = ''; s.oauthExpiresAt = null; }
+    clearQr(s);
     s.revision += 1; await s.save(); return safeSettings(s);
   }
   async function profile(token, scopes = '') {
@@ -100,7 +109,7 @@ function createTiktokService({ Model = Settings, PageModel = Pages, fetchFn = fe
     s.expiresAt = new Date(Date.now() + Number(tokens.expires_in) * 1000);
     s.refreshExpiresAt = new Date(Date.now() + Number(tokens.refresh_expires_in || 31536000) * 1000);
     s.tokenUpdatedAt = new Date(); s.syncedAt = new Date(); s.lastError = ''; s.retryAt = null;
-    s.enabled = true; s.oauthHash = ''; s.oauthExpiresAt = null; s.revision += 1;
+    s.enabled = true; s.oauthHash = ''; s.oauthExpiresAt = null; clearQr(s); s.revision += 1;
     await s.save(); if (oldConnection) await PageModel.deleteMany({ connection: oldConnection });
     return safeSettings(s);
   }
@@ -108,6 +117,7 @@ function createTiktokService({ Model = Settings, PageModel = Pages, fetchFn = fe
     const s = await Model.getSingleton(); assertRevision(s, input); key();
     if (!s.clientKey || !s.clientSecretEncrypted || !s.redirectUri) throw new TiktokError('Guarda Client Key, Client Secret y URL de retorno antes de conectar.');
     const state = crypto.randomBytes(32).toString('hex');
+    clearQr(s);
     s.oauthHash = digest(state); s.oauthExpiresAt = new Date(Date.now() + 10 * 60000); await s.save();
     const url = new URL('/api/tiktok/start', s.redirectUri); url.searchParams.set('state', state);
     return { url: url.href };
@@ -123,7 +133,7 @@ function createTiktokService({ Model = Settings, PageModel = Pages, fetchFn = fe
   async function callback(query, cookieState) {
     const state = typeof query.state === 'string' ? query.state : '';
     if (!/^[a-f0-9]{64}$/.test(state) || state !== cookieState) throw new TiktokError('La autorización no pertenece a este navegador. Vuelve a conectar.', 400);
-    const s = await Model.findOneAndUpdate({ key: 'main', oauthHash: digest(state), oauthExpiresAt: { $gt: new Date() } }, { $set: { oauthHash: '', oauthExpiresAt: null } }, { new: true }).select('+clientSecretEncrypted +tokenEncrypted +refreshTokenEncrypted');
+    const s = await Model.findOneAndUpdate({ key: 'main', oauthHash: digest(state), oauthExpiresAt: { $gt: new Date() } }, { $set: { oauthHash: '', oauthExpiresAt: null }, $inc: { __v: 1 } }, { new: true }).select('+clientSecretEncrypted +tokenEncrypted +refreshTokenEncrypted');
     if (!s) throw new TiktokError('La autorización caducó o ya fue utilizada. Vuelve a conectar.', 400);
     if (query.error || typeof query.code !== 'string' || !query.code || query.code.length > 4096) throw new TiktokError('La autorización fue cancelada o no se recibió un código válido.');
     const tokens = await call('oauth/token', { form: { client_key: s.clientKey, client_secret: reveal(s.clientSecretEncrypted), grant_type: 'authorization_code', redirect_uri: s.redirectUri, code: query.code } });
@@ -134,7 +144,7 @@ function createTiktokService({ Model = Settings, PageModel = Pages, fetchFn = fe
     const connection = s.connectionId, token = s.tokenEncrypted;
     s.tokenEncrypted = ''; s.refreshTokenEncrypted = ''; s.account = null; s.enabled = false; s.connectionId = '';
     s.expiresAt = null; s.refreshExpiresAt = null; s.syncedAt = null; s.lastError = ''; s.retryAt = null;
-    s.oauthHash = ''; s.oauthExpiresAt = null; s.scopes = ''; s.revision += 1; await s.save();
+    s.oauthHash = ''; s.oauthExpiresAt = null; clearQr(s); s.scopes = ''; s.revision += 1; await s.save();
     await PageModel.deleteMany({ connection });
     if (token && s.clientSecretEncrypted) {
       try { await call('oauth/revoke', { form: { client_key: s.clientKey, client_secret: reveal(s.clientSecretEncrypted), token: reveal(token) } }); } catch { /* local disconnect always completes */ }
@@ -220,6 +230,7 @@ function createTiktokService({ Model = Settings, PageModel = Pages, fetchFn = fe
     }
     return result;
   }
-  return { getSettings, save, authorize, start, callback, disconnect, feed };
+  return { getSettings, save, authorize, start, callback, disconnect, feed,
+    ...createQrService({ Model, call, install, assertRevision, ErrorType: TiktokError }) };
 }
 module.exports = { ...createTiktokService(), createTiktokService, TiktokError, safeSettings, validateRedirect, normalizeVideo, request };

@@ -24,8 +24,15 @@ admin.post('/refresh-feed', noStore, requireAdmin, requirePermission('appearance
 admin.use(noStore, requireAdmin, requirePermission('settings:tiktok'));
 admin.get('/', handle(async (_req, res) => res.json(await service.getSettings())));
 admin.put('/', handle(async (req, res) => res.json(await service.save(req.body || {}))));
+const qrOwner = req => String(req.adminSessionId || req.adminUserId || req.adminUsername || '');
+const qrCheckLimit = rateLimit({ windowMs: 60000, limit: 30, standardHeaders: true, legacyHeaders: false,
+  message: { ok: false, message: 'Espera unos segundos antes de comprobar el QR.' } });
+// Polling has its own budget; never exhaust the ten settings actions per minute.
+admin.post('/qr/check', qrCheckLimit, handle(async (req, res) => res.json(await service.checkQr(req.body || {}, qrOwner(req)))));
 const actionLimit = rateLimit({ windowMs: 60000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { ok: false, message: 'Espera un minuto antes de volver a intentar.' } });
 admin.use(actionLimit);
+admin.post('/qr', handle(async (req, res) => res.json(await service.createQr(req.body || {}, qrOwner(req)))));
+admin.post('/qr/cancel', handle(async (req, res) => res.json(await service.cancelQr(req.body || {}, qrOwner(req)))));
 admin.post('/authorize', handle(async (req, res) => {
   return res.json({ ok: true, ...await service.authorize(req.body || {}) });
 }));
