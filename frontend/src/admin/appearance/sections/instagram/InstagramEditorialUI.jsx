@@ -164,7 +164,7 @@ export default function InstagramEditorialUI({
     <div data-editor-step="content" hidden={step !== 'content'}>
       <SectionEditorCardTabs label="Contenido de Instagram" labels={['Perfil', 'Textos', 'Publicaciones']}>
         <div className={box}>
-          <Text label="Usuario de Instagram" value={c.profileUser || ''} placeholder="@rosaboutique33" onChange={v => patch('profileUser', v)} />
+          <Text label="Usuario de Instagram" value={c.profileUser || ''} placeholder="@tuusuario" onChange={v => patch('profileUser', v)} />
           <Text label="Enlace del perfil" value={c.profileLink} placeholder="https://instagram.com/tuusuario" onChange={v => patch('profileLink', v)} />
           {c.profileLink && !safeInstagramLink(c.profileLink) && <p role="alert">Escribe un enlace completo que empiece por https://.</p>}
           {check('Mostrar usuario de Instagram', 'editorialShowProfile')}{check('Usar logo personalizado', 'editorialUseProfileLogo')}

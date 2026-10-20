@@ -6,6 +6,7 @@ import { categoriasBackdrop } from '../admin/appearance/sections/categorias/cate
 import './instagramEditorial.css';
 import './instagramDepth.css';
 import { instagramDepthStyle, moveInstagramDepth, resetInstagramDepth } from './instagramDepth';
+import { journalIdentity } from '../admin/appearance/sections/instagram/instagramJournalHelpers';
 export default function InstagramEditorialSection({
   theme,
   posts = []
@@ -38,6 +39,8 @@ export default function InstagramEditorialSection({
     color = theme?.colors?.background || '#fff';
   }
   const profile = safeInstagramLink(c.profileLink);
+  const identity = journalIdentity(c);
+  const profileLabel = identity.profileUser || identity.journalName;
   const vars = {
     '--ig-bg': color,
     '--ig-backdrop': background ? `url(${JSON.stringify(background)})` : 'none',
@@ -128,7 +131,7 @@ export default function InstagramEditorialSection({
   return <section className="ig-editorial" aria-label="Instagram de la tienda" style={vars} data-depth3d={e.editorialDepthEnabled ? 'true' : 'false'} data-motion={e.editorialMotion} data-mobile-wide-last={e.editorialMobileColumns === 2 && visible.length % 2 === 1 ? 'true' : undefined}>
     <div className="ig-editorial__canvas">
       <div className="ig-editorial__scene">
-        {e.editorialShowProfile && <div className="ig-editorial__profile">{profile ? <a href={profile} target="_blank" rel="noopener noreferrer">{e.editorialUseProfileLogo && c.instagramLogo ? <img className="ig-editorial__profile-logo" src={c.instagramLogo} alt="" /> : <Instagram aria-hidden="true" />}<span>{c.profileUser || '@rosaboutique33'}</span></a> : <span>{c.profileUser || '@rosaboutique33'}</span>}</div>}
+        {e.editorialShowProfile && <div className="ig-editorial__profile">{profile ? <a href={profile} target="_blank" rel="noopener noreferrer">{e.editorialUseProfileLogo && c.instagramLogo ? <img className="ig-editorial__profile-logo" src={c.instagramLogo} alt="" /> : <Instagram aria-hidden="true" />}<span>{profileLabel}</span></a> : <span>{profileLabel}</span>}</div>}
         {e.editorialShowTitle && <h2 className="ig-editorial__title" data-title-image={e.editorialUseTitleImage && c.titleImage ? 'true' : undefined}>{e.editorialUseTitleImage && c.titleImage ? <img src={c.titleImage} alt={c.titleAlt || e.editorialTitle} /> : e.editorialTitle}</h2>}
         <div className="ig-editorial__photos">{visible.slice(0, 5).map(renderPhoto)}</div>
         <div className="ig-editorial__footer">

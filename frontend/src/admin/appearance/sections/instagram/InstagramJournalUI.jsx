@@ -26,9 +26,10 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
   const latest = useRef(); latest.current = { theme, setPath };
   const section = find(theme), c = section.config, j = normalizeJournal(c), posts = c.posts;
   const connectedFeed = useContext(InstagramEditorFeed);
-  const available = c.journalSource === 'connected' && connectedFeed?.connected
-    ? selectionHelpers.visiblePosts(connectedFeed.posts, c, connectedFeed.account?.id) : journalPosts(posts, j.journalLimit);
-  const highlightsFor = config => Array.isArray(config.journalHighlights) ? config.journalHighlights : journalHighlights(config, journalPosts(config.posts, normalizeJournal(config).journalLimit));
+  const availableFor = config => config.journalSource === 'connected' && connectedFeed?.connected
+    ? selectionHelpers.visiblePosts(connectedFeed.posts, config, connectedFeed.account?.id) : journalPosts(config.posts, normalizeJournal(config).journalLimit);
+  const available = availableFor(c);
+  const highlightsFor = config => Array.isArray(config.journalHighlights) ? config.journalHighlights : journalHighlights(config, availableFor(config));
   const highlights = highlightsFor(c);
   function mutate(edit) {
     const { theme: current, setPath: save } = latest.current;
@@ -80,7 +81,7 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
     patch('posts', next); setActive(index + delta);
   }
   return <div className="space-y-4">
-    <p className="text-sm text-neutral-600">Diario social · Elige fotos manuales o la cuenta conectada desde Ajustes → Instagram. Cada publicación conserva su enlace de Instagram; las guardadas se almacenan en el navegador del visitante.</p>
+    <p className="text-sm text-neutral-600">Perfil social · Elige fotos manuales o la cuenta conectada desde Ajustes → Instagram. Personaliza los textos y destacados para tu negocio. Cada publicación conserva su enlace de Instagram; las guardadas se almacenan en el navegador del visitante.</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <SectionEditorSteps value={step} onChange={setStep} sectionName="Instagram" items={[{ value: 'content', label: 'Contenido', hint: 'Edita un elemento a la vez.' }, { value: 'design', label: 'Diseño', hint: 'Ajusta un grupo y comprueba la vista previa.' }]} />
     <div hidden={step !== 'content'} data-editor-step="content">
@@ -94,14 +95,14 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
                 <Check label="Usar foto de perfil de Instagram" value={c.journalUseAccountAvatar !== false} onChange={v => patch('journalUseAccountAvatar', v)} />
                 <Check label="Mostrar cantidad de seguidores y publicaciones" value={c.journalShowAccountStats === true} onChange={v => patch('journalShowAccountStats', v)} />
               </div>}
-              <Text label="Usuario de Instagram" value={c.profileUser || ''} placeholder="@rosaboutique33" onChange={v => patch('profileUser', v)} /><Text label="Enlace del perfil" value={c.profileLink} placeholder="https://instagram.com/tuusuario" onChange={v => patch('profileLink', v)} />
+              <Text label="Usuario de Instagram" value={c.profileUser || ''} placeholder="@tuusuario" onChange={v => patch('profileUser', v)} /><Text label="Enlace del perfil" value={c.profileLink} placeholder="https://instagram.com/tuusuario" onChange={v => patch('profileLink', v)} />
               {c.profileLink && !safeInstagramLink(c.profileLink) && <p role="alert">Escribe un enlace completo que empiece por https://.</p>}
               <Check label="Mostrar sección en la tienda" value={section.enabled !== false} onChange={v => mutate(s => ({ ...s, enabled: v }))} /></div>
-            <div className="space-y-3">{text('Nombre de la tienda en publicaciones', 'journalName')}{text('Iniciales del avatar', 'journalMonogram')}{image('Avatar de la cuenta', 'journalAvatarImage', j.journalAvatarImage)}</div>
+            <div className="space-y-3"><Text label="Nombre del perfil" value={j.journalName} placeholder="Nombre de tu negocio" onChange={v => patch('journalName', v)} />{text('Iniciales del avatar', 'journalMonogram')}<p className="text-xs">Sin nombre personalizado, se usa el usuario. Las iniciales se calculan del nombre si las dejas vacías. Con la identidad de Instagram activada, se muestran el nombre y usuario de la cuenta conectada.</p>{image('Avatar de la cuenta', 'journalAvatarImage', j.journalAvatarImage)}</div>
           </SectionEditorSubgroups>
         </div>
         <div className={box}><SectionEditorSubgroups label="Editar textos" labels={['Encabezados', 'Botones']}>
-          <div className="space-y-3">{text('Título del diario', 'journalTitle')}{text('Título del panel lateral', 'journalSidebarTitle')}{text('Frase inferior', 'journalSubtitle')}</div>
+          <div className="space-y-3">{text('Título de la sección', 'journalTitle')}{text('Título del panel lateral', 'journalSidebarTitle')}{text('Frase inferior', 'journalSubtitle')}</div>
           <div className="space-y-3">{text('Texto del botón del perfil', 'journalFollowText')}{text('Texto del enlace de publicación', 'journalPostText')}</div>
         </SectionEditorSubgroups></div>
         <div className={box}>
@@ -152,13 +153,13 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
     </div>
     <div hidden={step !== 'design'} data-editor-step="design">
       <SectionEditorCardTabs label="Diseño de Instagram" labels={['Fondo', 'Distribución', 'Tipografía', 'Cristal', 'Botones', 'Móvil', 'Visibilidad']}>
-        <div className={box}><Select label="Fondo de la sección" value={j.journalBackgroundMode} onChange={v => patch('journalBackgroundMode', v)} options={[["included", 'Satén suave del diario'], ['continuity', 'Continuar fondo de las demás secciones'], ['custom', 'Imagen propia'], ['color', 'Color sólido'], ['global', 'Fondo global de la tienda']]} />
+        <div className={box}><Select label="Fondo de la sección" value={j.journalBackgroundMode} onChange={v => patch('journalBackgroundMode', v)} options={[["included", 'Satén suave'], ['continuity', 'Continuar fondo de las demás secciones'], ['custom', 'Imagen propia'], ['color', 'Color sólido'], ['global', 'Fondo global de la tienda']]} />
           {j.journalBackgroundMode === 'custom' && image('Imagen de fondo', 'journalBackgroundImage', j.journalBackgroundImage)}
           {color('Color de fondo', 'journalBackgroundColor')}{num('Velo de color (%)', 'journalBackgroundWash', 0, 100)}</div>
         <div className={box}><SectionEditorSubgroups label="Editar distribución" labels={['Publicaciones', 'Ancho y espacios', 'Fotografía principal']}>
-          <div className="space-y-3"><Select label="Publicación principal" value={j.journalFeaturedPostId} onChange={v => patch('journalFeaturedPostId', v)} options={postOptions} />{c.journalSource !== 'connected' && num('Publicaciones disponibles en el diario', 'journalLimit', 1, 48)}{num('Miniaturas por página lateral', 'journalPageSize', 1, 6)}<p className="text-xs">Las demás publicaciones se recorren con los botones del panel lateral. Todos los registros guardados se conservan.</p></div>
+          <div className="space-y-3"><Select label="Publicación principal" value={j.journalFeaturedPostId} onChange={v => patch('journalFeaturedPostId', v)} options={postOptions} />{c.journalSource !== 'connected' && num('Publicaciones disponibles', 'journalLimit', 1, 48)}{num('Miniaturas por página lateral', 'journalPageSize', 1, 6)}<p className="text-xs">Las demás publicaciones se recorren con los botones del panel lateral. Todos los registros guardados se conservan.</p></div>
           <div className="space-y-3">{num('Ancho máximo (px)', 'journalMaxWidth', 800, 2000)}{num('Margen interior horizontal (px)', 'journalPaddingX', 0, 100)}{num('Margen interior vertical (px)', 'journalPaddingY', 0, 100)}{num('Separación entre paneles (px)', 'journalGap', 12, 60)}{num('Ancho del panel principal (%)', 'journalMainWidth', 50, 70)}</div>
-          <div className="space-y-3">{num('Proporción ancho/alto de la imagen principal', 'journalImageRatio', .65, 1.8, .01)}<p className="text-xs">Para ajustar una prenda: Contenido → Publicaciones → Encuadre. El diseño calcula su altura automáticamente.</p></div>
+          <div className="space-y-3">{num('Proporción ancho/alto de la imagen principal', 'journalImageRatio', .65, 1.8, .01)}<p className="text-xs">Para ajustar una imagen: Contenido → Publicaciones → Encuadre. El diseño calcula su altura automáticamente.</p></div>
         </SectionEditorSubgroups></div>
         <div className={box}><Select label="Tipografía" value={j.journalFont} onChange={v => patch('journalFont', v)} options={[[JOURNAL_FONT, 'Bodoni'], ['Georgia, serif', 'Georgia'], ['Arial, sans-serif', 'Arial']]} />{color('Color del texto', 'journalInk')}{num('Tamaño del título (px)', 'journalTitleSize', 24, 80)}{num('Tamaño de texto (px)', 'journalTextSize', 13, 24)}</div>
         <div className={box}><SectionEditorSubgroups label="Editar cristal" labels={['Color y transparencia', 'Forma y sombra', 'Relieve y textura', 'Reflejos y movimiento', 'Vidrio líquido']}>

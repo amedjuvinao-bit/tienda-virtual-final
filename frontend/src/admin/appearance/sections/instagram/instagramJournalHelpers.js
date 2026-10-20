@@ -1,8 +1,8 @@
 import { bounded, safeInstagramLink } from './instagramEditorialHelpers';
 
 export const JOURNAL_DEFAULTS = {
-  journalTitle: 'El diario de Rosa', journalName: 'Rosa Boutique', journalMonogram: 'RB', journalAvatarImage: '',
-  journalSidebarTitle: 'Más momentos', journalSubtitle: 'Momentos que enamoran',
+  journalTitle: 'Instagram', journalName: '', journalMonogram: '', journalAvatarImage: '',
+  journalSidebarTitle: 'Más publicaciones', journalSubtitle: '',
   journalFollowText: 'Seguir en Instagram', journalPostText: 'Ver publicación', journalFeaturedPostId: '',
   journalLimit: 24, journalPageSize: 2,
   journalBackgroundMode: 'included', journalBackgroundImage: '', journalMobileBackgroundImage: '',
@@ -60,7 +60,7 @@ export function journalFeaturedId(posts, config) {
 }
 export function journalHighlights(config, posts) {
   const source = Array.isArray(config.journalHighlights) ? config.journalHighlights :
-    ['Looks', 'Detalles', 'Novedades'].slice(0, posts.length).map((title, i) => ({ id: `highlight_${i}`, title, postId: posts[i].id }));
+    posts.slice(0, 3).map((post, i) => ({ id: `highlight_${i}`, title: `Destacado ${i + 1}`, postId: post.id }));
   return source.filter(h => h && h.enabled !== false).map((h, i) => {
     const post = posts.find(p => p.id === h.postId);
     return { ...h, id: String(h.id || `highlight_${i}`), postId: post?.id || '', image: h.image || post?.image || '', title: h.title || `Destacado ${i + 1}` };
@@ -71,4 +71,16 @@ export function safeJournalVideo(value) {
   const trimmed = value.trim();
   if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) return trimmed;
   return safeInstagramLink(trimmed);
+}
+export function journalIdentity(config = {}, account = null) {
+  const text = value => typeof value === 'string' ? value.trim() : '';
+  const connected = account && config.journalUseAccountIdentity !== false;
+  const profileUser = connected ? (text(account.username) ? `@${text(account.username).replace(/^@/, '')}` : '') : text(config.profileUser);
+  const journalName = (connected ? text(account.name) : text(config.journalName)) || profileUser.replace(/^@/, '') || 'Instagram';
+  const initials = journalName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => Array.from(word)[0]).join('').toLocaleUpperCase('es');
+  return {
+    profileUser, journalName,
+    journalMonogram: text(config.journalMonogram) || (journalName === 'Instagram' ? 'IG' : initials.slice(0, 2)),
+    profileLink: connected ? text(account.url) : text(config.profileLink),
+  };
 }

@@ -20,14 +20,14 @@ describe('Diario social público', () => {
     const theme = themeFor({ editorialFeaturedPostId: 'p3' });
     const snapshot = JSON.stringify(theme);
     render(<InstagramSection theme={theme} />);
-    expect(screen.getByRole('heading', { name: /El diario de Rosa/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Instagram/ })).toBeInTheDocument();
     expect(within(featured()).getByRole('link', { name: 'Ver publicación: Prenda 3' })).toHaveAttribute('href', posts[3].link);
     expect(screen.getByRole('link', { name: 'Ver publicación: Prenda 0' })).toHaveAttribute('href', posts[0].link);
     expect(JSON.stringify(theme)).toBe(snapshot);
   });
   it('destacados y miniaturas actualizan la publicación principal y su enlace', () => {
     render(<InstagramSection theme={themeFor()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Destacado Looks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver destacado: Destacado 1' }));
     expect(within(featured()).getByRole('img', { name: 'Prenda 0' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver en grande: Prenda 1' }));
     expect(within(featured()).getByRole('link', { name: 'Ver publicación: Prenda 1' })).toHaveAttribute('href', posts[1].link);
@@ -61,7 +61,7 @@ describe('Diario social público', () => {
     expect(screen.getByRole('status')).toHaveTextContent('guardada en este navegador');
     view.unmount(); render(<InstagramSection theme={themeFor()} />);
     expect(screen.getByRole('button', { name: 'Quitar de guardadas' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Destacado Looks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver destacado: Destacado 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardadas' }));
     expect(screen.getByRole('button', { name: 'Ver en grande: Prenda 4' })).toBeInTheDocument();
   });
@@ -92,7 +92,7 @@ describe('Diario social público', () => {
   });
   it('reacciona al cambio de la principal en el panel y a la eliminación de la seleccionada', () => {
     const { rerender } = render(<InstagramSection theme={themeFor()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Destacado Looks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver destacado: Destacado 1' }));
     rerender(<InstagramSection theme={themeFor({ journalFeaturedPostId: 'p1' })} />);
     expect(within(featured()).getByRole('img', { name: 'Prenda 1' })).toBeInTheDocument();
     rerender(<InstagramSection theme={themeFor({ journalFeaturedPostId: 'p1' }, posts.filter(p => p.id !== 'p1'))} />);
@@ -116,7 +116,7 @@ describe('Editor del diario', () => {
   it('guarda textos, principal y destacados en grupos cortos sin perder campos existentes', () => {
     const save = vi.fn(); render(<Editor save={save} />);
     nav('Contenido de Instagram', 'Textos');
-    fireEvent.change(screen.getByLabelText('Título del diario'), { target: { value: 'Nuestro diario' } });
+    fireEvent.change(screen.getByLabelText('Título de la sección'), { target: { value: 'Nuestro diario' } });
     nav('Contenido de Instagram', 'Destacados');
     fireEvent.change(screen.getAllByLabelText('Nombre del destacado')[0], { target: { value: 'Fiesta' } });
     fireEvent.change(screen.getAllByLabelText('Publicación del destacado')[0], { target: { value: 'p3' } });
@@ -143,11 +143,11 @@ describe('Editor del diario', () => {
   it('permite alternar con el muro anterior conservando la configuración de ambos', () => {
     const save = vi.fn(); render(<Editor save={save} />);
     nav('Contenido de Instagram', 'Textos');
-    fireEvent.change(screen.getByLabelText('Título del diario'), { target: { value: 'Mi diario' } });
+    fireEvent.change(screen.getByLabelText('Título de la sección'), { target: { value: 'Mi diario' } });
     fireEvent.change(screen.getByLabelText('Diseño de la sección Instagram'), { target: { value: 'editorial' } });
     fireEvent.change(screen.getByLabelText('Diseño de la sección Instagram'), { target: { value: 'journal' } });
     nav('Contenido de Instagram', 'Textos');
-    expect(screen.getByLabelText('Título del diario')).toHaveValue('Mi diario');
+    expect(screen.getByLabelText('Título de la sección')).toHaveValue('Mi diario');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
     expect(save.mock.calls[0][0].sections[0].config.posts).toEqual(posts);
   });

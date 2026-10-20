@@ -22,7 +22,7 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
   const href = safeInstagramLink(post.link);
   const video = post.kind === 'reel' ? safeJournalVideo(post.videoUrl) : '';
   const crop = photoCrop(post);
-  const description = post.alt || 'Publicación de la boutique';
+  const description = post.alt || 'Publicación de Instagram';
   const picture = <picture>
     <img className={post.mobileImage ? "ig-journal__desktop-image" : undefined} src={post.image} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />
     {post.mobileImage && <img className="ig-journal__mobile-image" src={post.mobileImage} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />}
@@ -31,7 +31,7 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
     <JournalLiquidLens settings={j} strength={compact ? .7 : 1} />
     <div className="ig-journal__post-header">
       <JournalAvatar settings={j} small={compact} />
-      <div className="ig-journal__identity"><strong>{user.replace(/^@/, '')}</strong>{!compact && <span>{j.journalName}</span>}</div>
+      <div className="ig-journal__identity"><strong>{user.replace(/^@/, '')}</strong>{!compact && j.journalName !== user.replace(/^@/, '') && <span>{j.journalName}</span>}</div>
       <details ref={menu} className="ig-journal__menu" onKeyDown={event => { if (event.key === 'Escape') { menu.current.open = false; menu.current.querySelector('summary')?.focus(); } }}>
         <summary aria-label={`Opciones: ${description}`}><MoreHorizontal aria-hidden="true" /></summary>
         <div>{href && <a href={href} target="_blank" rel="noopener noreferrer" onClick={() => { menu.current.open = false; }}>Abrir en Instagram <ArrowUpRight size={16} /></a>}

@@ -48,6 +48,15 @@ describe('Cuenta conectada y fotos manuales', () => {
     expect(screen.getByText('manual')).toBeInTheDocument();
     expect(container.querySelector('.ig-journal__avatar img')).toHaveAttribute('src', '/own-avatar.jpg');
   });
+  it('calcula iniciales de la cuenta real sin imponer nombre ni título del diseño', async () => {
+    const business = { ...account, username: 'cafenorte', name: 'Café Norte', avatar: '', url: 'https://instagram.com/cafenorte/' };
+    api.get.mockResolvedValue({ data: { connected: true, account: business, posts: [post('one')], nextCursor: '' } });
+    const { container } = render(<InstagramJournal theme={theme({ journalSource: 'connected', journalTitle: 'InstaGram', journalName: 'Nombre de respaldo' })} />);
+    expect(await screen.findByRole('link', { name: '@cafenorte' })).toHaveAttribute('href', business.url);
+    expect(container.querySelector('.ig-journal__identity')).toHaveTextContent('Café Norte');
+    expect(container.querySelector('.ig-journal__avatar')).toHaveTextContent('CN');
+    expect(screen.getByRole('heading', { name: /^InstaGram/ })).toBeInTheDocument();
+  });
   it('mantiene fotos manuales ante error y permite reintentar', async () => {
     api.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: { connected: true, account, posts: [post('one')], nextCursor: '' } });
     render(<InstagramJournal theme={theme({ journalSource: 'connected' })} />);

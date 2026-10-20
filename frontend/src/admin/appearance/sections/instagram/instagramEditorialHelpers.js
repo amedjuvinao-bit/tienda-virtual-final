@@ -11,7 +11,7 @@ export const EDITORIAL_DEFAULTS = {
   editorialPhotoWarmth: 3,
   editorialFollowTextColor: '#790d2d',
   editorialTitle: 'Instagram',
-  editorialSubtitle: 'Momentos que enamoran',
+  editorialSubtitle: '',
   editorialUseTitleImage: false,
   editorialShowProfile: true,
   editorialShowTitle: true,

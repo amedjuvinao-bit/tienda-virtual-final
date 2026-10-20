@@ -23,6 +23,22 @@ function Harness({ config = {}, realPreview = false }) {
 const openPosts = () => fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Instagram' })).getByRole('button', { name: 'Publicaciones' }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 describe('selección visual de la cuenta conectada', () => {
+  it('permite renombrar y enlazar los destacados automáticos de la cuenta conectada', async () => {
+    api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });
+    const { container } = render(<Harness />);
+    await screen.findByRole('link', { name: '@rosa' });
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Instagram' })).getByRole('button', { name: 'Destacados' }));
+    const names = screen.getAllByLabelText('Nombre del destacado');
+    expect(names).toHaveLength(2);
+    expect(names[0]).toHaveValue('Destacado 1');
+    fireEvent.change(names[0], { target: { value: 'Nuestro equipo' } });
+    fireEvent.change(screen.getAllByLabelText('Publicación del destacado')[0], { target: { value: 'ig_2' } });
+    const saved = JSON.parse(screen.getByLabelText('Borrador guardable').textContent);
+    expect(saved.journalHighlights[0]).toMatchObject({ title: 'Nuestro equipo', postId: 'ig_2' });
+    fireEvent.click(screen.getByRole('button', { name: 'Ver destacado: Nuestro equipo' }));
+    expect(container.querySelector('.ig-journal__post--featured')).toHaveAttribute('data-post-id', 'ig_2');
+    expect(saved.posts).toEqual([]);
+  });
   it('muestra fotos reales sin formulario manual; ocultar y mostrar actualizan el borrador y la vista previa', async () => {
     api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });
     const { container } = render(<Harness />); openPosts();

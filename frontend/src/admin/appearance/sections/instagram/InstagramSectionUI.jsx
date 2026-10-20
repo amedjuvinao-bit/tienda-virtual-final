@@ -14,7 +14,7 @@ export default function InstagramSectionUI(props) {
     props.setPath?.('sections', found ? current.map(s => s.id === 'instagram' || s.type === 'instagram' ? next : s) : [...current, next]);
   };
   return <div className="space-y-4">
-    <JournalSelect label="Diseño de la sección Instagram" value={layout} onChange={change} options={[["journal", "El diario de Rosa · perfil social"], ["editorial", "Muro editorial anterior"]]} />
+    <JournalSelect label="Diseño de la sección Instagram" value={layout} onChange={change} options={[["journal", "Perfil social · cristal"], ["editorial", "Muro editorial"]]} />
     {layout === 'journal' ? <InstagramJournalUI {...props} /> : <InstagramEditorialUI {...props} />}
   </div>;
 }

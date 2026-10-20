@@ -20,7 +20,7 @@ export default function JournalReelPlayer({ post, src, onExpand }) {
     <img className="ig-reel__ambience" src={post.image} alt="" aria-hidden="true" decoding="async" />
     <div className="ig-reel__shade" aria-hidden="true" />
     <video ref={video} src={src} poster={post.image} playsInline preload="metadata"
-      aria-label={`Reel: ${post.alt || 'Publicación de la boutique'}`} onClick={toggle}
+      aria-label={`Reel: ${post.alt || 'Publicación de Instagram'}`} onClick={toggle}
       onLoadedMetadata={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
       onDurationChange={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
       onTimeUpdate={event => setPosition(event.currentTarget.currentTime)}
