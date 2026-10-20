@@ -1,21 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Instagram, RefreshCw, ExternalLink, Link2, ShieldCheck } from 'lucide-react';
 import api from '../../../lib/api';
+import { instagramSettingsEndpoint, instagramSettingsLoadError } from './instagramSettingsLoadError';
 const BASE = '/api/admin/instagram-settings';
 const blank = { appId: '', appSecret: '', apiVersion: 'v24.0', redirectUri: '', enabled: false };
 const fieldClass = 'mt-1 w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900';
 export default function InstagramSettingsSection() {
   const [data, setData] = useState(null), [draft, setDraft] = useState(blank), [token, setToken] = useState('');
   const [tab, setTab] = useState('account'), [waiting, setWaiting] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState('');
+  const [loadFailure, setLoadFailure] = useState(null), [loading, setLoading] = useState(true);
+  const endpoint = instagramSettingsEndpoint(api.defaults?.baseURL);
   const mounted = useRef(true), popup = useRef(null), timer = useRef(null);
   const read = async (replace = false) => {
+    setLoading(true);
     try {
       const { data: result } = await api.get(BASE);
       if (!mounted.current) return;
+      if (!result?.settings || !Number.isInteger(result.settings.revision)) throw Object.assign(new Error('Invalid Instagram settings response'), { code: 'INSTAGRAM_INVALID_SETTINGS_RESPONSE', response: { status: 200 } });
+      setLoadFailure(null); setError('');
       setData(result.settings);
       if (replace) setDraft({ ...blank, ...result.settings, appSecret: '' });
       return result.settings;
-    } catch (e) { if (mounted.current) setError(e.response?.data?.message || 'No se pudo cargar Instagram.'); }
+    } catch (e) { if (mounted.current) setLoadFailure(instagramSettingsLoadError(e)); }
+    finally { if (mounted.current) setLoading(false); }
   };
   useEffect(() => {
     mounted.current = true; read(true);
@@ -65,7 +72,14 @@ export default function InstagramSettingsSection() {
   };
   const field = (label, name, type = 'text', placeholder = '') => <label className="block text-sm font-medium">{label}<input className={fieldClass} type={type} autoComplete="off" value={draft[name]} placeholder={placeholder} onChange={e => setDraft(d => ({ ...d, [name]: e.target.value }))} disabled={busy} /></label>;
   const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold disabled:opacity-40';
-  if (!data) return <div className="rounded-2xl border p-6"><p role="status">{error || 'Cargando conexión de Instagram…'}</p>{error && <button className={button} onClick={() => read(true)}>Reintentar</button>}</div>;
+  const failure = loadFailure && <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 space-y-3">
+    <h2 className="font-semibold">{loadFailure.title}</h2><p className="text-sm">{loadFailure.help}</p>
+    <p className="text-xs font-semibold">{loadFailure.status}</p>
+    <p className="text-xs break-all">Servidor consultado: <a className="underline" href={endpoint} target="_blank" rel="noopener noreferrer">{endpoint}</a></p>
+    <div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={loading} onClick={() => read(!data)}>{loading ? 'Comprobando…' : 'Reintentar'}</button><a className={button} href={endpoint} target="_blank" rel="noopener noreferrer">Ver respuesta del servidor <ExternalLink size={16} /></a></div>
+    <p className="text-xs">Esta consulta carga la configuración del panel; todavía no se está intentando conectar con Meta.</p>
+  </div>;
+  if (!data) return <section className="rounded-2xl border p-5 space-y-4" style={{ background: 'var(--admin-card-bg,white)', color: 'var(--admin-card-text,#29202a)' }}><h1 className="text-xl font-semibold">Instagram · Configuración de la cuenta</h1>{failure || <p role="status">Cargando conexión de Instagram…</p>}</section>;
   return <div className="space-y-4">
     <header className="rounded-2xl border p-5" style={{ background: 'var(--admin-card-bg,white)', color: 'var(--admin-card-text,#29202a)' }}><div className="flex items-center gap-3"><Instagram className="h-7 w-7" /><div><h1 className="text-xl font-semibold">Instagram</h1><p className="text-sm opacity-70">Conecta la cuenta y controla su acceso desde un solo lugar.</p></div></div></header>
     <nav className="flex flex-wrap gap-2" aria-label="Ajustes de Instagram">{[['account', 'Cuenta'], ['credentials', 'Credenciales'], ['help', 'Mostrar en la tienda']].map(([value, title]) => <button key={value} type="button" className={button} aria-pressed={tab === value} onClick={() => setTab(value)} style={tab === value ? { background: 'var(--admin-primary,#790d2d)', color: 'white' } : {}}>{title}</button>)}</nav>
@@ -102,6 +116,7 @@ export default function InstagramSettingsSection() {
         <a className="block text-sm underline" href="https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login" target="_blank" rel="noopener noreferrer">Guía oficial de Meta: app, cuenta profesional, permisos y revisión</a>
       </>}
     </section>
+    {failure}
     {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>}
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
   </div>;

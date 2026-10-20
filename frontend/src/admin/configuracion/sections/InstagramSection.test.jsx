@@ -44,3 +44,21 @@ describe('Ajustes privados de Instagram', () => {
     expect(screen.getByRole('button', { name: 'Conectar con Instagram' })).toBeDisabled();
   });
 });
+describe('recuperación de la carga de ajustes', () => {
+  it('expone HTTP 404 y permite recuperar la carga sin mostrar un falso formulario guardable', async () => {
+    api.get.mockRejectedValueOnce({ response: { status: 404, data: '<html>Cannot GET</html>' } }).mockResolvedValueOnce({ data: { settings } });
+    render(<InstagramSettingsSection />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('HTTP 404');
+    expect(screen.getByRole('link', {name:'Ver respuesta del servidor'})).toHaveAttribute('href', expect.stringContaining('/api/admin/instagram-settings'));
+    expect(screen.queryByRole('button', {name:'Guardar ajustes'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:'Reintentar'}));
+    await screen.findByRole('button', {name:'Conectar con Instagram'});
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('trata HTML 200 sin configuración como error en lugar de quedar cargando indefinidamente', async () => {
+    api.get.mockResolvedValueOnce({data:'<html>Frontend</html>'});
+    render(<InstagramSettingsSection />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('HTTP 200 · respuesta inesperada');
+    expect(screen.queryByText('Cargando conexión de Instagram…')).not.toBeInTheDocument();
+  });
+});
