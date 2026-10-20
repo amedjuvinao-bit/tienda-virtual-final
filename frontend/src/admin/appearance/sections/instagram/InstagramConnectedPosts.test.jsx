@@ -21,6 +21,8 @@ function Harness({ config = {}, realPreview = false }) {
   </InstagramEditorFeedProvider>;
 }
 const openPosts = () => fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Instagram' })).getByRole('button', { name: 'Publicaciones' }));
+const openHighlights = () => fireEvent.click(within(screen.getByRole('navigation', { name: 'Contenido de Instagram' })).getByRole('button', { name: 'Destacados' }));
+const openHighlightPicker = () => fireEvent.click(screen.getByRole('button', { name: 'Elegir publicación de Instagram para el destacado' }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 describe('selección visual de la cuenta conectada', () => {
   it('permite renombrar y enlazar los destacados automáticos de la cuenta conectada', async () => {
@@ -32,12 +34,69 @@ describe('selección visual de la cuenta conectada', () => {
     expect(names).toHaveLength(2);
     expect(names[0]).toHaveValue('Destacado 1');
     fireEvent.change(names[0], { target: { value: 'Nuestro equipo' } });
-    fireEvent.change(screen.getAllByLabelText('Publicación del destacado')[0], { target: { value: 'ig_2' } });
+    openHighlightPicker();
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 2' }));
     const saved = JSON.parse(screen.getByLabelText('Borrador guardable').textContent);
     expect(saved.journalHighlights[0]).toMatchObject({ title: 'Nuestro equipo', postId: 'ig_2' });
     fireEvent.click(screen.getByRole('button', { name: 'Ver destacado: Nuestro equipo' }));
     expect(container.querySelector('.ig-journal__post--featured')).toHaveAttribute('data-post-id', 'ig_2');
     expect(saved.posts).toEqual([]);
+  });
+  it('cambia la miniatura guardada anteriormente al elegir otra publicación y mantiene el nombre del destacado', async () => {
+    api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });
+    const { container } = render(<Harness config={{ journalHighlights: [{ id: 'legacy', title: 'Mi destacado', postId: 'ig_1', image: records[0].image }] }} />);
+    await screen.findByRole('link', { name: '@rosa' }); openHighlights(); openHighlightPicker();
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 2' }));
+    expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', records[1].image);
+    expect(screen.getByRole('button', { name: 'Editar destacado 1' }).querySelector('img')).toHaveAttribute('src', records[1].image);
+    const saved = JSON.parse(screen.getByLabelText('Borrador guardable').textContent);
+    expect(saved.journalHighlights[0]).toMatchObject({ title: 'Mi destacado', postId: 'ig_2', image: '', imageSource: 'post' });
+    expect(screen.queryByRole('region', { name: 'Publicaciones de Instagram para el destacado' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Elegir publicación de Instagram para el destacado' })).toHaveFocus();
+    fireEvent.change(screen.getByLabelText('Imagen del círculo destacado'), { target: { value: 'custom' } });
+    fireEvent.change(screen.getByLabelText('Imagen del destacado (opcional)'), { target: { value: '/custom-cover.jpg' } });
+    expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', '/custom-cover.jpg');
+    fireEvent.change(screen.getByLabelText('Imagen del círculo destacado'), { target: { value: 'post' } });
+    expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', records[1].image);
+  });
+  it('elegir una publicación oculta para un destacado la hace visible sin aprobar las demás', async () => {
+    api.get.mockResolvedValue({ data: { connected: true, account, posts: [...records, post('3')], nextCursor: '' } });
+    const { container } = render(<Harness config={{ journalConnectedSelection: { accountId: '123', mode: 'selected', included: ['ig_1'], excluded: ['ig_2'] } }} />);
+    await screen.findByRole('link', { name: '@rosa' }); openHighlights(); openHighlightPicker();
+    expect(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 2' })).toHaveTextContent('Oculta');
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 2' }));
+    const saved = JSON.parse(screen.getByLabelText('Borrador guardable').textContent);
+    expect(saved.journalConnectedSelection).toMatchObject({ accountId: '123', mode: 'selected', included: ['ig_1', 'ig_2'], excluded: [] });
+    expect(container.querySelector('.ig-journal [data-post-id="ig_2"]')).not.toBeNull();
+    expect(container.querySelector('.ig-journal [data-post-id="ig_3"]')).toBeNull();
+  });
+  it('carga más publicaciones desde Destacados y permite buscar y elegir una de otra página', async () => {
+    api.get.mockResolvedValueOnce({ data: { connected: true, account, posts: records, nextCursor: 'signed' } })
+      .mockResolvedValueOnce({ data: { connected: true, account, posts: Array.from({ length: 7 }, (_, i) => post(String(i + 3))), nextCursor: '' } });
+    const { container } = render(<Harness />);
+    await screen.findByRole('link', { name: '@rosa' }); openHighlights(); openHighlightPicker();
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más para elegir' }));
+    await screen.findByText('9 publicaciones cargadas');
+    expect(api.get.mock.calls[1][1].params.cursor).toBe('signed');
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Páginas para elegir un destacado' })).getByRole('button', { name: 'Siguientes' }));
+    expect(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 9' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar publicación de Instagram' }), { target: { value: 'Prenda 9' } });
+    expect(screen.queryByRole('button', { name: 'Elegir para el destacado: Prenda 1' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 9' }));
+    expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', post('9').image);
+  });
+  it('mantiene la publicación y permite reintentar si falla cargar más en el selector', async () => {
+    api.get.mockResolvedValueOnce({ data: { connected: true, account, posts: records, nextCursor: 'signed' } })
+      .mockRejectedValueOnce({ response: { data: { message: 'Instagram no respondió.' } } })
+      .mockResolvedValueOnce({ data: { connected: true, account, posts: records, nextCursor: '' } });
+    render(<Harness />);
+    await screen.findByRole('link', { name: '@rosa' }); openHighlights(); openHighlightPicker();
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más para elegir' }));
+    const retry = await screen.findByRole('button', { name: 'Reintentar publicaciones de Instagram' });
+    expect(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 1' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Reintentar publicaciones de Instagram' })).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 1' })).toHaveAttribute('aria-pressed', 'true');
   });
   it('muestra fotos reales sin formulario manual; ocultar y mostrar actualizan el borrador y la vista previa', async () => {
     api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });

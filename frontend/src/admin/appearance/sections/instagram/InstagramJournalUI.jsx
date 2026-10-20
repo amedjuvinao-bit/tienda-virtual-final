@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { InstagramEditorFeed } from '../../../../components/instagram/InstagramEditorFeed';
 import InstagramConnectedPosts from './InstagramConnectedPosts';
+import InstagramHighlightPicker from './InstagramHighlightPicker';
 import selectionHelpers from '@shared/instagram-selection';
 import { Button } from '../ui/UiComponents';
 import SectionEditorSteps from '../ui/SectionEditorSteps';
@@ -29,7 +30,7 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
   const availableFor = config => config.journalSource === 'connected' && connectedFeed?.connected
     ? selectionHelpers.visiblePosts(connectedFeed.posts, config, connectedFeed.account?.id) : journalPosts(config.posts, normalizeJournal(config).journalLimit);
   const available = availableFor(c);
-  const highlightsFor = config => Array.isArray(config.journalHighlights) ? config.journalHighlights : journalHighlights(config, availableFor(config));
+  const highlightsFor = config => Array.isArray(config.journalHighlights) ? config.journalHighlights : journalHighlights(config, availableFor(config)).map(h => ({ ...h, image: '' }));
   const highlights = highlightsFor(c);
   function mutate(edit) {
     const { theme: current, setPath: save } = latest.current;
@@ -44,7 +45,13 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
   }
   const patch = (key, value) => mutate(s => ({ ...s, config: { ...s.config, ...normalizeJournal(s.config), [key]: value } }));
   const patchPost = (id, key, value) => mutate(s => ({ ...s, config: { ...s.config, posts: s.config.posts.map(p => p.id === id ? { ...p, [key]: value } : p) } }));
-  const patchHighlight = (id, key, value) => mutate(s => ({ ...s, config: { ...s.config, journalHighlights: highlightsFor(s.config).map(h => h.id === id ? { ...h, [key]: value } : h) } }));
+  const patchHighlight = (id, key, value) => mutate(s => ({ ...s, config: { ...s.config, journalHighlights: highlightsFor(s.config).map(h => h.id === id ? { ...h, [key]: value, ...(key === 'image' ? { imageSource: value ? 'custom' : 'post' } : {}) } : h) } }));
+  const selectHighlightPost = (id, postId) => mutate(s => ({ ...s, config: { ...s.config,
+    journalHighlights: highlightsFor(s.config).map(h => h.id === id ? { ...h, postId, image: '', imageSource: 'post', accountId: s.config.journalSource === 'connected' ? String(connectedFeed?.account?.id || '') : '' } : h),
+    ...(s.config.journalSource === 'connected' && connectedFeed?.connected && connectedFeed.account?.id && postId ? {
+      journalConnectedSelection: selectionHelpers.updateSelection(s.config, connectedFeed.account.id, [postId], true)
+    } : {})
+  } }));
   async function upload(file, key, target) {
     if (!file) return;
     setError('');
@@ -137,14 +144,21 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
           </div>
         </div>
         <div className={box}>
-          <div className="flex items-center justify-between gap-2"><strong>Destacados</strong><Button disabled={highlights.length >= 8 || pending} onClick={() => { patch('journalHighlights', [...highlights, { id: uid('highlight'), title: '', image: '', postId: available[0]?.id || '', enabled: true }]); setActiveHighlight(highlights.length); }}>Agregar destacado</Button></div>
-          <p className="text-xs">Cada círculo muestra en grande la publicación que elijas. La imagen del círculo puede ser distinta a la publicación.</p>
-          <SectionEditorPostPicker posts={highlights.map(h => ({ ...h, image: h.image || available.find(p => p.id === h.postId)?.image }))} activeIndex={Math.max(0, Math.min(activeHighlight, highlights.length - 1))} onSelect={setActiveHighlight} label="Instagram" itemName="destacado" />
+          <div className="flex items-center justify-between gap-2"><strong>Destacados</strong><Button disabled={highlights.length >= 8 || pending} onClick={() => { patch('journalHighlights', [...highlights, { id: uid('highlight'), title: '', image: '', imageSource: 'post', postId: available[0]?.id || '', enabled: true }]); setActiveHighlight(highlights.length); }}>Agregar destacado</Button></div>
+          <p className="text-xs">Cada círculo muestra en grande la publicación que elijas. Al cambiar la publicación también se actualiza su imagen; puedes usar una imagen personalizada si lo prefieres.</p>
+          <SectionEditorPostPicker posts={highlights.map(h => ({ ...h, image: (h.imageSource === 'post' ? '' : h.image) || available.find(p => p.id === h.postId)?.image }))} activeIndex={Math.max(0, Math.min(activeHighlight, highlights.length - 1))} onSelect={setActiveHighlight} label="Instagram" itemName="destacado" />
           {highlights.map((h, i) => <div key={h.id} className="space-y-3" hidden={i !== Math.max(0, Math.min(activeHighlight, highlights.length - 1))}>
             <Text label="Nombre del destacado" value={h.title || ''} onChange={v => patchHighlight(h.id, 'title', v)} />
-            <Select label="Publicación del destacado" value={h.postId || ''} onChange={v => patchHighlight(h.id, 'postId', v)} options={[["", 'Seleccionar publicación'], ...postOptions.slice(1)]} />
+            {c.journalSource === 'connected'
+              ? <InstagramHighlightPicker posts={connectedFeed?.posts || []} selectedId={h.postId || ''} feed={connectedFeed} onSelect={postId => selectHighlightPost(h.id, postId)} isVisible={id => available.some(p => p.id === id)} />
+              : <Select label="Publicación del destacado" value={h.postId || ''} onChange={v => selectHighlightPost(h.id, v)} options={[["", 'Seleccionar publicación'], ...postOptions.slice(1)]} />}
             {!available.some(p => p.id === h.postId) && <p className="text-xs text-amber-800">Selecciona una publicación visible para que este destacado aparezca en la tienda.</p>}
-            {image('Imagen del destacado (opcional)', 'image', h.image, { highlight: h.id })}
+            <Select label="Imagen del círculo destacado" value={h.imageSource || (h.image && h.image !== available.find(p => p.id === h.postId)?.image ? 'custom' : 'post')}
+              options={[["post", 'Usar imagen de la publicación'], ["custom", 'Usar imagen personalizada']]}
+              onChange={v => patchHighlight(h.id, 'imageSource', v)} />
+            {h.imageSource === 'custom' || (!h.imageSource && h.image && h.image !== available.find(p => p.id === h.postId)?.image)
+              ? image('Imagen del destacado (opcional)', 'image', h.image, { highlight: h.id })
+              : <p className="text-xs">El círculo usa la imagen actual de la publicación seleccionada, sin necesidad de subir otra foto.</p>}
             <Check label="Mostrar destacado" value={h.enabled !== false} onChange={v => patchHighlight(h.id, 'enabled', v)} />
             <div className="flex flex-wrap gap-2"><Button kind="outline" disabled={i === 0 || pending} onClick={() => { const next = [...highlights]; [next[i], next[i - 1]] = [next[i - 1], next[i]]; patch('journalHighlights', next); setActiveHighlight(i - 1); }}>Mover antes</Button><Button kind="outline" disabled={i === highlights.length - 1 || pending} onClick={() => { const next = [...highlights]; [next[i], next[i + 1]] = [next[i + 1], next[i]]; patch('journalHighlights', next); setActiveHighlight(i + 1); }}>Mover después</Button><Button kind="outline" disabled={pending} onClick={() => { patch('journalHighlights', highlights.filter(item => item.id !== h.id)); setActiveHighlight(Math.max(0, i - 1)); }}>Eliminar destacado</Button></div>
           </div>)}

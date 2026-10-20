@@ -57,6 +57,30 @@ describe('Cuenta conectada y fotos manuales', () => {
     expect(container.querySelector('.ig-journal__avatar')).toHaveTextContent('CN');
     expect(screen.getByRole('heading', { name: /^InstaGram/ })).toBeInTheDocument();
   });
+  it('recupera un destacado elegido de una página posterior al abrir la tienda', async () => {
+    const business = { ...account, id: '123' };
+    api.get.mockResolvedValueOnce({ data: { connected: true, account: business, posts: [post('one')], nextCursor: 'signed-next' } })
+      .mockResolvedValueOnce({ data: { connected: true, account: business, posts: [post('two')], nextCursor: 'unused-next' } });
+    render(<InstagramJournal theme={theme({ journalSource: 'connected', journalHighlights: [{ id: 'chosen', postId: 'ig_two', accountId: '123', imageSource: 'post', title: 'Nuestro equipo' }] })} />);
+    const highlight = await screen.findByRole('button', { name: 'Ver destacado: Nuestro equipo' });
+    expect(highlight.querySelector('img')).toHaveAttribute('src', post('two').image);
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(api.get.mock.calls[1][1].params.cursor).toBe('signed-next');
+    fireEvent.click(highlight);
+    expect(screen.getByLabelText('Publicación principal').querySelector('article')).toHaveAttribute('data-post-id', 'ig_two');
+  });
+  it.each([
+    { accountId: 'other' },
+    { accountId: '123', enabled: false },
+    { accountId: '123', hidden: true },
+  ])('no busca destacados de otra cuenta, desactivados u ocultos', async overrides => {
+    const business = { ...account, id: '123' };
+    api.get.mockResolvedValue({ data: { connected: true, account: business, posts: [post('one')], nextCursor: 'signed-next' } });
+    render(<InstagramJournal theme={theme({ journalSource: 'connected', journalHighlights: [{ id: 'chosen', postId: 'ig_two', title: 'No mostrar', ...overrides }],
+      ...(overrides.hidden ? { journalConnectedSelection: { accountId: '123', mode: 'all', included: [], excluded: ['ig_two'] } } : {}) })} />);
+    await screen.findByRole('link', { name: '@realrosa' });
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
   it('mantiene fotos manuales ante error y permite reintentar', async () => {
     api.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: { connected: true, account, posts: [post('one')], nextCursor: '' } });
     render(<InstagramJournal theme={theme({ journalSource: 'connected' })} />);

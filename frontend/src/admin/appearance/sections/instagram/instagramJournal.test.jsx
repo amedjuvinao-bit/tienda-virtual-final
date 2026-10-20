@@ -106,6 +106,14 @@ describe('Diario social público', () => {
     expect(featured().querySelector('video')).toBeNull();
     expect(within(featured()).getByRole('link', { name: 'Ver publicación: Prenda 2' })).toHaveAttribute('href', posts[2].link);
   });
+  it('actualiza la imagen automática al renovarse Instagram y conserva las portadas personalizadas', () => {
+    const config = { journalHighlights: [
+      { id: 'auto', title: 'Actual', postId: 'p0', image: '/expired.jpg', imageSource: 'post' },
+      { id: 'custom', title: 'Propia', postId: 'p1', image: '/custom.jpg', imageSource: 'custom' },
+    ] };
+    const refreshed = posts.map(post => ({ ...post, image: `/refreshed-${post.id}.jpg` }));
+    expect(journalHighlights(config, refreshed).map(h => h.image)).toEqual(['/refreshed-p0.jpg', '/custom.jpg']);
+  });
 });
 
 function Editor({ save, upload }) {

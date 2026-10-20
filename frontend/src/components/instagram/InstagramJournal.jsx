@@ -44,8 +44,25 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [notice, setNotice] = useState('');
+  const highlightPages = useRef({ account: '', cursors: new Set() });
   const user = resolved.profileUser || resolved.journalName;
   const { ids: saved, toggle } = useJournalSaved(resolved.profileLink || user);
+  useEffect(() => {
+    if (!section.enabled || !connectedMode || editorFeed || !feed.connected || !j.journalShowHighlights) return;
+    const accountId = String(feed.account?.id || '');
+    if (!accountId) return;
+    if (highlightPages.current.account !== accountId) highlightPages.current = { account: accountId, cursors: new Set() };
+    if (feed.error) { highlightPages.current.cursors.clear(); return; }
+    if (feed.loading || !feed.nextCursor || highlightPages.current.cursors.has(feed.nextCursor)) return;
+    const selection = selectionHelpers.selectionFor(c, accountId);
+    const missing = (Array.isArray(c.journalHighlights) ? c.journalHighlights : []).some(h =>
+      h && h.enabled !== false && h.accountId === accountId && /^ig_[\w-]{1,100}$/.test(h.postId || '') &&
+      selectionHelpers.isPostVisible(selection, h.postId) && !feed.posts.some(post => post.id === h.postId));
+    if (missing) {
+      highlightPages.current.cursors.add(feed.nextCursor);
+      feed.loadMore();
+    }
+  }, [section.enabled, connectedMode, editorFeed, feed, c, j.journalShowHighlights]);
   useEffect(() => { if (lightbox && !posts.some(post => post.id === lightbox.id)) setLightbox(null); }, [lightbox, posts]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   if (!section.enabled) return null;

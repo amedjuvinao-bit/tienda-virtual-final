@@ -60,10 +60,10 @@ export function journalFeaturedId(posts, config) {
 }
 export function journalHighlights(config, posts) {
   const source = Array.isArray(config.journalHighlights) ? config.journalHighlights :
-    posts.slice(0, 3).map((post, i) => ({ id: `highlight_${i}`, title: `Destacado ${i + 1}`, postId: post.id }));
+    posts.slice(0, 3).map((post, i) => ({ id: `highlight_${i}`, title: `Destacado ${i + 1}`, postId: post.id, imageSource: 'post' }));
   return source.filter(h => h && h.enabled !== false).map((h, i) => {
     const post = posts.find(p => p.id === h.postId);
-    return { ...h, id: String(h.id || `highlight_${i}`), postId: post?.id || '', image: h.image || post?.image || '', title: h.title || `Destacado ${i + 1}` };
+    return { ...h, id: String(h.id || `highlight_${i}`), postId: post?.id || '', image: h.imageSource === 'post' ? post?.image || '' : h.image || post?.image || '', title: h.title || `Destacado ${i + 1}` };
   }).filter(h => h.postId && h.image).slice(0, 8);
 }
 export function safeJournalVideo(value) {

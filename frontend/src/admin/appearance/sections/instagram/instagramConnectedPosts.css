@@ -31,3 +31,20 @@
 .ig-media-manager button:focus-visible, .ig-media-manager a:focus-visible, .ig-media-manager input:focus-visible, .ig-media-manager select:focus-visible { outline: 2px solid #790d2d; outline-offset: 3px; }
 .ig-media-manager__pagination { justify-content: center; font-size: 12px; }
 @media (max-width: 480px) { .ig-media-manager__tools { grid-template-columns: minmax(0, 1fr); } .ig-media-manager__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ig-media-manager__body { padding: 8px; } }
+.ig-highlight-picker__label { font-size: 12px; }
+.ig-highlight-picker__current { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 12px; border: 1px solid #dbb6c8; border-radius: 12px; background: linear-gradient(135deg, #fff9fc, #fcebf2); text-align: left; cursor: pointer; }
+.ig-highlight-picker__current > img { width: 54px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.ig-highlight-picker__current > span:first-of-type { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.ig-highlight-picker__current strong { font-size: 12px; }
+.ig-highlight-picker__current > span > span { font-size: 11px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ig-highlight-picker__panel { display: grid; gap: 12px; padding: 12px; border: 1px solid #e9cbd9; border-radius: 12px; background: #fff9fc; min-width: 0; }
+.ig-highlight-picker__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ig-highlight-picker__option { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 5px; overflow: hidden; min-width: 0; border: 1px solid #e9cbd9; border-radius: 10px; background: white; text-align: left; padding-bottom: 8px; cursor: pointer; }
+.ig-highlight-picker__option[aria-pressed="true"] { border-color: #790d2d; box-shadow: 0 0 0 2px #790d2d; }
+.ig-highlight-picker__option img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+.ig-highlight-picker__caption { padding: 0 7px; font-size: 11px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ig-highlight-picker__kind { position: absolute; top: 6px; left: 6px; padding: 3px 6px; border-radius: 12px; background: #fffdf2e6; font-size: 10px; }
+.ig-highlight-picker__option > strong { padding: 0 7px; font-size: 10px; }
+.ig-highlight-picker__footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.ig-highlight-picker__footer > span { flex: 1 1 100%; }
+@media (max-width: 480px) { .ig-highlight-picker__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
