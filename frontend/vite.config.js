@@ -2,19 +2,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
+import instagramSelectionSource from './vitePlugins/instagramSelectionSource.js'
+
+const instagramSelectionPath = fileURLToPath(new URL('../shared/instagramSelection.cjs', import.meta.url))
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [instagramSelectionSource(instagramSelectionPath), react()],
   resolve: {
     alias: {
-      '@shared/instagram-selection': fileURLToPath(new URL('../shared/instagramSelection.cjs', import.meta.url)),
+      '@shared/instagram-selection': instagramSelectionPath,
       '@shared/variant-key-authority': fileURLToPath(
         new URL('../shared/variantKeyAuthority.cjs', import.meta.url),
       ),
     },
   },
   optimizeDeps: {
-    include: ['@shared/variant-key-authority', '@shared/instagram-selection'],
+    include: ['@shared/variant-key-authority'],
+    exclude: ['@shared/instagram-selection'],
   },
   test: {
     environment: 'jsdom',
