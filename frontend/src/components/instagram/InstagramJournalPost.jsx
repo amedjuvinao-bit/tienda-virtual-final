@@ -3,6 +3,7 @@ import { ArrowUpRight, Bookmark, Clapperboard, Heart, MessageCircle, MoreHorizon
 import { photoCrop, safeInstagramLink } from '../../admin/appearance/sections/instagram/instagramEditorialHelpers';
 import { safeJournalVideo } from '../../admin/appearance/sections/instagram/instagramJournalHelpers';
 import { moveJournalGlass, resetJournalGlass } from './journalGlass';
+import JournalLiquidLens from './JournalLiquidLens';
 
 export function JournalAvatar({ settings, small = false }) {
   return <span className={`ig-journal__avatar${small ? ' ig-journal__avatar--small' : ''}`} aria-hidden="true">
@@ -24,7 +25,8 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
     <img className={post.mobileImage ? "ig-journal__desktop-image" : undefined} src={post.image} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />
     {post.mobileImage && <img className="ig-journal__mobile-image" src={post.mobileImage} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />}
   </picture>;
-  return <article className={`ig-journal__post${compact ? ' ig-journal__post--compact' : ' ig-journal__post--featured'}`} data-igj-glass={compact ? 'preview' : 'featured'} onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} data-post-id={post.id} aria-label={description}>
+  return <article className={`ig-journal__post${compact ? ' ig-journal__post--compact' : ' ig-journal__post--featured'}`} data-video={video ? 'true' : undefined} data-igj-glass={compact ? 'preview' : 'featured'} onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} data-post-id={post.id} aria-label={description}>
+    <JournalLiquidLens settings={j} strength={compact ? .7 : 1} />
     <div className="ig-journal__post-header">
       <JournalAvatar settings={j} small={compact} />
       <div className="ig-journal__identity"><strong>{user.replace(/^@/, '')}</strong>{!compact && <span>{j.journalName}</span>}</div>
@@ -40,6 +42,7 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
       {post.kind === 'reel' && (compact || !video) && <span className="ig-journal__reel"><Clapperboard size={18} aria-hidden="true" /> Reel</span>}
     </div>
     <div className="ig-journal__post-bottom">
+      {!compact && <JournalLiquidLens settings={j} strength={.8} />}
       {!compact && j.journalShowActions && <div className="ig-journal__actions">
         {href && <><a href={href} target="_blank" rel="noopener noreferrer" aria-label="Dar me gusta en Instagram" title="Dar me gusta en Instagram"><Heart /></a>
           <a href={href} target="_blank" rel="noopener noreferrer" aria-label="Comentar en Instagram" title="Comentar en Instagram"><MessageCircle /></a>

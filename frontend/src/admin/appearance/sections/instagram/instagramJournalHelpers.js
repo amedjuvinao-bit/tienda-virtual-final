@@ -16,6 +16,8 @@ export const JOURNAL_DEFAULTS = {
   journalMaterialRevision: 1, journalGlassEnabled: true, journalGlassDepth: 8,
   journalGlassTexture: 26, journalGlassReflection: 48,
   journalGlassInteractive: true, journalGlassTilt: 1.2,
+  journalGlassFinish: 'liquid', journalLiquidOpacity: 12, journalLiquidBlur: 2,
+  journalLiquidRefraction: 28, journalLiquidEdge: 20,
   journalShowProfile: true, journalShowTitle: true, journalShowFollow: true, journalShowSubtitle: true,
   journalShowHighlights: true, journalShowActions: true, journalShowCaptions: true, journalShowFilters: true, journalShowSidebar: true
 };
@@ -28,7 +30,8 @@ const ranges = {
   journalRadius: [0, 40], journalShadow: [0, 50], journalBlur: [0, 30],
   journalHoverLift: [0, 8], journalMobilePadding: [8, 32],
   journalMaterialRevision: [1, 1], journalGlassDepth: [0, 16],
-  journalGlassTexture: [0, 60], journalGlassReflection: [0, 80], journalGlassTilt: [0, 3]
+  journalGlassTexture: [0, 60], journalGlassReflection: [0, 80], journalGlassTilt: [0, 3],
+  journalLiquidOpacity: [2, 45], journalLiquidBlur: [0, 12], journalLiquidRefraction: [0, 50], journalLiquidEdge: [6, 36]
 };
 export function normalizeJournal(config = {}) {
   const next = {};
@@ -41,6 +44,7 @@ export function normalizeJournal(config = {}) {
   }
   next.journalLimit = Math.round(next.journalLimit);
   next.journalPageSize = Math.round(next.journalPageSize);
+  if (!['liquid', 'frosted'].includes(next.journalGlassFinish)) next.journalGlassFinish = 'liquid';
   if (!['included', 'custom', 'continuity', 'color', 'global'].includes(next.journalBackgroundMode)) next.journalBackgroundMode = 'included';
   return next;
 }
