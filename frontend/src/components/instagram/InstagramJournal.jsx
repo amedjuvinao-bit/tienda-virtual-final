@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Instagram, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, Instagram, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { normalizeInstagramSection } from '../../admin/appearance/sections/instagram/instagramSectionHelpers';
-import { normalizeJournal, journalPosts, journalHighlights, journalFeaturedId, journalIdentity } from '../../admin/appearance/sections/instagram/instagramJournalHelpers';
+import { normalizeJournal, journalPosts, journalHighlights, journalFeaturedId, journalIdentity, journalFeedPlan } from '../../admin/appearance/sections/instagram/instagramJournalHelpers';
 import { safeInstagramLink } from '../../admin/appearance/sections/instagram/instagramEditorialHelpers';
 import { categoriasBackdrop } from '../../admin/appearance/sections/categorias/categoriasFanHelpers';
 import InstagramJournalPost from './InstagramJournalPost';
@@ -12,11 +12,13 @@ import JournalLightbox from './JournalLightbox';
 import useInstagramFeed from './useInstagramFeed';
 import { InstagramEditorFeed } from './InstagramEditorFeed';
 import selectionHelpers from '@shared/instagram-selection';
+import useJournalMotion from './useJournalMotion';
 import './instagramJournal.css';
 import './instagramJournalGlass.css';
 import './instagramJournalLiquid.css';
 import './journalReel.css';
 import './instagramJournalDepth.css';
+import './instagramJournalMotion.css';
 
 export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const raw = theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram');
@@ -26,6 +28,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const editorFeed = useContext(InstagramEditorFeed);
   const publicFeed = useInstagramFeed(section.enabled && connectedMode && !editorFeed);
   const feed = editorFeed || publicFeed;
+  const initialLoading = connectedMode && feed.loaded === false;
   const account = connectedMode && feed.connected ? feed.account : null;
   const resolved = { ...c,
     ...journalIdentity(c, account),
@@ -34,39 +37,40 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const j = normalizeJournal(resolved);
   const manualPosts = journalPosts(Array.isArray(raw?.config?.posts) ? c.posts : fallback, j.journalLimit);
   const posts = connectedMode && feed.connected ? selectionHelpers.visiblePosts(feed.posts, c, feed.account?.id) : manualPosts;
-  const preferred = connectedMode && feed.connected ? (posts.find(p => p.id === c.journalFeaturedPostId)?.id || posts[0]?.id) : journalFeaturedId(posts, c);
+  const plan = journalFeedPlan(c, feed.account?.id, posts, !editorFeed);
+  const preferred = connectedMode && feed.connected ? plan.primaryId : journalFeaturedId(posts, c);
+  const root = useRef(null);
   const main = useRef(null);
   const [selection, setSelection] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const requested = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('ig_post');
   // A changed preferred post in the admin must immediately update the real preview.
   const featured = posts.find(p => p.id === (selection && selection.preferred === preferred ? selection.id : (!selection && posts.some(p => p.id === requested) ? requested : preferred))) || posts[0];
+  const primaryLoading = connectedMode && feed.connected && preferred && !posts.some(post => post.id === preferred) && !(selection?.preferred === preferred) && (feed.loading || feed.nextCursor) && !feed.error;
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [notice, setNotice] = useState('');
-  const highlightPages = useRef({ account: '', cursors: new Set() });
+  const feedPages = useRef({ account: '', cursors: new Set() });
   const user = resolved.profileUser || resolved.journalName;
   const { ids: saved, toggle } = useJournalSaved(resolved.profileLink || user);
+  const motion = useJournalMotion({ root, main, settings: j, postId: !section.enabled || initialLoading || primaryLoading ? '' : featured?.id, onReturn: () => { setSelection(null); setPage(0); setNotice(''); } });
   useEffect(() => {
-    if (!section.enabled || !connectedMode || editorFeed || !feed.connected || !j.journalShowHighlights) return;
+    if (!section.enabled || !connectedMode || !feed.connected) return;
     const accountId = String(feed.account?.id || '');
     if (!accountId) return;
-    if (highlightPages.current.account !== accountId) highlightPages.current = { account: accountId, cursors: new Set() };
-    if (feed.error) { highlightPages.current.cursors.clear(); return; }
-    if (feed.loading || !feed.nextCursor || highlightPages.current.cursors.has(feed.nextCursor)) return;
-    const selection = selectionHelpers.selectionFor(c, accountId);
-    const missing = (Array.isArray(c.journalHighlights) ? c.journalHighlights : []).some(h =>
-      h && h.enabled !== false && h.accountId === accountId && /^ig_[\w-]{1,100}$/.test(h.postId || '') &&
-      selectionHelpers.isPostVisible(selection, h.postId) && !feed.posts.some(post => post.id === h.postId));
+    if (feedPages.current.account !== accountId) feedPages.current = { account: accountId, cursors: new Set() };
+    if (feed.error) { feedPages.current.cursors.clear(); return; }
+    if (feed.loading || !feed.nextCursor || feedPages.current.cursors.has(feed.nextCursor)) return;
+    const missing = plan.requiredIds.some(id => !feed.posts.some(post => post.id === id));
     if (missing) {
-      highlightPages.current.cursors.add(feed.nextCursor);
+      feedPages.current.cursors.add(feed.nextCursor);
       feed.loadMore();
     }
-  }, [section.enabled, connectedMode, editorFeed, feed, c, j.journalShowHighlights]);
+  }, [section.enabled, connectedMode, feed, plan]);
   useEffect(() => { if (lightbox && !posts.some(post => post.id === lightbox.id)) setLightbox(null); }, [lightbox, posts]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   if (!section.enabled) return null;
-  if (!featured) return connectedMode ? <section className="ig-journal__connection-state" aria-label="Instagram de la tienda"><p role="status">{feed.loading ? 'Cargando publicaciones de Instagram…' : feed.error || (feed.connected ? 'Pronto compartiremos nuevas publicaciones.' : 'Pronto podrás ver aquí nuestras publicaciones de Instagram.')}</p>{feed.nextCursor && <button type="button" disabled={feed.loading} onClick={feed.loadMore}>{feed.loading ? 'Cargando…' : 'Cargar más publicaciones'}</button>}{feed.error && <button type="button" onClick={feed.retry}>Volver a intentar</button>}</section> : null;
+  if (!featured || initialLoading) return connectedMode ? <section className="ig-journal__connection-state" aria-label="Instagram de la tienda"><p role="status">{feed.loading || initialLoading ? 'Cargando publicaciones de Instagram…' : feed.error || (feed.connected ? 'Pronto compartiremos nuevas publicaciones.' : 'Pronto podrás ver aquí nuestras publicaciones de Instagram.')}</p>{feed.nextCursor && <button type="button" disabled={feed.loading} onClick={feed.loadMore}>{feed.loading ? 'Cargando…' : 'Cargar más publicaciones'}</button>}{feed.error && <button type="button" onClick={feed.retry}>Volver a intentar</button>}</section> : null;
   const profile = safeInstagramLink(resolved.profileLink);
   const highlights = journalHighlights(c, posts);
   const filterPosts = posts.filter(p => filter === 'reels' ? p.kind === 'reel' : filter === 'saved' ? saved.includes(p.id) : true);
@@ -74,7 +78,8 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const maxPage = Math.max(0, Math.ceil(others.length / j.journalPageSize) - 1);
   const currentPage = Math.min(page, maxPage);
   const shown = others.slice(currentPage * j.journalPageSize, (currentPage + 1) * j.journalPageSize);
-  const select = id => {
+  const select = (id, event) => {
+    motion.feedback(event);
     setSelection({ id, preferred }); setNotice('Publicación mostrada en grande.');
     main.current?.focus({ preventScroll: true });
     if (main.current?.closest('.ig-journal')?.clientWidth < 768) main.current.scrollIntoView?.({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth' });
@@ -102,7 +107,8 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   if (j.journalBackgroundMode === 'color') background = '';
   if (j.journalBackgroundMode === 'global') { background = ''; color = theme?.colors?.background || '#fff'; }
   const common = { settings: j, user, onSave: id => setNotice(toggle(id)), onShare: share, onSelect: select, onExpand: setLightbox };
-  return <section className="ig-journal" aria-label="Instagram de la tienda" data-glass={j.journalGlassEnabled ? 'true' : 'false'} data-finish={j.journalGlassFinish} style={{
+  return <section ref={root} className="ig-journal" aria-label="Instagram de la tienda" data-motion-enabled={j.journalMotionEnabled ? 'true' : 'false'} data-entered={motion.entered ? 'true' : 'false'} data-highlight-motion={j.journalHighlightMotion} data-glass={j.journalGlassEnabled ? 'true' : 'false'} data-finish={j.journalGlassFinish} style={{
+    '--igj-motion-duration': `${j.journalMotionDuration}ms`,
     '--igj-background': color, '--igj-backdrop': background ? `url(${JSON.stringify(background)})` : 'none',
     '--igj-mobile-backdrop': j.journalMobileBackgroundImage ? `url(${JSON.stringify(j.journalMobileBackgroundImage)})` : background ? `url(${JSON.stringify(background)})` : 'none',
     '--igj-wash': j.journalBackgroundWash / 100, '--igj-ink': j.journalInk, '--igj-accent': j.journalAccent,
@@ -126,11 +132,11 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
         {j.journalShowFollow && profile && <a className="ig-journal__follow" href={profile} target="_blank" rel="noopener noreferrer">{j.journalFollowText}<ArrowUpRight size={19} aria-hidden="true" /></a>}
       </header>
       <div className="ig-journal__layout" data-sidebar={j.journalShowSidebar ? 'true' : 'false'}>
-        <div className="ig-journal__main" ref={main} tabIndex={-1} aria-label="Publicación principal"><InstagramJournalPost key={featured.id} post={featured} saved={saved.includes(featured.id)} {...common} /></div>
+        <div className="ig-journal__main" ref={main} tabIndex={-1} aria-label="Publicación principal" aria-busy={Boolean(primaryLoading)}>{primaryLoading ? <div className="ig-journal__primary-loading" role="status"><span aria-hidden="true" /><p>Cargando la publicación principal elegida…</p></div> : <InstagramJournalPost key={featured.id} post={featured} saved={saved.includes(featured.id)} {...common} />}</div>
         {j.journalShowSidebar && <aside className="ig-journal__sidebar" data-igj-glass="sidebar" onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} aria-label={j.journalSidebarTitle || 'Más publicaciones'}>
           <JournalLiquidLens settings={j} />
           <h3>{j.journalSidebarTitle}</h3>
-          {j.journalShowHighlights && highlights.length > 0 && <div className="ig-journal__highlights" aria-label="Destacados de Instagram">{highlights.map(h => <button type="button" key={h.id} onClick={() => select(h.postId)} aria-pressed={featured.id === h.postId} aria-label={`Ver destacado: ${h.title}`}><span><img src={h.image} alt="" loading="lazy" /></span><strong>{h.title}</strong></button>)}</div>}
+          {j.journalShowHighlights && highlights.length > 0 && <div className="ig-journal__highlights" aria-label="Destacados de Instagram">{highlights.map((h, index) => <button type="button" key={h.id} style={{ '--igj-highlight-index': index }} onClick={event => select(h.postId, event)} aria-pressed={!primaryLoading && featured.id === h.postId} aria-label={`Ver destacado: ${h.title}`}><span className="ig-journal__highlight-ring"><span className="ig-journal__highlight-photo"><img src={h.image} alt="" loading="lazy" /></span><i className="ig-journal__highlight-wave" aria-hidden="true" />{!primaryLoading && featured.id === h.postId && <i className="ig-journal__highlight-check" aria-hidden="true"><Check /></i>}</span><strong>{h.title}</strong></button>)}</div>}
           {j.journalShowFilters && <div className="ig-journal__filters" role="group" aria-label="Filtrar publicaciones">{[['all', 'Todas'], ['reels', 'Reels'], ['saved', 'Guardadas']].map(([value, label]) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setView(value)}>{label}</button>)}</div>}
           <div className="ig-journal__previews">{shown.map(post => <InstagramJournalPost key={post.id} post={post} compact saved={saved.includes(post.id)} {...common} />)}</div>
           {!shown.length && <p className="ig-journal__empty">{filterPosts.some(p => p.id === featured.id) ? 'Esta publicación ya está abierta en grande.' : filter === 'saved' ? 'Guarda publicaciones con el marcador para encontrarlas aquí.' : filter === 'reels' ? (feed.nextCursor ? 'No hay reels entre las publicaciones cargadas. Puedes cargar más.' : 'Todavía no hay reels en esta selección.') : 'Pronto compartiremos más momentos.'}</p>}

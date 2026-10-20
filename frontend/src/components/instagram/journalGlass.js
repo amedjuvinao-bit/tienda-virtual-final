@@ -2,7 +2,7 @@ const bounds = new WeakMap();
 
 export function moveJournalGlass(event, settings) {
   const el = event.currentTarget;
-  if (!settings.journalGlassEnabled || !settings.journalGlassInteractive || event.pointerType === 'touch') return;
+  if (settings.journalMotionEnabled === false || !settings.journalGlassEnabled || !settings.journalGlassInteractive || event.pointerType === 'touch') return;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
   if (!window.matchMedia?.('(hover: hover) and (pointer: fine)')?.matches) return;
   if ((el.closest('.ig-journal')?.clientWidth ?? 0) < 768) return;

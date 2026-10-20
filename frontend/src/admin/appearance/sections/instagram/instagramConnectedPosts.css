@@ -26,6 +26,12 @@
 .ig-media-manager__body time { font-size: 10px; color: #79586b; }
 .ig-media-manager__toggle { display: flex; justify-content: center; align-items: center; gap: 5px; width: 100%; min-height: 38px; padding: 7px; background: #790d2d; border: 1px solid #790d2d; border-radius: 9px; color: white; font-size: 11px; font-weight: 650; cursor: pointer; }
 .ig-media-manager__toggle[aria-pressed="false"] { background: #fff; color: #790d2d; }
+.ig-media-manager__principal { width: 100%; padding: 8px; border: 1px solid #dbb6c8; border-radius: 9px; font-size: 11px; color: #790d2d; background: #fff9fc; cursor: pointer; }
+.ig-media-manager__principal[aria-pressed="true"] { background: #f4dae4; border-color: #790d2d; font-weight: 700; }
+.ig-media-manager__order { display: flex; gap: 6px; flex-wrap: wrap; font-size: 10px; }
+.ig-media-manager__order span { flex-basis: 100%; }
+.ig-media-manager__order button { flex: 1 1 60px; padding: 6px; border-radius: 7px; border: 1px solid #dbb6c8; background: #fff; cursor: pointer; }
+.ig-media-manager__order button:disabled { opacity: .4; cursor: default; }
 .ig-media-manager a { color: #790d2d; text-decoration: underline; }
 .ig-media-manager__body a { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
 .ig-media-manager button:focus-visible, .ig-media-manager a:focus-visible, .ig-media-manager input:focus-visible, .ig-media-manager select:focus-visible { outline: 2px solid #790d2d; outline-offset: 3px; }

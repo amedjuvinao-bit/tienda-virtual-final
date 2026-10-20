@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import InstagramJournal from './InstagramJournal';
 import api from '../../lib/api';
 vi.mock('../../lib/api', () => ({ default: { get: vi.fn() } }));
@@ -10,6 +10,36 @@ const account = { username: 'realrosa', name: 'Cuenta Rosa', url: 'https://insta
 const theme = (config = {}) => ({ sections: [{ id: 'instagram', enabled: true, config: { posts: manual, profileUser: '@manual', ...config } }] });
 afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); });
 describe('Cuenta conectada y fotos manuales', () => {
+  it('no muestra la foto manual de respaldo mientras se consulta la principal de Instagram', async () => {
+    let finish;
+    api.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(<InstagramJournal theme={theme({ journalSource: 'connected', journalFeaturedPostId: 'ig_two' })} />);
+    expect(screen.getByText('Cargando publicaciones de Instagram…')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Foto manual' })).not.toBeInTheDocument();
+    await act(async () => finish({ data: { connected: true, account, posts: [post('two')], nextCursor: '' } }));
+    expect(screen.getByLabelText('Publicación principal').querySelector('article')).toHaveAttribute('data-post-id', 'ig_two');
+  });
+  it('espera a la principal guardada en una página posterior sin mostrar otra en grande', async () => {
+    let finish;
+    const business = { ...account, id: '123' };
+    api.get.mockResolvedValueOnce({ data: { connected: true, account: business, posts: [post('one')], nextCursor: 'next' } })
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(<InstagramJournal theme={theme({ journalSource: 'connected', posts: [], journalFeaturedPostId: 'ig_two', journalFeaturedAccountId: '123' })} />);
+    await screen.findByText('Cargando la publicación principal elegida…');
+    expect(screen.getByLabelText('Publicación principal').querySelector('article')).toBeNull();
+    await act(async () => finish({ data: { connected: true, account: business, posts: [post('two')], nextCursor: '' } }));
+    expect(screen.getByLabelText('Publicación principal').querySelector('article')).toHaveAttribute('data-post-id', 'ig_two');
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+  it('carga y aplica el orden manual guardado aunque sus primeras publicaciones estén en otra página', async () => {
+    const business = { ...account, id: '123' };
+    api.get.mockResolvedValueOnce({ data: { connected: true, account: business, posts: [post('one'), post('two')], nextCursor: 'next' } })
+      .mockResolvedValueOnce({ data: { connected: true, account: business, posts: [post('three')], nextCursor: '' } });
+    const { container } = render(<InstagramJournal theme={theme({ journalSource: 'connected', posts: [], journalConnectedOrder: { accountId: '123', mode: 'manual', ids: ['ig_three', 'ig_two', 'ig_one'] } })} />);
+    await waitFor(() => expect(container.querySelector('.ig-journal__post--featured')).toHaveAttribute('data-post-id', 'ig_three'));
+    expect([...container.querySelectorAll('.ig-journal__previews article')].map(el => el.dataset.postId)).toEqual(['ig_two', 'ig_one']);
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
   it('las fotos sin enlace tienen ampliar, compartir y guardar sin un contenedor vacío', async () => {
     const copy = vi.fn().mockResolvedValue();
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copy } });

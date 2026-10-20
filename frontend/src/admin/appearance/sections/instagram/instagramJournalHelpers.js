@@ -1,10 +1,12 @@
 import { bounded, safeInstagramLink } from './instagramEditorialHelpers';
+import selectionHelpers from '@shared/instagram-selection';
 
 export const JOURNAL_DEFAULTS = {
   journalTitle: 'Instagram', journalName: '', journalMonogram: '', journalAvatarImage: '',
   journalSidebarTitle: 'Más publicaciones', journalSubtitle: '',
   journalFollowText: 'Seguir en Instagram', journalPostText: 'Ver publicación', journalFeaturedPostId: '',
   journalLimit: 24, journalPageSize: 2,
+  journalMotionEnabled: true, journalMotion: 'glide', journalHighlightMotion: 'halo', journalMotionDuration: 480, journalMotionStrength: 1, journalResetOnEnter: true,
   journalBackgroundMode: 'included', journalBackgroundImage: '', journalMobileBackgroundImage: '',
   journalBackgroundColor: '#f5ded8', journalBackgroundWash: 0,
   journalInk: '#790d2d', journalAccent: '#b9935b', journalCardColor: '#fff8f3', journalCardOpacity: 52,
@@ -23,6 +25,7 @@ export const JOURNAL_DEFAULTS = {
 };
 const ranges = {
   journalLimit: [1, 48], journalPageSize: [1, 6], journalBackgroundWash: [0, 100],
+  journalMotionDuration: [180, 900], journalMotionStrength: [.5, 1.5],
   journalCardOpacity: [20, 100], journalTitleSize: [24, 80], journalTextSize: [13, 24],
   journalMobileTitleSize: [24, 48], journalMaxWidth: [800, 2000],
   journalPaddingX: [0, 100], journalPaddingY: [0, 100], journalGap: [12, 60],
@@ -45,6 +48,8 @@ export function normalizeJournal(config = {}) {
   next.journalLimit = Math.round(next.journalLimit);
   next.journalPageSize = Math.round(next.journalPageSize);
   if (!['liquid', 'frosted'].includes(next.journalGlassFinish)) next.journalGlassFinish = 'liquid';
+  if (!['fade', 'glide', 'focus', 'zoom', 'none'].includes(next.journalMotion)) next.journalMotion = 'glide';
+  if (!['halo', 'lift', 'tilt', 'zoom', 'none'].includes(next.journalHighlightMotion)) next.journalHighlightMotion = 'halo';
   if (!['included', 'custom', 'continuity', 'color', 'global'].includes(next.journalBackgroundMode)) next.journalBackgroundMode = 'included';
   return next;
 }
@@ -57,6 +62,14 @@ export function journalPosts(posts = [], limit = 48) {
 export function journalFeaturedId(posts, config) {
   const preferred = config.journalFeaturedPostId || config.editorialFeaturedPostId;
   return posts.find(p => p.id === preferred)?.id || posts[Math.min(posts.length - 1, 4)]?.id || '';
+}
+export function journalFeedPlan(config, accountId, posts, includeHighlights = true) {
+  const selection = selectionHelpers.selectionFor(config, accountId), order = selectionHelpers.orderFor(config, accountId);
+  const valid = id => typeof id === 'string' && /^ig_[\w-]{1,100}$/.test(id) && selectionHelpers.isPostVisible(selection, id);
+  const fixed = (!config.journalFeaturedAccountId || String(config.journalFeaturedAccountId) === String(accountId)) && valid(config.journalFeaturedPostId) ? config.journalFeaturedPostId : '';
+  const ordered = order.mode === 'manual' ? order.ids.filter(valid) : [];
+  const highlighted = includeHighlights && config.journalShowHighlights !== false && Array.isArray(config.journalHighlights) ? config.journalHighlights.filter(h => h && h.enabled !== false && String(h.accountId) === String(accountId) && valid(h.postId)).map(h => h.postId) : [];
+  return { primaryId: fixed || ordered[0] || posts[0]?.id || '', requiredIds: [...new Set([fixed, ...ordered, ...highlighted].filter(Boolean))] };
 }
 export function journalHighlights(config, posts) {
   const source = Array.isArray(config.journalHighlights) ? config.journalHighlights :

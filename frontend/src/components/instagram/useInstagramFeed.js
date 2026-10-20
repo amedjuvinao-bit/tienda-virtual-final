@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../lib/api';
-const empty = { connected: false, posts: [], account: null, nextCursor: '', loading: false, error: '', stale: false };
+const empty = { connected: false, posts: [], account: null, nextCursor: '', loading: false, loaded: false, error: '', stale: false };
 export default function useInstagramFeed(enabled, adminPreview = false) {
   const [state, setState] = useState(empty), request = useRef(null), current = useRef(empty);
   current.current = state;
@@ -16,9 +16,9 @@ export default function useInstagramFeed(enabled, adminPreview = false) {
         : await api.get(adminPreview ? '/api/admin/instagram-settings/feed' : '/api/instagram/feed', { params: cursor ? { cursor } : {}, signal: controller.signal, ...(adminPreview ? { timeout: 45000 } : {}) });
       if (controller.signal.aborted) return;
       if (!data || typeof data !== 'object' || typeof data.connected !== 'boolean' || !Array.isArray(data.posts)) throw new Error('INVALID_INSTAGRAM_RESPONSE');
-      setState(s => ({ ...data, posts: more && data.connected && s.account?.id === data.account?.id ? [...new Map([...s.posts, ...(data.posts || [])].map(p => [p.id, p])).values()] : data.posts || [], loading: false, error: '' }));
+      setState(s => ({ ...data, posts: more && data.connected && s.account?.id === data.account?.id ? [...new Map([...s.posts, ...(data.posts || [])].map(p => [p.id, p])).values()] : data.posts || [], loading: false, loaded: true, error: '' }));
     } catch (error) {
-      if (!controller.signal.aborted) setState(s => ({ ...s, loading: false, error: feedError(error, adminPreview) }));
+      if (!controller.signal.aborted) setState(s => ({ ...s, loading: false, loaded: true, error: feedError(error, adminPreview) }));
     } finally { if (request.current === controller) request.current = null; }
   }, [enabled, adminPreview]);
   useEffect(() => {

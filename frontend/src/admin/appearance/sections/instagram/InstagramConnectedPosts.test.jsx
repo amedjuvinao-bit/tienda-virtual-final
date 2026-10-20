@@ -25,6 +25,20 @@ const openHighlights = () => fireEvent.click(within(screen.getByRole('navigation
 const openHighlightPicker = () => fireEvent.click(screen.getByRole('button', { name: 'Elegir publicación de Instagram para el destacado' }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 describe('selección visual de la cuenta conectada', () => {
+  it('ordena publicaciones visibles y marca una principal independiente del orden lateral', async () => {
+    api.get.mockResolvedValue({ data: { connected: true, account, posts: [...records, post('3')], nextCursor: '' } });
+    const { container } = render(<Harness />); openPosts();
+    await screen.findByRole('button', { name: 'Usar como principal: Prenda 1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Usar como principal: Prenda 1' }));
+    fireEvent.change(screen.getByLabelText('Orden de las publicaciones'), { target: { value: 'manual' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Mover antes: Prenda 3' }));
+    const config = JSON.parse(screen.getByLabelText('Borrador guardable').textContent);
+    expect(config).toMatchObject({ journalFeaturedPostId: 'ig_1', journalFeaturedAccountId: '123', journalConnectedOrder: { accountId: '123', mode: 'manual', ids: ['ig_1', 'ig_3', 'ig_2'] } });
+    expect(container.querySelector('.ig-journal__post--featured')).toHaveAttribute('data-post-id', 'ig_1');
+    expect([...container.querySelectorAll('.ig-journal__previews article')].map(el => el.dataset.postId)).toEqual(['ig_3', 'ig_2']);
+    fireEvent.change(screen.getByLabelText('Orden de las publicaciones'), { target: { value: 'instagram' } });
+    expect([...container.querySelectorAll('.ig-journal__previews article')].map(el => el.dataset.postId)).toEqual(['ig_2', 'ig_3']);
+  });
   it('permite renombrar y enlazar los destacados automáticos de la cuenta conectada', async () => {
     api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });
     const { container } = render(<Harness />);
