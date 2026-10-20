@@ -8,6 +8,7 @@ import EmpresaSection from './configuracion/sections/EmpresaSection';
 import PagosSection from './configuracion/sections/PagosSection';
 import EnviosSection from './configuracion/sections/EnviosSection';
 import CorreoSection from './configuracion/sections/CorreoSection';
+import InstagramSettingsSection from './configuracion/sections/InstagramSection';
 import LoginAdminSection from './configuracion/sections/LoginAdminSection';
 import PanelAdminSection from './configuracion/sections/PanelAdminSection';
 import UsuariosSection from './configuracion/sections/UsuariosSection';
@@ -19,6 +20,7 @@ import RespaldosSection from './configuracion/sections/RespaldosSection';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
+  { id: 'instagram', label: 'Instagram', description: 'Cuenta y credenciales privadas de Instagram.' },
   {
     id: 'empresa',
     label: 'Tienda',
@@ -112,6 +114,8 @@ export default function ConfiguracionPage() {
         return <PagosSection />;
       case 'envios':
         return <EnviosSection />;
+      case 'instagram':
+        return <InstagramSettingsSection />;
       case 'correo':
         return <CorreoSection />;
       case 'login-admin':

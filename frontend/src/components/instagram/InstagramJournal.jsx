@@ -8,6 +8,8 @@ import InstagramJournalPost from './InstagramJournalPost';
 import useJournalSaved from './useJournalSaved';
 import { moveJournalGlass, resetJournalGlass } from './journalGlass';
 import JournalLiquidLens from './JournalLiquidLens';
+import JournalLightbox from './JournalLightbox';
+import useInstagramFeed from './useInstagramFeed';
 import './instagramJournal.css';
 import './instagramJournalGlass.css';
 import './instagramJournalLiquid.css';
@@ -16,21 +18,32 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const raw = theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram');
   const section = normalizeInstagramSection(raw);
   const c = section.config;
-  const j = normalizeJournal(c);
-  const posts = journalPosts(Array.isArray(raw?.config?.posts) ? c.posts : fallback, j.journalLimit);
-  const preferred = journalFeaturedId(posts, c);
+  const connectedMode = c.journalSource === 'connected';
+  const feed = useInstagramFeed(section.enabled && connectedMode);
+  const account = connectedMode && feed.connected ? feed.account : null;
+  const resolved = { ...c,
+    ...(account && c.journalUseAccountIdentity !== false ? { profileUser: `@${account.username}`, profileLink: account.url, journalName: account.name } : {}),
+    ...(account && c.journalUseAccountAvatar !== false && account.avatar ? { journalAvatarImage: account.avatar } : {}),
+  };
+  const j = normalizeJournal(resolved);
+  const manualPosts = journalPosts(Array.isArray(raw?.config?.posts) ? c.posts : fallback, j.journalLimit);
+  const posts = connectedMode && feed.connected ? feed.posts : manualPosts;
+  const preferred = connectedMode && feed.connected ? (posts.find(p => p.id === c.journalFeaturedPostId)?.id || posts[0]?.id) : journalFeaturedId(posts, c);
   const main = useRef(null);
   const [selection, setSelection] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
+  const requested = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('ig_post');
   // A changed preferred post in the admin must immediately update the real preview.
-  const featured = posts.find(p => p.id === (selection?.preferred === preferred ? selection.id : preferred)) || posts[0];
+  const featured = posts.find(p => p.id === (selection && selection.preferred === preferred ? selection.id : (!selection && posts.some(p => p.id === requested) ? requested : preferred))) || posts[0];
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [notice, setNotice] = useState('');
-  const user = c.profileUser || '@rosaboutique33';
-  const { ids: saved, toggle } = useJournalSaved(c.profileLink || user);
+  const user = resolved.profileUser || '@rosaboutique33';
+  const { ids: saved, toggle } = useJournalSaved(resolved.profileLink || user);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
-  if (!section.enabled || !featured) return null;
-  const profile = safeInstagramLink(raw?.config?.profileLink === '' ? '' : c.profileLink);
+  if (!section.enabled) return null;
+  if (!featured) return connectedMode ? <section className="ig-journal__connection-state" aria-label="Instagram de la tienda"><p role="status">{feed.loading ? 'Cargando publicaciones de Instagram…' : feed.error || (feed.connected ? 'Pronto compartiremos nuevas publicaciones.' : 'Pronto podrás ver aquí nuestras publicaciones de Instagram.')}</p>{feed.nextCursor && <button type="button" disabled={feed.loading} onClick={feed.loadMore}>{feed.loading ? 'Cargando…' : 'Cargar más publicaciones'}</button>}{feed.error && <button type="button" onClick={feed.retry}>Volver a intentar</button>}</section> : null;
+  const profile = safeInstagramLink(account && c.journalUseAccountIdentity !== false ? account.url : raw?.config?.profileLink === '' ? '' : c.profileLink);
   const highlights = journalHighlights(c, posts);
   const filterPosts = posts.filter(p => filter === 'reels' ? p.kind === 'reel' : filter === 'saved' ? saved.includes(p.id) : true);
   const others = filterPosts.filter(p => p.id !== featured.id);
@@ -44,14 +57,17 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   };
   const setView = value => { setFilter(value); setPage(0); };
   async function share(post, copy = false) {
-    const url = safeInstagramLink(post.link);
-    if (!url) return;
+    let url = safeInstagramLink(post.link);
+    if (!url) {
+      const local = new URL(window.location.origin + window.location.pathname);
+      local.searchParams.set('ig_post', post.id); local.hash = 'instagram'; url = local.href;
+    }
     try {
       if (!copy && typeof navigator.share === 'function') await navigator.share({ title: post.alt || j.journalName, url });
       else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url); setNotice('Enlace copiado.'); }
-      else setNotice('Abre la publicación en Instagram para compartir su enlace.');
+      else setNotice(`Copia este enlace para compartir: ${url}`);
     } catch (error) {
-      if (error?.name !== 'AbortError') setNotice('No se pudo compartir. Abre la publicación en Instagram e inténtalo allí.');
+      if (error?.name !== 'AbortError') setNotice('No se pudo compartir. Usa Copiar enlace en las opciones de la foto.');
     }
   }
   let background = j.journalBackgroundMode === 'included' ? '/instagram/journal-satin.webp' : j.journalBackgroundImage;
@@ -61,7 +77,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   }
   if (j.journalBackgroundMode === 'color') background = '';
   if (j.journalBackgroundMode === 'global') { background = ''; color = theme?.colors?.background || '#fff'; }
-  const common = { settings: j, user, onSave: id => setNotice(toggle(id)), onShare: share, onSelect: select };
+  const common = { settings: j, user, onSave: id => setNotice(toggle(id)), onShare: share, onSelect: select, onExpand: setLightbox };
   return <section className="ig-journal" aria-label="Instagram de la tienda" data-glass={j.journalGlassEnabled ? 'true' : 'false'} data-finish={j.journalGlassFinish} style={{
     '--igj-background': color, '--igj-backdrop': background ? `url(${JSON.stringify(background)})` : 'none',
     '--igj-mobile-backdrop': j.journalMobileBackgroundImage ? `url(${JSON.stringify(j.journalMobileBackgroundImage)})` : background ? `url(${JSON.stringify(background)})` : 'none',
@@ -93,10 +109,17 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
           {j.journalShowHighlights && highlights.length > 0 && <div className="ig-journal__highlights" aria-label="Destacados de Instagram">{highlights.map(h => <button type="button" key={h.id} onClick={() => select(h.postId)} aria-pressed={featured.id === h.postId} aria-label={`Destacado ${h.title}`}><span><img src={h.image} alt="" loading="lazy" /></span><strong>{h.title}</strong></button>)}</div>}
           {j.journalShowFilters && <div className="ig-journal__filters" role="group" aria-label="Filtrar publicaciones">{[['all', 'Todas'], ['reels', 'Reels'], ['saved', 'Guardadas']].map(([value, label]) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setView(value)}>{label}</button>)}</div>}
           <div className="ig-journal__previews">{shown.map(post => <InstagramJournalPost key={post.id} post={post} compact saved={saved.includes(post.id)} {...common} />)}</div>
-          {!shown.length && <p className="ig-journal__empty">{filterPosts.some(p => p.id === featured.id) ? 'Esta publicación ya está abierta en grande.' : filter === 'saved' ? 'Guarda publicaciones con el marcador para encontrarlas aquí.' : filter === 'reels' ? 'Todavía no hay reels en esta selección.' : 'Pronto compartiremos más momentos.'}</p>}
+          {!shown.length && <p className="ig-journal__empty">{filterPosts.some(p => p.id === featured.id) ? 'Esta publicación ya está abierta en grande.' : filter === 'saved' ? 'Guarda publicaciones con el marcador para encontrarlas aquí.' : filter === 'reels' ? (feed.nextCursor ? 'No hay reels entre las publicaciones cargadas. Puedes cargar más.' : 'Todavía no hay reels en esta selección.') : 'Pronto compartiremos más momentos.'}</p>}
           {maxPage > 0 && <nav className="ig-journal__pagination" aria-label="Más publicaciones de Instagram"><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} aria-label="Publicaciones anteriores"><ChevronLeft size={18} /></button><span>{currentPage + 1} / {maxPage + 1}</span><button type="button" disabled={currentPage === maxPage} onClick={() => setPage(currentPage + 1)} aria-label="Siguientes publicaciones"><ChevronRight size={18} /></button></nav>}
         </aside>}
       </div>
+      {connectedMode && <div className="ig-journal__feed-status">
+        {account && c.journalShowAccountStats === true && <p>{account.followers.toLocaleString('es')} seguidores · {account.mediaCount.toLocaleString('es')} publicaciones</p>}
+        {feed.nextCursor && <button type="button" disabled={feed.loading} onClick={feed.loadMore}>{feed.loading ? 'Cargando…' : 'Cargar más publicaciones'}</button>}
+        {feed.error && <><p role="status">{feed.error}{!feed.connected && manualPosts.length ? ' Mostramos nuestra selección guardada.' : ''}</p><button type="button" disabled={feed.loading} onClick={feed.retry}>Volver a intentar</button></>}
+        {feed.stale && <p>Mostramos las últimas publicaciones guardadas mientras se restablece la conexión.</p>}
+      </div>}
+      {lightbox && <JournalLightbox key={lightbox.id} post={lightbox} onClose={() => setLightbox(null)} />}
       {j.journalShowSubtitle && j.journalSubtitle && <p className="ig-journal__subtitle">{j.journalSubtitle}</p>}
       <div className="ig-journal__notice" role="status" aria-live="polite">{notice}</div>
     </div>

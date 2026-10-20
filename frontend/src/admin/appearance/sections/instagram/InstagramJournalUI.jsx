@@ -75,14 +75,21 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
     patch('posts', next); setActive(index + delta);
   }
   return <div className="space-y-4">
-    <p className="text-sm text-neutral-600">Diario social · Fotos y enlaces administrados desde aquí. Cada publicación conserva su enlace de Instagram; las guardadas se almacenan en el navegador del visitante.</p>
+    <p className="text-sm text-neutral-600">Diario social · Elige fotos manuales o la cuenta conectada desde Ajustes → Instagram. Cada publicación conserva su enlace de Instagram; las guardadas se almacenan en el navegador del visitante.</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <SectionEditorSteps value={step} onChange={setStep} sectionName="Instagram" items={[{ value: 'content', label: 'Contenido', hint: 'Edita un elemento a la vez.' }, { value: 'design', label: 'Diseño', hint: 'Ajusta un grupo y comprueba la vista previa.' }]} />
     <div hidden={step !== 'content'} data-editor-step="content">
       <SectionEditorCardTabs label="Contenido de Instagram" labels={['Perfil', 'Textos', 'Publicaciones', 'Destacados']}>
         <div className={box}>
           <SectionEditorSubgroups label="Editar perfil" labels={['Cuenta', 'Identidad']}>
-            <div className="space-y-3"><Text label="Usuario de Instagram" value={c.profileUser || ''} placeholder="@rosaboutique33" onChange={v => patch('profileUser', v)} /><Text label="Enlace del perfil" value={c.profileLink} placeholder="https://instagram.com/tuusuario" onChange={v => patch('profileLink', v)} />
+            <div className="space-y-3">
+              <Select label="Origen de las publicaciones" value={c.journalSource || 'manual'} options={[["manual", "Fotos y enlaces manuales"], ["connected", "Cuenta de Instagram conectada"]]} onChange={v => patch('journalSource', v)} />
+              {c.journalSource === 'connected' && <div className="rounded-lg bg-rose-50 p-3 text-sm space-y-2"><p>Conecta y actualiza la cuenta en <a className="underline" href="/admin/configuracion/instagram">Ajustes → Instagram</a>. Se podrán recorrer las publicaciones disponibles; las fotos manuales sirven como respaldo si la conexión falla.</p>
+                <Check label="Usar nombre y usuario de la cuenta conectada" value={c.journalUseAccountIdentity !== false} onChange={v => patch('journalUseAccountIdentity', v)} />
+                <Check label="Usar foto de perfil de Instagram" value={c.journalUseAccountAvatar !== false} onChange={v => patch('journalUseAccountAvatar', v)} />
+                <Check label="Mostrar cantidad de seguidores y publicaciones" value={c.journalShowAccountStats === true} onChange={v => patch('journalShowAccountStats', v)} />
+              </div>}
+              <Text label="Usuario de Instagram" value={c.profileUser || ''} placeholder="@rosaboutique33" onChange={v => patch('profileUser', v)} /><Text label="Enlace del perfil" value={c.profileLink} placeholder="https://instagram.com/tuusuario" onChange={v => patch('profileLink', v)} />
               {c.profileLink && !safeInstagramLink(c.profileLink) && <p role="alert">Escribe un enlace completo que empiece por https://.</p>}
               <Check label="Mostrar sección en la tienda" value={section.enabled !== false} onChange={v => mutate(s => ({ ...s, enabled: v }))} /></div>
             <div className="space-y-3">{text('Nombre de la tienda en publicaciones', 'journalName')}{text('Iniciales del avatar', 'journalMonogram')}{image('Avatar de la cuenta', 'journalAvatarImage', j.journalAvatarImage)}</div>
