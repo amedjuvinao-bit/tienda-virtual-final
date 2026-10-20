@@ -302,6 +302,7 @@ export default function App() {
                     <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/instagram" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/tiktok" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/correo" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/login-admin" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/panel-admin" element={protectAdminContent(<ConfiguracionPage />)} />

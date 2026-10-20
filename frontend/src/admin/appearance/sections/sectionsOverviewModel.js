@@ -1,6 +1,7 @@
 import { isStorefrontSectionVisible } from '../../../lib/storefrontSectionVisibility';
 import { CATEGORIAS_SECTION_DEFAULTS } from './categorias/categoriasSectionHelpers';
 import { INFO_SECTION_DEFAULTS } from './info/infoSectionHelpers';
+import { stagePosts } from './tiktok/tiktokStageHelpers';
 
 export const SECTION_LABELS = {
   tendencia: 'En tendencia',
@@ -31,9 +32,9 @@ export function getSectionOverview(section, sections) {
     const total = count(slides, (slide) => slide?.enabled !== false);
     detail = `${total} ${total === 1 ? 'categoría activa' : 'categorías activas'}`;
   } else if (id === 'instagram' || id === 'tiktok') {
-    const total = count(config.posts, (post) => post?.enabled !== false &&
+    const total = id === 'tiktok' && config.stageLayout !== 'legacy' ? stagePosts(config.posts).length : count(config.posts, (post) => post?.enabled !== false &&
       (id === 'instagram' ? post?.image : post?.image || post?.thumb));
-    detail = id === 'instagram' && config.journalSource === 'connected'
+    detail = (id === 'instagram' && config.journalSource === 'connected' || id === 'tiktok' && config.stageSource === 'connected')
       ? 'Publicaciones de la cuenta conectada' : `${total} ${total === 1 ? 'publicación lista' : 'publicaciones listas'}`;
   } else if (id === 'informacion') {
     const cards = Array.isArray(config.cards) ? config.cards : INFO_SECTION_DEFAULTS.config.cards;

@@ -1,3 +1,4 @@
+import TiktokStageUI from './TiktokStageUI';
 // src/admin/appearance/sections/tiktok/TiktokSectionUI.jsx
 
 import React, { useMemo, useState } from "react";
@@ -278,7 +279,7 @@ function getBigLogoPreviewStyle(config) {
   }
 }
 
-export default function TiktokSectionUI({
+function LegacyTiktokSectionUI({
   theme,
   setPath,
   uploadToCloudinary,
@@ -1644,4 +1645,9 @@ export default function TiktokSectionUI({
       </div>    
     </div>
   );
+}
+
+export default function TiktokSectionUI(props) {
+  const config = props.theme?.sections?.find(s => s.id === 'tiktok' || s.type === 'tiktok')?.config;
+  return config?.stageLayout === 'legacy' ? <LegacyTiktokSectionUI {...props}/> : <TiktokStageUI {...props}/>;
 }

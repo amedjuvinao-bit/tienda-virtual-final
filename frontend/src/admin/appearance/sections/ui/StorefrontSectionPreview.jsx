@@ -58,7 +58,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
     if (!viewport) return undefined;
 
     const measure = () => {
-      const device = previewDevice(['tendencia', 'complementos', 'categorias', 'instagram'].includes(section.id) ? viewMode : 'auto');
+      const device = previewDevice(['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok'].includes(section.id) ? viewMode : 'auto');
       const availableWidth = viewport.clientWidth || device.width;
       const scale = Math.min(1, availableWidth / device.width);
       const height = Math.ceil(Math.max(260, canvas?.scrollHeight || 0) * scale);
@@ -108,13 +108,14 @@ export default function StorefrontSectionPreview({ section, theme }) {
     <section className="section-real-preview" aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
         <div><span className="section-real-preview__eyebrow">Vista previa · {frame.label} {frame.width} px</span><h3>Así se verá en la tienda</h3></div>
-        {['tendencia', 'complementos', 'categorias', 'instagram'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
-          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio'], ...(['categorias', 'instagram'].includes(section.id) ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
+        {['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
+          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio'], ...(['categorias', 'instagram', 'tiktok'].includes(section.id) ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
             <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)}>{label}</button>)}
         </div>}
       </header>
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
       <div ref={viewportRef} className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
+        if (section.id === 'tiktok' && event.target.closest('.tk-stage button, .tk-stage input')) return;
         if (section.id === 'instagram' && event.target.closest('.ig-journal button, .ig-journal__connection-state button')) return;
         if (section.id === 'look' && event.target.closest('.look-editorial__card-image, .look-editorial__hero-controls button, .look-editorial__rail-controls button')) return;
         if (section.id === 'tendencia' && event.target.closest('.trending-runway__select, .trending-runway__hint, .trending-runway__pagination button')) return;

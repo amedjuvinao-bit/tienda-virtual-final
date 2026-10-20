@@ -41,6 +41,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'configuracion/pagos': ['settings:payments'],
   'configuracion/envios': ['settings:shipping'],
   'configuracion/instagram': ['settings:instagram'],
+  'configuracion/tiktok': ['settings:tiktok'],
   'configuracion/correo': ['settings:mail'],
   'configuracion/login-admin': ['settings:login'],
   'configuracion/panel-admin': ['settings:panel'],

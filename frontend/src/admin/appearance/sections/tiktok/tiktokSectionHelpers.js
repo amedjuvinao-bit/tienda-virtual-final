@@ -627,6 +627,7 @@ export function normalizeTiktokSection(section) {
 
       posts: Array.isArray(cfg.posts)
         ? cfg.posts.map((p, i) => ({
+            ...p,
             id: p?.id || `post_${i + 1}`,
             image: p?.image || p?.thumb || "",
             thumb: p?.thumb || p?.image || "",

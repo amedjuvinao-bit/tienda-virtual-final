@@ -1,4 +1,5 @@
 import { CATEGORIAS_SECTION_DEFAULTS } from '../admin/appearance/sections/categorias/categoriasSectionHelpers';
+import { stagePosts } from '../admin/appearance/sections/tiktok/tiktokStageHelpers';
 
 const hasProduct = (value) => Boolean(
   String(typeof value === 'string' ? value : value?.productId || '').trim()
@@ -30,6 +31,8 @@ export function isStorefrontSectionVisible(theme, id) {
 
   if (id === 'instagram' || id === 'tiktok') {
     if (id === 'instagram' && config.journalSource === 'connected') return true;
+    if (id === 'tiktok' && config.stageSource === 'connected') return true;
+    if (id === 'tiktok' && config.stageLayout !== 'legacy') return stagePosts(config.posts).length > 0;
     return Array.isArray(config.posts) && config.posts.some((post) =>
       post?.enabled !== false && (id === 'instagram' ? post?.image : post?.image || post?.thumb)
     );

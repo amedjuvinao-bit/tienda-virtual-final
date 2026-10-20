@@ -8,6 +8,7 @@ import EmpresaSection from './configuracion/sections/EmpresaSection';
 import PagosSection from './configuracion/sections/PagosSection';
 import EnviosSection from './configuracion/sections/EnviosSection';
 import CorreoSection from './configuracion/sections/CorreoSection';
+import TiktokSettingsSection from './configuracion/sections/TiktokSection';
 import InstagramSettingsSection from './configuracion/sections/InstagramSection';
 import LoginAdminSection from './configuracion/sections/LoginAdminSection';
 import PanelAdminSection from './configuracion/sections/PanelAdminSection';
@@ -20,6 +21,7 @@ import RespaldosSection from './configuracion/sections/RespaldosSection';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
+  { id: 'tiktok', label: 'TikTok', description: 'Cuenta y credenciales privadas de TikTok.' },
   { id: 'instagram', label: 'Instagram', description: 'Cuenta y credenciales privadas de Instagram.' },
   {
     id: 'empresa',
@@ -114,6 +116,8 @@ export default function ConfiguracionPage() {
         return <PagosSection />;
       case 'envios':
         return <EnviosSection />;
+      case 'tiktok':
+        return <TiktokSettingsSection />;
       case 'instagram':
         return <InstagramSettingsSection />;
       case 'correo':

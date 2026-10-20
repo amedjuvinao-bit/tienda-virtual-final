@@ -16,6 +16,12 @@ const {
 const { requiredUserWritePermissions } = require('./adminUserWritePolicy');
 
 const ADMIN_ROUTE_PERMISSION_RULES = [
+  { method: 'GET', path: '/api/admin/tiktok-settings/feed', permission: 'appearance:view', description: 'Consultar publicaciones desde Apariencia.' },
+  { method: 'POST', path: '/api/admin/tiktok-settings/refresh-feed', permission: 'appearance:view', description: 'Actualizar publicaciones desde Apariencia.' },
+  { method: 'GET', path: '/api/tiktok/admin/feed', permission: 'appearance:view', description: 'Consultar publicaciones para la selección de Apariencia.' },
+  { method: 'POST', path: '/api/tiktok/admin/refresh', permission: 'appearance:view', description: 'Actualizar publicaciones para la selección de Apariencia.' },
+  ...['GET', 'PUT'].map(method => ({ method, path: '/api/admin/tiktok-settings', permission: 'settings:tiktok', audit: method !== 'GET', danger: method !== 'GET', description: 'Administrar la conexión privada de TikTok.' })),
+  ...['authorize', 'sync', 'disconnect'].map(action => ({ method: 'POST', path: `/api/admin/tiktok-settings/${action}`, permission: 'settings:tiktok', audit: true, danger: true, description: 'Gestionar la cuenta conectada de TikTok.' })),
   { method: 'GET', path: '/api/admin/instagram-settings/feed', permission: 'appearance:view', description: 'Consultar publicaciones desde Apariencia.' },
   { method: 'POST', path: '/api/admin/instagram-settings/refresh-feed', permission: 'appearance:view', description: 'Actualizar publicaciones desde Apariencia.' },
   { method: 'GET', path: '/api/instagram/admin/feed', permission: 'appearance:view', description: 'Consultar publicaciones para la selección de Apariencia.' },

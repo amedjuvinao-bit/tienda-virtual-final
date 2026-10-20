@@ -1,4 +1,5 @@
 // src/components/TiktokSection.jsx
+import TiktokStage from './tiktok/TiktokStage';
 import React, { useMemo, useState } from "react";
 import { Music2 } from "lucide-react";
 import { normalizeTiktokSection } from "../admin/appearance/sections/tiktok/tiktokSectionHelpers";
@@ -447,7 +448,7 @@ function TikTokThumbnail({
   );
 }
 
-export default function TiktokSection({ theme, posts = [] }) {
+function LegacyTiktokSection({ theme, posts = [] }) {
   const [hoveredId, setHoveredId] = useState(null);
   const [mobileActiveId, setMobileActiveId] = useState(null);
 
@@ -942,4 +943,8 @@ export default function TiktokSection({ theme, posts = [] }) {
       </div>
     </section>
   );
+}
+export default function TiktokSection(props) {
+  const config = props.theme?.sections?.find(s => s.id === 'tiktok' || s.type === 'tiktok')?.config;
+  return config?.stageLayout === 'legacy' ? <LegacyTiktokSection {...props}/> : <TiktokStage {...props}/>;
 }

@@ -16,6 +16,7 @@ import SectionEditorSteps from './ui/SectionEditorSteps';
 import SectionEditorCardTabs from './ui/SectionEditorCardTabs';
 import SectionEditorPostPicker from './ui/SectionEditorPostPicker';
 import StorefrontSectionPreview from './ui/StorefrontSectionPreview';
+import { TiktokEditorFeedProvider } from '../../../components/tiktok/TiktokEditorFeed';
 import { InstagramEditorFeedProvider } from '../../../components/instagram/InstagramEditorFeed';
 import { normalizeTrendingPresentation } from '../../../components/trendingPresentation';
 import boutiqueBackdrop from '../../../assets/trending-vitrine-boutique.webp';
@@ -2150,6 +2151,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
       {selected ? (
       <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
         <InstagramEditorFeedProvider enabled={isInstagramSection}>
+        <TiktokEditorFeedProvider enabled={isTiktokSection}>
         <div className="section-editor-layout">
         <div className="section-editor-layout__form">
         {isLookSection ? (
@@ -2265,6 +2267,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
           <StorefrontSectionPreview section={selected} theme={{ ...theme, sections }} />
         </aside>
         </div>
+        </TiktokEditorFeedProvider>
         </InstagramEditorFeedProvider>
       </ModalShell>
       ) : null}
