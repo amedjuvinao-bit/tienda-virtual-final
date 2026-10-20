@@ -17,6 +17,10 @@ El diseño de tres columnas muestra identidad y textos, un video vertical princi
 
 No se puede completar una autorización real sin la app y el consentimiento de su titular. Las pruebas del repositorio simulan las respuestas oficiales; no usan cuentas ni secretos reales.
 
+### Páginas públicas para Sandbox
+
+El formulario de TikTok Sandbox también solicita términos, privacidad y la plataforma de la app. La documentación pública de desarrollo se mantiene en `docs/legal-sandbox/` y se genera con `node scripts/buildLegalSandbox.cjs` en `frontend/public/legal/`. La rama `gh-pages` publica únicamente esos documentos; activar la fuente en GitHub Pages y verificar sus respuestas HTTP es un paso distinto de publicar los archivos con Git. Véase [preparación y publicación de las páginas legales](../../docs/legal-sandbox/README.md). Las páginas de desarrollo se revisarán e integrarán con el dominio y la administración definitivos antes del uso comercial.
+
 ## Rutas, almacenamiento y reproducción
 
 `/api/admin/tiktok-settings` (GET/PUT) y sus acciones `/authorize`, `/qr`, `/qr/check`, `/qr/cancel`, `/sync`, `/disconnect` requieren `settings:tiktok`. El sondeo QR tiene un límite separado de 30 peticiones por minuto para no agotar las acciones de configuración. GET `/feed` y POST `/refresh-feed` en ese montaje requieren `appearance:view` y nunca entregan credenciales. `/api/tiktok/feed` solo entrega videos aprobados por la apariencia publicada; filtra después de leer la caché. El arranque valida que el montaje de medios esté completo.

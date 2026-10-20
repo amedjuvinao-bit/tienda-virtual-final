@@ -1,0 +1,132 @@
+{
+  "terms": {
+    "file": "terminos.html",
+    "title": "Términos del servicio",
+    "summary": "Condiciones del entorno de desarrollo y de la conexión voluntaria de una cuenta de TikTok.",
+    "sections": [
+      {
+        "title": "1. Identidad y alcance",
+        "paragraphs": [
+          "Este documento regula el uso del entorno de desarrollo del proyecto identificado en esta página. Su finalidad es probar un catálogo de tienda virtual y la integración de perfil y videos públicos de una cuenta de TikTok autorizada por su titular.",
+          "Estas páginas públicas son informativas: no permiten realizar compras, recibir pagos ni introducir credenciales. Las condiciones de venta de la futura tienda se publicarán con su puesta en funcionamiento comercial."
+        ]
+      },
+      {
+        "title": "2. Participación en las pruebas",
+        "paragraphs": [
+          "Las pruebas de conexión se realizan con cuentas que el administrador esté autorizado a usar y con los permisos que TikTok habilite para la app. El acceso al panel requiere una cuenta administrativa autorizada.",
+          "Al participar en las pruebas, utiliza información de prueba en los formularios del catálogo, pedidos o pagos. La autorización de TikTok debe realizarse con una cuenta propia o gestionada con permiso de su titular."
+        ]
+      },
+      {
+        "title": "3. Qué permite la conexión de TikTok",
+        "paragraphs": [
+          "La conexión utiliza Login Kit y Display API para obtener la identidad básica del perfil y consultar sus videos públicos. Los permisos solicitados son user.info.basic y video.list.",
+          "El administrador puede decidir qué publicaciones se muestran en la tienda, su orden y el video principal. Esta selección solo modifica la presentación del proyecto; no edita ni elimina publicaciones de TikTok."
+        ],
+        "items": [
+          "La autorización se realiza en TikTok, mediante QR o la alternativa web configurada. El panel no solicita la contraseña personal de TikTok.",
+          "La integración no solicita permisos para publicar videos, acceder a mensajes privados ni modificar la cuenta.",
+          "Los videos se reproducen mediante el reproductor oficial y conservan un enlace a la publicación original."
+        ]
+      },
+      {
+        "title": "4. Control de acceso y desconexión",
+        "paragraphs": [
+          "El administrador puede cancelar un QR pendiente o desconectar la cuenta desde Configuración → TikTok. Desconectar retira los tokens, la identidad conectada y las páginas de caché de esa conexión en la instalación activa; el servidor también intenta revocar el acceso en TikTok.",
+          "El titular puede retirar el permiso desde los controles de aplicaciones autorizadas de TikTok. Las publicaciones que se hayan añadido manualmente al proyecto deben gestionarse por separado desde Apariencia."
+        ]
+      },
+      {
+        "title": "5. Contenido y uso permitido",
+        "paragraphs": [
+          "Los nombres, marcas, fotografías, videos y demás contenidos conservan los derechos de sus respectivos titulares. Vincular una cuenta no transfiere la propiedad de su contenido al proyecto.",
+          "Solo se debe mostrar contenido para el que se disponga de autorización. No se permite intentar acceder a cuentas ajenas, eludir permisos, alterar el reproductor para ocultar la autoría ni utilizar las pruebas para actividades ilícitas."
+        ]
+      },
+      {
+        "title": "6. Disponibilidad y servicios externos",
+        "paragraphs": [
+          "El entorno está en desarrollo y puede cambiar o quedar fuera de servicio durante ajustes. La disponibilidad de los datos, videos y permisos depende también de TikTok y de la autorización de la cuenta.",
+          "El proyecto es independiente de TikTok y GitHub; no se presenta como un servicio oficial, patrocinado o avalado por esas plataformas. El uso de los servicios externos se rige además por sus propias condiciones."
+        ]
+      },
+      {
+        "title": "7. Privacidad, consultas y actualizaciones",
+        "paragraphs": [
+          "La política de privacidad enlazada en esta página describe los datos tratados, sus finalidades, conservación y controles. Las consultas sobre el entorno de pruebas se atienden por el canal de contacto indicado al final del documento.",
+          "Los cambios se publicarán con una fecha de actualización. Antes de usar la integración de forma comercial, se revisarán los datos del responsable, las condiciones del negocio y la configuración de producción correspondiente."
+        ]
+      }
+    ]
+  },
+  "privacy": {
+    "file": "privacidad.html",
+    "title": "Política de privacidad",
+    "summary": "Qué datos utiliza la integración de TikTok, para qué se usan y cómo controlar la autorización.",
+    "sections": [
+      {
+        "title": "1. Responsable y ámbito de esta política",
+        "paragraphs": [
+          "Esta política describe el tratamiento de datos en el entorno de desarrollo del proyecto identificado en esta página y en su integración de TikTok. La administración de ese entorno y su canal de contacto se identifican al final del documento.",
+          "El sitio público de documentación no contiene formularios de registro, compra o pago. La aplicación principal se encuentra en desarrollo; en los formularios de prueba se debe utilizar información ficticia y evitar datos financieros reales."
+        ]
+      },
+      {
+        "title": "2. Datos obtenidos al conectar TikTok",
+        "paragraphs": [
+          "Solo se consulta información de una cuenta después de que su titular autorice el acceso y TikTok conceda los permisos de perfil básico y videos públicos."
+        ],
+        "items": [
+          "Perfil básico: identificador de la cuenta, nombre mostrado y URL de la foto de perfil. El nombre de usuario y el enlace de perfil también pueden deducirse de los enlaces públicos de sus videos.",
+          "Videos públicos: identificador, título, descripción, portada, enlace original, duración y fecha de publicación que entregue la API.",
+          "Conexión: tokens de acceso y renovación, permisos concedidos, fechas de caducidad y sincronización. Client Secret y los tokens se cifran antes de guardarse en el backend.",
+          "Preferencias del administrador: publicaciones seleccionadas u ocultas, orden, principal y ajustes de presentación."
+        ]
+      },
+      {
+        "title": "3. Finalidades y autorización",
+        "paragraphs": [
+          "Los datos permiten comprobar la conexión, mostrar el perfil y las publicaciones elegidas, reproducir videos con el reproductor oficial y renovar el acceso mientras el permiso permanezca vigente.",
+          "La autorización de la cuenta se gestiona en TikTok. La integración no solicita la contraseña de TikTok ni permisos de mensajes privados o publicación de contenido. Los datos de esta integración no se utilizan para vender bases de datos, crear perfiles publicitarios ni entrenar modelos de inteligencia artificial."
+        ]
+      },
+      {
+        "title": "4. Datos visibles y servicios que intervienen",
+        "paragraphs": [
+          "La sección de la tienda puede mostrar el nombre y la foto del perfil conectado, así como los metadatos públicos de las publicaciones aprobadas por el administrador. Los tokens y secretos no se envían en el feed público.",
+          "El backend consulta las API oficiales de TikTok. Al cargar portadas o abrir el reproductor, el navegador puede contactar los servidores de TikTok y sus proveedores de contenido, que pueden recibir información técnica de la conexión y aplicar sus propias políticas.",
+          "GitHub Pages aloja estas páginas informativas y puede registrar direcciones IP por seguridad conforme a la política de GitHub. Estas páginas no incorporan analítica ni scripts de seguimiento propios. El enlace de contacto abre WhatsApp solo cuando el visitante decide utilizarlo."
+        ]
+      },
+      {
+        "title": "5. Conservación y seguridad",
+        "paragraphs": [
+          "Los tokens se mantienen en el backend de la instalación para conservar la conexión hasta su desconexión, caducidad o revocación. El acceso administrativo está protegido por los controles de autenticación y permisos de la aplicación.",
+          "Las respuestas de videos de TikTok se almacenan temporalmente: se consideran frescas durante una hora y no se reutilizan más allá de cinco horas. El almacenamiento incorpora una caducidad de cinco horas; su eliminación física depende del proceso de limpieza de la base de datos.",
+          "Los flujos QR pendientes dejan de ser válidos como máximo a los diez minutos en la aplicación, o antes si TikTok los caduca, se cancelan o son sustituidos. Su contenido sensible se guarda cifrado; al cancelar, completar o detectar el vencimiento se retira de la sesión pendiente.",
+          "Las selecciones e imágenes añadidas manualmente al diseño se administran de forma independiente y pueden conservarse hasta que el administrador las retire. Si existen copias de seguridad de la instalación, deben gestionarse también al tramitar una solicitud de supresión."
+        ]
+      },
+      {
+        "title": "6. Desconectar, retirar el permiso o solicitar eliminación",
+        "items": [
+          "En el panel: Configuración → TikTok → Desconectar. Esta acción retira los tokens, el perfil conectado y las páginas de caché de esa conexión en la instalación activa.",
+          "En TikTok: retirar el acceso del proyecto desde las opciones de aplicaciones autorizadas de la cuenta. La integración dejará de poder consultar nuevos datos cuando TikTok invalide ese permiso.",
+          "Para datos guardados manualmente o consultas sobre copias de seguridad: contactar la administración por el canal indicado en esta página."
+        ],
+        "paragraphs": [
+          "Puedes solicitar información sobre tus datos, su corrección, la retirada de la autorización y su supresión cuando corresponda. La administración comprobará la identidad y el alcance de la solicitud por un medio adecuado. No envíes contraseñas, tokens, códigos de acceso ni documentos sensibles para iniciar una consulta.",
+          "Retirar el permiso no elimina publicaciones de la propia red social. Las publicaciones e imágenes que se hayan incorporado manualmente deben retirarse también de la configuración del diseño si se solicita su eliminación del proyecto."
+        ]
+      },
+      {
+        "title": "7. Uso de prueba y futuras actualizaciones",
+        "paragraphs": [
+          "La conexión de prueba está dirigida a titulares o administradores autorizados de las cuentas incluidas en el entorno de TikTok. No está diseñada para recopilar datos de menores ni información sensible como parte de estas pruebas.",
+          "La política se revisará al cambiar las funciones, los proveedores o el entorno de publicación. Antes de la operación comercial se completarán y revisarán la identificación del responsable, los canales de atención y las condiciones aplicables al negocio. La fecha de la versión vigente figura al inicio de cada documento."
+        ]
+      }
+    ]
+  }
+}
