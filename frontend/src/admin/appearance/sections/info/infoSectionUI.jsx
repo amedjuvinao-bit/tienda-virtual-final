@@ -1,752 +1,139 @@
-// src/admin/appearance/sections/info/infoSectionUI.jsx
+import React, { useMemo, useRef, useState } from 'react';
+import { Field as BaseField, Input } from '../ui/UiComponents';
+import { ColorField } from '../ui/SectionsPanelUI';
+import SectionEditorSteps from '../ui/SectionEditorSteps';
+import SectionEditorCardTabs from '../ui/SectionEditorCardTabs';
+import { normalizeInfoSection, isInfoSection, INFO_FONT_OPTIONS, INFO_ICON_OPTIONS, INFO_ANIMATION_OPTIONS } from './infoSectionHelpers';
+import { normalizeInfoGlass, infoGlassCard, INFO_GLASS_DEFAULTS, safeInfoHref, safeInfoImage } from './infoGlassHelpers';
 
-import React, { useMemo, useState } from "react";
-import { Field, Input, Toggle } from "../ui/UiComponents";
-import { ColorField } from "../ui/SectionsPanelUI";
-import SectionEditorSteps from "../ui/SectionEditorSteps";
-import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
-import {
-  normalizeInfoSection,
-  INFO_SECTION_ID,
-  INFO_GRADIENT_OPTIONS,
-  INFO_ICON_OPTIONS,
-  INFO_FONT_OPTIONS,
-  INFO_ANIMATION_OPTIONS,
-  clampNumber,
-  isInfoSection,
-} from "./infoSectionHelpers";
-
-function PanelCard({ title, subtitle, children, right }) {
-  return (
-    <div className="rounded-3xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-neutral-100 bg-gradient-to-r from-white to-neutral-50">
-        <div>
-          <h3 className="text-sm font-semibold text-neutral-900">{title}</h3>
-          {subtitle ? <p className="text-xs text-neutral-500 mt-1">{subtitle}</p> : null}
-        </div>
-        {right}
-      </div>
-      <div className="p-5">{children}</div>
-    </div>
-  );
+function Toggle({ checked, onChange, 'aria-label': label }) {
+  return <button type="button" role="switch" aria-label={label} aria-checked={!!checked} onClick={()=>onChange?.(!checked)} className={'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition '+(checked?'bg-emerald-500 border-emerald-500':'bg-neutral-200 border-neutral-300')}><span className={'h-4 w-4 rounded-full bg-white shadow transition-transform '+(checked?'translate-x-5':'translate-x-1')}/></button>;
 }
-
-function MiniStat({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-[11px] uppercase tracking-wide text-neutral-500">{label}</div>
-      <div className="text-sm font-semibold text-neutral-900 mt-1">{value}</div>
-    </div>
-  );
+function Field({ label, children }) {
+  return <BaseField label={label}>{React.isValidElement(children) ? React.cloneElement(children, { 'aria-label': label }) : children}</BaseField>;
 }
-
-function FontSelect({ value, onChange }) {
-  return (
-    <select
-      className="w-full rounded-2xl border border-neutral-300 px-3 py-2.5 text-sm bg-white"
-      value={value || ""}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {INFO_FONT_OPTIONS.map((font) => (
-        <option key={font.label} value={font.value}>
-          {font.label}
-        </option>
-      ))}
-    </select>
-  );
+const panel = 'rounded-2xl border border-rose-100 bg-white/65 p-4 space-y-4';
+const button = 'min-h-11 rounded-xl border border-rose-200 px-3 py-2 text-sm disabled:opacity-40';
+function Select({ value, onChange, options, label, ...props }) {
+  return <select {...props} aria-label={label || props['aria-label']} className="w-full min-h-11 rounded-xl border border-rose-200 bg-white/70 px-3 text-sm" value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>;
 }
-
-function SelectField({ value, onChange, options }) {
-  return (
-    <select
-      className="w-full rounded-2xl border border-neutral-300 px-3 py-2.5 text-sm bg-white"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  );
+function Text({ value, onChange, rows = 3, ...props }) {
+  return <textarea {...props} className="w-full rounded-xl border border-rose-200 bg-white/70 p-3 text-sm" value={value ?? ''} onChange={e => onChange(e.target.value)} rows={rows} />;
 }
-
-function TextAreaField({ value, onChange, rows = 4, placeholder = "" }) {
-  return (
-    <textarea
-      rows={rows}
-      className="w-full rounded-2xl border border-neutral-300 px-3 py-2.5 text-sm bg-white resize-y min-h-[120px]"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-    />
-  );
-}
-
+const options = pairs => pairs.map(([value,label]) => ({ value,label }));
+const sizes = {
+  Medidas: [['maxWidth','Ancho máximo (px)',600,2200],['minHeight','Alto mínimo (px)',0,1400],['paddingX','Margen lateral (px)',0,160],['paddingY','Espacio vertical (px)',0,200],['cardHeight','Alto de los bloques (px)',220,700],['cardPadding','Espacio interior (px)',16,64],['gap','Separación (px)',12,80],['radius','Esquinas (px)',0,60],['featuredLift','Elevación del destacado (px)',0,80],['featuredWidth','Ancho del destacado (%)',100,140]],
+  Cristal: [['depth','Separación de capas (px)',0,40],['materialOpacity','Intensidad de la textura (%)',0,100],['glassOpacity','Color del vidrio (%)',0,90],['blur','Desenfoque (px)',0,32]],
+  Tipografía: [['titleSize','Tamaño del título (px)',24,100],['cardTitleSize','Títulos de bloque (px)',18,48],['bodySize','Texto de bloque (px)',12,28],['iconSize','Tamaño de iconos (px)',40,160]],
+  Móvil: [['mobileTitleSize','Título en móvil (px)',22,60],['mobileCardHeight','Alto de bloque en móvil (px)',220,600],['mobilePadding','Margen lateral en móvil (px)',12,48],['mobileGap','Separación en móvil (px)',16,64],['mobileIconSize','Icono en móvil (px)',40,120]],
+};
 export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uploading }) {
   const sections = Array.isArray(theme?.sections) ? theme.sections : [];
-
-  const [activeTab, setActiveTab] = useState("contenido");
-  const [openCardIndex, setOpenCardIndex] = useState(0);
-
-  const selectedIndex = useMemo(() => {
-    return sections.findIndex((section) => isInfoSection(section));
-  }, [sections]);
-
-  const safeSection = useMemo(() => {
-    if (selectedIndex >= 0) {
-      return normalizeInfoSection(sections[selectedIndex]);
-    }
-    return normalizeInfoSection(null);
-  }, [sections, selectedIndex]);
-
-  const config = safeSection.config;
-  const cards = Array.isArray(config.cards) ? config.cards : [];
-
-  function commitSection(nextSection) {
-    const nextSections = [...sections];
-
-    if (selectedIndex >= 0) {
-      nextSections[selectedIndex] = normalizeInfoSection(nextSection);
-    } else {
-      nextSections.push(normalizeInfoSection(nextSection));
-    }
-
-    setPath?.("sections", nextSections);
+  const index = sections.findIndex(isInfoSection);
+  const section = useMemo(() => normalizeInfoSection(sections[index]), [sections,index]);
+  const c = normalizeInfoGlass(section.config), cards = section.config.cards.map(infoGlassCard);
+  const [tab,setTab] = useState('contenido'), [contentTab,setContentTab] = useState('textos'), [cardId,setCardId] = useState('');
+  const [uploadError,setUploadError] = useState(''), [pending,setPending] = useState(false);
+  const current = cards.find(card => card.id === cardId) || cards[0];
+  const latest = useRef(null); latest.current = { sections,index,section };
+  function commit(next) {
+    const state = latest.current, list = [...state.sections];
+    if (state.index >= 0) list[state.index] = normalizeInfoSection(next); else list.push(normalizeInfoSection(next));
+    setPath?.('sections',list);
   }
-
-  function updateSection(partial) {
-    commitSection({
-      ...safeSection,
-      ...partial,
-    });
+  function config(patch) { const s=latest.current.section; commit({ ...s,config:{ ...s.config,...patch } }); }
+  function glass(patch) { const s=latest.current.section; config({ glass:{ ...normalizeInfoGlass(s.config),...patch },layout:'glass' }); }
+  function card(id,patch) { const list=latest.current.section.config.cards.map(infoGlassCard); config({ cards:list.map(item=>item.id===id?{...item,...patch}:item) }); }
+  function move(delta) {
+    const list=latest.current.section.config.cards.map(infoGlassCard), from=list.findIndex(item=>item.id===current.id), to=from+delta;
+    if(to<0 || to>=list.length)return; [list[from],list[to]]=[list[to],list[from]]; config({cards:list});
   }
-
-  function updateConfig(field, value) {
-    commitSection({
-      ...safeSection,
-      config: {
-        ...config,
-        [field]: value,
-      },
-    });
+  async function upload(file,targetId) {
+    if(!file || !uploadToCloudinary)return;
+    setUploadError('');setPending(true);
+    try { const url=await uploadToCloudinary(file); if(!safeInfoImage(url))throw new Error('No se pudo cargar una imagen válida.');
+      if(targetId)card(targetId,{iconType:'image',iconUrl:url});else glass({backgroundImage:url,backgroundMode:'image'});
+    }catch(error){setUploadError(error?.message || 'No se pudo cargar la imagen.');}finally{setPending(false);}
   }
-
-  function updateCard(cardIndex, partial) {
-    const nextCards = [...cards];
-    nextCards[cardIndex] = {
-      ...nextCards[cardIndex],
-      ...partial,
-    };
-
-    commitSection({
-      ...safeSection,
-      config: {
-        ...config,
-        cards: nextCards,
-      },
-    });
-  }
-
-  async function handleIconUpload(cardIndex, file) {
-    if (!file || !uploadToCloudinary) return;
-    const url = await uploadToCloudinary(file);
-    if (!url) return;
-
-    updateCard(cardIndex, {
-      iconType: "image",
-      iconUrl: url,
-    });
-  }
-
-  const currentCard = cards[openCardIndex] || cards[0];
-  const selectedAnimationLabel =
-    INFO_ANIMATION_OPTIONS.find((item) => item.value === config.entranceAnimation)?.label ||
-    "Sin animación";
-
-  return (
-    <div className="space-y-6">
-      <div className="sticky top-0 z-20 -mx-1 px-1 py-1 bg-[linear-gradient(to_bottom,rgba(250,250,250,0.96),rgba(250,250,250,0.88),rgba(250,250,250,0))] backdrop-blur-sm">
-        <div className="rounded-3xl border border-neutral-200 bg-white shadow-sm p-4">
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">Sección</div>
-              <div className="text-lg font-semibold text-neutral-900 mt-1">
-                Información
-              </div>
-              <div className="text-xs text-neutral-500 mt-1">Organiza textos, bloques y apariencia; revisa el resultado antes de guardar.</div>
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <div className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2 min-w-[140px]">
-                <span className="text-sm font-medium text-neutral-700">Activa</span>
-                <Toggle
-                  checked={!!safeSection.enabled}
-                  onChange={(val) => updateSection({ enabled: !!val })}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="mt-3">
-            <SectionEditorSteps
-              value={activeTab === "bloques" ? "contenido" : activeTab}
-              onChange={setActiveTab}
-              sectionName="Información"
-              items={[
-                { value: "contenido", label: "Contenido", hint: "Escribe el título y configura los bloques de información." },
-                { value: "general", label: "Diseño", hint: "Ajusta dimensiones, tipografía, fondos e iconos." },
-              ]}
-            />
-            {["contenido", "bloques"].includes(activeTab) && (
-              <nav className="section-editor-substeps mt-2" aria-label="Opciones de contenido">
-                <button type="button" aria-pressed={activeTab === "contenido"} onClick={() => setActiveTab("contenido")}>Textos</button>
-                <button type="button" aria-pressed={activeTab === "bloques"} onClick={() => setActiveTab("bloques")}>Bloques</button>
-              </nav>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="section-info-editor grid grid-cols-1 xl:grid-cols-[minmax(380px,0.9fr)_minmax(0,1.1fr)] gap-4 items-start" data-tab={activeTab}>
-        <div className="space-y-4 xl:sticky xl:top-28">
-          <MiniStat label="Bloques" value={`${cards.length} configurados`} />
-          <MiniStat label="Ancho" value={`${config.containerMaxWidth || 1200}px`} />
-          <MiniStat label="Alto mínimo" value={`${config.containerMinHeight || 250}px`} />
-          <MiniStat
-            label="Degradado"
-            value={
-              INFO_GRADIENT_OPTIONS.find((g) => g.value === config.backgroundGradient)?.label ||
-              "Sin degradado"
-            }
-          />
-          <MiniStat label="Animación" value={selectedAnimationLabel} />
-
-          <PanelCard
-            title="Vista rápida"
-            subtitle="Resumen visual del estado actual"
-          >
-            <div
-              className="rounded-3xl border overflow-hidden"
-              style={{
-                borderColor: config.borderColor || "#ffffff",
-                borderWidth: `${config.borderWidth || 4}px`,
-                borderStyle: "solid",
-                background:
-                  config.backgroundGradient !== "none"
-                    ? INFO_GRADIENT_OPTIONS.find((g) => g.value === config.backgroundGradient)?.css ||
-                      config.backgroundColor
-                    : config.backgroundColor,
-                boxShadow: config.shadow ? "0 18px 40px rgba(0,0,0,0.10)" : "none",
-              }}
-            >
-              <div className="px-4 py-5">
-                <div
-                  className="text-center mb-4"
-                  style={{
-                    color: config.titleColor,
-                    fontSize: `${Math.min(Number(config.titleFontSize || 32), 28)}px`,
-                    fontWeight: config.titleFontWeight || 700,
-                    fontFamily: config.titleFontFamily || undefined,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {config.titleText || "Título"}
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  {cards.map((card, idx) => (
-                    <div
-                      key={card.id || idx}
-                      className="flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-3"
-                    >
-                      <div
-                        className="rounded-full flex items-center justify-center shrink-0"
-                        style={{
-                          width: 42,
-                          height: 42,
-                          background: card.iconBgColor || "#fbcfe8",
-                        }}
-                      >
-                        <div
-                          className="rounded-full"
-                          style={{
-                            width: Math.min(Number(card.iconSize || 32), 24),
-                            height: Math.min(Number(card.iconSize || 32), 24),
-                            background:
-                              card.iconType === "image" && card.iconUrl
-                                ? `url(${card.iconUrl}) center/contain no-repeat`
-                                : "transparent",
-                            color: card.iconColor || "#fff",
-                            border:
-                              card.iconType === "image" && card.iconUrl
-                                ? "none"
-                                : "2px solid currentColor",
-                          }}
-                        />
-                      </div>
-                      <div
-                        className="text-xs line-clamp-2"
-                        style={{
-                          color: card.textColor || "#fff",
-                          fontFamily: card.textFontFamily || undefined,
-                        }}
-                      >
-                        {card.text || `Bloque ${idx + 1}`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </PanelCard>
-        </div>
-
-        <div className="space-y-6">
-          {activeTab === "general" ? (
-            <SectionEditorCardTabs label="Diseño de Información" labels={['Contenedor', 'Fondo', 'Animación']}>
-              <PanelCard
-                title="Contenedor"
-                subtitle="Medidas, borde, sombra y estructura general"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  <Field label="Ancho máximo (px)">
-                    <Input
-                      type="number"
-                      value={config.containerMaxWidth}
-                      onChange={(e) =>
-                        updateConfig("containerMaxWidth", clampNumber(e.target.value, 600, 2000))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Alto mínimo (px)">
-                    <Input
-                      type="number"
-                      value={config.containerMinHeight}
-                      onChange={(e) =>
-                        updateConfig("containerMinHeight", clampNumber(e.target.value, 100, 1000))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Padding vertical (px)">
-                    <Input
-                      type="number"
-                      value={config.paddingY}
-                      onChange={(e) =>
-                        updateConfig("paddingY", clampNumber(e.target.value, 0, 200))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Padding horizontal (px)">
-                    <Input
-                      type="number"
-                      value={config.paddingX}
-                      onChange={(e) =>
-                        updateConfig("paddingX", clampNumber(e.target.value, 0, 200))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Radio bordes (px)">
-                    <Input
-                      type="number"
-                      value={config.borderRadius}
-                      onChange={(e) =>
-                        updateConfig("borderRadius", clampNumber(e.target.value, 0, 80))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Grosor borde (px)">
-                    <Input
-                      type="number"
-                      value={config.borderWidth}
-                      onChange={(e) =>
-                        updateConfig("borderWidth", clampNumber(e.target.value, 0, 20))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Color borde">
-                    <ColorField
-                      value={config.borderColor}
-                      onChange={(value) => updateConfig("borderColor", value)}
-                    />
-                  </Field>
-
-                  <Field label="Sombra">
-                    <div className="h-full min-h-[44px] rounded-2xl border border-neutral-200 bg-neutral-50 px-3 flex items-center justify-between">
-                      <span className="text-sm text-neutral-700">Activar</span>
-                      <Toggle
-                        checked={!!config.shadow}
-                        onChange={(val) => updateConfig("shadow", !!val)}
-                      />
-                    </div>
-                  </Field>
-                </div>
-              </PanelCard>
-
-              <PanelCard
-                title="Fondo"
-                subtitle="Color base y degradado predefinido"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Color de fondo">
-                    <ColorField
-                      value={config.backgroundColor}
-                      onChange={(value) => updateConfig("backgroundColor", value)}
-                    />
-                  </Field>
-
-                  <Field label="Degradado">
-                    <SelectField
-                      value={config.backgroundGradient}
-                      onChange={(value) => updateConfig("backgroundGradient", value)}
-                      options={INFO_GRADIENT_OPTIONS}
-                    />
-                  </Field>
-                </div>
-
-                <div className="mt-5">
-                  <div className="text-xs font-medium text-neutral-600 mb-2">Preview de fondo</div>
-                  <div
-                    data-admin-storefront-preview="true"
-                    className="h-20 rounded-2xl border border-neutral-200"
-                    style={{
-                      background:
-                        config.backgroundGradient !== "none"
-                          ? INFO_GRADIENT_OPTIONS.find((g) => g.value === config.backgroundGradient)?.css ||
-                            config.backgroundColor
-                          : config.backgroundColor,
-                    }}
-                  />
-                </div>
-              </PanelCard>
-
-              <PanelCard
-                title="Animación de entrada"
-                subtitle="Define cómo aparecerá la sección cuando cargue en la página pública"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Tipo de animación">
-                    <SelectField
-                      value={config.entranceAnimation || "none"}
-                      onChange={(value) => updateConfig("entranceAnimation", value)}
-                      options={INFO_ANIMATION_OPTIONS}
-                    />
-                  </Field>
-
-                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 flex items-center">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-neutral-500">
-                        Selección actual
-                      </div>
-                      <div className="text-sm font-semibold text-neutral-900 mt-1">
-                        {selectedAnimationLabel}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </PanelCard>
-            </SectionEditorCardTabs>
-          ) : null}
-
-          {activeTab === "contenido" ? (
-            <>
-              <PanelCard
-                title="Título"
-                subtitle="Texto principal y estilo tipográfico"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  <Field label="Texto del título">
-                    <Input
-                      value={config.titleText}
-                      onChange={(e) => updateConfig("titleText", e.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Color del título">
-                    <ColorField
-                      value={config.titleColor}
-                      onChange={(value) => updateConfig("titleColor", value)}
-                    />
-                  </Field>
-
-                  <Field label="Tamaño del título (px)">
-                    <Input
-                      type="number"
-                      value={config.titleFontSize}
-                      onChange={(e) =>
-                        updateConfig("titleFontSize", clampNumber(e.target.value, 16, 80))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Peso del título">
-                    <Input
-                      type="number"
-                      value={config.titleFontWeight}
-                      onChange={(e) =>
-                        updateConfig("titleFontWeight", clampNumber(e.target.value, 300, 900))
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Fuente del título">
-                    <FontSelect
-                      value={config.titleFontFamily || ""}
-                      onChange={(value) => updateConfig("titleFontFamily", value)}
-                    />
-                  </Field>
-                </div>
-              </PanelCard>
-
-              <PanelCard
-                title="Bloques rápidos"
-                subtitle="Selecciona el bloque que quieres editar sin recorrer todo el formulario"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {cards.map((card, index) => {
-                    const active = openCardIndex === index;
-                    return (
-                      <button
-                        key={card.id || index}
-                        type="button"
-                        onClick={() => {
-                          setOpenCardIndex(index);
-                          setActiveTab("bloques");
-                        }}
-                        className={[
-                          "text-left rounded-2xl border px-4 py-3 transition shadow-sm",
-                          active
-                            ? "section-editor-accent-border section-editor-accent text-white"
-                            : "border-neutral-200 bg-white hover:border-neutral-400",
-                        ].join(" ")}
-                      >
-                        <div className="text-xs uppercase tracking-wide opacity-70">Bloque</div>
-                        <div className="text-sm font-semibold mt-1">{index + 1}</div>
-                        <div className="text-xs mt-2 line-clamp-2 opacity-80">
-                          {card.text || "Sin texto"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </PanelCard>
-            </>
-          ) : null}
-
-          {activeTab === "bloques" ? (
-            <>
-              <PanelCard
-                title="Editor de bloques"
-                subtitle="Ahora solo ves un bloque a la vez para reducir scroll y hacerlo más intuitivo"
-                right={
-                  <div className="flex items-center gap-2">
-                    {cards.map((_, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => setOpenCardIndex(index)}
-                        className={[
-                          "h-9 w-9 rounded-xl border text-sm font-semibold transition",
-                          openCardIndex === index
-                            ? "section-editor-accent section-editor-accent-border text-white"
-                            : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-400",
-                        ].join(" ")}
-                      >
-                        {index + 1}
-                      </button>
-                    ))}
-                  </div>
-                }
-              >
-                {currentCard ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      <Field label="Tipo de ícono">
-                        <SelectField
-                          value={currentCard.iconType}
-                          onChange={(value) => updateCard(openCardIndex, { iconType: value })}
-                          options={[
-                            { value: "lucide", label: "Ícono de sistema" },
-                            { value: "image", label: "Imagen subida" },
-                          ]}
-                        />
-                      </Field>
-
-                      {currentCard.iconType === "lucide" ? (
-                        <Field label="Ícono">
-                          <SelectField
-                            value={currentCard.icon}
-                            onChange={(value) => updateCard(openCardIndex, { icon: value })}
-                            options={INFO_ICON_OPTIONS}
-                          />
-                        </Field>
-                      ) : (
-                        <Field label="Imagen del ícono">
-                          <div className="space-y-3">
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <Input
-                                value={currentCard.iconUrl || ""}
-                                onChange={(e) => updateCard(openCardIndex, { iconUrl: e.target.value })}
-                                placeholder="https://..."
-                              />
-                              <label className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl section-editor-accent text-white text-sm font-medium cursor-pointer section-editor-accent-hover transition shrink-0">
-                                <span>{uploading ? "Subiendo..." : "Subir imagen"}</span>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  disabled={uploading}
-                                  onChange={(e) =>
-                                    handleIconUpload(openCardIndex, e.target.files?.[0] || null)
-                                  }
-                                />
-                              </label>
-                            </div>
-
-                            {currentCard.iconUrl ? (
-                              <div className="h-20 w-20 rounded-2xl border border-neutral-200 overflow-hidden bg-white flex items-center justify-center">
-                                <img
-                                  src={currentCard.iconUrl}
-                                  alt={`Icono bloque ${openCardIndex + 1}`}
-                                  className="max-h-full max-w-full object-contain"
-                                />
-                              </div>
-                            ) : null}
-                          </div>
-                        </Field>
-                      )}
-
-                      <Field label="Tamaño ícono (px)">
-                        <Input
-                          type="number"
-                          value={currentCard.iconSize}
-                          onChange={(e) =>
-                            updateCard(openCardIndex, {
-                              iconSize: clampNumber(e.target.value, 16, 100),
-                            })
-                          }
-                        />
-                      </Field>
-
-                      <Field label="Color ícono">
-                        <ColorField
-                          value={currentCard.iconColor}
-                          onChange={(value) => updateCard(openCardIndex, { iconColor: value })}
-                        />
-                      </Field>
-
-                      <Field label="Fondo circular ícono">
-                        <ColorField
-                          value={
-                            typeof currentCard.iconBgColor === "string" && currentCard.iconBgColor
-                              ? currentCard.iconBgColor
-                              : "#fbcfe8"
-                          }
-                          onChange={(value) => updateCard(openCardIndex, { iconBgColor: value })}
-                        />
-                      </Field>
-
-                      <Field label="Color texto">
-                        <ColorField
-                          value={currentCard.textColor}
-                          onChange={(value) => updateCard(openCardIndex, { textColor: value })}
-                        />
-                      </Field>
-
-                      <Field label="Tamaño texto (px)">
-                        <Input
-                          type="number"
-                          value={currentCard.textFontSize}
-                          onChange={(e) =>
-                            updateCard(openCardIndex, {
-                              textFontSize: clampNumber(e.target.value, 10, 40),
-                            })
-                          }
-                        />
-                      </Field>
-
-                      <Field label="Fuente texto">
-                        <FontSelect
-                          value={currentCard.textFontFamily || ""}
-                          onChange={(value) => updateCard(openCardIndex, { textFontFamily: value })}
-                        />
-                      </Field>
-                    </div>
-
-                    <Field label="Texto del bloque">
-                      <TextAreaField
-                        value={currentCard.text}
-                        onChange={(value) => updateCard(openCardIndex, { text: value })}
-                        rows={5}
-                      />
-                    </Field>
-                  </div>
-                ) : null}
-              </PanelCard>
-
-              <PanelCard
-                title="Vista rápida del bloque actual"
-                subtitle="Así puedes revisar color, tipografía y texto sin bajar más"
-              >
-                {currentCard ? (
-                  <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
-                    <div className="flex flex-col items-center text-center">
-                      <div
-                        className="rounded-full flex items-center justify-center mb-4"
-                        style={{
-                          width: 74,
-                          height: 74,
-                          background: currentCard.iconBgColor || "#fbcfe8",
-                        }}
-                      >
-                        {currentCard.iconType === "image" && currentCard.iconUrl ? (
-                          <img
-                            src={currentCard.iconUrl}
-                            alt=""
-                            className="object-contain"
-                            style={{
-                              width: `${currentCard.iconSize || 32}px`,
-                              height: `${currentCard.iconSize || 32}px`,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            className="rounded-full"
-                            style={{
-                              width: `${currentCard.iconSize || 32}px`,
-                              height: `${currentCard.iconSize || 32}px`,
-                              border: `2px solid ${currentCard.iconColor || "#ffffff"}`,
-                              color: currentCard.iconColor || "#ffffff",
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      <div
-                        style={{
-                          color: currentCard.textColor || "#111827",
-                          fontSize: `${currentCard.textFontSize || 18}px`,
-                          fontFamily: currentCard.textFontFamily || undefined,
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {currentCard.text || "Aquí verás el texto del bloque."}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </PanelCard>
-            </>
-          ) : null}
-
-        </div>
-      </div>
+  const numbers = name => <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{sizes[name].map(([key,label,min,max])=><Field key={key} label={label}><Input type="number" min={min} max={max} value={c[key]} onChange={e=>glass({[key]:Number(e.target.value)})}/></Field>)}</div>;
+  const colors = entries => <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{entries.map(([key,label])=><ColorField key={key} label={label} value={c[key]} onChange={value=>glass({[key]:value})}/>)}</div>;
+  const active = current ? cards.findIndex(item=>item.id===current.id) : 0;
+  return <div className="space-y-4 min-w-0">
+    <div className={panel}>
+      <div className="flex items-center justify-between gap-3"><strong>Información · Cristal en capas</strong><label className="flex items-center gap-3 text-sm">Activa<Toggle aria-label="Activar Información" checked={section.enabled} onChange={value=>commit({...latest.current.section,enabled:!!value})}/></label></div>
+      <SectionEditorSteps value={tab} onChange={setTab} sectionName="Información" items={[
+        {value:'contenido',label:'Contenido',hint:'Edita el encabezado y selecciona un bloque para configurar su contenido y su botón.'},
+        {value:'general',label:'Diseño',hint:'Ajusta la composición, los materiales, el fondo y las animaciones.'},
+      ]}/>
+      {tab==='contenido' && <nav className="section-editor-substeps" aria-label="Opciones de contenido">{[['textos','Textos'],['bloques','Bloques']].map(([value,label])=><button type="button" key={value} aria-pressed={contentTab===value} onClick={()=>setContentTab(value)}>{label}</button>)}</nav>}
     </div>
-  );
+    {uploadError && <p role="alert" className="text-sm text-red-800">{uploadError}</p>}
+    {tab==='contenido' && contentTab==='textos' && <div className={panel}>
+      <Field label="Texto superior"><Input value={c.eyebrow} onChange={e=>glass({eyebrow:e.target.value})}/></Field>
+      <Field label="Texto del título"><Text value={c.title} onChange={value=>glass({title:value})}/></Field>
+      <p className="text-xs opacity-65">Puedes dejar el encabezado vacío o insertar un salto de línea. Los textos se adaptan a cualquier negocio.</p>
+    </div>}
+    {tab==='contenido' && contentTab==='bloques' && <>
+      <nav className="section-editor-substeps" aria-label="Elegir bloque">{cards.map((item,i)=><button type="button" key={item.id} aria-pressed={current?.id===item.id} onClick={()=>setCardId(item.id)}>{'Bloque '+(i+1)}</button>)}</nav>
+      {current && <SectionEditorCardTabs label="Opciones del bloque" labels={['Contenido','Icono','Botón']}>
+        <div className={panel}>
+          <div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm">Mostrar bloque<Toggle aria-label="Mostrar bloque" checked={current.enabled} onChange={value=>card(current.id,{enabled:!!value})}/></label><button className={button} type="button" disabled={active===0} onClick={()=>move(-1)}>← Antes</button><button className={button} type="button" disabled={active===cards.length-1} onClick={()=>move(1)}>Después →</button></div>
+          <Field label="Título del bloque"><Input value={current.heading} onChange={e=>card(current.id,{heading:e.target.value})}/></Field>
+          <Field label="Texto del bloque"><Text value={current.text} onChange={value=>card(current.id,{text:value})}/></Field>
+          <button type="button" className={button} aria-pressed={c.featuredId===current.id} onClick={()=>glass({featuredId:c.featuredId===current.id?'':current.id})}>{c.featuredId===current.id?'★ Bloque destacado':'Destacar este bloque'}</button>
+        </div>
+        <div className={panel}>
+          <Field label="Origen del icono"><Select value={current.iconType==='image'?'image':'lucide'} onChange={value=>card(current.id,{iconType:value})} options={options([['lucide','Biblioteca de iconos'],['image','Imagen personalizada']])}/></Field>
+          {current.iconType==='image'?<><Field label="URL de la imagen"><Input value={current.iconUrl || ''} onChange={e=>card(current.id,{iconUrl:e.target.value})}/></Field><Field label="Subir icono"><input type="file" accept="image/*" disabled={uploading||pending} onChange={e=>upload(e.target.files?.[0],current.id)}/></Field></>:
+            <Field label="Icono"><Select value={current.icon} onChange={value=>card(current.id,{icon:value})} options={INFO_ICON_OPTIONS}/></Field>}
+          <Field label="Estilo de iconos"><Select value={c.iconStyle} onChange={value=>glass({iconStyle:value})} options={options([['relief','Relieve de la referencia'],['line','Líneas con color editable']])}/></Field>
+          <p className="text-xs opacity-65">Camión, atención y tienda incluyen el relieve del modelo. Los otros iconos usan trazos con volumen.</p>
+        </div>
+        <div className={panel}>
+          <label className="flex items-center justify-between text-sm">Mostrar botón<Toggle aria-label="Mostrar botón" checked={current.buttonEnabled} onChange={value=>card(current.id,{buttonEnabled:!!value})}/></label>
+          <Field label="Texto del botón"><Input value={current.buttonText} onChange={e=>card(current.id,{buttonText:e.target.value})}/></Field>
+          <Field label="Acción del botón"><Select value={current.actionMode} onChange={value=>card(current.id,{actionMode:value})} options={options([['details','Abrir información'],['link','Ir a un enlace o sección'],['whatsapp','Abrir WhatsApp']])}/></Field>
+          {current.actionMode==='details'?<Field label="Información al pulsar"><Text value={current.detailText} onChange={value=>card(current.id,{detailText:value})} rows={4}/></Field>:<>
+            <Field label={current.actionMode==='whatsapp'?'Número con indicativo (opcional)':'Destino del botón'}><Input value={current.href} placeholder={current.actionMode==='whatsapp'?'Usar WhatsApp de la tienda':'https://… o /ruta o #seccion'} onChange={e=>card(current.id,{href:e.target.value})}/></Field>
+            {current.actionMode==='link' && current.href && !safeInfoHref(current.href) && <p role="alert" className="text-xs text-red-700">Introduce un enlace válido. El botón no se activará con este destino.</p>}
+            {current.actionMode==='whatsapp' && <><p className="text-xs opacity-65">Si lo dejas vacío, se utiliza el WhatsApp configurado en la tienda.</p><Field label="Mensaje de WhatsApp"><Text value={current.whatsappMessage || ''} onChange={value=>card(current.id,{whatsappMessage:value})} rows={2}/></Field></>}
+            <label className="flex items-center justify-between text-sm">Abrir en otra pestaña<Toggle aria-label="Abrir en otra pestaña" checked={current.newTab} onChange={value=>card(current.id,{newTab:!!value})}/></label>
+          </>}
+          <p className="text-xs opacity-65">La información usa el texto del bloque si no añades un detalle. Los contactos y destinos se toman de lo que configures.</p>
+        </div>
+      </SectionEditorCardTabs>}
+    </>}
+    {tab==='general' && <SectionEditorCardTabs label="Diseño de Información" labels={['Modelo','Medidas','Cristal','Fondo','Tipografía','Móvil','Animación']}>
+      <div className={panel}>
+        <h3 className="font-semibold">Modelo elegido · Cristal en capas</h3><p className="text-sm opacity-75">Tres paneles superpuestos, iconos con relieve y un bloque destacado. Los contenidos siguen siendo editables.</p>
+        <Field label="Bloque destacado"><Select value={c.featuredId} onChange={value=>glass({featuredId:value})} options={[{value:'',label:'Ninguno'},...cards.map((item,i)=>({value:item.id,label:'Bloque '+(i+1)+' · '+item.heading}))]}/></Field>
+        <label className="flex items-center justify-between text-sm">Mostrar numeración<Toggle aria-label="Mostrar numeración" checked={c.showNumbers} onChange={value=>glass({showNumbers:!!value})}/></label>
+        <button className={button} type="button" onClick={()=>config({layout:'glass',glass:{...INFO_GLASS_DEFAULTS,title:c.title,eyebrow:c.eyebrow}})}>Restaurar apariencia de referencia</button>
+      </div>
+      <div className={panel}>{numbers('Medidas')}</div>
+      <div className={panel}>
+        <Field label="Material"><Select value={c.material} onChange={value=>glass({material:value})} options={options([['artwork','Textura del modelo elegido'],['css','Cristal con color libre']])}/></Field>
+        {numbers('Cristal')}{colors([['cardTint','Tinte del cristal'],['edgeColor','Bordes y reflejos'],['accentColor','Detalles e iconos de líneas'],['buttonColor','Botón destacado'],['buttonTextColor','Texto del botón destacado'],['sideButtonColor','Botones secundarios']])}
+        <p className="text-xs opacity-65">La textura conserva el rosa y el dorado de la referencia. Para cambiar completamente su color, elige Cristal con color libre.</p>
+      </div>
+      <div className={panel}>
+        <Field label="Fondo de la sección"><Select value={c.backgroundMode} onChange={value=>glass({backgroundMode:value})} options={options([['satin','Satén del modelo'],['inherit','Continuar fondo de la página'],['color','Color liso'],['image','Imagen personalizada']])}/></Field>
+        {colors([['backgroundColor','Color de fondo']])}
+        {c.backgroundMode==='image' && <><Field label="URL del fondo"><Input value={c.backgroundImage} onChange={e=>glass({backgroundImage:e.target.value})}/></Field><Field label="Subir fondo"><input type="file" accept="image/*" disabled={uploading||pending} onChange={e=>upload(e.target.files?.[0])}/></Field></>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{[['backgroundPositionX','Posición horizontal (%)',0,100],['backgroundPositionY','Posición vertical (%)',0,100],['backgroundZoom','Zoom del fondo (%)',100,180]].map(([key,label,min,max])=><Field key={key} label={label}><Input type="number" min={min} max={max} value={c[key]} onChange={e=>glass({[key]:Number(e.target.value)})}/></Field>)}</div>
+      </div>
+      <div className={panel}>
+        {numbers('Tipografía')}{colors([['titleColor','Color de títulos'],['bodyColor','Color del texto']])}
+        <Field label="Fuente de los títulos"><Select value={c.titleFont} onChange={value=>glass({titleFont:value})} options={[{value:'Georgia, serif',label:'Editorial de la referencia'},...INFO_FONT_OPTIONS]}/></Field>
+        <Field label="Fuente de los textos"><Select value={c.bodyFont} onChange={value=>glass({bodyFont:value})} options={[{value:'Inter, system-ui, sans-serif',label:'Inter de la referencia'},...INFO_FONT_OPTIONS]}/></Field>
+      </div>
+      <div className={panel}>{numbers('Móvil')}<p className="text-xs opacity-65">Los bloques se apilan en el mismo orden, sin deslizador. El alto crece si el contenido lo necesita.</p></div>
+      <div className={panel}>
+        <Field label="Animación de entrada"><Select value={c.entranceAnimation} onChange={value=>glass({entranceAnimation:value})} options={INFO_ANIMATION_OPTIONS}/></Field>
+        <Field label="Al pasar el cursor"><Select value={c.hoverAnimation} onChange={value=>glass({hoverAnimation:value})} options={options([['none','Sin efecto'],['lift','Elevar y reflejar'],['tilt','Perspectiva suave'],['shine','Reflejo de cristal']])}/></Field>
+        <Field label="Duración (ms)"><Input type="number" min={150} max={1600} value={c.animationDuration} onChange={e=>glass({animationDuration:Number(e.target.value)})}/></Field>
+        <p className="text-xs opacity-65">Las animaciones respetan la preferencia de movimiento reducido del dispositivo.</p>
+      </div>
+    </SectionEditorCardTabs>}
+  </div>;
 }
