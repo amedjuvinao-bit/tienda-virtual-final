@@ -21,7 +21,7 @@ The connecting line follows the store accent color unless the administrator sele
 
 ## Rendering and accessibility
 
-A single SVG world is pinned within the storefront. A continuous cubic curve determines the path and the ornament transforms. Scroll events schedule one animation frame, with no idle rendering loop. Short-lived local transitions update occlusion while they run. A soft mask places decorations visually behind real text, photos and controls without changing component layout or intercepting pointer events.
+A single SVG world is pinned within the storefront. A continuous cubic curve determines the path and the ornament transforms. Scroll events schedule one animation frame, with no idle rendering loop. Short-lived local transitions update occlusion while they run. A sharp mask places decorations visually behind real text, photos and controls without changing component layout or intercepting pointer events. Neither the source images nor the mask use a blur filter. Near unboxed text, the entire ornament fades out continuously and reappears intact after passing it, avoiding rectangular fragments around headings. Depth comes from movement, scale and a separate shadow composed after the ornament transforms; its dimensions follow viewport pixels and adapt to mobile and preview sizes.
 
 Reduced motion keeps a static decorative pose. The mobile “off” mode removes the decoration and restores the individual backgrounds. The desktop and mobile density limits bound the rendering cost. Changing to a different route, disabling the effect or unmounting releases its observers and listeners.
 

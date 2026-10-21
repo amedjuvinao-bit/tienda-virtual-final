@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { mountDecorativeJourney } from './decorativeJourney';
 import { normalizeStoryConfig } from './storefrontStoryConfig';
+import { journeyTextVisibility } from './decorativeJourneyGeometry';
 import { normalizeDecorativeJourney } from './decorativeJourneyConfig';
 
 afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();});
@@ -11,7 +12,7 @@ function fixture(raw={},options={}){
   vi.spyOn(window,'innerHeight','get').mockReturnValue(800);vi.spyOn(window,'scrollY','get').mockImplementation(()=>y);
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{frame=callback;return 1;});vi.spyOn(window,'cancelAnimationFrame').mockImplementation(()=>{});
   const root=document.createElement('div');
-  root.innerHTML='<div data-journey-pin><svg data-journey-world><mask data-journey-mask>'+Array.from({length:8},()=>'<rect data-journey-occluder/>').join('')+'</mask><path data-journey-stem/>'+Array.from({length:28},(_,i)=>`<g data-journey-piece="${i}"><image href="/test-resource.webp"/></g>`).join('')+'</svg></div><section data-story-top="0"><button>Explorar</button><video></video></section><section data-story-top="800"><h2>Segunda sección</h2><iframe></iframe></section><section data-story-top="2400"><h2>Final</h2></section>';
+  root.innerHTML='<div data-journey-pin><svg data-journey-world><mask data-journey-mask>'+Array.from({length:8},()=>'<rect data-journey-occluder/>').join('')+'</mask><path data-journey-stem/><g data-journey-ornaments>'+Array.from({length:28},(_,i)=>`<g data-journey-piece="${i}"><image href="/test-resource.webp"/></g>`).join('')+'</g></svg></div><section data-story-top="0"><button>Explorar</button><video></video></section><section data-story-top="800"><h2>Segunda sección</h2><iframe></iframe></section><section data-story-top="2400"><h2>Final</h2></section>';
   Object.defineProperty(root,'offsetWidth',{value:1200});
   [...root.querySelectorAll('section')].forEach(node=>Object.defineProperty(node,'offsetHeight',{value:800}));
   root.querySelector('[data-journey-world]').getBoundingClientRect=()=>({top:0,left:0,width:1200,height:800});
@@ -70,4 +71,27 @@ it('mantiene los recursos de cada tienda y no restaura imágenes al quitarlas',(
   expect(first).toMatchObject({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemColor:'#1286aa',unifyBackground:true});
   expect(second).toMatchObject({image:'https://cdn.example.test/second-store.png',backgroundImage:'',stemVisible:false,unifyBackground:false});
   expect(normalizeDecorativeJourney({...first,image:'',backgroundImage:''})).toMatchObject({image:'',backgroundImage:''});
+});
+
+it('conserva los adornos nítidos a máxima profundidad y adapta la sombra en móvil',()=>{
+  const f=fixture({journey:{depth:100}}),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],art=f.root.querySelector('[data-journey-ornaments]');
+  const initialScales=pieces.map(node=>node.getAttribute('transform'));
+  for(const y of [0,300,1200,2300]){
+    f.scroll(y);
+    expect(pieces.every(node=>!node.style.filter)).toBe(true);
+    expect(art.style.filter).toBe('drop-shadow(0 10px 7px rgb(0 0 0 / .14))');
+  }
+  expect(pieces.map(node=>node.getAttribute('transform'))).not.toEqual(initialScales);
+  f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();
+  expect(art.style.filter).toBe('drop-shadow(0 6px 4.2px rgb(0 0 0 / .14))');
+  expect(pieces.every(node=>!node.style.filter)).toBe(true);f.stop();
+});
+
+it('protege los títulos con una desaparición completa y gradual, sin cortes dentro del adorno',()=>{
+  const boxes=[{x:100,y:100,width:200,height:50}];
+  expect(journeyTextVisibility(200,125,30,boxes)).toBe(0);
+  expect(journeyTextVisibility(65,125,30,boxes)).toBeCloseTo(.25);
+  expect(journeyTextVisibility(60,125,30,boxes)).toBeCloseTo(.5);
+  expect(journeyTextVisibility(50,125,30,boxes)).toBe(1);
+  expect(journeyTextVisibility(200,125,30,[])).toBe(1);
 });

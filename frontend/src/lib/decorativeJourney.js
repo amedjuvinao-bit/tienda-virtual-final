@@ -1,5 +1,6 @@
-import { journeyCurve, pointOnJourney, journeyPhase } from './decorativeJourneyGeometry';
+import { journeyCurve, pointOnJourney, journeyPhase, journeyTextVisibility } from './decorativeJourneyGeometry';
 
+const textSelector='h1,h2,h3,p,[data-story-actor="title"],[data-story-actor="copy"],[data-story-actor="eyebrow"],.ig-journal__profile,.tk-stage__identity,.footer-ed__watermark';
 const occlusionSelector='.info-glass-dialog-backdrop,[role=dialog],dialog,[data-story-actor],.categories-fan__category,.look-editorial__hero,.look-editorial__card-surface,.ig-journal__main,.tk-stage__hero,.tk-stage__item,.info-glass-card,.footer-ed__social,.footer-ed__watermark,h1,h2,h3,p,a,button,input,textarea,select,article,picture,img,video,iframe';
 
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
@@ -7,7 +8,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   if(!world)return ()=>{};
   const c=config.journey,reduce=view.matchMedia?.('(prefers-reduced-motion: reduce)'),mobile=view.matchMedia?.('(max-width:767px)');
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')],masks=[...world.querySelectorAll('[data-journey-occluder]')];
-  const stem=world.querySelector('[data-journey-stem]'),mask=world.querySelector('[data-journey-mask]');
+  const stem=world.querySelector('[data-journey-stem]'),mask=world.querySelector('[data-journey-mask]'),ornaments=world.querySelector('[data-journey-ornaments]');
   let frame=0,dirty=true,disposed=false,tops=[],candidates=[],width=0,height=0,movingUntil=0;
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
@@ -43,26 +44,33 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     const count=adapted?c.mobileDensity:c.density,size=(adapted?c.mobileSize:c.size)*previewScale;
     const path=journeyCurve(phase*.8,width,height,c.path,config.intensity),origin=world.getBoundingClientRect();
     // Read content geometry before writing the SVG. Nothing intercepts input.
-    const boxes=[];
+    const boxes=[],textBoxes=[];
     for(const node of candidates){
       const rect=node.getBoundingClientRect();
       if(rect.width<4 || rect.height<4 || rect.bottom<=origin.top || rect.top>=origin.top+height || rect.right<=origin.left || rect.left>=origin.left+width)continue;
       const css=view.getComputedStyle(node);
       if(css.display==='none' || css.visibility==='hidden' || Number(css.opacity || 1)<.05)continue;
-      boxes.push({x:rect.left-origin.left-5,y:rect.top-origin.top-5,width:rect.width+10,height:rect.height+10,radius:Math.max(6,Math.min(48,parseFloat(css.borderTopLeftRadius)||0))});
+      const padding=2;
+      const box={x:rect.left-origin.left-padding,y:rect.top-origin.top-padding,width:rect.width+padding*2,height:rect.height+padding*2,radius:Math.min(48,(parseFloat(css.borderTopLeftRadius)||0)+padding)};
+      boxes.push(box);if(node.matches(textSelector))textBoxes.push(box);
       if(boxes.length===masks.length)break;
     }
     stem.setAttribute('d',path.d);stem.style.opacity=c.stemVisible?String(c.opacity/100*.65):'0';
     stem.setAttribute('stroke-width',adapted?'1.2':'2');
+    // Cast the shadow after the ornament transforms, in viewport pixels.
+    // The source images and the occlusion mask stay sharp at every depth.
+    const depth=c.depth/100,shadowScale=previewScale*(adapted ? .6 : 1);
+    if(ornaments)ornaments.style.filter=`drop-shadow(0 ${(4+depth*6)*shadowScale}px ${(4+depth*3)*shadowScale}px rgb(0 0 0 / .14))`;
     pieces.forEach((piece,i)=>{
       if(i>=count || !(c.image || c.secondaryImage)){piece.setAttribute('opacity','0');return;}
       const u=((i/count+phase*.028)%1+1)%1,p=pointOnJourney(path,u);
-      const z=Math.sin(u*Math.PI*2+phase*.45),depth=c.depth/100;
+      const z=Math.sin(u*Math.PI*2+phase*.45);
       const scale=size/100*(.78+(i*7%11)/22)*(1+z*depth*.24);
       const mirror=i%4===1?-1:1,angle=p.angle+(mirror<0?-50:50)+(i%2?-7:10);
       piece.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${(scale*mirror).toFixed(3)} ${scale.toFixed(3)})`);
-      piece.setAttribute('opacity',String(c.opacity/100*(.86+z*depth*.12)));
-      piece.style.filter=`blur(${Math.max(0,-z)*depth*(adapted ? .6 : 1.1)}px) drop-shadow(0 ${4+depth*6}px ${4+depth*3}px rgb(0 0 0 / .14))`;
+      const radians=angle*Math.PI/180,radius=50*scale*(Math.abs(Math.cos(radians))+Math.abs(Math.sin(radians)));
+      const clearText=journeyTextVisibility(p.x,p.y,radius,textBoxes,24*previewScale);
+      piece.setAttribute('opacity',String(c.opacity/100*(.86+z*depth*.12)*clearText));
     });
     masks.forEach((rect,i)=>{
       const box=boxes[i];if(!box){rect.setAttribute('width','0');return;}

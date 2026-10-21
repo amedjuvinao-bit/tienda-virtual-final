@@ -36,3 +36,15 @@ export function journeyPhase(scroll,tops,viewport){
   const next=tops[index+1]??tops[index]+viewport;
   return Math.max(0,index+(position-tops[index])/Math.max(1,next-tops[index]));
 }
+
+// Fade the whole ornament near unboxed text, rather than cutting a rectangular
+// hole through the image. Radius includes rotation, so every visible edge clears
+// the text; the continuous falloff follows scroll in either direction.
+export function journeyTextVisibility(x,y,radius,boxes,clearance=20){
+  let visibility=1;
+  for(const box of boxes){
+    const dx=Math.max(box.x-x,0,x-box.x-box.width),dy=Math.max(box.y-y,0,y-box.y-box.height);
+    visibility=Math.min(visibility,Math.max(0,Math.min(1,(Math.hypot(dx,dy)-radius)/clearance)));
+  }
+  return visibility;
+}
