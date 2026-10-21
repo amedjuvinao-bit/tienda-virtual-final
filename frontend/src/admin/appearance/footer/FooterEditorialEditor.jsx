@@ -17,7 +17,7 @@ const sizes={
 export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryViaBackend,uploading,setUploading}) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer), columns=footerColumns(footer);
   const [step,setStep]=useState('content'), [column,setColumn]=useState('column1'), [social,setSocial]=useState('instagram');
-  const [pending,setPending]=useState(false), [error,setError]=useState('');
+  const [pending,setPending]=useState(false), [error,setError]=useState(''), [restored,setRestored]=useState(false);
   const write=(field,value)=>setPath?.('footer.'+field,value), edit=(field,value)=>write('editorial.'+field,value);
   const col=columns.find(item=>item.id===column) || columns[0], links=Array.isArray(footer[column+'Links'])?footer[column+'Links']:col.links;
   async function upload(field,file) {
@@ -29,10 +29,12 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
   const image=(label,field)=><ImageField label={label} value={field.startsWith('editorial.')?(footer.editorial?.[field.split('.')[1]]??c[field.split('.')[1]]):footer[field] || ''} onChange={value=>write(field,value)} pending={pending||uploading} onUpload={file=>upload(field,file)}/>;
   const numbers=group=><div className="footer-editor__grid">{sizes[group].map(([key,label,min,max])=><NumberField key={key} label={label} min={min} max={max} value={footer.editorial?.[key]??c[key]} onChange={value=>edit(key,value)}/>)}</div>;
   const colors=entries=><div className="footer-editor__grid">{entries.map(([key,label])=><ColorField key={key} label={label} value={c[key]} onChange={value=>edit(key,value)}/>)}</div>;
-  function restore(){const next={...FOOTER_EDITORIAL_DEFAULTS};for(const key of ['headline','description','brandName','brandMode','brandTagline','watermarkText','successMessage','errorMessage',...Object.keys(next).filter(k=>k.endsWith('Enabled'))])next[key]=c[key];write('editorial',next);}
+  function restore(){const next={...FOOTER_EDITORIAL_DEFAULTS};for(const key of ['headline','description','brandName','brandTagline','watermarkText','successMessage','errorMessage',...Object.keys(next).filter(k=>k.endsWith('Enabled'))])next[key]=c[key];write('editorial',next);setRestored(true);}
   return <div className="footer-editor section-editor-layout">
     <div className="section-editor-layout__form footer-editor__form">
       <div className="footer-editor__card"><div className="footer-editor__heading"><div><strong>Pie de página · Firma editorial</strong><p>Modelo 3 · Textos, cristal y enlaces configurables.</p></div><CheckField label="Mostrar footer" checked={footer.enabled!==false} onChange={value=>write('enabled',value)}/></div>
+        <button type="button" className="footer-editor__restore" onClick={restore}>Aplicar apariencia del modelo aprobado</button>
+        {restored && <p role="status">Apariencia aplicada: firma grande, iconos en relieve y cristal compacto. Guarda los cambios para publicarla. Se conservaron tus textos y enlaces.</p>}
         <SectionEditorSteps sectionName="Pie de página" value={step} onChange={setStep} items={[{value:'content',label:'Contenido',hint:'Edita un grupo a la vez. Todos los textos de la tienda son configurables.'},{value:'design',label:'Diseño',hint:'Ajusta el material, los colores y los tamaños. Comprueba cada dispositivo en la vista previa.'}]}/>
       </div>
       {error && <p role="alert">{error}</p>}
@@ -56,11 +58,12 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar redes sociales" checked={c.socialsEnabled} onChange={value=>edit('socialsEnabled',value)}/>
+          <SelectField label="Estilo de los iconos sociales" value={c.socialIconStyle} onChange={value=>edit('socialIconStyle',value)} options={[["relief","Dorado en relieve del modelo"],["custom","Mis imágenes personalizadas"]]}/>
           <SelectField label="Configurar red social" value={social} onChange={setSocial} options={FOOTER_SOCIALS.map(item=>[item.key,item.label])}/>
           <TextField label={'Enlace de '+FOOTER_SOCIALS.find(item=>item.key===social).label} value={footer[social] || ''} onChange={value=>write(social,value)} placeholder="https://…"/>
           {footer[social] && !/^https?:\/\//i.test(safeFooterLink(footer[social])) && <p role="alert">Introduce un enlace http o https válido para mostrar esta red.</p>}
-          {image('Imagen del icono (opcional)',social+'Icon')}
-          <p>Sin imagen se utiliza el icono de la red con relieve. Las redes sin un enlace válido se ocultan.</p>
+          {c.socialIconStyle==='custom' && image('Imagen del icono (opcional)',social+'Icon')}
+          <p>Las imágenes guardadas se conservan y se usan al elegir Mis imágenes personalizadas. Las redes sin un enlace válido se ocultan.</p>
           <div className="footer-editor__grid"><NumberField label="Tamaño de los iconos (px)" min={36} max={90} value={c.socialSize} onChange={value=>edit('socialSize',value)}/><NumberField label="Separación entre iconos (px)" min={4} max={32} value={c.socialGap} onChange={value=>edit('socialGap',value)}/></div>
         </div>
         <div className="footer-editor__card">
@@ -72,7 +75,7 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar texto legal" checked={c.legalEnabled} onChange={value=>edit('legalEnabled',value)}/>
-          <TextField label="Texto legal inferior" area value={footer.copyright??('© '+c.brandName+' · Todos los derechos reservados.')} onChange={value=>write('copyright',value)}/>
+          <TextField label="Texto legal inferior" area value={footer.copyright?.trim()?footer.copyright:('© '+c.brandName+' · Todos los derechos reservados.')} onChange={value=>write('copyright',value)}/>
           <CheckField label="Mostrar botón para volver arriba" checked={c.backToTopEnabled} onChange={value=>edit('backToTopEnabled',value)}/>
           <TextField label="Nombre accesible del botón" value={c.backToTopLabel} onChange={value=>edit('backToTopLabel',value)}/>
         </div>
@@ -95,7 +98,7 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
         </div>
         <div className="footer-editor__card">
           {numbers('typography')}{colors([['headingColor','Color de los títulos'],['textColor','Color del texto']])}
-          <SelectField label="Fuente de títulos y marca" value={c.titleFont} onChange={value=>edit('titleFont',value)} options={[["Georgia, serif","Editorial de la referencia"],...INFO_FONT_OPTIONS.map(item=>[item.value,item.label])]}/>
+          <SelectField label="Fuente de títulos y marca" value={c.titleFont} onChange={value=>edit('titleFont',value)} options={[[FOOTER_EDITORIAL_DEFAULTS.titleFont,"Bodoni · Modelo aprobado"],["Georgia, serif","Georgia"],...INFO_FONT_OPTIONS.filter(item=>![FOOTER_EDITORIAL_DEFAULTS.titleFont,'Georgia, serif'].includes(item.value)).map(item=>[item.value,item.label])]}/>
           <SelectField label="Fuente de los textos" value={c.bodyFont} onChange={value=>edit('bodyFont',value)} options={[["Inter, system-ui, sans-serif","Inter de la referencia"],...INFO_FONT_OPTIONS.map(item=>[item.value,item.label])]}/>
         </div>
         <div className="footer-editor__card">{numbers('mobile')}<SelectField label="Enlaces en móvil" value={c.mobileNavigation} onChange={value=>edit('mobileNavigation',value)} options={[["accordion","Grupos desplegables"],["open","Todos los enlaces visibles"]]}/><p>La suscripción se apila y los iconos se adaptan al ancho. Usa Móvil o Tablet en la vista previa para comprobar el resultado.</p></div>

@@ -34,6 +34,25 @@ describe('footer Firma editorial',()=>{
     fireEvent.submit(screen.getByRole('form',{name:'Suscripción a novedades'}));
     expect(await screen.findByRole('status')).toHaveTextContent('Vista previa');expect(post).not.toHaveBeenCalled();
   });
+  it('usa la firma y el relieve del modelo aunque existan imágenes del footer anterior',()=>{
+    const footer={logoUrl:'/mi-logo.png',instagram:'https://instagram.com/demo',instagramIcon:'/icono-anterior.png'};
+    const {rerender}=render(<FooterSection theme={makeTheme(footer)}/>);
+    expect(screen.getByText('Tu marca',{selector:'.footer-ed__brand-name'})).toBeInTheDocument();
+    expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toBeNull();
+    rerender(<FooterSection theme={makeTheme({...footer,editorial:{brandMode:'image',socialIconStyle:'custom'}})}/>);
+    expect(screen.getByRole('img',{name:'Tu marca'})).toHaveAttribute('src','/mi-logo.png');
+    expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toHaveAttribute('src','/icono-anterior.png');
+  });
+  it('recupera la apariencia aprobada sin borrar contenido, enlaces ni imágenes guardadas',()=>{
+    let saved;
+    const initial={editorial:{brandName:'Mi negocio',brandMode:'image',socialIconStyle:'custom',titleFont:'Georgia, serif',depth:1},logoUrl:'/mi-logo.png',instagramIcon:'/mi-icono.png',column1Title:'Descubre',column1Links:[{label:'Mi catálogo',href:'/catalogo'}]};
+    function Harness(){const [theme,setTheme]=useState(makeTheme(initial));saved=theme;return <FooterPanel theme={theme} setPath={(path,value)=>setTheme(old=>({...old,footer:{...old.footer,[path.slice(7)]:value}}))}/>;}
+    render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Aplicar apariencia del modelo aprobado'}));
+    expect(saved.footer.editorial).toMatchObject({brandName:'Mi negocio',brandMode:'text',socialIconStyle:'relief',depth:12});
+    expect(saved.footer.editorial.titleFont).toContain('Bodoni');
+    expect(saved.footer).toMatchObject({logoUrl:'/mi-logo.png',instagramIcon:'/mi-icono.png',column1Title:'Descubre',column1Links:initial.column1Links});
+    expect(screen.getByText(/Apariencia aplicada:/)).toHaveTextContent('Guarda los cambios');
+  });
   it('edita la marca, los enlaces y el material por grupos y muestra los tres dispositivos',async()=>{
     let saved;
     function Harness(){const [theme,setTheme]=useState(makeTheme({}));saved=theme;return <FooterPanel theme={theme} setPath={(path,value)=>setTheme(old=>{const next=structuredClone(old);const parts=path.split('.');let current=next;parts.slice(0,-1).forEach(key=>{current[key]??={};current=current[key];});current[parts.at(-1)]=value;return next;})}/>;}

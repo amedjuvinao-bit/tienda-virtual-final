@@ -12,7 +12,7 @@ export default function FooterEditorial({ theme, preview=false }) {
   if(footer.enabled===false && !preview)return null;
   const columns=footerColumns(footer).filter(col=>c[col.id+'Enabled']);
   const logo=safeFooterImage(footer.logoUrl), showLogo=c.brandMode!=='text' && logo && failedLogo!==logo;
-  const image=c.backgroundMode==='satin'?'/information/satin.webp':c.backgroundMode==='image'?c.backgroundImage:'';
+  const image=c.backgroundMode==='satin'?'/footer/editorial-satin-v2.webp':c.backgroundMode==='image'?c.backgroundImage:'';
   const style={
     backgroundColor:c.backgroundMode==='inherit'?'transparent':c.backgroundColor,
     backgroundImage:image?'url('+JSON.stringify(image)+')':'none',
@@ -48,8 +48,8 @@ export default function FooterEditorial({ theme, preview=false }) {
         <FooterSocials footer={footer} theme={theme} config={c}/>
         {c.backToTopEnabled && <button type="button" className="footer-ed__top-button" aria-label={c.backToTopLabel || 'Volver arriba'} onClick={backToTop}><ArrowUp size={30} aria-hidden="true"/></button>}
       </div>
-      {c.legalEnabled && <div className="footer-ed__legal">{typeof footer.copyright==='string'?footer.copyright:'© '+c.brandName+' · Todos los derechos reservados.'}</div>}
-      {c.watermarkEnabled && (c.watermarkText || c.brandName) && <div className="footer-ed__watermark" aria-hidden="true"><svg viewBox="0 0 1000 180" preserveAspectRatio="none"><text x="5" y="150" textLength="990" lengthAdjust="spacingAndGlyphs">{(c.watermarkText || c.brandName).toLocaleUpperCase()}</text></svg></div>}
+      {c.legalEnabled && <div className="footer-ed__legal">{typeof footer.copyright==='string' && footer.copyright.trim()?footer.copyright:'© '+c.brandName+' · Todos los derechos reservados.'}</div>}
+      {c.watermarkEnabled && (c.watermarkText || c.brandName) && <div className="footer-ed__watermark" aria-hidden="true"><svg viewBox="0 0 1000 180" preserveAspectRatio="none">{['shadow','light','edge'].map(layer=><text key={layer} className={'footer-ed__engraving-'+layer} x="5" y="151" textLength="990" lengthAdjust="spacingAndGlyphs">{(c.watermarkText || c.brandName).toLocaleUpperCase()}</text>)}</svg></div>}
     </div>
   </footer></div>;
 }
