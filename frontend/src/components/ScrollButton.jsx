@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown, ChevronUp, ChevronDown } from "lucide-react";
 import "./storefrontLiquidGlass.css";
+import MobileSectionJourney from "./MobileSectionJourney";
 import './storefrontChromeGlassHover.css';
 import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
 import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
@@ -52,7 +53,9 @@ function scrollExactlyToSection(target, options = {}) {
   });
 }
 
-export default function ScrollButton({ config, buttonAnimation }) {
+export default function ScrollButton({ config, buttonAnimation, motionConfig }) {
+  const [isMobile,setIsMobile]=useState(()=>window.matchMedia?.("(max-width: 767px)")?.matches ?? window.innerWidth<768);
+  useEffect(()=>{const media=window.matchMedia?.("(max-width: 767px)");const update=()=>setIsMobile(media?.matches ?? window.innerWidth<768);media?.addEventListener?.("change",update);return ()=>media?.removeEventListener?.("change",update);},[]);
   const [activeAnimation, setActiveAnimation] = useState(null);
   const safeConfig = config && typeof config === "object" ? config : {};
 
@@ -62,6 +65,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
       : DEFAULT_SECTION_IDS;
 
   const enabled = safeConfig.enabled !== false;
+  const mobileEnabled=safeConfig.mobileEnabled!==false;
   const visualStyle = resolveSectionControlStyle(safeConfig.visualStyle);
   const showUp = safeConfig.showUp !== false;
   const showDown = safeConfig.showDown !== false;
@@ -118,15 +122,17 @@ export default function ScrollButton({ config, buttonAnimation }) {
 
   useEffect(() => {
     document.documentElement.classList.toggle("rb-section-dock-enabled", enabled);
+    document.documentElement.classList.toggle("rb-mobile-section-dock-enabled",enabled && isMobile && mobileEnabled);
     document.documentElement.style.setProperty(
       "--rb-scroll-dock-height",
       `${Math.max(0, bottomPx + buttonSizePx + 48)}px`
     );
     return () => {
       document.documentElement.classList.remove("rb-section-dock-enabled");
+      document.documentElement.classList.remove("rb-mobile-section-dock-enabled");
       document.documentElement.style.removeProperty("--rb-scroll-dock-height");
     };
-  }, [enabled, bottomPx, buttonSizePx]);
+  }, [enabled, bottomPx, buttonSizePx,isMobile,mobileEnabled]);
 
   const navigate = (direction) => {
     const targets = getSectionTargets(sectionIds);
@@ -157,6 +163,7 @@ export default function ScrollButton({ config, buttonAnimation }) {
   };
 
   if (!enabled) return null;
+  if(isMobile)return mobileEnabled?<MobileSectionJourney config={safeConfig} motion={motionConfig} sectionIds={sectionIds}/>:null;
 
   const wrapperPositionStyle =
     position === "left"

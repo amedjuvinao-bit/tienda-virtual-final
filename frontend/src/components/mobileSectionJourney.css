@@ -1,0 +1,20 @@
+.mobile-section-journey{position:fixed;z-index:50;left:50%;bottom:calc(var(--journey-bottom,24px) + env(safe-area-inset-bottom,0px) + var(--journey-clearance,0px));transform:translateX(-50%);display:flex;align-items:center;gap:4px;max-width:calc(100vw - 24px);padding:5px 6px;border:1px solid #fffa;border-radius:40px;color:var(--journey-ink,#b47d3f);background:linear-gradient(150deg,#ffffffb8,color-mix(in srgb,var(--journey-tint,#f7d9d0) 78%,transparent),#fff5);box-shadow:inset 0 2px 1px #fff,inset 0 -3px 8px #8a3b5a18,0 8px 24px #64284029;backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);--journey-progress:0}
+.mobile-section-journey button{position:relative;display:grid;place-items:center;flex:none;width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.mobile-section-journey button:disabled{opacity:.3;cursor:default}
+.mobile-section-journey[data-moving="true"] button:disabled{opacity:.8}
+.mobile-section-journey button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.mobile-section-journey button:active:not(:disabled)>svg:not(.mobile-section-journey__progress){transform:translateY(2px)}
+.mobile-section-journey button img{width:27px;height:27px;object-fit:contain}
+.mobile-section-journey .mobile-section-journey__next{width:52px;height:52px;background:linear-gradient(150deg,#fff9,#fff1);box-shadow:inset 0 1px 1px #fff9}
+.mobile-section-journey__count{display:grid;justify-items:center;gap:1px;min-width:26px;font:10px/1.1 system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.mobile-section-journey__count b{font-size:13px;font-weight:650}
+.mobile-section-journey__count>span{opacity:.65;font-size:9px}
+.mobile-section-journey__progress{position:absolute;inset:0;width:52px;height:52px;transform:rotate(-90deg);fill:none;stroke:currentColor;stroke-width:1.35;pointer-events:none}
+.mobile-section-journey__progress circle:first-child{opacity:.15}
+.mobile-section-journey__progress circle:last-child{stroke-dasharray:100;stroke-dashoffset:calc(100 * (1 - var(--journey-progress,0)));stroke-linecap:round}
+.mobile-section-journey__announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(min-width:768px){.mobile-section-journey{display:none}}
+@media(max-width:767px){html.rb-mobile-section-dock-enabled .rb-template:not([data-preview-device]) .rb-template__rail{bottom:max(5%,var(--rb-mobile-scroll-dock-height,110px))}}
+@media(prefers-reduced-motion:reduce){.mobile-section-journey *{animation:none!important;transition:none!important}}
+
+.mobile-section-journey[hidden]{display:none}

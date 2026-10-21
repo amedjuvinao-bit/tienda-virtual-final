@@ -447,6 +447,13 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     onChange={(value) => setPath("global.scrollButtons.enabled", value)}
                   />
 
+                  <Toggle
+                    label="Mostrar control de recorrido en móvil"
+                    checked={globalConfig.scrollButtons.mobileEnabled !== false}
+                    onChange={(value) => setPath("global.scrollButtons.mobileEnabled", value)}
+                  />
+                  <p className="text-xs opacity-70">En móvil, las flechas se detienen al inicio de cada sección. Con desplazamiento suave, siguen el ritmo elegido en Animación global. Puedes interrumpir el recorrido tocando la pantalla.</p>
+
                   <Select
                     label="Comportamiento del scroll"
                     value={globalConfig.scrollButtons.behavior || "smooth"}

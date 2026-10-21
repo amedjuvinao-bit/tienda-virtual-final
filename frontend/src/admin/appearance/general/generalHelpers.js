@@ -32,6 +32,7 @@ export const GLOBAL_DEFAULTS = {
 
   scrollButtons: {
     enabled: true,
+    mobileEnabled: true,
     showUp: true,
     showDown: true,
     offsetTopPx: 80, // Reserva espacio para el encabezado solo al subir.

@@ -122,7 +122,7 @@ function GlobalFloatingButtons({ theme }) {
   return (
     <>
       <WhatsAppButton config={theme?.global?.whatsapp} />
-      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} buttonAnimation={theme?.banner?.templateConfigs?.[theme?.banner?.templateId]?.buttonAnimation} />}
+      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} motionConfig={theme?.global?.sectionMotion} buttonAnimation={theme?.banner?.templateConfigs?.[theme?.banner?.templateId]?.buttonAnimation} />}
     </>
   );
 }
