@@ -50,12 +50,13 @@
 .footer-ed__social-emblem{display:grid;place-items:center;width:100%;height:100%}
 .footer-ed__social img{width:100%;height:100%;object-fit:contain}
 .footer-ed__social svg{display:block;width:100%;height:100%}
-/* Individual transparent tiles reproduce the reference's square glass bevel. */
+/* A transparent rendered glass surface supplies curved refraction and caustics.
+   The backdrop stays visible; the icon and destination remain native elements. */
 .footer-ed__social-dock[data-presentation="glass"]{padding:8px 2px 12px;background:none;border:0;box-shadow:none}
-.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social{padding:calc(var(--fe-social-size) * .23);border:1px solid color-mix(in srgb,var(--fe-accent) 72%,#ffe9cf);border-radius:22%;color:var(--fe-social-ink);background:radial-gradient(ellipse at 14% 5%,#fffa,transparent 46%),linear-gradient(135deg,#fff4,transparent 45%,#fff5),color-mix(in srgb,var(--fe-social-button) 24%,transparent);backdrop-filter:blur(3px) saturate(1.1);-webkit-backdrop-filter:blur(3px) saturate(1.1);box-shadow:0 0 0 1px #fffc,inset 0 2px 2px #fff,inset 2px 0 2px #fff9,inset -2px -3px 3px #b56c4966,0 2px 1px #fffd,0 6px 5px -3px #8c3b3299,0 11px 13px -7px #813e354d;transition:transform var(--fe-duration),box-shadow var(--fe-duration)}
-.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:before{content:"";position:absolute;inset:3px;border:1px solid #fff9;border-radius:calc(22% - 2px);box-shadow:inset 0 1px 1px #9c513c44,0 1px 1px #fff9;pointer-events:none}
-.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:after{content:"";position:absolute;inset:5px;border-radius:calc(22% - 4px);background:linear-gradient(130deg,#fffa,transparent 27%,transparent 76%,#fff8);opacity:.45;pointer-events:none;transition:opacity var(--fe-duration)}
-.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem{position:relative;z-index:1}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social{padding:calc(var(--fe-social-size) * .23);border:0;border-radius:24%;color:var(--fe-social-ink);background:color-mix(in srgb,var(--fe-social-button) 8%,transparent);backdrop-filter:blur(1px) saturate(1.18) brightness(1.035);-webkit-backdrop-filter:blur(1px) saturate(1.18) brightness(1.035);box-shadow:0 8px 11px -9px #813e3570;transition:transform var(--fe-duration),box-shadow var(--fe-duration)}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:before{content:"";position:absolute;inset:-10%;border-radius:inherit;background:url("/footer/social-liquid-glass-v1.webp") center/100% 100% no-repeat;opacity:var(--fe-art-alpha,1);pointer-events:none;z-index:1}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:after{content:"";position:absolute;inset:6%;border-radius:24%;background:radial-gradient(ellipse at var(--fe-light-x,22%) var(--fe-light-y,12%),#fff9,transparent 46%);opacity:.25;mix-blend-mode:screen;pointer-events:none;z-index:2;transition:opacity var(--fe-duration)}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem{position:relative;z-index:3;transition:transform var(--fe-duration)}
 .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem>svg{stroke:var(--fe-social-metal);filter:drop-shadow(0 -1px 0 #ffedc3) drop-shadow(.7px 1px .15px #6c321b)}
 .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem svg [stroke="currentColor"]{stroke:var(--fe-social-metal)}
 .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem svg:is([fill="currentColor"]),.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem svg [fill="currentColor"]{fill:var(--fe-social-metal)}
@@ -87,7 +88,8 @@
  .footer-ed[data-motion="lift"] .footer-ed__social:hover,.footer-ed[data-motion="lift"] .footer-ed__top-button:hover{transform:translateY(-5px)}
  .footer-ed[data-motion="tilt"] .footer-ed__social:hover{transform:perspective(400px) rotateY(-12deg) translateY(-3px)}
  .footer-ed[data-motion="shine"] .footer-ed__social:hover{background:#fff4}
- .footer-ed:not([data-motion="none"]) .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:hover:after{opacity:.85}
+ .footer-ed:not([data-motion="none"]) .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:hover:after{opacity:.68}
+ .footer-ed:not([data-motion="none"]) .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:hover{box-shadow:0 12px 15px -9px #813e3580}
  .footer-ed:not([data-motion="none"]) .footer-ed__newsletter:hover{filter:brightness(1.025)}
 }
 @container footer-editorial (min-width:1051px){.footer-ed__navigation:has(>.footer-ed__column:nth-child(3):last-child){grid-template-columns:1fr 1.15fr 1.15fr}}
@@ -144,6 +146,6 @@
  .footer-ed__watermark[data-finish="signature"] svg{height:var(--fe-mobile-watermark-size)}
 }
 @keyframes footerLinksIn{from{opacity:0;translate:0 -4px}to{opacity:1;translate:0 0}}
-@media(prefers-reduced-motion:reduce){.footer-ed *{animation:none!important;transition:none!important;scroll-behavior:auto!important}.footer-ed .footer-ed__social:hover,.footer-ed .footer-ed__top-button:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.footer-ed *{animation:none!important;transition:none!important;scroll-behavior:auto!important}.footer-ed[data-motion] .footer-ed__social:hover,.footer-ed[data-motion] .footer-ed__top-button:hover{transform:none}}
 
 .footer-ed__utility:empty{display:none}
