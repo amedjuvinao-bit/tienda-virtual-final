@@ -548,7 +548,7 @@ export default function TrendingSection({ theme, previewProducts }) {
             );
 
             return (
-              <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block" title={floatingGlass ? product.name : undefined}>
+              <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block" data-story-actor="product" title={floatingGlass ? product.name : undefined}>
                 <div
                   className={floatingGlass ? "relative group trending-card--floating-glass" : "relative group bg-white border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col"}
                   style={floatingGlass ? undefined : { borderRadius: radius, overflow: "hidden" }}

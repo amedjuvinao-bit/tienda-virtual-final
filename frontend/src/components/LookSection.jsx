@@ -362,6 +362,7 @@ export default function LookSection({ theme, previewProducts }) {
     return (
       <button
         key="look-custom-hero"
+        data-story-actor="detail"
         type="button"
         aria-label="Mostrar imagen principal"
         aria-pressed={!selectedId}
@@ -398,6 +399,7 @@ export default function LookSection({ theme, previewProducts }) {
     return (
       <div
         key={prod.id}
+        data-story-actor="product"
         className={isMobile ? "w-[calc(50%-6px)] shrink-0 snap-start" : "w-full"}
         style={isMobile ? undefined : { maxWidth: thumbCardMaxWidthPx }}
       >
@@ -576,7 +578,7 @@ export default function LookSection({ theme, previewProducts }) {
         className="mx-auto grid grid-cols-1 md:grid-cols-[2fr_1fr] items-start"
         style={contentStyle}
       >
-        <div className="relative">
+        <div className="relative" data-story-actor="hero">
           <div
             className={`${getAspectClass(style.mainImageAspect)} relative w-full overflow-hidden group ${
               mainImage ? "cursor-none" : ""

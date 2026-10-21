@@ -4,10 +4,12 @@ import StorefrontStory from '../../../components/StorefrontStory';
 import { STORY_PRESETS, normalizeStoryConfig, storySectionOrder } from '../../../lib/storefrontStoryConfig';
 import './sectionMotionPanel.css';
 
+const sampleImages=['/categorias/collection-older.webp','/categorias/collection-atlas.webp','/complementos/cristal-floral-mobile.webp'];
+function sceneImages(theme,id){const config=theme.sections?.find(item=>item.id===id)?.config || {};const values=[config.heroImage,config.imageSrc,config.image,config.fanImage,theme.banner?.imageUrl];const found=values.filter(value=>typeof value==='string'&&/^(?:\/(?!\/)|https:\/\/)/i.test(value));return [...found,...sampleImages];}
 const labels={tendencia:'Tendencias',look:'Looks',complementos:'Complementos',categorias:'Categorías',instagram:'Instagram',tiktok:'TikTok',informacion:'Información'};
 export default function SectionMotionPreview({config,theme={}}) {
   const c=normalizeStoryConfig(config), viewport=useRef(null), uid=useId().replace(/:/g,'');
-  const [device,setDevice]=useState('desktop'), [progress,setProgress]=useState(0), [playing,setPlaying]=useState(false);
+  const [device,setDevice]=useState('desktop'), [progress,setProgress]=useState(0), [playing,setPlaying]=useState(false),[replay,setReplay]=useState(0);
   const progressRef=useRef(progress);progressRef.current=progress;
   const [reduced,setReduced]=useState(()=>window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false);
   const sections=storySectionOrder(theme.sections).filter(id=>!theme.sections?.some(item=>item.id===id && item.enabled===false));
@@ -48,15 +50,15 @@ export default function SectionMotionPreview({config,theme={}}) {
     <div className="story-preview__devices" role="group" aria-label="Dispositivo del recorrido">{[['desktop','Escritorio',Monitor],['mobile','Móvil',Smartphone]].map(([id,label,Icon])=><button key={id} type="button" aria-label={'Recorrido en '+label.toLowerCase()} aria-pressed={device===id} onClick={()=>setDevice(id)}><Icon size={15}/>{label}</button>)}</div>
     <div className="story-preview__screen" data-device={device}>
       <div ref={viewport} className="story-preview__viewport" aria-label="Demostración de las transiciones">
-        <StorefrontStory config={c} viewportRef={viewport} mobileOverride={device==='mobile'}>
+        <StorefrontStory config={c} viewportRef={viewport} mobileOverride={device==='mobile'} replayKey={replay}>
           {chapters.map((chapter,index)=><section key={chapter.id} id={'story-preview-'+uid+'-'+chapter.id} className="story-preview__chapter" data-tone={index%3}>
-            <div className="story-preview__content"><span className="story-preview__counter">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2><div className="story-preview__visuals"><article aria-label="Imagen de demostración"><span/></article><article aria-label="Detalle de demostración"><span/></article></div><span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
+            <div className="story-preview__content"><span className="story-preview__counter" data-story-actor="eyebrow">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2><div className="story-preview__visuals"><article className="story-preview__hero" data-story-actor="hero" aria-label="Imagen principal de demostración"><img src={sceneImages(theme,chapter.id)[0]} alt=""/></article><div className="story-preview__details">{sceneImages(theme,chapter.id).slice(1,4).map((src,i)=><article data-story-actor="product" key={i} aria-label={'Pieza de demostración '+(i+1)}><img src={src} alt=""/></article>)}</div></div><span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
           </section>)}
         </StorefrontStory>
       </div>
     </div>
-    <div className="story-preview__controls"><button type="button" disabled={reduced} onClick={()=>{if(!playing)setProgress(0);setPlaying(!playing);}}>{playing?<Pause size={15}/>:<Play size={15}/>} {playing?'Pausar':'Reproducir recorrido'}</button><button type="button" aria-label="Reiniciar recorrido" onClick={()=>{setPlaying(false);setProgress(0);}}><RotateCcw size={15}/></button></div>
+    <div className="story-preview__controls"><button type="button" disabled={reduced} onClick={()=>{if(!playing)setProgress(0);setPlaying(!playing);}}>{playing?<Pause size={15}/>:<Play size={15}/>} {playing?'Pausar':'Reproducir recorrido'}</button><button type="button" aria-label="Reiniciar recorrido" onClick={()=>{setPlaying(false);setProgress(0);setReplay(value=>value+1);}}><RotateCcw size={15}/></button></div>
     <label className="story-preview__scrubber">Recorrer secciones<input type="range" min="0" max="100" value={progress} onChange={event=>{setPlaying(false);setProgress(Number(event.target.value));}}/><span>{chapters[current]?.title}</span></label>
-    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para ver la transición completa. Las escenas alternan su composición para apreciar el relevo; la tienda conserva sus propios diseños.'}</p>
+    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para ver la transición completa. La tarjeta abre y presenta su imagen, sus piezas y su acción en secuencia. La presentación termina aunque detengas el recorrido.'}</p>
   </aside>;
 }
