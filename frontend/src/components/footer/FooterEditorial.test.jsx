@@ -54,10 +54,32 @@ describe('footer Firma editorial',()=>{
     fireEvent.click(content.getByRole('button',{name:'Redes'}));
     fireEvent.change(screen.getByRole('combobox',{name:'Estilo de los iconos sociales'}),{target:{value:'custom'}});
     expect(saved.footer.editorial.socialPresentation).toBe('custom');
-    fireEvent.click(content.getByRole('button',{name:'Marca'}));
+    fireEvent.click(content.getByRole('button',{name:'Marca de agua'}));
     fireEvent.change(screen.getByRole('combobox',{name:'Acabado del nombre grande'}),{target:{value:'engraved'}});
     expect(saved.footer.editorial.watermarkStyle).toBe('engraved');
     expect(saved.footer).toMatchObject({instagram:'https://instagram.com/demo',instagramIcon:'/mi-icono.png',editorial:{brandName:'Mi negocio'}});
+  });
+  it('ajusta el color y toda la transparencia desde una sola pestaña y conserva los cambios al recargar',async()=>{
+    let saved;
+    function Harness({initial}){const [theme,setTheme]=useState(initial);saved=theme;return <FooterPanel theme={theme} setPath={(path,value)=>setTheme(old=>({...old,footer:{...old.footer,[path.slice(7)]:value}}))}/>;}
+    const view=render(<Harness initial={makeTheme({editorial:{brandName:'Mi negocio'}})}/>);
+    const openWatermark=()=>fireEvent.click(within(screen.getByRole('navigation',{name:'Contenido del footer'})).getByRole('button',{name:'Marca de agua'}));
+    openWatermark();
+    const color=screen.getByRole('textbox',{name:'Color de la marca de agua: código hexadecimal'});
+    fireEvent.change(color,{target:{value:'#123456'}});
+    const slider=screen.getByRole('slider',{name:'Transparencia de la marca de agua'});
+    fireEvent.change(slider,{target:{value:'65'}});
+    expect(saved.footer.editorial).toMatchObject({watermarkColor:'#123456',watermarkOpacity:35});
+    await waitFor(()=>expect(document.querySelector('.footer-ed').style.getPropertyValue('--fe-watermark-alpha')).toBe('0.35'));
+    expect(document.querySelector('.footer-ed').style.getPropertyValue('--fe-signature-color')).toBe('#123456');
+    const persisted=JSON.parse(JSON.stringify(saved));view.unmount();render(<Harness initial={persisted}/>);openWatermark();
+    expect(screen.getByRole('textbox',{name:'Color de la marca de agua: código hexadecimal'})).toHaveValue('#123456');
+    const reloadedSlider=screen.getByRole('slider',{name:'Transparencia de la marca de agua'});
+    expect(reloadedSlider).toHaveValue('65');
+    fireEvent.change(reloadedSlider,{target:{value:'0'}});expect(saved.footer.editorial.watermarkOpacity).toBe(100);
+    await waitFor(()=>expect(document.querySelector('.footer-ed').style.getPropertyValue('--fe-watermark-alpha')).toBe('1'));
+    fireEvent.change(reloadedSlider,{target:{value:'100'}});expect(saved.footer.editorial.watermarkOpacity).toBe(0);
+    await waitFor(()=>expect(document.querySelector('.footer-ed').style.getPropertyValue('--fe-watermark-alpha')).toBe('0'));
   });
   it('reemplaza las letras de prueba de la captura por textos comerciales y toma la identidad real de la tienda',()=>{
     const footer={subscribeText:'ASDADASDASDASD',column1Title:'ERWRWERWERWERWERW',column2Title:'WERWERWERWERWER',column3Title:'WRWERWERWERWER',editorial:{brandName:'Tu marca',brandMode:'text',watermarkText:'TU MARCA',socialIconStyle:'relief'},copyright:'© Tu marca · Todos los derechos reservados.'};

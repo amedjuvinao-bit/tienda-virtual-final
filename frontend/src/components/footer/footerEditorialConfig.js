@@ -23,7 +23,7 @@ const bounds = {
   backgroundX:[0,100], backgroundY:[0,100], backgroundZoom:[100,180],
   maxWidth:[640,2200], minHeight:[0,1400], paddingX:[12,160], paddingTop:[0,180], paddingBottom:[0,120],
   contentGap:[16,120], headlineSize:[28,110], brandSize:[24,100], columnTitleSize:[18,42], bodySize:[12,24],
-  watermarkSize:[80,400], watermarkOpacity:[0,90], materialOpacity:[0,100], glassOpacity:[0,80], blur:[0,32], depth:[0,30], radius:[12,50],
+  watermarkSize:[80,400], watermarkOpacity:[0,100], materialOpacity:[0,100], glassOpacity:[0,80], blur:[0,32], depth:[0,30], radius:[12,50],
   socialSize:[36,90], socialGap:[4,32], buttonWidth:[100,320], buttonHeight:[44,80],
   mobilePadding:[14,40], mobileHeadlineSize:[26,60], mobileBrandSize:[24,64], mobileWatermarkSize:[48,140], animationDuration:[150,1000],
 };
@@ -58,6 +58,7 @@ export function normalizeEditorialOptions(footer = {}, {store={},theme={}} = {})
   const input=footer.editorial && typeof footer.editorial==='object' ? footer.editorial : {};
   const c={...FOOTER_EDITORIAL_DEFAULTS,...input};
   for(const [key,[min,max]] of Object.entries(bounds)) { const n=Number(c[key]);c[key]=Number.isFinite(n)?Math.min(max,Math.max(min,n)):FOOTER_EDITORIAL_DEFAULTS[key]; }
+  if(/^#[\da-f]{3}$/i.test(c.watermarkColor || ''))c.watermarkColor='#'+[...c.watermarkColor.slice(1)].map(digit=>digit+digit).join('');
   for(const key of ['headingColor','textColor','accentColor','glassTint','edgeColor','buttonColor','buttonTextColor','backgroundColor','watermarkColor','socialButtonColor','socialIconColor']) if(!/^#[\da-f]{6}$/i.test(c[key] || '')) c[key]=FOOTER_EDITORIAL_DEFAULTS[key];
   for(const key of ['headline','description','brandName','brandTagline','watermarkText','backToTopLabel','successMessage','errorMessage','titleFont','bodyFont']) c[key]=typeof c[key]==='string'?c[key].slice(0,1000):FOOTER_EDITORIAL_DEFAULTS[key];
   for(const key of Object.keys(FOOTER_EDITORIAL_DEFAULTS).filter(key=>key.endsWith('Enabled'))) c[key]=c[key]!==false;

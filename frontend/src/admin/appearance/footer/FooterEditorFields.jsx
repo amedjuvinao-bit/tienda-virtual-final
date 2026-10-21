@@ -6,6 +6,9 @@ export function TextField({label,value,onChange,area=false,...props}) {
   return <FooterField label={label}><Tag {...props} rows={area?2:undefined} value={value ?? ''} onChange={e=>onChange(e.target.value)}/></FooterField>;
 }
 export function NumberField({label,value,onChange,min,max}) {return <TextField label={label} type="number" min={min} max={max} value={value} onChange={value=>onChange(value===''?'':Number(value))}/>;}
+export function RangeField({label,value,onChange,min=0,max=100}) {
+  return <FooterField label={label}><div className="footer-editor__range"><input type="range" min={min} max={max} step={1} value={value} aria-label={label} aria-valuetext={value+' % de transparencia'} onChange={e=>onChange(Number(e.target.value))}/><output aria-hidden="true">{value}%</output></div></FooterField>;
+}
 export function SelectField({label,value,onChange,options}) {return <FooterField label={label}><select value={value} onChange={e=>onChange(e.target.value)}>{options.map(([key,text])=><option key={key} value={key}>{text}</option>)}</select></FooterField>;}
 export function CheckField({label,checked,onChange}) {return <label className="footer-editor__check"><span>{label}</span><input type="checkbox" checked={!!checked} onChange={e=>onChange(e.target.checked)}/></label>;}
 export function ImageField({label,value,onChange,onUpload,pending}) {

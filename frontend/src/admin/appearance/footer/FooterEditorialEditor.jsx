@@ -5,14 +5,14 @@ import StorefrontSectionPreview from '../sections/ui/StorefrontSectionPreview';
 import { ColorField } from '../sections/ui/SectionsPanelUI';
 import { INFO_FONT_OPTIONS } from '../sections/info/infoSectionHelpers';
 import { FOOTER_EDITORIAL_DEFAULTS, FOOTER_SOCIALS, footerColumns, footerLegalText, normalizeEditorialOptions, safeFooterImage, safeFooterLink } from '../../../components/footer/footerEditorialConfig';
-import { TextField, NumberField, SelectField, CheckField, ImageField, FooterLinkEditor } from './FooterEditorFields';
+import { TextField, NumberField, RangeField, SelectField, CheckField, ImageField, FooterLinkEditor } from './FooterEditorFields';
 import './footerEditor.css';
 
 const sizes={
   composition:[['maxWidth','Ancho máximo (px)',640,2200],['minHeight','Alto mínimo en escritorio (px)',0,1400],['paddingX','Margen lateral (px)',12,160],['paddingTop','Espacio superior (px)',0,180],['paddingBottom','Espacio inferior (px)',0,120],['contentGap','Separación entre bloques (px)',16,120]],
   glass:[['materialOpacity','Intensidad de la textura (%)',0,100],['glassOpacity','Tinte del vidrio (%)',0,80],['blur','Desenfoque (px)',0,32],['depth','Profundidad de las capas (px)',0,30],['radius','Esquinas (px)',12,50]],
-  typography:[['headlineSize','Título principal (px)',28,110],['brandSize','Nombre de la marca (px)',24,100],['columnTitleSize','Títulos de columna (px)',18,42],['bodySize','Texto y enlaces (px)',12,24],['watermarkSize','Tamaño del nombre grande (px)',80,400],['watermarkOpacity','Intensidad del nombre grande (%)',0,90]],
-  mobile:[['mobilePadding','Margen lateral en móvil (px)',14,40],['mobileHeadlineSize','Título en móvil (px)',26,60],['mobileBrandSize','Marca en móvil (px)',24,64],['mobileWatermarkSize','Nombre grande en móvil (px)',48,140]],
+  typography:[['headlineSize','Título principal (px)',28,110],['brandSize','Nombre de la marca (px)',24,100],['columnTitleSize','Títulos de columna (px)',18,42],['bodySize','Texto y enlaces (px)',12,24]],
+  mobile:[['mobilePadding','Margen lateral en móvil (px)',14,40],['mobileHeadlineSize','Título en móvil (px)',26,60],['mobileBrandSize','Marca en móvil (px)',24,64]],
 };
 export default function FooterEditorialEditor({theme,store,setPath,uploadToCloudinaryViaBackend,uploading,setUploading}) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), columns=footerColumns(footer);
@@ -41,7 +41,7 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
         <SectionEditorSteps sectionName="Pie de página" value={step} onChange={setStep} items={[{value:'content',label:'Contenido',hint:'Edita un grupo a la vez. Todos los textos de la tienda son configurables.'},{value:'design',label:'Diseño',hint:'Ajusta el material, los colores y los tamaños. Comprueba cada dispositivo en la vista previa.'}]}/>
       </div>
       {error && <p role="alert">{error}</p>}
-      {step==='content'?<SectionEditorCardTabs label="Contenido del footer" labels={['Suscripción','Marca','Redes','Enlaces','Legal','Mensajes']}>
+      {step==='content'?<SectionEditorCardTabs label="Contenido del footer" labels={['Suscripción','Marca','Marca de agua','Redes','Enlaces','Legal','Mensajes']}>
         <div className="footer-editor__card">
           <CheckField label="Mostrar suscripción" checked={c.newsletterEnabled} onChange={value=>edit('newsletterEnabled',value)}/>
           <TextField label="Título principal" area value={c.headline} onChange={value=>edit('headline',value)}/>
@@ -56,9 +56,15 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
           <SelectField label="Presentación de la marca" value={c.brandMode} onChange={value=>edit('brandMode',value)} options={[["store","Logo configurado de la tienda"],["text","Nombre de la tienda"],["image","Solo logo"],["both","Logo y nombre"]]}/>
           {c.brandMode!=='text' && <>{image('Imagen del logo','logoUrl')}<NumberField label="Ancho del logo (px)" value={footer.logoSizePx??220} min={60} max={260} onChange={value=>write('logoSizePx',value)}/><p>Si no eliges otro logo, se utiliza el del encabezado. El nombre se toma de Configuración → Tienda cuando este campo queda vacío.</p></>}
           <TextField label="Texto bajo la marca (opcional)" area value={c.brandTagline} onChange={value=>edit('brandTagline',value)}/>
-          <CheckField label="Mostrar nombre grande al fondo" checked={c.watermarkEnabled} onChange={value=>edit('watermarkEnabled',value)}/>
+        </div>
+        <div className="footer-editor__card">
+          <CheckField label="Mostrar marca de agua" checked={c.watermarkEnabled} onChange={value=>edit('watermarkEnabled',value)}/>
+          <TextField label="Texto grande (vacío usa la marca)" value={c.watermarkText} placeholder={c.brandName} onChange={value=>edit('watermarkText',value)}/>
+          <ColorField label="Color de la marca de agua" value={footer.editorial?.watermarkColor??c.watermarkColor} onChange={value=>edit('watermarkColor',value)}/>
+          <RangeField label="Transparencia de la marca de agua" value={Math.round(100-c.watermarkOpacity)} onChange={value=>edit('watermarkOpacity',100-value)}/>
+          <p>0 %: máxima intensidad. 100 %: invisible. La vista previa se actualiza al instante.</p>
           <SelectField label="Acabado del nombre grande" value={c.watermarkStyle} onChange={value=>edit('watermarkStyle',value)} options={[["signature","Marca de agua con relieve satinado"],["engraved","Contorno grabado delicado"]]}/>
-          <TextField label="Texto grande (vacío usa la marca)" value={c.watermarkText} onChange={value=>edit('watermarkText',value)}/>
+          <div className="footer-editor__grid"><NumberField label="Tamaño en escritorio (px)" value={footer.editorial?.watermarkSize??c.watermarkSize} min={80} max={400} onChange={value=>edit('watermarkSize',value)}/><NumberField label="Tamaño en móvil (px)" value={footer.editorial?.mobileWatermarkSize??c.mobileWatermarkSize} min={48} max={140} onChange={value=>edit('mobileWatermarkSize',value)}/></div>
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar redes sociales" checked={c.socialsEnabled} onChange={value=>edit('socialsEnabled',value)}/>
@@ -102,7 +108,7 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
           <div className="footer-editor__grid">{[['backgroundX','Posición horizontal (%)',0,100],['backgroundY','Posición vertical (%)',0,100],['backgroundZoom','Zoom del fondo (%)',100,180]].map(([key,label,min,max])=><NumberField key={key} label={label} min={min} max={max} value={c[key]} onChange={value=>edit(key,value)}/>)}</div>
         </div>
         <div className="footer-editor__card">
-          {numbers('typography')}{colors([['headingColor','Color de los títulos'],['textColor','Color del texto'],['watermarkColor','Color del nombre grande']])}
+          {numbers('typography')}{colors([['headingColor','Color de los títulos'],['textColor','Color del texto']])}
           <SelectField label="Fuente de títulos y marca" value={c.titleFont} onChange={value=>edit('titleFont',value)} options={[[FOOTER_EDITORIAL_DEFAULTS.titleFont,"Bodoni · Modelo aprobado"],["Georgia, serif","Georgia"],...INFO_FONT_OPTIONS.filter(item=>![FOOTER_EDITORIAL_DEFAULTS.titleFont,'Georgia, serif'].includes(item.value)).map(item=>[item.value,item.label])]}/>
           <SelectField label="Fuente de los textos" value={c.bodyFont} onChange={value=>edit('bodyFont',value)} options={[["Inter, system-ui, sans-serif","Inter de la referencia"],...INFO_FONT_OPTIONS.map(item=>[item.value,item.label])]}/>
         </div>
