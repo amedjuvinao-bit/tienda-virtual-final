@@ -17,6 +17,10 @@ describe('footer Firma editorial',()=>{
     expect(screen.getByRole('link',{name:'Instagram'})).toHaveAttribute('href','https://instagram.com/mi.cuenta');
     expect(screen.queryByRole('link',{name:'Facebook'})).not.toBeInTheDocument();
     const accordion=screen.getByRole('button',{name:'Descubre'});expect(accordion).toHaveAttribute('aria-expanded','false');fireEvent.click(accordion);expect(accordion).toHaveAttribute('aria-expanded','true');
+    const support=screen.getByRole('button',{name:'Atención al cliente'});fireEvent.click(support);
+    expect(support).toHaveAttribute('aria-expanded','true');expect(accordion).toHaveAttribute('aria-expanded','false');
+    expect(document.getElementById(support.getAttribute('aria-controls'))).toHaveAttribute('aria-labelledby',support.id);
+    fireEvent.click(support);expect(support).toHaveAttribute('aria-expanded','false');
   });
   it('confirma la suscripción solo después del guardado y muestra un error cuando falla',async()=>{
     const post=vi.spyOn(api,'post').mockResolvedValueOnce({data:{ok:true}}).mockRejectedValueOnce(new Error('offline'));

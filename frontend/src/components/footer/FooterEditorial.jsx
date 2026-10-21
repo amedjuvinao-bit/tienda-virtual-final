@@ -44,7 +44,7 @@ export default function FooterEditorial({ theme, store, preview=false }) {
           {(['text','both'].includes(c.brandMode) || !showLogo) && c.brandName && <p className="footer-ed__brand-name">{c.brandName}</p>}
           {c.brandTagline && <p className="footer-ed__tagline">{c.brandTagline}</p>}
         </div>}
-        <FooterNavigation columns={columns}/>
+        <FooterNavigation columns={columns} mobileNavigation={c.mobileNavigation}/>
       </div>
       <div className="footer-ed__utility">
         <FooterSocials footer={footer} theme={theme} config={c}/>
