@@ -25,7 +25,7 @@ const sizes = {
   Medidas: [['maxWidth','Ancho máximo (px)',600,2200],['minHeight','Alto mínimo (px)',0,1400],['paddingX','Margen lateral (px)',0,160],['paddingY','Espacio vertical (px)',0,200],['cardHeight','Alto de los bloques (px)',220,700],['cardPadding','Espacio interior (px)',16,64],['gap','Separación (px)',12,80],['radius','Esquinas (px)',0,60],['featuredLift','Elevación del destacado (px)',0,80],['featuredWidth','Ancho del destacado (%)',100,140]],
   Cristal: [['depth','Separación de capas (px)',0,40],['materialOpacity','Intensidad de la textura (%)',0,100],['glassOpacity','Color del vidrio (%)',0,90],['blur','Desenfoque (px)',0,32]],
   Tipografía: [['titleSize','Tamaño del título (px)',24,100],['cardTitleSize','Títulos de bloque (px)',18,48],['bodySize','Texto de bloque (px)',12,28],['iconSize','Tamaño de iconos (px)',40,160]],
-  Móvil: [['mobileTitleSize','Título en móvil (px)',22,60],['mobileCardHeight','Alto de bloque en móvil (px)',220,600],['mobilePadding','Margen lateral en móvil (px)',12,48],['mobileGap','Separación en móvil (px)',16,64],['mobileIconSize','Icono en móvil (px)',40,120]],
+  Móvil: [['mobileTitleSize','Título en móvil (px)',22,60],['mobileCardHeight','Alto mínimo de bloque en móvil (px)',140,600],['mobilePadding','Margen lateral en móvil (px)',12,48],['mobileGap','Separación en móvil (px)',12,64],['mobileIconSize','Icono en móvil (px)',40,120]],
 };
 export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uploading }) {
   const sections = Array.isArray(theme?.sections) ? theme.sections : [];
@@ -127,7 +127,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
         <Field label="Fuente de los títulos"><Select value={c.titleFont} onChange={value=>glass({titleFont:value})} options={[{value:'Georgia, serif',label:'Editorial de la referencia'},...INFO_FONT_OPTIONS]}/></Field>
         <Field label="Fuente de los textos"><Select value={c.bodyFont} onChange={value=>glass({bodyFont:value})} options={[{value:'Inter, system-ui, sans-serif',label:'Inter de la referencia'},...INFO_FONT_OPTIONS]}/></Field>
       </div>
-      <div className={panel}>{numbers('Móvil')}<p className="text-xs opacity-65">Los bloques se apilan en el mismo orden, sin deslizador. El alto crece si el contenido lo necesita.</p></div>
+      <div className={panel}><Field label="Composición móvil"><Select value={c.mobileLayout} onChange={value=>glass({mobileLayout:value})} options={options([['compact','Bloques compactos con icono lateral'],['cards','Tarjetas verticales']])}/></Field>{numbers('Móvil')}<p className="text-xs opacity-65">La composición compacta reduce el espacio vertical y da más espacio al contenido y a los botones. El contenido crece si hace falta, sin desplazamiento lateral.</p></div>
       <div className={panel}>
         <Field label="Animación de entrada"><Select value={c.entranceAnimation} onChange={value=>glass({entranceAnimation:value})} options={INFO_ANIMATION_OPTIONS}/></Field>
         <Field label="Al pasar el cursor"><Select value={c.hoverAnimation} onChange={value=>glass({hoverAnimation:value})} options={options([['none','Sin efecto'],['lift','Elevar y reflejar'],['tilt','Perspectiva suave'],['shine','Reflejo de cristal']])}/></Field>

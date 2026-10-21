@@ -33,6 +33,7 @@ class StorefrontPreviewBoundary extends React.Component {
 
 function previewDevice(mode = 'auto') {
   if (mode === 'mobile') return { width: 390, label: 'Móvil' };
+  if (mode === 'tablet') return { width: 768, label: 'Tablet' };
   if (mode === 'wide') return { width: 1920, label: 'Escritorio amplio' };
   if (mode === 'desktop') return { width: 1280, label: 'Escritorio' };
   if (typeof window === 'undefined') return { width: 1280, label: 'Escritorio' };
@@ -46,6 +47,8 @@ export default function StorefrontSectionPreview({ section, theme }) {
   const canvasRef = useRef(null);
   const [viewMode, setViewMode] = useState('auto');
   const [frame, setFrame] = useState(() => ({ ...previewDevice(), scale: 1, height: 320 }));
+  const canChooseDevice = ['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion'].includes(section.id);
+  const fitWholeSection = section.id === 'informacion';
   const sections = theme.sections || [];
   const previewSections = sections.map((entry) => entry.id === section.id
     ? { ...(section.id === 'complementos' ? normalizeComplementosSection(entry) : entry), enabled: true } : entry);
@@ -58,21 +61,39 @@ export default function StorefrontSectionPreview({ section, theme }) {
     if (!viewport) return undefined;
 
     const measure = () => {
-      const device = previewDevice(['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok'].includes(section.id) ? viewMode : 'auto');
+      const device = previewDevice(canChooseDevice ? viewMode : 'auto');
       const availableWidth = viewport.clientWidth || device.width;
-      const scale = Math.min(1, availableWidth / device.width);
-      const height = Math.ceil(Math.max(260, canvas?.scrollHeight || 0) * scale);
-      setFrame((current) => current.width === device.width && current.scale === scale && current.height === height
-        ? current : { ...device, scale, height });
+      const contentHeight = Math.max(260, canvas?.scrollHeight || 0);
+      let maxHeight = Infinity;
+      if (fitWholeSection) {
+        const preview = viewport.parentElement;
+        const column = viewport.closest('.section-editor-layout__preview');
+        const scrollArea = viewport.closest('[data-section-modal-scroll]');
+        const positive = value => Number.isFinite(value) && value > 0 ? value : Infinity;
+        const chromeHeight = [...(preview?.children || [])].filter(el => el !== viewport).reduce((sum, el) => {
+          const css = window.getComputedStyle(el);
+          return sum + el.offsetHeight + (parseFloat(css.marginTop) || 0) + (parseFloat(css.marginBottom) || 0);
+        }, 2);
+        const scrollStyle = scrollArea && window.getComputedStyle(scrollArea);
+        const modalSpace = scrollArea ? scrollArea.clientHeight - (parseFloat(scrollStyle.paddingTop) || 0) - (parseFloat(scrollStyle.paddingBottom) || 0) : Infinity;
+        const columnSpace = column ? parseFloat(window.getComputedStyle(column).maxHeight) : Infinity;
+        maxHeight = Math.min(positive(parseFloat(window.getComputedStyle(viewport).maxHeight)), Math.max(80, Math.min(positive(modalSpace), positive(columnSpace)) - chromeHeight));
+      }
+      const scale = Math.min(1, availableWidth / device.width, Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight / contentHeight : 1);
+      const height = fitWholeSection ? Math.floor(contentHeight * scale) : Math.ceil(contentHeight * scale);
+      const left = fitWholeSection ? Math.max(0, (availableWidth - device.width * scale) / 2) : 0;
+      setFrame((current) => current.width === device.width && current.scale === scale && current.height === height && current.left === left
+        ? current : { ...device, scale, height, left });
     };
 
     measure();
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     observer?.observe(viewport);
     if (canvas) observer?.observe(canvas);
+    if (fitWholeSection) [...viewport.parentElement.children].filter(el => el !== viewport).forEach(el => observer?.observe(el));
     window.addEventListener('resize', measure);
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [section?.id, viewMode, overview.status]);
+  }, [section?.id, viewMode, overview.status, canChooseDevice, fitWholeSection]);
 
   const PublicSection = PUBLIC_SECTIONS[section?.id];
   const colors = theme.colors || {};
@@ -105,16 +126,17 @@ export default function StorefrontSectionPreview({ section, theme }) {
     '--line-height-base': String(fonts.lineHeight || 1.6),
   };
   return (
-    <section className="section-real-preview" aria-label="Vista real de la tienda">
+    <section className={'section-real-preview' + (fitWholeSection ? ' section-real-preview--fit' : '')} aria-label="Vista real de la tienda">
       <header className="section-real-preview__header">
         <div><span className="section-real-preview__eyebrow">Vista previa · {frame.label} {frame.width} px</span><h3>Así se verá en la tienda</h3></div>
-        {['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok'].includes(section.id) && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
-          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ['desktop', 'Vista escritorio'], ...(['categorias', 'instagram', 'tiktok'].includes(section.id) ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
-            <button key={value} type="button" aria-pressed={viewMode === value} onClick={() => setViewMode(value)}>{label}</button>)}
+        {canChooseDevice && <div className="section-real-preview__devices" role="group" aria-label="Dispositivo de vista previa">
+          {[['auto', 'Automática'], ['mobile', 'Vista móvil'], ...(fitWholeSection ? [['tablet', 'Vista tablet']] : []), ['desktop', 'Vista escritorio'], ...(['categorias', 'instagram', 'tiktok'].includes(section.id) ? [['wide', 'Vista escritorio amplio']] : [])].map(([value, label]) =>
+            <button key={value} type="button" aria-label={label} aria-pressed={viewMode === value} onClick={() => setViewMode(value)}>{fitWholeSection ? ({ auto: 'Auto', mobile: 'Móvil', tablet: 'Tablet', desktop: 'Escritorio' })[value] : label}</button>)}
         </div>}
       </header>
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
       <div ref={viewportRef} className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
+        if (section.id === 'informacion' && event.target.closest('.info-glass button')) return;
         if (section.id === 'tiktok' && event.target.closest('.tk-stage button, .tk-stage input')) return;
         if (section.id === 'instagram' && event.target.closest('.ig-journal button, .ig-journal__connection-state button')) return;
         if (section.id === 'look' && event.target.closest('.look-editorial__card-image, .look-editorial__hero-controls button, .look-editorial__rail-controls button')) return;
@@ -126,7 +148,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
           <div className="section-real-preview__empty"><strong>Agrega contenido para verla aquí.</strong><span>{overview.detail}. Completa los datos en Contenido y la vista aparecerá automáticamente.</span></div>
         ) : PublicSection ? (
           <div className="section-real-preview__stage" style={{ height: frame.height }}>
-            <div ref={canvasRef} className="section-real-preview__canvas" style={{ width: frame.width, transform: `scale(${frame.scale})` }}>
+            <div ref={canvasRef} className="section-real-preview__canvas" style={{ width: frame.width, left: frame.left || 0, transform: `scale(${frame.scale})` }}>
               <StorefrontPreviewBoundary key={section.id}>
                 <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>
                   <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} />

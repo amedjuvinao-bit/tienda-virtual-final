@@ -115,7 +115,7 @@ describe('editor de secciones, etapa 3', () => {
     fireEvent.resize(window);
     await waitFor(() => expect(preview.querySelector('.section-real-preview__canvas')).toHaveStyle({ width: '1280px', transform: 'scale(0.5)' }));
     expect(viewport).toHaveStyle('--color-primary: #345678');
-    expect(within(preview).getByAltText('Banner horizontal')).toHaveAttribute('src', '/banner-horizontal.jpg');
+    expect(await within(preview).findByAltText('Banner horizontal')).toHaveAttribute('src', '/banner-horizontal.jpg');
   });
 
   it('muestra la tarjeta guardada en la vista de Tendencia si el catálogo no responde', async () => {

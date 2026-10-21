@@ -25,8 +25,8 @@ export const INFO_GLASS_DEFAULTS = {
   titleFont: 'Georgia, serif', bodyFont: 'Inter, system-ui, sans-serif',
   showNumbers: true, iconStyle: 'relief', hoverAnimation: 'lift',
   entranceAnimation: 'fade-up', animationDuration: 550,
-  mobileTitleSize: 38, mobileCardHeight: 310, mobilePadding: 22,
-  mobileGap: 30, mobileIconSize: 90,
+  mobileLayout: 'compact', mobileTitleSize: 34, mobileCardHeight: 160, mobilePadding: 18,
+  mobileGap: 20, mobileIconSize: 72,
 };
 const numeric = {
   maxWidth: [600, 2200], minHeight: [0, 1400], paddingX: [0, 160], paddingY: [0, 200],
@@ -35,8 +35,8 @@ const numeric = {
   backgroundPositionX: [0, 100], backgroundPositionY: [0, 100], backgroundZoom: [100, 180],
   materialOpacity: [0, 100], glassOpacity: [0, 90], blur: [0, 32],
   titleSize: [24, 100], cardTitleSize: [18, 48], bodySize: [12, 28], iconSize: [40, 160],
-  animationDuration: [150, 1600], mobileTitleSize: [22, 60], mobileCardHeight: [220, 600],
-  mobilePadding: [12, 48], mobileGap: [16, 64], mobileIconSize: [40, 120],
+  animationDuration: [150, 1600], mobileTitleSize: [22, 60], mobileCardHeight: [140, 600],
+  mobilePadding: [12, 48], mobileGap: [12, 64], mobileIconSize: [40, 120],
 };
 export function safeInfoHref(value) {
   if (typeof value !== 'string') return '';
@@ -57,6 +57,12 @@ export function safeInfoImage(value) {
 export function normalizeInfoGlass(config = {}) {
   const input = config.glass && typeof config.glass === 'object' ? config.glass : {};
   const c = { ...INFO_GLASS_DEFAULTS, ...input };
+  // Upgrade the former tall default while preserving deliberately customized dimensions.
+  if (input.mobileLayout === undefined) {
+    for (const [key, oldValue] of Object.entries({ mobileTitleSize: 38, mobileCardHeight: 310, mobilePadding: 22, mobileGap: 30, mobileIconSize: 90 })) {
+      if (Number(input[key]) === oldValue) c[key] = INFO_GLASS_DEFAULTS[key];
+    }
+  }
   for (const [key, [min, max]] of Object.entries(numeric)) {
     const n = Number(c[key]);
     c[key] = Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : INFO_GLASS_DEFAULTS[key];
@@ -64,7 +70,7 @@ export function normalizeInfoGlass(config = {}) {
   for (const key of ['cardTint','edgeColor','accentColor','titleColor','bodyColor','buttonColor','buttonTextColor','sideButtonColor','backgroundColor']) {
     if (!/^#[a-f\d]{6}$/i.test(c[key] || '')) c[key] = INFO_GLASS_DEFAULTS[key];
   }
-  const choices = { backgroundMode: ['satin','inherit','color','image'], material: ['artwork','css'],
+  const choices = { backgroundMode: ['satin','inherit','color','image'], material: ['artwork','css'], mobileLayout: ['compact','cards'],
     iconStyle: ['relief','line'], hoverAnimation: ['none','lift','tilt','shine'],
     entranceAnimation: ['none','fade-in','fade-up','zoom-in','slide-left','slide-right'] };
   for (const [key, list] of Object.entries(choices)) if (!list.includes(c[key])) c[key] = INFO_GLASS_DEFAULTS[key];

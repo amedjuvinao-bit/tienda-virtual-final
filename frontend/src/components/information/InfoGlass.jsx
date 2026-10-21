@@ -15,7 +15,7 @@ function Details({ card, config, trigger, onClose }) {
     doc.body.style.overflow = 'hidden';
     dialog.current?.querySelector('button')?.focus();
     const keydown = event => {
-      if (event.key === 'Escape') { event.preventDefault(); close.current(); }
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current(); }
       if (event.key === 'Tab') {
         const items = [...(dialog.current?.querySelectorAll('button,a[href],input,textarea,select,[tabindex="0"]') || [])].filter(el => !el.disabled);
         const first = items[0], last = items.at(-1);
@@ -70,8 +70,8 @@ export default function InfoGlass({ section, theme }) {
     backgroundPosition: c.backgroundPositionX + '% ' + c.backgroundPositionY + '%',
     backgroundSize: c.backgroundZoom === 100 ? 'cover' : c.backgroundZoom + '% auto',
   };
-  return <section ref={root} className={'info-glass info-glass--' + c.hoverAnimation + (entered ? ' info-glass--entered' : '')}
-    data-material={c.material} data-entrance={c.entranceAnimation} style={style} aria-label={c.eyebrow || c.title || 'Información'}>
+  return <div className="info-glass-viewport"><section ref={root} className={'info-glass info-glass--' + c.hoverAnimation + (entered ? ' info-glass--entered' : '')}
+    data-material={c.material} data-mobile-layout={c.mobileLayout} data-entrance={c.entranceAnimation} style={style} aria-label={c.eyebrow || c.title || 'Información'}>
     <div className="info-glass-inner">
       {(c.eyebrow || c.title) && <header className="info-glass-header">
         {c.eyebrow && <div className="info-glass-eyebrow"><span>{c.eyebrow}</span><i aria-hidden="true" /></div>}
@@ -111,5 +111,5 @@ export default function InfoGlass({ section, theme }) {
       </div>
     </div>
     {detail && <Details card={detail.card} config={c} trigger={detail.trigger} onClose={() => setDetail(null)} />}
-  </section>;
+  </section></div>;
 }
