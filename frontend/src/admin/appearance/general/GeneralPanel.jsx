@@ -452,6 +452,14 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     checked={globalConfig.scrollButtons.mobileEnabled !== false}
                     onChange={(value) => setPath("global.scrollButtons.mobileEnabled", value)}
                   />
+                  {globalConfig.scrollButtons.mobileEnabled !== false && <Select
+                    label="Lado del control móvil"
+                    value={globalConfig.scrollButtons.mobilePosition === "left" ? "left" : "right"}
+                    onChange={(event) => setPath("global.scrollButtons.mobilePosition", event.target.value)}
+                  >
+                    <option value="right">Borde derecho</option>
+                    <option value="left">Borde izquierdo</option>
+                  </Select>}
                   <p className="text-xs opacity-70">En móvil, las flechas se detienen al inicio de cada sección. Con desplazamiento suave, siguen el ritmo elegido en Animación global. Puedes interrumpir el recorrido tocando la pantalla.</p>
 
                   <Select
@@ -488,7 +496,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                   />
 
                   <Select
-                    label="Posición horizontal"
+                    label="Posición horizontal (escritorio)"
                     value={globalConfig.scrollButtons.position || "center"}
                     onChange={(e) => setPath("global.scrollButtons.position", e.target.value)}
                   >

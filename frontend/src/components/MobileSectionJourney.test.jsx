@@ -44,3 +44,10 @@ it('bloquea pulsaciones repetidas mientras recorre una sección y libera el cont
   expect(screen.getByRole('navigation')).toHaveAttribute('aria-busy','false');
   expect(screen.getByRole('button',{name:'Siguiente sección'})).toBeEnabled();
 });
+
+it('coloca la guía en el borde aunque el escritorio conserve controles centrados y permite cambiar de lado',()=>{
+  const view=setup({position:'center'});
+  expect(screen.getByRole('navigation')).toHaveAttribute('data-align','right');
+  view.rerender(<ScrollButton config={{sectionIds:['first','middle','last'],position:'center',mobilePosition:'left',behavior:'auto'}}/>);
+  expect(screen.getByRole('navigation')).toHaveAttribute('data-align','left');
+});
