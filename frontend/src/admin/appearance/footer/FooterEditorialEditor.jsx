@@ -57,7 +57,7 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
           {c.brandMode!=='text' && <>{image('Imagen del logo','logoUrl')}<NumberField label="Ancho del logo (px)" value={footer.logoSizePx??220} min={60} max={260} onChange={value=>write('logoSizePx',value)}/><p>Si no eliges otro logo, se utiliza el del encabezado. El nombre se toma de Configuración → Tienda cuando este campo queda vacío.</p></>}
           <TextField label="Texto bajo la marca (opcional)" area value={c.brandTagline} onChange={value=>edit('brandTagline',value)}/>
           <CheckField label="Mostrar nombre grande al fondo" checked={c.watermarkEnabled} onChange={value=>edit('watermarkEnabled',value)}/>
-          <SelectField label="Acabado del nombre grande" value={c.watermarkStyle} onChange={value=>edit('watermarkStyle',value)} options={[["signature","Firma en relieve con contraste"],["engraved","Contorno grabado delicado"]]}/>
+          <SelectField label="Acabado del nombre grande" value={c.watermarkStyle} onChange={value=>edit('watermarkStyle',value)} options={[["signature","Marca de agua con relieve satinado"],["engraved","Contorno grabado delicado"]]}/>
           <TextField label="Texto grande (vacío usa la marca)" value={c.watermarkText} onChange={value=>edit('watermarkText',value)}/>
         </div>
         <div className="footer-editor__card">

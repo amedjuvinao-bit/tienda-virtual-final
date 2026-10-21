@@ -64,9 +64,13 @@
 .footer-ed__watermark svg{width:100%;height:calc(var(--fe-watermark-size) * .86);display:block;overflow:visible}
 .footer-ed__watermark text{font:400 180px var(--fe-title-font);stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linejoin:round}
 .footer-ed__watermark[data-finish="signature"] svg{height:var(--fe-watermark-size)}
-.footer-ed__watermark[data-finish="signature"] text{font-weight:600}
-.footer-ed__signature-depth{fill:color-mix(in srgb,var(--fe-signature-color) 82%,#35101b);transform:translate(.8px,1.4px);opacity:.7}
-.footer-ed__signature-face{stroke:color-mix(in srgb,var(--fe-signature-color) 65%,var(--fe-accent));stroke-width:.25!important;paint-order:stroke fill;filter:drop-shadow(0 -1px 0 #fff0df99) drop-shadow(0 2px 1px #71321d44)}
+/* Translucent letter faces let the satin show through. Opposing light/shadow
+   edges supply relief without turning the watermark into an opaque heading. */
+.footer-ed__watermark[data-finish="signature"] text{font-weight:400}
+.footer-ed__signature-shadow{fill:none;stroke:var(--fe-signature-color);stroke-width:1.25!important;transform:translate(-.7px,-.8px);opacity:.45;filter:blur(.2px)}
+.footer-ed__signature-light{fill:none;stroke:var(--fe-edge);stroke-width:1.65!important;transform:translate(.7px,1.1px);opacity:.95}
+.footer-ed__signature-face{stroke:none;filter:none}
+.footer-ed__signature-rim{fill:none;stroke:color-mix(in srgb,var(--fe-accent) 45%,var(--fe-tint));stroke-width:.55!important;opacity:.75}
 .footer-ed__watermark[data-finish="engraved"] text{fill:none}
 .footer-ed__engraving-shadow{stroke:#8f412e;transform:translate(-.35px,-.45px);opacity:.65}
 .footer-ed__engraving-light{stroke:#fff3df;transform:translate(.35px,.7px);stroke-width:.7!important;opacity:.95}
