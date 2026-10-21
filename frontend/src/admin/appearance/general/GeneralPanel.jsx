@@ -196,7 +196,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
 
         <div className="appearance-general__workspace" data-tool={activeMainTab}>
           <div className="appearance-general__form">
-        {activeMainTab === 'motion' && <SectionMotionPanel uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} config={globalConfig.sectionMotion} onChange={value=>setPath('global.sectionMotion',value)}/>}
+        {activeMainTab === 'motion' && <SectionMotionPanel theme={theme} uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} config={globalConfig.sectionMotion} onChange={value=>setPath('global.sectionMotion',value)}/>}
 
         {activeMainTab === "whatsapp" && (
           <section className="appearance-general__section">

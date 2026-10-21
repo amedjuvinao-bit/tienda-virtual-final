@@ -4,8 +4,7 @@ import StorefrontStory from '../../../components/StorefrontStory';
 import { STORY_PRESETS, normalizeStoryConfig, storySectionOrder } from '../../../lib/storefrontStoryConfig';
 import './sectionMotionPanel.css';
 
-const sampleImages=['/categorias/collection-older.webp','/categorias/collection-atlas.webp','/complementos/cristal-floral-mobile.webp'];
-function sceneImages(theme,id){const config=theme.sections?.find(item=>item.id===id)?.config || {};const values=[config.heroImage,config.imageSrc,config.image,config.fanImage,theme.banner?.imageUrl];const found=values.filter(value=>typeof value==='string'&&/^(?:\/(?!\/)|https:\/\/)/i.test(value));return [...found,...sampleImages];}
+function sceneImages(theme,id){const config=theme.sections?.find(item=>item.id===id)?.config || {};const values=[config.heroImage,config.imageSrc,config.image,config.fanImage,theme.banner?.imageUrl];const found=values.filter(value=>typeof value==='string'&&/^(?:\/(?!\/)|https:\/\/)/i.test(value));return [...new Set(found)];}
 const labels={tendencia:'Tendencias',look:'Looks',complementos:'Complementos',categorias:'Categorías',instagram:'Instagram',tiktok:'TikTok',informacion:'Información'};
 export default function SectionMotionPreview({config,theme={}}) {
   const c=normalizeStoryConfig(config), viewport=useRef(null), uid=useId().replace(/:/g,'');
@@ -54,12 +53,12 @@ export default function SectionMotionPreview({config,theme={}}) {
   return <aside className="appearance-general__preview story-preview" aria-label="Vista previa de la animación global">
     <div className="appearance-general__preview-header"><span className="appearance-general__preview-live" aria-hidden="true"/><strong>Vista previa del movimiento</strong><small>{c.experience==='journey'?'Camino continuo':STORY_PRESETS.find(item=>item.id===c.preset).name}</small></div>
     <div className="story-preview__devices" role="group" aria-label="Dispositivo del recorrido">{[['desktop','Escritorio',Monitor],['mobile','Móvil',Smartphone]].map(([id,label,Icon])=><button key={id} type="button" aria-label={'Recorrido en '+label.toLowerCase()} aria-pressed={device===id} onClick={()=>setDevice(id)}><Icon size={15}/>{label}</button>)}</div>
-    <div className="story-preview__screen" data-device={device}>
+    <div className="story-preview__screen" data-device={device} data-admin-storefront-preview="true" style={{'--color-bg':theme.colors?.background || '#ffffff','--color-text':theme.colors?.text || '#111827','--color-accent':theme.colors?.accent || '#64748b',fontFamily:theme.fonts?.base || 'system-ui, sans-serif'}}>
       <div ref={viewport} className="story-preview__viewport" aria-label="Demostración de las transiciones">
         <StorefrontStory config={c} viewportRef={viewport} mobileOverride={device==='mobile'} replayKey={replay}>
-          {chapters.map((chapter,index)=><section key={chapter.id} id={'story-preview-'+uid+'-'+chapter.id} className="story-preview__chapter" data-tone={index%3}>
-            <div className="story-preview__content"><span className="story-preview__counter" data-story-actor="eyebrow">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2><div className="story-preview__visuals"><article className="story-preview__hero" data-story-actor="hero" aria-label="Imagen principal de demostración"><img src={sceneImages(theme,chapter.id)[0]} alt=""/></article><div className="story-preview__details">{sceneImages(theme,chapter.id).slice(1,4).map((src,i)=><article data-story-actor="product" key={i} aria-label={'Pieza de demostración '+(i+1)}><img src={src} alt=""/></article>)}</div></div><span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
-          </section>)}
+          {chapters.map((chapter,index)=>{const images=sceneImages(theme,chapter.id);return <section key={chapter.id} id={'story-preview-'+uid+'-'+chapter.id} className="story-preview__chapter" data-tone={index%3}>
+            <div className="story-preview__content"><span className="story-preview__counter" data-story-actor="eyebrow">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2>{images.length>0?<div className="story-preview__visuals" data-single={images.length===1}><article className="story-preview__hero" data-story-actor="hero" aria-label="Imagen configurada de la sección"><img src={images[0]} alt=""/></article>{images.length>1 && <div className="story-preview__details">{images.slice(1,4).map((src,i)=><article data-story-actor="product" key={src} aria-label={'Imagen configurada '+(i+2)}><img src={src} alt=""/></article>)}</div>}</div>:<p className="story-preview__empty" data-story-actor="hero">Las imágenes que configures en esta tienda aparecerán aquí.</p>}<span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
+          </section>;})}
         </StorefrontStory>
       </div>
     </div>

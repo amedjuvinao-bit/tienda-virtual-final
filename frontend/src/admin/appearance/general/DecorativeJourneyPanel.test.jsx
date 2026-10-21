@@ -8,11 +8,13 @@ afterEach(cleanup);
 it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al recargar',async()=>{
   let saved;const upload=vi.fn().mockResolvedValue('https://cdn.example.test/adorno.webp');
   function Editor({initial}){
-    const [theme,setTheme]=useState(initial || {global:{whatsapp:{phone:'573001234567'}}});saved=theme;
+    const [theme,setTheme]=useState(initial || {colors:{accent:'#146fca'},global:{whatsapp:{phone:'573001234567'}}});saved=theme;
     return <GeneralPanel theme={theme} uploadToCloudinaryViaBackend={upload} setPath={(path,value)=>setTheme(old=>({...old,global:{...old.global,[path.split('.')[1]]:value}}))}/>;
   }
   const view=render(<Editor/>);fireEvent.click(screen.getByRole('button',{name:/Animación global Transiciones/}));
   expect(screen.getByRole('button',{name:'Camino continuo',exact:true})).toHaveAttribute('aria-pressed','true');
+  expect(screen.queryByRole('button',{name:/Usar flores incluidas|Usar fondo incluido/})).not.toBeInTheDocument();
+  expect(document.querySelectorAll('.story-preview img,.story-preview image')).toHaveLength(0);
   fireEvent.change(screen.getByLabelText('Seleccionar imagen para Adorno principal'),{target:{files:[new File(['image'],'adorno.png',{type:'image/png'})]}});
   await waitFor(()=>expect(saved.global.sectionMotion.journey.image).toBe('https://cdn.example.test/adorno.webp'));
   expect(upload).toHaveBeenCalledOnce();
@@ -22,12 +24,19 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   fireEvent.change(screen.getByRole('slider',{name:'Cantidad de adornos'}),{target:{value:'26'}});
   fireEvent.change(screen.getByRole('slider',{name:'Profundidad del camino'}),{target:{value:'90'}});
   fireEvent.change(screen.getByRole('slider',{name:'Opacidad de los adornos'}),{target:{value:'75'}});
+  expect(screen.getByRole('checkbox',{name:'Mostrar hilo que une los adornos'})).not.toBeChecked();
   fireEvent.click(screen.getByRole('checkbox',{name:'Mostrar hilo que une los adornos'}));
-  fireEvent.click(screen.getByRole('button',{name:'Fondo',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Usar solo el color de la tienda'}));
+  expect(screen.getByLabelText('Color del hilo')).toHaveValue('#146fca');
+  fireEvent.change(screen.getByLabelText('Color del hilo'),{target:{value:'#123456'}});
+  fireEvent.click(screen.getByRole('button',{name:'Usar el color de la tienda'}));
+  expect(saved.global.sectionMotion.journey.stemColor).toBe('');
+  fireEvent.click(screen.getByRole('button',{name:'Fondo',exact:true}));
+  expect(screen.getByRole('checkbox',{name:'Usar un fondo continuo para toda la tienda'})).not.toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox',{name:'Usar un fondo continuo para toda la tienda'}));fireEvent.click(screen.getByRole('button',{name:'Usar solo el color de la tienda'}));
   fireEvent.click(screen.getByRole('button',{name:'Móvil',exact:true}));
   fireEvent.change(screen.getByRole('slider',{name:'Tamaño de adornos en móvil'}),{target:{value:'100'}});
   fireEvent.change(screen.getByRole('slider',{name:'Cantidad de adornos en móvil'}),{target:{value:'8'}});
-  expect(saved.global.sectionMotion).toMatchObject({experience:'journey',journey:{image:'https://cdn.example.test/adorno.webp',path:'edges',size:230,density:26,depth:90,opacity:75,stemVisible:false,backgroundImage:'',mobileSize:100,mobileDensity:8}});
+  expect(saved.global.sectionMotion).toMatchObject({experience:'journey',journey:{image:'https://cdn.example.test/adorno.webp',path:'edges',size:230,density:26,depth:90,opacity:75,stemVisible:true,stemColor:'',unifyBackground:true,backgroundImage:'',mobileSize:100,mobileDensity:8}});
   expect(saved.global.whatsapp.phone).toBe('573001234567');
   const persisted=JSON.parse(JSON.stringify(saved));view.unmount();render(<Editor initial={{...persisted,global:normalizeGlobalConfig(persisted.global)}}/>);
   fireEvent.click(screen.getByRole('button',{name:/Animación global Transiciones/}));
@@ -35,4 +44,7 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   fireEvent.click(screen.getByRole('button',{name:'Recorrido',exact:true}));expect(screen.getByRole('slider',{name:'Tamaño de los adornos'})).toHaveValue('230');
   fireEvent.click(screen.getByRole('button',{name:'Entradas por sección',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Camino continuo',exact:true}));
   expect(saved.global.sectionMotion.journey.image).toBe('https://cdn.example.test/adorno.webp');
+  fireEvent.click(screen.getByRole('button',{name:'Quitar',exact:true}));
+  expect(saved.global.sectionMotion.journey.image).toBe('');
+  expect(document.querySelectorAll('.story-preview image')).toHaveLength(0);
 });

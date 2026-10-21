@@ -31,9 +31,10 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   }
   function paint(){
     frame=0;if(disposed)return;
-    const active=config.enabled && config.experience==='journey' && !(compact() && config.mobileMode==='off');
+    const enabled=config.enabled && config.experience==='journey' && !(compact() && config.mobileMode==='off');
+    const active=enabled && Boolean(c.image || c.secondaryImage || c.stemVisible);
     container.dataset.journeyActive=String(active);
-    container.dataset.journeyShared=String(active && c.unifyBackground);
+    container.dataset.journeyShared=String(enabled && c.unifyBackground);
     if(!active)return;
     if(dirty)measure();if(width<1 || height<1)return;
     const phase=reduce?.matches?0:journeyPhase(scroll(),tops,height);
@@ -54,14 +55,14 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     stem.setAttribute('d',path.d);stem.style.opacity=c.stemVisible?String(c.opacity/100*.65):'0';
     stem.setAttribute('stroke-width',adapted?'1.2':'2');
     pieces.forEach((piece,i)=>{
-      if(i>=count){piece.setAttribute('opacity','0');return;}
+      if(i>=count || !(c.image || c.secondaryImage)){piece.setAttribute('opacity','0');return;}
       const u=((i/count+phase*.028)%1+1)%1,p=pointOnJourney(path,u);
       const z=Math.sin(u*Math.PI*2+phase*.45),depth=c.depth/100;
       const scale=size/100*(.78+(i*7%11)/22)*(1+z*depth*.24);
       const mirror=i%4===1?-1:1,angle=p.angle+(mirror<0?-50:50)+(i%2?-7:10);
       piece.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${(scale*mirror).toFixed(3)} ${scale.toFixed(3)})`);
       piece.setAttribute('opacity',String(c.opacity/100*(.86+z*depth*.12)));
-      piece.style.filter=`blur(${Math.max(0,-z)*depth*(adapted ? .6 : 1.1)}px) drop-shadow(0 ${4+depth*6}px ${4+depth*3}px #77384929)`;
+      piece.style.filter=`blur(${Math.max(0,-z)*depth*(adapted ? .6 : 1.1)}px) drop-shadow(0 ${4+depth*6}px ${4+depth*3}px rgb(0 0 0 / .14))`;
     });
     masks.forEach((rect,i)=>{
       const box=boxes[i];if(!box){rect.setAttribute('width','0');return;}

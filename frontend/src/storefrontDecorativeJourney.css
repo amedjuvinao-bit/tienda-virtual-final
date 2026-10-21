@@ -2,7 +2,7 @@
 .story-journey-world{position:absolute;top:0;left:0;display:block;width:100%;overflow:hidden;pointer-events:none!important}
 .storefront-sections:not([data-journey-active="true"])>.story-journey-pin{display:none}
 .story-journey-world image{pointer-events:none}
-.storefront-sections[data-journey-shared="true"]{background-color:var(--color-bg,#f5d0c7);background-image:var(--journey-shared-image);background-size:cover;background-position:center;background-attachment:fixed}
+.storefront-sections[data-journey-shared="true"]{background-color:var(--color-bg,Canvas);background-image:var(--journey-shared-image);background-size:cover;background-position:center;background-attachment:fixed}
 .storefront-sections[data-journey-shared="true"] .storefront-chapter-surface{background:transparent}
 /* Only background artwork is unified. Product images, glass, layout and local
    component interactions continue to be rendered by their own components. */

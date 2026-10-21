@@ -9,6 +9,6 @@
 
 Preset identifiers and existing saved settings remain compatible. There are no added covers or blank opening panels. Desktop and mobile previews in the administration panel use the same production engine; the automatic preview pauses at each section so its sequence can finish.
 
-## Continuous floral journey
+## Configured decoration example
 
-`floral-journey.mp4` shows the default continuous ornament world, using the real Home components and repository imagery. Categories and Information share the same mounted ornaments while the page scrolls between them. See `docs/motion/decorative-journey.md` for the controls, resource prompt and behavior.
+`floral-journey.mp4` shows a continuous ornament world explicitly configured with a floral resource, using the real Home components and repository imagery. New stores start without decorative images, a connecting line or a shared background; this clip is an optional example. Categories and Information share the same mounted ornaments while the page scrolls between them. See `docs/motion/decorative-journey.md` for the controls, resource prompt and behavior.

@@ -11,13 +11,13 @@ function fixture(raw={},options={}){
   vi.spyOn(window,'innerHeight','get').mockReturnValue(800);vi.spyOn(window,'scrollY','get').mockImplementation(()=>y);
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{frame=callback;return 1;});vi.spyOn(window,'cancelAnimationFrame').mockImplementation(()=>{});
   const root=document.createElement('div');
-  root.innerHTML='<div data-journey-pin><svg data-journey-world><mask data-journey-mask>'+Array.from({length:8},()=>'<rect data-journey-occluder/>').join('')+'</mask><path data-journey-stem/>'+Array.from({length:28},(_,i)=>`<g data-journey-piece="${i}"><image href="/flowers.webp"/></g>`).join('')+'</svg></div><section data-story-top="0"><button>Explorar</button><video></video></section><section data-story-top="800"><h2>Segunda sección</h2><iframe></iframe></section><section data-story-top="2400"><h2>Final</h2></section>';
+  root.innerHTML='<div data-journey-pin><svg data-journey-world><mask data-journey-mask>'+Array.from({length:8},()=>'<rect data-journey-occluder/>').join('')+'</mask><path data-journey-stem/>'+Array.from({length:28},(_,i)=>`<g data-journey-piece="${i}"><image href="/test-resource.webp"/></g>`).join('')+'</svg></div><section data-story-top="0"><button>Explorar</button><video></video></section><section data-story-top="800"><h2>Segunda sección</h2><iframe></iframe></section><section data-story-top="2400"><h2>Final</h2></section>';
   Object.defineProperty(root,'offsetWidth',{value:1200});
   [...root.querySelectorAll('section')].forEach(node=>Object.defineProperty(node,'offsetHeight',{value:800}));
   root.querySelector('[data-journey-world]').getBoundingClientRect=()=>({top:0,left:0,width:1200,height:800});
   root.querySelector('button').getBoundingClientRect=()=>({top:600-y,left:450,right:650,bottom:650-y,width:200,height:50});
   document.body.append(root);
-  const stop=mountDecorativeJourney(root,normalizeStoryConfig(raw),options);
+  const stop=mountDecorativeJourney(root,normalizeStoryConfig({...raw,journey:{image:'/test-resource.webp',...raw.journey}}),options);
   const flush=()=>{const cb=frame;frame=null;cb?.();};
   const scroll=top=>{y=top;window.dispatchEvent(new Event('scroll'));flush();};
   return {root,reduce,mobile,stop,flush,scroll};
@@ -48,5 +48,26 @@ it('no deja un bucle de cuadros activo ni eventos después de desmontarse',()=>{
 });
 it('limita la carga visual y rechaza imágenes con protocolos que no son de imagen',()=>{
   const c=normalizeDecorativeJourney({density:999,mobileDensity:999,size:999,image:'javascript:alert(1)',backgroundImage:'data:text/html,test',stemColor:'red'});
-  expect(c).toMatchObject({density:28,mobileDensity:14,size:320,image:'',backgroundImage:'',stemColor:'#b99466'});
+  expect(c).toMatchObject({density:28,mobileDensity:14,size:320,image:'',backgroundImage:'',stemColor:''});
+});
+
+it('empieza sin recursos de un negocio y conserva los fondos de cada sección',()=>{
+  expect(normalizeDecorativeJourney()).toMatchObject({image:'',secondaryImage:'',backgroundImage:'',unifyBackground:false,stemVisible:false,stemColor:''});
+  const f=fixture({journey:{image:''}});
+  expect(f.root.dataset.journeyActive).toBe('false');expect(f.root.dataset.journeyShared).toBe('false');
+  expect(f.root.querySelector('[data-journey-stem]').getAttribute('d')).toBeNull();f.stop();
+});
+it('permite elegir solo un fondo compartido o solo la línea sin imágenes obligatorias',()=>{
+  const background=fixture({journey:{image:'',unifyBackground:true,backgroundImage:'/store-background.webp'}});
+  expect(background.root.dataset.journeyActive).toBe('false');expect(background.root.dataset.journeyShared).toBe('true');background.stop();
+  const line=fixture({journey:{image:'',stemVisible:true}});
+  expect(line.root.dataset.journeyActive).toBe('true');expect(line.root.querySelector('[data-journey-stem]').getAttribute('d')).toBeTruthy();
+  expect([...line.root.querySelectorAll('[data-journey-piece]')].every(node=>node.getAttribute('opacity')==='0')).toBe(true);line.stop();
+});
+it('mantiene los recursos de cada tienda y no restaura imágenes al quitarlas',()=>{
+  const first=normalizeDecorativeJourney({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemVisible:true,stemColor:'#1286aa',unifyBackground:true});
+  const second=normalizeDecorativeJourney({image:'https://cdn.example.test/second-store.png'});
+  expect(first).toMatchObject({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemColor:'#1286aa',unifyBackground:true});
+  expect(second).toMatchObject({image:'https://cdn.example.test/second-store.png',backgroundImage:'',stemVisible:false,unifyBackground:false});
+  expect(normalizeDecorativeJourney({...first,image:'',backgroundImage:''})).toMatchObject({image:'',backgroundImage:''});
 });

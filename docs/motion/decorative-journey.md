@@ -1,21 +1,23 @@
 # Continuous decorative journey
 
-The storefront now uses one persistent floral composition across its sections. The path changes continuously with scroll; scrolling back restores the same pose. The ornament nodes stay mounted, and no product content or media players are cloned.
+The storefront now uses one persistent composition of store-configured images across its sections. The path changes continuously with scroll; scrolling back restores the same pose. The ornament nodes stay mounted, and no product content or media players are cloned.
 
 ## Administration
 
 Apariencia → General → Animación global → Camino continuo.
 
-- **Adornos**: upload a transparent PNG/WebP as the main decoration, optionally add a second one, or restore the included flowers.
+- **Adornos**: upload a transparent PNG/WebP as the main decoration, optionally add a second one. There is no business-specific preset or restore button.
 - **Recorrido**: choose enveloping curves or side paths, size, density, depth, opacity and the connecting thread.
 - **Fondo**: use one continuous background image, the store background color, or the individual section backgrounds.
 - **Móvil**: set the size and density used by the adapted mobile mode.
 
-The existing intensity, pace, mobile mode and global enable controls remain available. The old section entrance presets can be selected under “Entradas por sección”. Their identifiers and saved values remain compatible. Existing configurations without an `experience` field use the approved continuous journey by default.
+The existing intensity, pace, mobile mode and global enable controls remain available. The old section entrance presets can be selected under “Entradas por sección”. Their identifiers and saved values remain compatible. Existing configurations without an `experience` field use the continuous journey mode. Its initial state has no images, no connecting line and no shared background. Nothing decorative appears until the store configures it. Explicitly saved resources remain intact.
 
 Settings are stored under `theme.global.sectionMotion.experience` and `theme.global.sectionMotion.journey`, using the existing appearance save endpoint. No account credentials or backend setup are required for the decoration.
 
-The admin preview uses the production journey engine. The preview scales decoration sizes to its viewport; changing sections keeps the same ornaments. The mobile navigation still targets the natural section starts.
+The admin preview uses the production journey engine, the current store’s images and its configured colors. It does not fall back to a boutique catalog or stock background. The preview scales decoration sizes to its viewport; changing sections keeps the same ornaments. The mobile navigation still targets the natural section starts.
+
+The connecting line follows the store accent color unless the administrator selects an override. Its color can be reset to the store color. A shared background is opt-in and can use a store-uploaded image or its background color. Clearing an image leaves it empty rather than restoring stock artwork.
 
 ## Rendering and accessibility
 
@@ -23,9 +25,9 @@ A single SVG world is pinned within the storefront. A continuous cubic curve det
 
 Reduced motion keeps a static decorative pose. The mobile “off” mode removes the decoration and restores the individual backgrounds. The desktop and mobile density limits bound the rendering cost. Changing to a different route, disabling the effect or unmounting releases its observers and listeners.
 
-## Resource
+## Optional demonstration resource
 
-- Project asset: `frontend/public/story/floral-spray-v1.webp`.
+- Example asset (not referenced by runtime defaults): `frontend/public/story/floral-spray-v1.webp`.
 - True alpha, 640 × 768, optimized WebP. The original generated PNG is preserved outside the repository.
 - Generated using the built-in image generation tool, with `frontend/public/looks-editorial-background.webp` as a style and palette reference. This is new artwork, rather than an extraction of the original background.
 
@@ -41,4 +43,4 @@ Final generation prompt:
 - Admin preview in Chromium: desktop/mobile, interactive scrubber, settings persistence and reduced motion.
 - Production build.
 
-`docs/previews/floral-journey.mp4` is captured from the real Home components with a controlled demonstration catalog. It shows a continuous scroll from Categories to Information. The existing four-preset clip remains available as a legacy entrance comparison.
+`docs/previews/floral-journey.mp4` is captured from the real Home components with an explicitly configured floral resource and a controlled demonstration catalog; this is an example, not the initial state for stores. It shows a continuous scroll from Categories to Information. The existing four-preset clip remains available as a legacy entrance comparison.

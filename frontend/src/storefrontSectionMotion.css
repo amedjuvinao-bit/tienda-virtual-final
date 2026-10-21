@@ -1,5 +1,5 @@
 /* The original section artwork is the stage. No added covers or blank panels. */
-.storefront-sections{position:relative;display:block;min-width:0;overflow:clip;isolation:isolate;background:var(--color-bg,#f5d0c7)}
+.storefront-sections{position:relative;display:block;min-width:0;overflow:clip;isolation:isolate;background:var(--color-bg,Canvas)}
 .storefront-section-shell:empty{display:none}
 .storefront-sections>section{margin:0;min-width:0}
 .storefront-chapter-surface{position:relative;display:flow-root;min-width:0;height:100%;background:inherit}
