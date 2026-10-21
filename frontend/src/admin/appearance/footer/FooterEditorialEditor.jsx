@@ -11,8 +11,8 @@ import './footerEditor.css';
 const sizes={
   composition:[['maxWidth','Ancho máximo (px)',640,2200],['minHeight','Alto mínimo en escritorio (px)',0,1400],['paddingX','Margen lateral (px)',12,160],['paddingTop','Espacio superior (px)',0,180],['paddingBottom','Espacio inferior (px)',0,120],['contentGap','Separación entre bloques (px)',16,120]],
   glass:[['materialOpacity','Intensidad de la textura (%)',0,100],['glassOpacity','Tinte del vidrio (%)',0,80],['blur','Desenfoque (px)',0,32],['depth','Profundidad de las capas (px)',0,30],['radius','Esquinas (px)',12,50]],
-  typography:[['headlineSize','Título principal (px)',28,110],['brandSize','Nombre de la marca (px)',24,100],['columnTitleSize','Títulos de columna (px)',18,42],['bodySize','Texto y enlaces (px)',12,24],['watermarkSize','Tamaño del grabado (px)',80,400],['watermarkOpacity','Intensidad del grabado (%)',0,90]],
-  mobile:[['mobilePadding','Margen lateral en móvil (px)',14,40],['mobileHeadlineSize','Título en móvil (px)',26,60],['mobileBrandSize','Marca en móvil (px)',24,64],['mobileWatermarkSize','Grabado en móvil (px)',48,140]],
+  typography:[['headlineSize','Título principal (px)',28,110],['brandSize','Nombre de la marca (px)',24,100],['columnTitleSize','Títulos de columna (px)',18,42],['bodySize','Texto y enlaces (px)',12,24],['watermarkSize','Tamaño del nombre grande (px)',80,400],['watermarkOpacity','Intensidad del nombre grande (%)',0,90]],
+  mobile:[['mobilePadding','Margen lateral en móvil (px)',14,40],['mobileHeadlineSize','Título en móvil (px)',26,60],['mobileBrandSize','Marca en móvil (px)',24,64],['mobileWatermarkSize','Nombre grande en móvil (px)',48,140]],
 };
 export default function FooterEditorialEditor({theme,store,setPath,uploadToCloudinaryViaBackend,uploading,setUploading}) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), columns=footerColumns(footer);
@@ -56,17 +56,19 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
           <SelectField label="Presentación de la marca" value={c.brandMode} onChange={value=>edit('brandMode',value)} options={[["store","Logo configurado de la tienda"],["text","Nombre de la tienda"],["image","Solo logo"],["both","Logo y nombre"]]}/>
           {c.brandMode!=='text' && <>{image('Imagen del logo','logoUrl')}<NumberField label="Ancho del logo (px)" value={footer.logoSizePx??220} min={60} max={260} onChange={value=>write('logoSizePx',value)}/><p>Si no eliges otro logo, se utiliza el del encabezado. El nombre se toma de Configuración → Tienda cuando este campo queda vacío.</p></>}
           <TextField label="Texto bajo la marca (opcional)" area value={c.brandTagline} onChange={value=>edit('brandTagline',value)}/>
-          <CheckField label="Mostrar nombre grabado al fondo" checked={c.watermarkEnabled} onChange={value=>edit('watermarkEnabled',value)}/>
-          <TextField label="Texto del grabado (vacío usa la marca)" value={c.watermarkText} onChange={value=>edit('watermarkText',value)}/>
+          <CheckField label="Mostrar nombre grande al fondo" checked={c.watermarkEnabled} onChange={value=>edit('watermarkEnabled',value)}/>
+          <SelectField label="Acabado del nombre grande" value={c.watermarkStyle} onChange={value=>edit('watermarkStyle',value)} options={[["signature","Firma en relieve con contraste"],["engraved","Contorno grabado delicado"]]}/>
+          <TextField label="Texto grande (vacío usa la marca)" value={c.watermarkText} onChange={value=>edit('watermarkText',value)}/>
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar redes sociales" checked={c.socialsEnabled} onChange={value=>edit('socialsEnabled',value)}/>
-          <SelectField label="Estilo de los iconos sociales" value={c.socialIconStyle} onChange={value=>edit('socialIconStyle',value)} options={[["custom","Logos configurados de la tienda"],["minimal","Iconos simples"]]}/>
+          <SelectField label="Estilo de los iconos sociales" value={c.socialPresentation} onChange={value=>edit('socialPresentation',value)} options={[["medallions","Cristal color vino con etiquetas"],["custom","Mis logos personalizados"],["minimal","Iconos sencillos"]]}/>
           <SelectField label="Configurar red social" value={social} onChange={setSocial} options={FOOTER_SOCIALS.map(item=>[item.key,item.label])}/>
           <TextField label={'Enlace de '+FOOTER_SOCIALS.find(item=>item.key===social).label} value={footer[social] || ''} onChange={value=>write(social,value)} placeholder="https://…"/>
           {footer[social] && !/^https?:\/\//i.test(safeFooterLink(footer[social])) && <p role="alert">Introduce un enlace http o https válido para mostrar esta red.</p>}
-          {c.socialIconStyle==='custom' && image('Imagen del icono (opcional)',social+'Icon')}
-          <p>Se usan las imágenes de cada red sin relieve añadido. Si no hay imagen, aparece un icono simple. Las redes sin un enlace válido se ocultan.</p>
+          {c.socialPresentation==='custom' && image('Imagen del icono (opcional)',social+'Icon')}
+          <p>Cada botón abre su red social. Los enlaces y las imágenes guardadas se conservan al cambiar el estilo.</p>
+          {c.socialPresentation==='medallions' && colors([['socialButtonColor','Color de los botones sociales'],['socialIconColor','Color de los símbolos']])}
           <div className="footer-editor__grid"><NumberField label="Tamaño de los iconos (px)" min={36} max={90} value={c.socialSize} onChange={value=>edit('socialSize',value)}/><NumberField label="Separación entre iconos (px)" min={4} max={32} value={c.socialGap} onChange={value=>edit('socialGap',value)}/></div>
         </div>
         <div className="footer-editor__card">
@@ -100,7 +102,7 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
           <div className="footer-editor__grid">{[['backgroundX','Posición horizontal (%)',0,100],['backgroundY','Posición vertical (%)',0,100],['backgroundZoom','Zoom del fondo (%)',100,180]].map(([key,label,min,max])=><NumberField key={key} label={label} min={min} max={max} value={c[key]} onChange={value=>edit(key,value)}/>)}</div>
         </div>
         <div className="footer-editor__card">
-          {numbers('typography')}{colors([['headingColor','Color de los títulos'],['textColor','Color del texto']])}
+          {numbers('typography')}{colors([['headingColor','Color de los títulos'],['textColor','Color del texto'],['watermarkColor','Color del nombre grande']])}
           <SelectField label="Fuente de títulos y marca" value={c.titleFont} onChange={value=>edit('titleFont',value)} options={[[FOOTER_EDITORIAL_DEFAULTS.titleFont,"Bodoni · Modelo aprobado"],["Georgia, serif","Georgia"],...INFO_FONT_OPTIONS.filter(item=>![FOOTER_EDITORIAL_DEFAULTS.titleFont,'Georgia, serif'].includes(item.value)).map(item=>[item.value,item.label])]}/>
           <SelectField label="Fuente de los textos" value={c.bodyFont} onChange={value=>edit('bodyFont',value)} options={[["Inter, system-ui, sans-serif","Inter de la referencia"],...INFO_FONT_OPTIONS.map(item=>[item.value,item.label])]}/>
         </div>

@@ -47,15 +47,27 @@
 .footer-ed__social-list{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:var(--fe-social-gap);min-width:0}
 /* Use uploaded brand artwork as-is; native fallbacks stay light and legible. */
 .footer-ed__social{display:grid;place-items:center;position:relative;flex:0 0 var(--fe-social-size);width:var(--fe-social-size);height:var(--fe-social-size);padding:10px;border:0;border-radius:14px;background:transparent;box-shadow:none;color:var(--fe-ink);text-decoration:none;transition:transform var(--fe-duration),background var(--fe-duration)}
+.footer-ed__social-emblem{display:grid;place-items:center;width:100%;height:100%}
 .footer-ed__social img{width:100%;height:100%;object-fit:contain}
 .footer-ed__social svg{display:block;width:100%;height:100%}
+.footer-ed__social-dock[data-presentation="medallions"]{padding:8px 0 0;background:none;border:0;box-shadow:none}
+.footer-ed__social-dock[data-presentation="medallions"] .footer-ed__social{display:flex;flex-direction:column;gap:10px;height:auto;padding:0;border-radius:999px 999px 10px 10px}
+.footer-ed__social-dock[data-presentation="medallions"] .footer-ed__social-emblem{position:relative;flex:none;aspect-ratio:1;height:auto;padding:23%;border:1px solid var(--fe-accent);border-radius:50%;color:var(--fe-social-ink);background:radial-gradient(ellipse at 22% 0,#fff5,transparent 58%),linear-gradient(155deg,color-mix(in srgb,var(--fe-social-button) 85%,#fff),var(--fe-social-button) 58%,color-mix(in srgb,var(--fe-social-button) 78%,#1e0710));box-shadow:0 0 0 2px #fff7,inset 0 1px 2px #fff8,inset 0 -3px 5px #290a1e55,0 7px 12px #79233d30}
+.footer-ed__social-dock[data-presentation="medallions"] .footer-ed__social-emblem:after{content:"";position:absolute;inset:4px;border:1px solid #fff3;border-radius:50%;pointer-events:none}
+.footer-ed__social-label{display:block;width:max-content;text-align:center;white-space:nowrap;font:500 11px/1.3 var(--fe-body-font);color:var(--fe-ink);letter-spacing:.01em}
+
 .footer-ed__top-button{position:relative;display:grid;place-items:center;flex-shrink:0;width:64px;height:64px;margin-left:auto;border-radius:50%;border:1px solid var(--fe-accent);color:var(--fe-accent);background:radial-gradient(ellipse at 25% 12%,#fff9,transparent 55%),linear-gradient(145deg,#fff6,#fff1 55%,#b76e3a33);box-shadow:0 0 0 1px #fff9,inset 0 0 0 2px #fff9,inset 0 3px 3px #fff,inset -2px -3px 2px #a25b3d99,0 5px 6px #733a2b44;cursor:pointer;transition:transform var(--fe-duration)}
 .footer-ed__top-button:before{content:"";position:absolute;inset:5px;border:1px solid #fff9;border-radius:50%;box-shadow:0 -1px 1px #b9754d88,inset 0 -1px 2px #fff8;pointer-events:none}
 .footer-ed__top-button svg{filter:drop-shadow(0 -1px 0 #fff9) drop-shadow(1px 1px 0 #733718)}
 .footer-ed__legal{border-top:1px solid var(--fe-accent);padding:18px 0 0;color:var(--fe-body);font:400 15px/1.5 Georgia,serif;line-height:1.5;white-space:pre-line;overflow-wrap:anywhere}
 .footer-ed__watermark{margin-top:22px;opacity:var(--fe-watermark-alpha);pointer-events:none;user-select:none;padding-bottom:8px}
 .footer-ed__watermark svg{width:100%;height:calc(var(--fe-watermark-size) * .86);display:block;overflow:visible}
-.footer-ed__watermark text{font:400 180px var(--fe-title-font);fill:none;stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.footer-ed__watermark text{font:400 180px var(--fe-title-font);stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.footer-ed__watermark[data-finish="signature"] svg{height:var(--fe-watermark-size)}
+.footer-ed__watermark[data-finish="signature"] text{font-weight:600}
+.footer-ed__signature-depth{fill:color-mix(in srgb,var(--fe-signature-color) 82%,#35101b);transform:translate(.8px,1.4px);opacity:.7}
+.footer-ed__signature-face{stroke:color-mix(in srgb,var(--fe-signature-color) 65%,var(--fe-accent));stroke-width:.25!important;paint-order:stroke fill;filter:drop-shadow(0 -1px 0 #fff0df99) drop-shadow(0 2px 1px #71321d44)}
+.footer-ed__watermark[data-finish="engraved"] text{fill:none}
 .footer-ed__engraving-shadow{stroke:#8f412e;transform:translate(-.35px,-.45px);opacity:.65}
 .footer-ed__engraving-light{stroke:#fff3df;transform:translate(.35px,.7px);stroke-width:.7!important;opacity:.95}
 .footer-ed__engraving-edge{stroke:color-mix(in srgb,var(--fe-accent) 48%,#ffe5d4);opacity:.8}
@@ -78,6 +90,7 @@
  .footer-ed__brand-name{font-size:44px}.footer-ed__navigation{gap:20px;grid-template-columns:repeat(3,minmax(0,1fr))}
  .footer-ed__column h3{font-size:25px}.footer-ed__links a{font-size:15px}
  .footer-ed__watermark svg{height:clamp(100px,16cqi,calc(var(--fe-watermark-size) * .86))}
+ .footer-ed__watermark[data-finish="signature"] svg{height:clamp(100px,16cqi,var(--fe-watermark-size))}
 }
 @container footer-editorial (max-width:700px){
  .footer-ed{padding:36px var(--fe-mobile-padding) var(--fe-padding-bottom);min-height:0}
@@ -111,10 +124,13 @@
  .footer-ed__social-dock{grid-area:social;width:100%;max-width:100%;padding:14px;margin:22px 0 24px}
  .footer-ed__social-list{width:100%;justify-content:space-between;gap:clamp(8px,3cqi,var(--fe-social-gap))}
  .footer-ed__social{flex-basis:clamp(36px,calc(var(--fe-social-size) * .8),60px);width:clamp(36px,calc(var(--fe-social-size) * .8),60px);height:clamp(36px,calc(var(--fe-social-size) * .8),60px);padding:10px}
+ .footer-ed__social-dock[data-presentation="medallions"]{padding:4px 0 0}
+ .footer-ed__social-label{font-size:10px}
  .footer-ed__top-button{grid-area:up;margin:18px auto 0;width:48px;height:48px}
  .footer-ed__legal{grid-area:legal;font-size:11px;padding-top:18px}
  .footer-ed__watermark{grid-area:watermark;margin-top:20px;padding-bottom:8px}
  .footer-ed__watermark svg{height:calc(var(--fe-mobile-watermark-size) * .86)}
+ .footer-ed__watermark[data-finish="signature"] svg{height:var(--fe-mobile-watermark-size)}
 }
 @keyframes footerLinksIn{from{opacity:0;translate:0 -4px}to{opacity:1;translate:0 0}}
 @media(prefers-reduced-motion:reduce){.footer-ed *{animation:none!important;transition:none!important;scroll-behavior:auto!important}.footer-ed .footer-ed__social:hover,.footer-ed .footer-ed__top-button:hover{transform:none}}

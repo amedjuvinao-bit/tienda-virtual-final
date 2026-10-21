@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { footerColumns, footerLegalText, normalizeEditorialOptions, resolveFooterLogo } from './footerEditorialConfig';
 import FooterNewsletter from './FooterNewsletter';
@@ -9,6 +9,7 @@ import './footerEditorial.css';
 export default function FooterEditorial({ theme, store, preview=false }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
   const [failedLogo,setFailedLogo]=useState('');
+  const signatureId='footer-signature-'+useId().replace(/:/g,'');
   if(footer.enabled===false && !preview)return null;
   const columns=footerColumns(footer).filter(col=>c[col.id+'Enabled']);
   const logo=resolveFooterLogo(footer,theme), showLogo=c.brandMode!=='text' && logo && failedLogo!==logo;
@@ -21,6 +22,7 @@ export default function FooterEditorial({ theme, store, preview=false }) {
     '--fe-ink':c.headingColor,'--fe-body':c.textColor,'--fe-accent':c.accentColor,
     '--fe-tint':c.glassTint,'--fe-edge':c.edgeColor,'--fe-button':c.buttonColor,'--fe-button-ink':c.buttonTextColor,
     '--fe-title-font':c.titleFont || 'Georgia, serif','--fe-body-font':c.bodyFont || 'system-ui',
+    '--fe-signature-color':c.watermarkColor,'--fe-social-button':c.socialButtonColor,'--fe-social-ink':c.socialIconColor,
     '--fe-art-alpha':c.materialOpacity/100,'--fe-glass-alpha':c.glassOpacity/100,'--fe-watermark-alpha':c.watermarkOpacity/100,
     '--fe-duration':c.animationDuration+'ms','--fe-logo-size':Math.min(260,Math.max(60,Number(footer.logoSizePx)||220))+'px',
   };
@@ -49,7 +51,10 @@ export default function FooterEditorial({ theme, store, preview=false }) {
         {c.backToTopEnabled && <button type="button" className="footer-ed__top-button" aria-label={c.backToTopLabel || 'Volver arriba'} onClick={backToTop}><ArrowUp size={30} aria-hidden="true"/></button>}
       </div>
       {c.legalEnabled && <div className="footer-ed__legal">{footerLegalText(footer,c.brandName)}</div>}
-      {c.watermarkEnabled && (c.watermarkText || c.brandName) && <div className="footer-ed__watermark" aria-hidden="true"><svg viewBox="0 0 1000 180" preserveAspectRatio="none">{['shadow','light','edge'].map(layer=><text key={layer} className={'footer-ed__engraving-'+layer} x="5" y="151" textLength="990" lengthAdjust="spacingAndGlyphs">{(c.watermarkText || c.brandName).toLocaleUpperCase()}</text>)}</svg></div>}
+      {c.watermarkEnabled && (c.watermarkText || c.brandName) && <div className="footer-ed__watermark" data-finish={c.watermarkStyle} aria-hidden="true"><svg viewBox={c.watermarkStyle==='signature'?'0 -35 1000 285':'0 0 1000 180'} preserveAspectRatio="none">
+        {c.watermarkStyle==='signature' && <defs><linearGradient id={signatureId} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stopColor="var(--fe-signature-color)"/><stop offset=".55" stopColor="var(--fe-signature-color)"/><stop offset=".82" stopColor="var(--fe-accent)"/><stop offset="1" stopColor="var(--fe-signature-color)"/></linearGradient></defs>}
+        {(c.watermarkStyle==='signature'?['depth','face']:['shadow','light','edge']).map(layer=><text key={layer} className={'footer-ed__'+(c.watermarkStyle==='signature'?'signature-':'engraving-')+layer} fill={layer==='face'?`url(#${signatureId})`:undefined} x="5" y="151" textLength="990" lengthAdjust="spacingAndGlyphs">{(c.watermarkText || c.brandName).toLocaleUpperCase()}</text>)}
+      </svg></div>}
     </div>
   </footer></div>;
 }

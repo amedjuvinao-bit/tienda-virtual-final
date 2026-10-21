@@ -34,14 +34,30 @@ describe('footer Firma editorial',()=>{
     fireEvent.submit(screen.getByRole('form',{name:'Suscripción a novedades'}));
     expect(await screen.findByRole('status')).toHaveTextContent('Vista previa');expect(post).not.toHaveBeenCalled();
   });
-  it('usa el logo de la tienda y las imágenes sociales configuradas, con iconos simples como alternativa',()=>{
+  it('presenta las redes con contraste y permite recuperar las imágenes guardadas o los iconos simples',()=>{
     const footer={logoUrl:'/mi-logo.png',instagram:'https://instagram.com/demo',instagramIcon:'/icono-anterior.png'};
     const {rerender}=render(<FooterSection theme={makeTheme(footer)}/>);
     expect(screen.getByRole('img',{name:'Logo de la tienda'})).toHaveAttribute('src','/mi-logo.png');
+    expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toBeNull();
+    expect(screen.getByRole('link',{name:'Instagram'})).toHaveTextContent('Instagram');
+    rerender(<FooterSection theme={makeTheme({...footer,editorial:{socialPresentation:'custom'}})}/>);
     expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toHaveAttribute('src','/icono-anterior.png');
-    rerender(<FooterSection theme={makeTheme({...footer,editorial:{brandName:'Mi tienda',brandMode:'text',socialIconStyle:'minimal'}})}/>);
+    rerender(<FooterSection theme={makeTheme({...footer,editorial:{brandName:'Mi tienda',brandMode:'text',socialPresentation:'minimal'}})}/>);
     expect(screen.getByText('Mi tienda',{selector:'.footer-ed__brand-name'})).toBeInTheDocument();
     expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toBeNull();
+  });
+  it('permite cambiar el acabado y los colores sin modificar la marca ni los destinos sociales',()=>{
+    let saved;
+    function Harness(){const [theme,setTheme]=useState(makeTheme({editorial:{brandName:'Mi negocio'},instagram:'https://instagram.com/demo',instagramIcon:'/mi-icono.png'}));saved=theme;return <FooterPanel theme={theme} setPath={(path,value)=>setTheme(old=>({...old,footer:{...old.footer,[path.slice(7)]:value}}))}/>;}
+    render(<Harness/>);
+    const content=within(screen.getByRole('navigation',{name:'Contenido del footer'}));
+    fireEvent.click(content.getByRole('button',{name:'Redes'}));
+    fireEvent.change(screen.getByRole('combobox',{name:'Estilo de los iconos sociales'}),{target:{value:'custom'}});
+    expect(saved.footer.editorial.socialPresentation).toBe('custom');
+    fireEvent.click(content.getByRole('button',{name:'Marca'}));
+    fireEvent.change(screen.getByRole('combobox',{name:'Acabado del nombre grande'}),{target:{value:'engraved'}});
+    expect(saved.footer.editorial.watermarkStyle).toBe('engraved');
+    expect(saved.footer).toMatchObject({instagram:'https://instagram.com/demo',instagramIcon:'/mi-icono.png',editorial:{brandName:'Mi negocio'}});
   });
   it('reemplaza las letras de prueba de la captura por textos comerciales y toma la identidad real de la tienda',()=>{
     const footer={subscribeText:'ASDADASDASDASD',column1Title:'ERWRWERWERWERWERW',column2Title:'WERWERWERWERWER',column3Title:'WRWERWERWERWER',editorial:{brandName:'Tu marca',brandMode:'text',watermarkText:'TU MARCA',socialIconStyle:'relief'},copyright:'© Tu marca · Todos los derechos reservados.'};
