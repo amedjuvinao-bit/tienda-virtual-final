@@ -1,10 +1,13 @@
 // src/admin/appearance/general/generalHelpers.js
+import { normalizeStoryConfig, STORY_DEFAULTS } from '../../../lib/storefrontStoryConfig';
+import { storefrontSectionTop } from '../../../lib/storefrontSectionMotion';
 
 // ==============================
 // ✅ DEFAULTS GLOBAL CONFIG
 // ==============================
 
 export const GLOBAL_DEFAULTS = {
+  sectionMotion: STORY_DEFAULTS,
   whatsapp: {
     enabled: true,
     phone: "",
@@ -135,6 +138,7 @@ export function normalizeGlobalConfig(globalRaw) {
   const g = globalRaw || {};
 
   return {
+    sectionMotion: normalizeStoryConfig(g.sectionMotion),
     whatsapp: {
       ...GLOBAL_DEFAULTS.whatsapp,
       ...(typeof g.whatsapp === "object" && g.whatsapp !== null ? g.whatsapp : {}),
@@ -171,7 +175,7 @@ export function scrollToSectionById(id, options = {}) {
 
   const behavior = options.behavior === "auto" ? "auto" : "smooth";
 
-  const y = el.getBoundingClientRect().top + window.pageYOffset - offsetTopPx;
+  const y = storefrontSectionTop(el) - offsetTopPx;
 
   window.scrollTo({
     top: y,
@@ -190,7 +194,7 @@ export function getCurrentSectionIndex(sectionIds = DEFAULT_SECTION_IDS) {
 
   sectionIds.forEach((id, i) => {
     const el = document.getElementById(id);
-    if (el && mid >= el.offsetTop) {
+    if (el && mid >= storefrontSectionTop(el)) {
       index = i;
     }
   });

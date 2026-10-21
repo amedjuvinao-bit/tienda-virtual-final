@@ -35,3 +35,11 @@ it('preserves a larger configured header offset', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Sección anterior' }));
   expect(window.scrollTo).toHaveBeenCalledWith({ top: 850, behavior: 'auto' });
 });
+
+it('uses the stable flow position when a section is pinned over the previous card',()=>{
+  document.getElementById('instagram').dataset.storyTop='1400';
+  document.getElementById('after').dataset.storyTop='2400';
+  mountAt(1400);
+  fireEvent.click(screen.getByRole('button',{name:'Siguiente sección'}));
+  expect(window.scrollTo).toHaveBeenCalledWith({top:2400,behavior:'auto'});
+});

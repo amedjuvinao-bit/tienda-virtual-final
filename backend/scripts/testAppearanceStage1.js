@@ -28,6 +28,14 @@ async function run() {
   // Appearance previews need the store identity, without expanding access to
   // contact, billing or other store configuration fields.
   const SiteSettings = require('../models/SiteSettings');
+  const { buildPublicSiteSettings } = require('../lib/siteSettingsSecurity');
+  for(const preset of ['stack','cinema','depth','cascade']) {
+    const sectionMotion={enabled:true,preset,intensity:85,pace:'leisurely',mobileMode:'off'};
+    const persisted=new SiteSettings({theme:{global:{sectionMotion}}}).toObject();
+    assert.deepStrictEqual(persisted.theme.global.sectionMotion,sectionMotion);
+    assert.deepStrictEqual(buildPublicSiteSettings(persisted).theme.global.sectionMotion,sectionMotion);
+    assert.deepStrictEqual(resolveSiteSettingsWritePermissions({theme:{global:{sectionMotion}}}),['appearance:update']);
+  }
   const originalFindOne = SiteSettings.findOne, originalUpdate = SiteSettings.findByIdAndUpdate;
   const identityFixture = new SiteSettings({store:{name:'Negocio de prueba',businessName:'Razón social',email:'privado@example.com'}}).toObject();
   try {

@@ -10,6 +10,7 @@ import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
 import { validateHeaderMenu } from '../components/headerPresentation';
 import { normalizeGlobalConfig } from "./appearance/general/generalHelpers";
+import { normalizeStoryConfig } from '../lib/storefrontStoryConfig';
 import { API_BASE_URL } from "../config/apiBaseUrl";
 
 // ✅ Banner separado
@@ -1078,6 +1079,14 @@ export default function AppearancePage() {
         }
       }
 
+      if(changedTheme.global?.sectionMotion && !deepEqual(normalizedTheme.global?.sectionMotion,originalTheme.global?.sectionMotion)) {
+        const expected=normalizeStoryConfig(changedTheme.global.sectionMotion), received=saved?.theme?.global?.sectionMotion;
+        if(!received || !deepEqual(expected,normalizeStoryConfig(received))) {
+          setAppearanceRevision(saved.appearanceRevision);
+          setServerSnapshot(buildThemeFromServer(saved.theme));
+          throw new Error('El servidor no conservó la animación global. Tus ajustes siguen en el panel; vuelve a guardar con la versión actualizada.');
+        }
+      }
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
       setAppearanceRevision(saved.appearanceRevision);
@@ -1122,7 +1131,7 @@ export default function AppearancePage() {
   }
 
   const tabs = [
-    { id: "general", label: "General", detail: "WhatsApp y carga", icon: Palette, help: "Configura WhatsApp, navegación y pantalla de carga." },
+    { id: "general", label: "General", detail: "Herramientas y animación", icon: Palette, help: "Configura la animación global, WhatsApp, navegación y pantalla de carga." },
     { id: "header", label: "Encabezado", detail: "Logo y menú", icon: LayoutTemplate, help: "Configura el logo y los enlaces del menú." },
     { id: "banner", label: "Portada", detail: "Imagen o video", icon: Image, help: "Configura la primera imagen o video que ve el cliente." },
     { id: "sections", label: "Secciones", detail: "Página de inicio", icon: Rows3, help: "Organiza el contenido debajo de la portada." },

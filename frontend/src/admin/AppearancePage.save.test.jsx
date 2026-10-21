@@ -19,7 +19,7 @@ vi.mock('./security/useAdminPermissions', () => ({
   default: () => ({ can: (permission) => permissions.allowed.includes(permission) }),
 }));
 vi.mock('./appearance/general/GeneralPanel', () => ({
-  default: ({ setPath }) => <button onClick={() => setPath('global.whatsapp.phone', '573001234567')}>Cambiar WhatsApp</button>,
+  default: ({ theme,setPath }) => <><button onClick={() => setPath('global.whatsapp.phone', '573001234567')}>Cambiar WhatsApp</button><button onClick={()=>setPath('global.sectionMotion',{enabled:true,preset:'depth',intensity:85,pace:'leisurely',mobileMode:'off'})}>Cambiar animación global</button><span data-testid="saved-story-preset">{theme.global.sectionMotion.preset}</span></>,
 }));
 vi.mock('./appearance/header/HeaderPanel', () => ({
   default: ({ addHeaderMenuItem, setHeaderMenuItem, setPath }) => <>
@@ -79,6 +79,26 @@ describe('guardado seguro de Apariencia', () => {
     }));
   });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it('guarda el tema global con su intensidad y configuración móvil y lo recupera del servidor',async()=>{
+    const user=userEvent.setup();const view=render(<AppearancePage/>);
+    await user.click(await screen.findByRole('button',{name:'Cambiar animación global'}));
+    await user.click(screen.getByRole('button',{name:'Guardar cambios'}));
+    await waitFor(()=>expect(saveSiteSettings).toHaveBeenCalledTimes(1));
+    const payload=saveSiteSettings.mock.calls[0][0];
+    expect(payload.theme.global.sectionMotion).toEqual({enabled:true,preset:'depth',intensity:85,pace:'leisurely',mobileMode:'off'});
+    await screen.findByText('Cambios guardados. La tienda pública ya usa esta configuración.');
+    view.unmount();fetchAppearanceSettings.mockResolvedValue({...initial,theme:payload.theme,appearanceRevision:4});render(<AppearancePage/>);
+    await waitFor(()=>expect(screen.getByTestId('saved-story-preset')).toHaveTextContent('depth'));
+  });
+  it('no confirma el guardado si el servidor descarta el tema global y conserva el borrador',async()=>{
+    const user=userEvent.setup();saveSiteSettings.mockImplementation(async payload=>({theme:{...payload.theme,global:{}},menus:initial.menus,appearanceRevision:4}));
+    render(<AppearancePage/>);await user.click(await screen.findByRole('button',{name:'Cambiar animación global'}));
+    await user.click(screen.getByRole('button',{name:'Guardar cambios'}));
+    expect(await screen.findByText(/El servidor no conservó la animación global/)).toBeInTheDocument();
+    expect(screen.getByTestId('saved-story-preset')).toHaveTextContent('depth');
+    expect(screen.getByRole('button',{name:'Guardar cambios'})).toBeEnabled();
+  });
 
   it('mantiene la botonera de iconos en el borde de la pantalla y accesible por nombre', async () => {
     render(<AppearancePage />);

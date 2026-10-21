@@ -5,6 +5,7 @@ import "./storefrontLiquidGlass.css";
 import './storefrontChromeGlassHover.css';
 import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
 import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
+import { storefrontSectionTop } from '../lib/storefrontSectionMotion';
 import {
   DEFAULT_SECTION_IDS,
   resolveSectionControlStyle,
@@ -27,15 +28,13 @@ function getButtonAnimation(name, fallback) {
 }
 
 function getLayoutTop(element) {
-  let top = 0;
-  for (let node = element; node; node = node.offsetParent) top += node.offsetTop;
-  return top;
+  return storefrontSectionTop(element);
 }
 
 function getSectionTargets(sectionIds) {
   return sectionIds
     .map((id) => document.getElementById(id))
-    .filter((element) => element && !element.matches('.storefront-section-shell:empty'))
+    .filter((element) => element && !element.matches('.storefront-section-shell:empty') && (!element.hasAttribute('data-story-chapter') || element.offsetHeight>0))
     .map((element) => ({
       id: element.id,
       top: getLayoutTop(element),

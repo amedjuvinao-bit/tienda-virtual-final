@@ -9,6 +9,7 @@ import TiktokPlayer from './TiktokPlayer';
 import useTiktokFeed from './useTiktokFeed';
 import { TiktokEditorFeed } from './TiktokEditorFeed';
 import './tiktokStage.css';
+import { STORY_VISIBILITY_EVENT } from '../../lib/storefrontStoryConfig';
 
 export default function TiktokStage({theme, posts:fallback=[]}) {
   const raw = theme?.sections?.find(s=>s?.id==='tiktok'||s?.type==='tiktok');
@@ -29,10 +30,15 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
     checked.current.add(feed.nextCursor);feed.loadMore();
   },[connected,feed,plan.missing.join('|')]);
   useEffect(()=>{
-    if(!s.stageResetOnEnter || typeof IntersectionObserver!=='function')return;
+    if(!s.stageResetOnEnter)return;
     let left=false;
-    const observer=new IntersectionObserver(entries=>{if(!entries[0]?.isIntersecting)left=true;else if(left){setChosen(null);setPage(0);left=false;}},{threshold:.12});
-    if(root.current)observer.observe(root.current);return()=>observer.disconnect();
+    const visibility=visible=>{if(!visible)left=true;else if(left){setChosen(null);setPage(0);left=false;}};
+    const observer=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>visibility(Boolean(entries[0]?.isIntersecting)),{threshold:.12}):null;
+    const chapter=root.current?.closest('[data-story-chapter]');
+    const onChapter=event=>visibility(event.detail.visible);
+    chapter?.addEventListener(STORY_VISIBILITY_EVENT,onChapter);
+    if(root.current)observer?.observe(root.current);
+    return()=>{observer?.disconnect();chapter?.removeEventListener(STORY_VISIBILITY_EVENT,onChapter);};
   },[s.stageResetOnEnter]);
   useEffect(()=>{
     if(!s.stageMotionEnabled || s.stageMotion==='none' || !main.current?.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)return;

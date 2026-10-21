@@ -25,7 +25,9 @@ import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAd
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
-import { mountStorefrontSectionMotion } from './lib/storefrontSectionMotion';
+import { storefrontSectionTop } from './lib/storefrontSectionMotion';
+import { storySectionOrder } from './lib/storefrontStoryConfig';
+import StorefrontStory from './components/StorefrontStory';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
@@ -90,7 +92,7 @@ function ScrollToHash() {
   useEffect(() => {
     if (!hash) return;
     const el = document.getElementById(hash.replace('#', ''));
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) window.scrollTo({top:Math.max(0,storefrontSectionTop(el)-(parseFloat(window.getComputedStyle(el).scrollMarginTop)||0)),behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches?'instant':'smooth'});
   }, [hash, pathname]);
 
   return null;
@@ -126,24 +128,19 @@ function GlobalFloatingButtons({ theme }) {
 }
 
 function Home({ theme, store }) {
-  const sectionsRef = useRef(null);
-
-  useEffect(() => mountStorefrontSectionMotion(sectionsRef.current), [theme]);
+  const components={tendencia:TrendingSection,look:LookSection,complementos:ComplementosLook,categorias:CategoriasSection,instagram:InstagramSection,tiktok:TiktokSection,informacion:InformacionSection};
 
   return (
     <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div ref={sectionsRef} className="storefront-sections min-w-0 max-w-full flex-grow overflow-x-clip">
+      <StorefrontStory config={theme?.global?.sectionMotion}>
         <section id="banner" className="w-full"><CarouselBanner /></section>
-        {isStorefrontSectionVisible(theme, 'tendencia') && <section id="tendencia" className="storefront-section-shell w-full"><TrendingSection theme={theme} /></section>}
-        {isStorefrontSectionVisible(theme, 'look') && <section id="look" className="storefront-section-shell w-full"><LookSection theme={theme} /></section>}
-        {isStorefrontSectionVisible(theme, 'complementos') && <section id="complementos" className="storefront-section-shell w-full"><ComplementosLook theme={theme} imageSrc="/SeccionComplementos/Complementos.png" /></section>}
-        {isStorefrontSectionVisible(theme, 'categorias') && <section id="categorias" className="storefront-section-shell w-full"><CategoriasSection theme={theme} /></section>}
-        {isStorefrontSectionVisible(theme, 'instagram') && <section id="instagram" className="storefront-section-shell w-full"><InstagramSection theme={theme} posts={[]} /></section>}
-        {isStorefrontSectionVisible(theme, 'tiktok') && <section id="tiktok" className="storefront-section-shell w-full"><TiktokSection theme={theme} posts={[]} /></section>}
-        {isStorefrontSectionVisible(theme, 'informacion') && <section id="informacion" className="storefront-section-shell w-full"><InformacionSection theme={theme} /></section>}
+        {storySectionOrder(theme?.sections).filter(id=>isStorefrontSectionVisible(theme,id)).map(id=>{
+          const Component=components[id];
+          return <section key={id} id={id} className="storefront-section-shell w-full"><Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/></section>;
+        })}
         <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
-      </div>
+      </StorefrontStory>
     </div>
   );
 }

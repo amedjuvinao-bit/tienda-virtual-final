@@ -4,6 +4,8 @@ import { CircleOff, Crown, Flower2, Gem, Heart, LoaderCircle, MessageCircle, Sho
 import { normalizeGlobalConfig, SECTION_CONTROL_STYLES, resolveSectionControlStyle, getSectionControlPresetStyle } from "./generalHelpers";
 import AppearanceToolPreview from "./AppearanceToolPreview";
 import GlassMotionPicker from "./GlassMotionPicker";
+import SectionMotionPanel from './SectionMotionPanel';
+import SectionMotionPreview from './SectionMotionPreview';
 import { safeBannerButtonAnimation } from '../../../lib/bannerTemplates';
 import CloudinaryImageField from "./CloudinaryImageField";
 import "./appearanceGeneral.css";
@@ -89,6 +91,7 @@ const MainTabButton = ({ active, label, description, status, Icon, onClick }) =>
     type="button"
     onClick={onClick}
     className="appearance-panel-main-tab"
+    aria-label={label+' '+description}
     aria-pressed={active}
     data-active={active}
   >
@@ -142,6 +145,12 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
         Icon: ChevronsUpDown,
       },
       {
+        id: "motion",
+        label: "Animación global",
+        description: "Transiciones entre secciones",
+        Icon: Sparkles,
+      },
+      {
         id: "loader",
         label: "Loader",
         description: "Pantalla de carga",
@@ -178,14 +187,16 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
               status={tab.id === "whatsapp"
                 ? (globalConfig.whatsapp.enabled ? (globalConfig.whatsapp.phone ? "Activo" : "Falta número") : "Apagado")
                 : tab.id === "scroll" ? (globalConfig.scrollButtons.enabled ? "Activo" : "Apagado")
+                : tab.id === "motion" ? (globalConfig.sectionMotion.enabled ? "4 temas" : "Apagado")
                 : (globalConfig.loader.enabled ? "Activo" : "Apagado")}
               onClick={() => setActiveMainTab(tab.id)}
             />
           ))}
         </div>
 
-        <div className="appearance-general__workspace">
+        <div className="appearance-general__workspace" data-tool={activeMainTab}>
           <div className="appearance-general__form">
+        {activeMainTab === 'motion' && <SectionMotionPanel config={globalConfig.sectionMotion} onChange={value=>setPath('global.sectionMotion',value)}/>}
 
         {activeMainTab === "whatsapp" && (
           <section className="appearance-general__section">
@@ -918,8 +929,8 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
           </section>
         )}
           </div>
-          <AppearanceToolPreview activeTool={activeMainTab} config={globalConfig}
-            inheritedMotion={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)} />
+          {activeMainTab==='motion'?<SectionMotionPreview config={globalConfig.sectionMotion} theme={theme}/>:<AppearanceToolPreview activeTool={activeMainTab} config={globalConfig}
+            inheritedMotion={safeBannerButtonAnimation(theme.banner?.templateConfigs?.[theme.banner?.templateId]?.buttonAnimation)} />}
         </div>
       </div>
     </div>

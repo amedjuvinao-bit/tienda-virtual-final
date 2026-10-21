@@ -25,6 +25,7 @@ describe("herramientas de Apariencia", () => {
     render(<Editor />);
     await user.click(screen.getByRole('button', { name: /Navegación Subir y bajar/ }));
     await user.click(screen.getByRole('button', { name: 'Estilo' }));
+    await user.click(screen.getByRole('button', { name: /Cristal Vidrio configurable/ }));
     const choices = screen.getByRole('group', { name: 'Efecto de vidrio de las flechas' });
     await user.click(within(choices).getByRole('button', { name: /Facetas/ }));
     const preview = screen.getByRole('button', { name: 'Probar animación de subir' });
@@ -167,7 +168,7 @@ describe("herramientas de Apariencia", () => {
     }
   });
 
-  it("separa la navegación de las tarjetas inferiores de la portada", async () => {
+  it("reserva espacio para las flechas y mantiene estable la navegación al pasar las tarjetas de portada", async () => {
     const rail = document.createElement('div');
     rail.className = 'rb-template__rail';
     rail.getBoundingClientRect = () => ({ left: 80, right: 940, top: 710, bottom: 760, width: 860, height: 50 });
@@ -175,7 +176,8 @@ describe("herramientas de Apariencia", () => {
     const { container, unmount } = render(<ScrollButton config={{ enabled: true, position: 'center', bottomPx: 24 }} />);
     fireEvent.scroll(window);
     const controls = container.querySelector('button[aria-label="Sección anterior"]').parentElement;
-    await waitFor(() => expect(Number.parseInt(controls.style.bottom, 10)).toBeGreaterThan(24));
+    expect(Number.parseInt(document.documentElement.style.getPropertyValue('--rb-scroll-dock-height'),10)).toBeGreaterThan(24);
+    expect(controls.style.bottom).toBe('24px');
     rail.getBoundingClientRect = () => ({ left: 80, right: 940, top: 100, bottom: 150, width: 860, height: 50 });
     fireEvent.scroll(window);
     await waitFor(() => expect(controls.style.bottom).toBe('24px'));

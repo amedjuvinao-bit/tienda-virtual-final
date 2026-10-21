@@ -3,6 +3,7 @@ import "keen-slider/keen-slider.min.css"
 import { useKeenSlider } from "keen-slider/react"
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { X } from "lucide-react"
+import { createPortal } from 'react-dom'
 import { fetchSiteSettings } from "../lib/siteSettingsApi" // ✅ MISMA RUTA QUE APPEARANCEPAGE
 import { getBannerHeightStyle } from "../lib/bannerHeight"
 import BannerTemplateView from './BannerTemplateView'
@@ -929,9 +930,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
           {renderMovableButtons(imageBtnPayload, imageLink, true, true)}
         </div>
 
-        {selectedImage && (
+        {selectedImage && createPortal(
           <div
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-auto animate-fade-in"
+            style={{zIndex:10000}}
             onClick={() => setSelectedImage(null)}
           >
             <div
@@ -939,6 +941,8 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
               onClick={(e) => e.stopPropagation()}
             >
               <button
+                type="button"
+                aria-label="Cerrar imagen ampliada"
                 onClick={() => setSelectedImage(null)}
                 className="absolute top-2 right-2 bg-white rounded-full p-1 shadow z-10"
               >
@@ -951,7 +955,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
                 draggable={false}
               />
             </div>
-          </div>
+          </div>, document.body
         )}
       </div>
     )
@@ -1016,9 +1020,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
         {renderSliderControls()}
       </div>
 
-      {selectedImage && (
+      {selectedImage && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-auto animate-fade-in"
+          style={{zIndex:10000}}
           onClick={() => setSelectedImage(null)}
         >
           <div
@@ -1026,6 +1031,8 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
             onClick={(e) => e.stopPropagation()}
           >
             <button
+              type="button"
+              aria-label="Cerrar imagen ampliada"
               onClick={() => setSelectedImage(null)}
               className="absolute top-2 right-2 bg-white rounded-full p-1 shadow z-10"
             >
@@ -1038,7 +1045,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
               draggable={false}
             />
           </div>
-        </div>
+        </div>, document.body
       )}
     </div>
   )

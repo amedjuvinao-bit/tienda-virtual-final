@@ -9,6 +9,7 @@ export default function TiktokPlayer({ post, settings:s, requestPlay = false }) 
   const mutedRef=useRef(muted);mutedRef.current=muted;
   const isDirect = Boolean(post.videoUrl), playable = isDirect || Boolean(post.tiktokId);
   const message = (type,value) => iframe.current?.contentWindow?.postMessage({ 'x-tiktok-player':true,type,value },ORIGIN);
+  const chapterVisible=()=>host.current?.closest('[data-story-chapter]')?.dataset.storyVisible!=='false' || document.fullscreenElement?.contains(host.current);
   const fail = () => { setPlaying(false); setError('No se pudo reproducir este video aquí.'); };
   const play = () => {
     if (!playable) return;
@@ -20,8 +21,8 @@ export default function TiktokPlayer({ post, settings:s, requestPlay = false }) 
     const receive = event => {
       if (event.origin !== ORIGIN || event.source !== iframe.current?.contentWindow || event.data?.['x-tiktok-player'] !== true) return;
       const {type,value} = event.data;
-      if (type === 'onPlayerReady') { setReady(true); message(mutedRef.current ? 'mute' : 'unMute'); message('play'); }
-      if (type === 'onStateChange') { setPlaying(value === 1); if(value === 1)setReady(true); }
+      if (type === 'onPlayerReady') { setReady(true); message(mutedRef.current ? 'mute' : 'unMute'); message(chapterVisible()?'play':'pause'); }
+      if (type === 'onStateChange') { if(value===1 && !chapterVisible()){message('pause');setPlaying(false);return;}setPlaying(value === 1); if(value === 1)setReady(true); }
       if (type === 'onCurrentTime' && Number.isFinite(value?.currentTime) && Number.isFinite(value?.duration)) { setTime(value.currentTime); setDuration(value.duration); }
       if (type === 'onMute' && typeof value === 'boolean') setMuted(value);
       if (type === 'onPlayerError' || type === 'onError') fail();
@@ -48,7 +49,7 @@ export default function TiktokPlayer({ post, settings:s, requestPlay = false }) 
   const frame = post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}?controls=0&autoplay=1&loop=${s.stageLoop?1:0}&description=0&music_info=0&rel=0` : '';
   return <div className="tk-player" ref={host} style={{'--tk-fit':s.stageFit,'--tk-position':`${post.positionX}% ${post.positionY}%`}}>
     {post.image && <img className="tk-player__poster" src={post.image} alt={post.title} draggable="false" style={{opacity:ready?0:1}} />}
-    {started && isDirect && <video ref={video} src={post.videoUrl} poster={post.image || undefined} autoPlay playsInline muted={muted} loop={s.stageLoop} preload="metadata" onLoadedMetadata={e=>setDuration(e.currentTarget.duration)} onPlaying={()=>{setReady(true);setPlaying(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onError={fail} />}
+    {started && isDirect && <video ref={video} src={post.videoUrl} poster={post.image || undefined} autoPlay playsInline muted={muted} loop={s.stageLoop} preload="metadata" onLoadedMetadata={e=>setDuration(e.currentTarget.duration)} onPlaying={()=>{if(!chapterVisible()){video.current?.pause();setPlaying(false);return;}setReady(true);setPlaying(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onError={fail} />}
     {started && !isDirect && frame && <iframe ref={iframe} title={`Video de TikTok: ${post.title}`} src={frame} allow="autoplay; fullscreen; encrypted-media" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />}
     {!post.image && !started && <div className="tk-player__empty"><span>♪</span><p>{post.title}</p></div>}
     {playable && !playing && !error && <button type="button" className="tk-player__play" aria-label={`Reproducir: ${post.title}`} onClick={play}><Play fill="currentColor" size={36} /></button>}

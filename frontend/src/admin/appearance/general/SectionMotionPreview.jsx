@@ -1,0 +1,62 @@
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { Monitor, Smartphone, Play, Pause, RotateCcw } from 'lucide-react';
+import StorefrontStory from '../../../components/StorefrontStory';
+import { STORY_PRESETS, normalizeStoryConfig, storySectionOrder } from '../../../lib/storefrontStoryConfig';
+import './sectionMotionPanel.css';
+
+const labels={tendencia:'Tendencias',look:'Looks',complementos:'Complementos',categorias:'Categorías',instagram:'Instagram',tiktok:'TikTok',informacion:'Información'};
+export default function SectionMotionPreview({config,theme={}}) {
+  const c=normalizeStoryConfig(config), viewport=useRef(null), uid=useId().replace(/:/g,'');
+  const [device,setDevice]=useState('desktop'), [progress,setProgress]=useState(0), [playing,setPlaying]=useState(false);
+  const progressRef=useRef(progress);progressRef.current=progress;
+  const [reduced,setReduced]=useState(()=>window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false);
+  const sections=storySectionOrder(theme.sections).filter(id=>!theme.sections?.some(item=>item.id===id && item.enabled===false));
+  const chapters=[{id:'banner',title:theme.banner?.title || 'Portada'},...sections.map(id=>({id,title:theme.sections?.find(item=>item.id===id)?.title || labels[id]})),{id:'footer',title:'Pie de página'}];
+  useEffect(()=>{
+    const media=window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const update=()=>{setReduced(media.matches);setPlaying(false);};
+    media?.addEventListener?.('change',update);return ()=>media?.removeEventListener?.('change',update);
+  },[]);
+  useEffect(()=>{
+    const el=viewport.current;if(el)el.scrollTop=(el.scrollHeight-el.clientHeight)*progress/100;
+  },[progress,device]);
+  useEffect(()=>{
+    const el=viewport.current;
+    const observer=window.ResizeObserver?new ResizeObserver(()=>{el.scrollTop=(el.scrollHeight-el.clientHeight)*progressRef.current/100;}):null;
+    if(el)observer?.observe(el);return ()=>observer?.disconnect();
+  },[]);
+  useEffect(()=>{
+    setPlaying(false);
+  },[c.preset,c.enabled,device,reduced]);
+  useEffect(()=>{
+    if(!playing || reduced)return;
+    let frame=0, start;
+    const duration={quick:5500,balanced:8000,leisurely:11000}[c.pace];
+    const animate=time=>{
+      start??=time;
+      const next=Math.min(100,(time-start)/duration*100);setProgress(next);
+      if(next<100)frame=requestAnimationFrame(animate);else setPlaying(false);
+    };
+    const hide=()=>{if(document.hidden)setPlaying(false);};
+    document.addEventListener('visibilitychange',hide);
+    frame=requestAnimationFrame(animate);
+    return ()=>{cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',hide);};
+  },[playing,c.pace,reduced]);
+  const current=Math.min(chapters.length-1,Math.floor(progress/100*(chapters.length-1)));
+  return <aside className="appearance-general__preview story-preview" aria-label="Vista previa de la animación global">
+    <div className="appearance-general__preview-header"><span className="appearance-general__preview-live" aria-hidden="true"/><strong>Vista previa del movimiento</strong><small>{STORY_PRESETS.find(item=>item.id===c.preset).name}</small></div>
+    <div className="story-preview__devices" role="group" aria-label="Dispositivo del recorrido">{[['desktop','Escritorio',Monitor],['mobile','Móvil',Smartphone]].map(([id,label,Icon])=><button key={id} type="button" aria-label={'Recorrido en '+label.toLowerCase()} aria-pressed={device===id} onClick={()=>setDevice(id)}><Icon size={15}/>{label}</button>)}</div>
+    <div className="story-preview__screen" data-device={device}>
+      <div ref={viewport} className="story-preview__viewport" aria-label="Demostración de las transiciones">
+        <StorefrontStory config={c} viewportRef={viewport} mobileOverride={device==='mobile'}>
+          {chapters.map((chapter,index)=><section key={chapter.id} id={'story-preview-'+uid+'-'+chapter.id} className="story-preview__chapter" data-tone={index%3}>
+            <div className="story-preview__content"><span className="story-preview__counter">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2><article aria-label="Imagen de demostración"><span/></article><span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
+          </section>)}
+        </StorefrontStory>
+      </div>
+    </div>
+    <div className="story-preview__controls"><button type="button" disabled={reduced} onClick={()=>{if(!playing)setProgress(0);setPlaying(!playing);}}>{playing?<Pause size={15}/>:<Play size={15}/>} {playing?'Pausar':'Reproducir recorrido'}</button><button type="button" aria-label="Reiniciar recorrido" onClick={()=>{setPlaying(false);setProgress(0);}}><RotateCcw size={15}/></button></div>
+    <label className="story-preview__scrubber">Recorrer secciones<input type="range" min="0" max="100" value={progress} onChange={event=>{setPlaying(false);setProgress(Number(event.target.value));}}/><span>{chapters[current]?.title}</span></label>
+    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Mueve el control o reproduce la secuencia. Esta miniatura muestra el movimiento; cada sección conserva su diseño en la tienda.'}</p>
+  </aside>;
+}

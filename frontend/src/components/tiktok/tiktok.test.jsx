@@ -12,6 +12,7 @@ import api from '../../lib/api';
 import {isStorefrontSectionVisible} from '../../lib/storefrontSectionVisibility';
 import {getSectionOverview} from '../../admin/appearance/sections/sectionsOverviewModel';
 import StorefrontSectionPreview from '../../admin/appearance/sections/ui/StorefrontSectionPreview';
+import { STORY_VISIBILITY_EVENT } from '../../lib/storefrontStoryConfig';
 vi.mock('../../lib/api',()=>({default:{get:vi.fn(),put:vi.fn(),post:vi.fn(),defaults:{baseURL:'https://api.example.test'}}}));
 const post=n=>({id:`tt_700000000000000000${n}`,tiktokId:`700000000000000000${n}`,title:`Video ${n}`,image:`https://cdn.example.test/${n}.jpg`,link:`https://www.tiktok.com/@test/video/700000000000000000${n}`,duration:30});
 const account={id:'account',name:'Mi negocio',avatar:'https://cdn.example.test/avatar.jpg',username:'',url:''};
@@ -19,6 +20,26 @@ const feed={connected:true,loaded:true,loading:false,error:'',posts:[post(1),pos
 const theme=config=>({sections:[{id:'tiktok',enabled:true,config}]});
 beforeEach(()=>{vi.clearAllMocks();api.get.mockResolvedValue({data:{connected:false,posts:[],nextCursor:''}});});
 afterEach(cleanup);
+it('mantiene pausado un reproductor que termina de cargar detrás de otra sección',()=>{
+  render(<section data-story-chapter="true" data-story-visible="false"><TiktokPlayer post={post(1)} settings={normalizeStage({})} requestPlay/></section>);
+  const frame=screen.getByTitle('Video de TikTok: Video 1');
+  const send=vi.spyOn(frame.contentWindow,'postMessage').mockImplementation(()=>{});
+  fireEvent(window,new MessageEvent('message',{origin:'https://www.tiktok.com',source:frame.contentWindow,data:{'x-tiktok-player':true,type:'onPlayerReady'}}));
+  fireEvent(window,new MessageEvent('message',{origin:'https://www.tiktok.com',source:frame.contentWindow,data:{'x-tiktok-player':true,type:'onStateChange',value:1}}));
+  expect(send).toHaveBeenCalledWith(expect.objectContaining({type:'pause'}),'https://www.tiktok.com');
+  expect(send.mock.calls.some(([data])=>data.type==='play')).toBe(false);
+});
+it('recupera el video principal al regresar a una tarjeta superpuesta',()=>{
+  const {container}=render(<section data-story-chapter="true"><TiktokSection theme={theme({stageResetOnEnter:true,posts:[post(1),post(2)]})}/></section>);
+  fireEvent.click(screen.getByRole('button',{name:'Seleccionar video: Video 2'}));
+  expect(screen.getByTitle('Video de TikTok: Video 2')).toBeInTheDocument();
+  const chapter=container.firstChild;
+  fireEvent(chapter,new CustomEvent(STORY_VISIBILITY_EVENT,{detail:{visible:false}}));
+  fireEvent(chapter,new CustomEvent(STORY_VISIBILITY_EVENT,{detail:{visible:true}}));
+  expect(screen.queryByTitle('Video de TikTok: Video 2')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Reproducir: Video 1'}));
+  expect(screen.getByTitle('Video de TikTok: Video 1')).toBeInTheDocument();
+});
 it('keeps a connected section visible without manual posts and supports video-only manual content',()=>{
   const t=theme({stageSource:'connected',posts:[]});expect(isStorefrontSectionVisible(t,'tiktok')).toBe(true);
   expect(getSectionOverview(t.sections[0],t.sections)).toMatchObject({status:'ready',detail:'Publicaciones de la cuenta conectada'});
