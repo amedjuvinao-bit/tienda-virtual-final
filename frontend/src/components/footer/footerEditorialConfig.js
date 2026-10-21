@@ -15,7 +15,7 @@ export const FOOTER_EDITORIAL_DEFAULTS = {
   headingColor: '#681429', textColor: '#6a4842', accentColor: '#b27342',
   glassTint: '#f3c4ba', edgeColor: '#fff0df', buttonColor: '#8c1738', buttonTextColor: '#ffffff',
   material: 'texture', materialOpacity: 95, glassOpacity: 22, blur: 12, depth: 12, radius: 28,
-  socialSize: 64, socialGap: 18, socialIconStyle: 'custom', socialPresentation: 'medallions', socialButtonColor: '#801c3c', socialIconColor: '#fff5ea', buttonWidth: 210, buttonHeight: 60,
+  socialSize: 64, socialGap: 18, socialIconStyle: 'custom', socialPresentation: 'glass', socialButtonColor: '#f3c4ba', socialIconColor: '#ac6b36', buttonWidth: 210, buttonHeight: 60,
   mobilePadding: 22, mobileHeadlineSize: 42, mobileBrandSize: 52, mobileWatermarkSize: 92,
   mobileNavigation: 'accordion', hoverMotion: 'lift', animationDuration: 350,
 };
@@ -57,12 +57,19 @@ export function footerLegalText(footer={},brandName='') {
 export function normalizeEditorialOptions(footer = {}, {store={},theme={}} = {}) {
   const input=footer.editorial && typeof footer.editorial==='object' ? footer.editorial : {};
   const c={...FOOTER_EDITORIAL_DEFAULTS,...input};
+  // Recover the approved clear square buttons for previously saved circles,
+  // including drafts saved before the presentation selector existed.
+  if(input.socialPresentation===undefined || input.socialPresentation==='medallions') {
+    c.socialPresentation='glass';
+    if(String(c.socialButtonColor).toLowerCase()==='#801c3c')c.socialButtonColor=FOOTER_EDITORIAL_DEFAULTS.socialButtonColor;
+    if(String(c.socialIconColor).toLowerCase()==='#fff5ea')c.socialIconColor=FOOTER_EDITORIAL_DEFAULTS.socialIconColor;
+  }
   for(const [key,[min,max]] of Object.entries(bounds)) { const n=Number(c[key]);c[key]=Number.isFinite(n)?Math.min(max,Math.max(min,n)):FOOTER_EDITORIAL_DEFAULTS[key]; }
   if(/^#[\da-f]{3}$/i.test(c.watermarkColor || ''))c.watermarkColor='#'+[...c.watermarkColor.slice(1)].map(digit=>digit+digit).join('');
   for(const key of ['headingColor','textColor','accentColor','glassTint','edgeColor','buttonColor','buttonTextColor','backgroundColor','watermarkColor','socialButtonColor','socialIconColor']) if(!/^#[\da-f]{6}$/i.test(c[key] || '')) c[key]=FOOTER_EDITORIAL_DEFAULTS[key];
   for(const key of ['headline','description','brandName','brandTagline','watermarkText','backToTopLabel','successMessage','errorMessage','titleFont','bodyFont']) c[key]=typeof c[key]==='string'?c[key].slice(0,1000):FOOTER_EDITORIAL_DEFAULTS[key];
   for(const key of Object.keys(FOOTER_EDITORIAL_DEFAULTS).filter(key=>key.endsWith('Enabled'))) c[key]=c[key]!==false;
-  const enums={brandMode:['store','text','image','both'],socialIconStyle:['minimal','custom'],socialPresentation:['medallions','minimal','custom'],watermarkStyle:['signature','engraved'],backgroundMode:['satin','inherit','color','image'],material:['texture','css'],mobileNavigation:['accordion','open'],hoverMotion:['none','lift','shine','tilt']};
+  const enums={brandMode:['store','text','image','both'],socialIconStyle:['minimal','custom'],socialPresentation:['glass','minimal','custom'],watermarkStyle:['signature','engraved'],backgroundMode:['satin','inherit','color','image'],material:['texture','css'],mobileNavigation:['accordion','open'],hoverMotion:['none','lift','shine','tilt']};
   for(const [key,values] of Object.entries(enums)) if(!values.includes(c[key])) c[key]=FOOTER_EDITORIAL_DEFAULTS[key];
   c.backgroundImage=safeFooterImage(c.backgroundImage);
   if(input.description===undefined && typeof footer.subscribeText==='string' && !footer.subscribeText.startsWith('Suscríbete y sé la primera')) c.description=footer.subscribeText;

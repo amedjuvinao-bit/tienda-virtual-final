@@ -50,11 +50,16 @@
 .footer-ed__social-emblem{display:grid;place-items:center;width:100%;height:100%}
 .footer-ed__social img{width:100%;height:100%;object-fit:contain}
 .footer-ed__social svg{display:block;width:100%;height:100%}
-.footer-ed__social-dock[data-presentation="medallions"]{padding:8px 0 0;background:none;border:0;box-shadow:none}
-.footer-ed__social-dock[data-presentation="medallions"] .footer-ed__social{display:flex;flex-direction:column;gap:10px;height:auto;padding:0;border-radius:999px 999px 10px 10px}
-.footer-ed__social-dock[data-presentation="medallions"] .footer-ed__social-emblem{position:relative;flex:none;aspect-ratio:1;height:auto;padding:23%;border:1px solid var(--fe-accent);border-radius:50%;color:var(--fe-social-ink);background:radial-gradient(ellipse at 22% 0,#fff5,transparent 58%),linear-gradient(155deg,color-mix(in srgb,var(--fe-social-button) 85%,#fff),var(--fe-social-button) 58%,color-mix(in srgb,var(--fe-social-button) 78%,#1e0710));box-shadow:0 0 0 2px #fff7,inset 0 1px 2px #fff8,inset 0 -3px 5px #290a1e55,0 7px 12px #79233d30}
-.footer-ed__social-dock[data-presentation="medallions"] .footer-ed__social-emblem:after{content:"";position:absolute;inset:4px;border:1px solid #fff3;border-radius:50%;pointer-events:none}
-.footer-ed__social-label{display:block;width:max-content;text-align:center;white-space:nowrap;font:500 11px/1.3 var(--fe-body-font);color:var(--fe-ink);letter-spacing:.01em}
+/* Individual transparent tiles reproduce the reference's square glass bevel. */
+.footer-ed__social-dock[data-presentation="glass"]{padding:8px 2px 12px;background:none;border:0;box-shadow:none}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social{padding:calc(var(--fe-social-size) * .23);border:1px solid color-mix(in srgb,var(--fe-accent) 72%,#ffe9cf);border-radius:22%;color:var(--fe-social-ink);background:radial-gradient(ellipse at 14% 5%,#fffa,transparent 46%),linear-gradient(135deg,#fff4,transparent 45%,#fff5),color-mix(in srgb,var(--fe-social-button) 24%,transparent);backdrop-filter:blur(3px) saturate(1.1);-webkit-backdrop-filter:blur(3px) saturate(1.1);box-shadow:0 0 0 1px #fffc,inset 0 2px 2px #fff,inset 2px 0 2px #fff9,inset -2px -3px 3px #b56c4966,0 2px 1px #fffd,0 6px 5px -3px #8c3b3299,0 11px 13px -7px #813e354d;transition:transform var(--fe-duration),box-shadow var(--fe-duration)}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:before{content:"";position:absolute;inset:3px;border:1px solid #fff9;border-radius:calc(22% - 2px);box-shadow:inset 0 1px 1px #9c513c44,0 1px 1px #fff9;pointer-events:none}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:after{content:"";position:absolute;inset:5px;border-radius:calc(22% - 4px);background:linear-gradient(130deg,#fffa,transparent 27%,transparent 76%,#fff8);opacity:.45;pointer-events:none;transition:opacity var(--fe-duration)}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem{position:relative;z-index:1}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem>svg{stroke:var(--fe-social-metal);filter:drop-shadow(0 -1px 0 #ffedc3) drop-shadow(.7px 1px .15px #6c321b)}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem svg [stroke="currentColor"]{stroke:var(--fe-social-metal)}
+.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem svg:is([fill="currentColor"]),.footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-emblem svg [fill="currentColor"]{fill:var(--fe-social-metal)}
+.footer-ed__social .footer-ed__metal-defs{position:absolute;width:0;height:0;overflow:hidden}
 
 .footer-ed__top-button{position:relative;display:grid;place-items:center;flex-shrink:0;width:64px;height:64px;margin-left:auto;border-radius:50%;border:1px solid var(--fe-accent);color:var(--fe-accent);background:radial-gradient(ellipse at 25% 12%,#fff9,transparent 55%),linear-gradient(145deg,#fff6,#fff1 55%,#b76e3a33);box-shadow:0 0 0 1px #fff9,inset 0 0 0 2px #fff9,inset 0 3px 3px #fff,inset -2px -3px 2px #a25b3d99,0 5px 6px #733a2b44;cursor:pointer;transition:transform var(--fe-duration)}
 .footer-ed__top-button:before{content:"";position:absolute;inset:5px;border:1px solid #fff9;border-radius:50%;box-shadow:0 -1px 1px #b9754d88,inset 0 -1px 2px #fff8;pointer-events:none}
@@ -82,6 +87,7 @@
  .footer-ed[data-motion="lift"] .footer-ed__social:hover,.footer-ed[data-motion="lift"] .footer-ed__top-button:hover{transform:translateY(-5px)}
  .footer-ed[data-motion="tilt"] .footer-ed__social:hover{transform:perspective(400px) rotateY(-12deg) translateY(-3px)}
  .footer-ed[data-motion="shine"] .footer-ed__social:hover{background:#fff4}
+ .footer-ed:not([data-motion="none"]) .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social:hover:after{opacity:.85}
  .footer-ed:not([data-motion="none"]) .footer-ed__newsletter:hover{filter:brightness(1.025)}
 }
 @container footer-editorial (min-width:1051px){.footer-ed__navigation:has(>.footer-ed__column:nth-child(3):last-child){grid-template-columns:1fr 1.15fr 1.15fr}}
@@ -128,8 +134,9 @@
  .footer-ed__social-dock{grid-area:social;width:100%;max-width:100%;padding:14px;margin:22px 0 24px}
  .footer-ed__social-list{width:100%;justify-content:space-between;gap:clamp(8px,3cqi,var(--fe-social-gap))}
  .footer-ed__social{flex-basis:clamp(36px,calc(var(--fe-social-size) * .8),60px);width:clamp(36px,calc(var(--fe-social-size) * .8),60px);height:clamp(36px,calc(var(--fe-social-size) * .8),60px);padding:10px}
- .footer-ed__social-dock[data-presentation="medallions"]{padding:4px 0 0}
- .footer-ed__social-label{font-size:10px}
+ .footer-ed__social-dock[data-presentation="glass"]{padding:4px 2px 12px;width:max-content;max-width:100%}
+ .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social-list{justify-content:flex-start}
+ .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social{padding:clamp(8px,calc(var(--fe-social-size) * .18),14px)}
  .footer-ed__top-button{grid-area:up;margin:18px auto 0;width:48px;height:48px}
  .footer-ed__legal{grid-area:legal;font-size:11px;padding-top:18px}
  .footer-ed__watermark{grid-area:watermark;margin-top:20px;padding-bottom:8px}

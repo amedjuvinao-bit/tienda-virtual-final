@@ -34,12 +34,18 @@ describe('footer Firma editorial',()=>{
     fireEvent.submit(screen.getByRole('form',{name:'Suscripción a novedades'}));
     expect(await screen.findByRole('status')).toHaveTextContent('Vista previa');expect(post).not.toHaveBeenCalled();
   });
-  it('presenta las redes con contraste y permite recuperar las imágenes guardadas o los iconos simples',()=>{
+  it('recupera los botones de cristal del modelo y mantiene accesibles los destinos y los logos personalizados',()=>{
     const footer={logoUrl:'/mi-logo.png',instagram:'https://instagram.com/demo',instagramIcon:'/icono-anterior.png'};
     const {rerender}=render(<FooterSection theme={makeTheme(footer)}/>);
     expect(screen.getByRole('img',{name:'Logo de la tienda'})).toHaveAttribute('src','/mi-logo.png');
     expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toBeNull();
-    expect(screen.getByRole('link',{name:'Instagram'})).toHaveTextContent('Instagram');
+    expect(screen.getByRole('link',{name:'Instagram'})).toHaveAttribute('title','Instagram');
+    expect(document.querySelector('.footer-ed__social-dock')).toHaveAttribute('data-presentation','glass');
+    expect(document.querySelector('.footer-ed__social-label')).toBeNull();
+    rerender(<FooterSection theme={makeTheme({...footer,editorial:{socialPresentation:'medallions',socialButtonColor:'#801c3c',socialIconColor:'#fff5ea'}})}/>);
+    expect(document.querySelector('.footer-ed__social-dock')).toHaveAttribute('data-presentation','glass');
+    expect(document.querySelector('.footer-ed').style.getPropertyValue('--fe-social-ink')).toBe('#ac6b36');
+    expect(document.querySelector('.footer-ed').style.getPropertyValue('--fe-social-button')).toBe('#f3c4ba');
     rerender(<FooterSection theme={makeTheme({...footer,editorial:{socialPresentation:'custom'}})}/>);
     expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toHaveAttribute('src','/icono-anterior.png');
     rerender(<FooterSection theme={makeTheme({...footer,editorial:{brandName:'Mi tienda',brandMode:'text',socialPresentation:'minimal'}})}/>);
@@ -52,6 +58,9 @@ describe('footer Firma editorial',()=>{
     render(<Harness/>);
     const content=within(screen.getByRole('navigation',{name:'Contenido del footer'}));
     fireEvent.click(content.getByRole('button',{name:'Redes'}));
+    expect(screen.getByRole('combobox',{name:'Estilo de los iconos sociales'})).toHaveValue('glass');
+    fireEvent.change(screen.getByRole('textbox',{name:'Color del relieve de los símbolos: código hexadecimal'}),{target:{value:'#a27842'}});
+    expect(saved.footer.editorial).toMatchObject({socialPresentation:'glass',socialIconColor:'#a27842'});
     fireEvent.change(screen.getByRole('combobox',{name:'Estilo de los iconos sociales'}),{target:{value:'custom'}});
     expect(saved.footer.editorial.socialPresentation).toBe('custom');
     fireEvent.click(content.getByRole('button',{name:'Marca de agua'}));

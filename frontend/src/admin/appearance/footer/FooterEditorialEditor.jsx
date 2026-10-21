@@ -19,9 +19,8 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
   const [step,setStep]=useState('content'), [column,setColumn]=useState('column1'), [social,setSocial]=useState('instagram');
   const [pending,setPending]=useState(false), [error,setError]=useState(''), [restored,setRestored]=useState(false);
   const write=(field,value)=>setPath?.('footer.'+field,value);
-  // Persist the presentation shown by the editor before a content change can
-  // revive the legacy text mode or the removed heavy social relief.
-  const edit=(field,value)=>write('editorial',{...footer.editorial,brandMode:c.brandMode,socialIconStyle:c.socialIconStyle,[field]:value});
+  // Persist migrated visual options along with the next edit.
+  const edit=(field,value)=>write('editorial',{...footer.editorial,brandMode:c.brandMode,socialIconStyle:c.socialIconStyle,socialPresentation:c.socialPresentation,socialButtonColor:c.socialButtonColor,socialIconColor:c.socialIconColor,[field]:value});
   const col=columns.find(item=>item.id===column) || columns[0], links=Array.isArray(footer[column+'Links'])?footer[column+'Links']:col.links;
   async function upload(field,file) {
     if(!file || !uploadToCloudinaryViaBackend)return;
@@ -68,13 +67,13 @@ export default function FooterEditorialEditor({theme,store,setPath,uploadToCloud
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar redes sociales" checked={c.socialsEnabled} onChange={value=>edit('socialsEnabled',value)}/>
-          <SelectField label="Estilo de los iconos sociales" value={c.socialPresentation} onChange={value=>edit('socialPresentation',value)} options={[["medallions","Cristal color vino con etiquetas"],["custom","Mis logos personalizados"],["minimal","Iconos sencillos"]]}/>
+          <SelectField label="Estilo de los iconos sociales" value={c.socialPresentation} onChange={value=>edit('socialPresentation',value)} options={[["glass","Cristal cuadrado con relieve dorado · Modelo"],["custom","Mis logos personalizados"],["minimal","Iconos sencillos"]]}/>
           <SelectField label="Configurar red social" value={social} onChange={setSocial} options={FOOTER_SOCIALS.map(item=>[item.key,item.label])}/>
           <TextField label={'Enlace de '+FOOTER_SOCIALS.find(item=>item.key===social).label} value={footer[social] || ''} onChange={value=>write(social,value)} placeholder="https://…"/>
           {footer[social] && !/^https?:\/\//i.test(safeFooterLink(footer[social])) && <p role="alert">Introduce un enlace http o https válido para mostrar esta red.</p>}
           {c.socialPresentation==='custom' && image('Imagen del icono (opcional)',social+'Icon')}
           <p>Cada botón abre su red social. Los enlaces y las imágenes guardadas se conservan al cambiar el estilo.</p>
-          {c.socialPresentation==='medallions' && colors([['socialButtonColor','Color de los botones sociales'],['socialIconColor','Color de los símbolos']])}
+          {c.socialPresentation==='glass' && colors([['socialButtonColor','Tinte del cristal de las redes'],['socialIconColor','Color del relieve de los símbolos']])}
           <div className="footer-editor__grid"><NumberField label="Tamaño de los iconos (px)" min={36} max={90} value={c.socialSize} onChange={value=>edit('socialSize',value)}/><NumberField label="Separación entre iconos (px)" min={4} max={32} value={c.socialGap} onChange={value=>edit('socialGap',value)}/></div>
         </div>
         <div className="footer-editor__card">
