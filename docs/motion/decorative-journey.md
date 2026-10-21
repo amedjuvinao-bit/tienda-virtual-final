@@ -1,13 +1,14 @@
 # Continuous decorative journey
 
-The storefront now uses one persistent composition of store-configured images across its sections. The path changes continuously with scroll; scrolling back restores the same pose. The ornament nodes stay mounted, and no product content or media players are cloned.
+The storefront uses one persistent lead image and a restrained supporting trail of store-configured images across its sections. Each section has its own composition, with a continuous handoff to the next one. The path changes continuously with scroll; scrolling back restores the same pose. The ornament nodes stay mounted, and no product content or media players are cloned.
 
 ## Administration
 
 Apariencia → General → Animación global → Camino continuo.
 
 - **Adornos**: upload a transparent PNG/WebP as the main decoration, optionally add a second one. There is no business-specific preset or restore button.
-- **Recorrido**: choose enveloping curves or side paths, size, density, depth, opacity and the connecting thread.
+- **Recorrido**: choose enveloping curves or side paths, size, supporting density, depth, opacity and the connecting thread. Density now controls a restrained accompaniment (at most six small accents), rather than filling the viewport with repeated large images.
+- **Secciones**: adjust one section at a time. Select the section using its configured title, keep its automatic composition or frame the left/right/lower edge, change its relative scale and supporting accents, or disable its ornament. Reset affects only the selected section.
 - **Fondo**: use one continuous background image, the store background color, or the individual section backgrounds.
 - **Móvil**: set the size and density used by the adapted mobile mode.
 
@@ -21,7 +22,11 @@ The connecting line follows the store accent color unless the administrator sele
 
 ## Rendering and accessibility
 
-A single SVG world is pinned within the storefront. A continuous cubic curve determines the path and the ornament transforms. Scroll events schedule one animation frame, with no idle rendering loop. Short-lived local transitions update occlusion while they run. A sharp mask places decorations visually behind real text, photos and controls without changing component layout or intercepting pointer events. Neither the source images nor the mask use a blur filter. Near unboxed text, the entire ornament fades out continuously and reappears intact after passing it, avoiding rectangular fragments around headings. Depth comes from movement, scale and a separate shadow composed after the ornament transforms; its dimensions follow viewport pixels and adapt to mobile and preview sizes.
+A single SVG world is pinned within the storefront. The same lead DOM node follows a section-specific cubic composition and a continuous handoff arc. The measured section order and actual heights determine the timing, including tall sections and reordered or disabled sections. The image is sized and positioned inside the visible area of its owning section; it does not borrow the next section’s space when its section is shorter than the screen. The final composition remains reachable for a short footer. Mobile has separate compositions for stacked galleries, images, social posts and information cards. Each structure has its own path: opening arc, gallery sweep, image framing, accessory orbit, category fan arc, social columns, video framing, information sweep and a closing composition. These are layout roles; no business artwork or brand text is built into the engine.
+
+The lead is placed within the visible viewport below the header and around actual text/control geometry. Text masks follow individual text lines, rather than the entire width of a heading. Supporting images pass behind cards and product media. The lead remains in the foreground at the framing edge and does not disappear wholesale near headings. The configured images are never blurred. Shadows are composed separately after the transforms, with viewport dimensions adapted to preview and mobile sizes. The layer never intercepts input.
+
+Scroll events schedule a frame. Layout-dependent position changes settle with a bounded, speed-limited animation so the lead does not jump between poses. Rendering stops once it reaches its target; there is no idle loop. A viewport resize immediately fits the composition to the new screen. Short-lived component transitions update the protection geometry while they run. Normalized per-section controls are stored under `journey.sectionSettings`, using the existing appearance save endpoint. Explicitly configured resources and legacy settings remain intact.
 
 Reduced motion keeps a static decorative pose. The mobile “off” mode removes the decoration and restores the individual backgrounds. The desktop and mobile density limits bound the rendering cost. Changing to a different route, disabling the effect or unmounting releases its observers and listeners.
 
@@ -43,4 +48,4 @@ Final generation prompt:
 - Admin preview in Chromium: desktop/mobile, interactive scrubber, settings persistence and reduced motion.
 - Production build.
 
-`docs/previews/floral-journey.mp4` is captured from the real Home components with an explicitly configured floral resource and a controlled demonstration catalog; this is an example, not the initial state for stores. It shows a continuous scroll from Categories to Information. The existing four-preset clip remains available as a legacy entrance comparison.
+`docs/previews/floral-journey.mp4` is a historical example recorded before the section-specific choreography. It was captured from the real Home components with an explicitly configured floral resource and a controlled demonstration catalog; this is an example, not the initial state for stores. It shows a continuous scroll from Categories to Information. The existing four-preset clip remains available as a legacy entrance comparison.
