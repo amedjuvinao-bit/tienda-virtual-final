@@ -1,6 +1,6 @@
 export const FOOTER_EDITORIAL_DEFAULTS = {
-  headline: 'Sigamos\nen contacto', description: 'Recibe novedades de nuestra tienda.',
-  brandName: 'Tu marca', brandMode: 'text', brandTagline: '',
+  headline: 'Sigamos\nen contacto', description: 'Conoce nuestras novedades, nuevas colecciones y promociones.',
+  brandName: '', brandMode: 'store', brandTagline: '',
   newsletterEnabled: true, brandEnabled: true, socialsEnabled: true,
   column1Enabled: true, column2Enabled: true, column3Enabled: true,
   legalEnabled: true, watermarkEnabled: true, backToTopEnabled: true,
@@ -15,7 +15,7 @@ export const FOOTER_EDITORIAL_DEFAULTS = {
   headingColor: '#681429', textColor: '#6a4842', accentColor: '#b27342',
   glassTint: '#f3c4ba', edgeColor: '#fff0df', buttonColor: '#8c1738', buttonTextColor: '#ffffff',
   material: 'texture', materialOpacity: 95, glassOpacity: 22, blur: 12, depth: 12, radius: 28,
-  socialSize: 70, socialGap: 18, socialIconStyle: 'relief', buttonWidth: 210, buttonHeight: 60,
+  socialSize: 64, socialGap: 18, socialIconStyle: 'custom', buttonWidth: 210, buttonHeight: 60,
   mobilePadding: 22, mobileHeadlineSize: 42, mobileBrandSize: 52, mobileWatermarkSize: 92,
   mobileNavigation: 'accordion', hoverMotion: 'lift', animationDuration: 350,
 };
@@ -37,29 +37,51 @@ export function safeFooterLink(value) {
 export function safeFooterImage(value) {
   const url=safeFooterLink(value); return /^https:\/\//i.test(url) || /^\/(?!\/)/.test(url) ? url : '';
 }
-export function normalizeEditorialOptions(footer = {}) {
+// Replace only the two keyboard-test patterns visible in the old footer. Real
+// business copy, links and uploaded images remain editable and are preserved.
+export function cleanFooterDraftText(value, fallback='') {
+  if(typeof value!=='string')return fallback;
+  const compact=value.replace(/\s/g,'').toUpperCase();
+  return /^(?:[ASD]{8,}|[WER]{8,})$/.test(compact)?fallback:value;
+}
+function isSampleBrand(value) {
+  return /^(?:tu marca|your brand)$/i.test(String(value||'').trim());
+}
+export function resolveFooterLogo(footer={},theme={}) {
+  return [footer.logoUrl,theme?.header?.logoLight,theme?.logo?.light,theme?.header?.logoDark,theme?.logo?.dark].map(safeFooterImage).find(Boolean)||'';
+}
+export function footerLegalText(footer={},brandName='') {
+  const text=cleanFooterDraftText(footer.copyright);
+  return text.trim() && !/\btu marca\b/i.test(text)?text:'© '+(brandName?brandName+' · ':'')+'Todos los derechos reservados.';
+}
+export function normalizeEditorialOptions(footer = {}, {store={},theme={}} = {}) {
   const input=footer.editorial && typeof footer.editorial==='object' ? footer.editorial : {};
   const c={...FOOTER_EDITORIAL_DEFAULTS,...input};
   for(const [key,[min,max]] of Object.entries(bounds)) { const n=Number(c[key]);c[key]=Number.isFinite(n)?Math.min(max,Math.max(min,n)):FOOTER_EDITORIAL_DEFAULTS[key]; }
   for(const key of ['headingColor','textColor','accentColor','glassTint','edgeColor','buttonColor','buttonTextColor','backgroundColor']) if(!/^#[\da-f]{6}$/i.test(c[key] || '')) c[key]=FOOTER_EDITORIAL_DEFAULTS[key];
   for(const key of ['headline','description','brandName','brandTagline','watermarkText','backToTopLabel','successMessage','errorMessage','titleFont','bodyFont']) c[key]=typeof c[key]==='string'?c[key].slice(0,1000):FOOTER_EDITORIAL_DEFAULTS[key];
   for(const key of Object.keys(FOOTER_EDITORIAL_DEFAULTS).filter(key=>key.endsWith('Enabled'))) c[key]=c[key]!==false;
-  const enums={brandMode:['text','image','both'],socialIconStyle:['relief','custom'],backgroundMode:['satin','inherit','color','image'],material:['texture','css'],mobileNavigation:['accordion','open'],hoverMotion:['none','lift','shine','tilt']};
+  const enums={brandMode:['store','text','image','both'],socialIconStyle:['minimal','custom'],backgroundMode:['satin','inherit','color','image'],material:['texture','css'],mobileNavigation:['accordion','open'],hoverMotion:['none','lift','shine','tilt']};
   for(const [key,values] of Object.entries(enums)) if(!values.includes(c[key])) c[key]=FOOTER_EDITORIAL_DEFAULTS[key];
   c.backgroundImage=safeFooterImage(c.backgroundImage);
-  // Keep business copy. A legacy logo/icon must not silently replace the model's
-  // large editorial signature or sculpted social glyphs; those are explicit choices.
   if(input.description===undefined && typeof footer.subscribeText==='string' && !footer.subscribeText.startsWith('Suscríbete y sé la primera')) c.description=footer.subscribeText;
+  c.description=cleanFooterDraftText(c.description,FOOTER_EDITORIAL_DEFAULTS.description);
+  const sampleBrand=isSampleBrand(c.brandName);
+  c.brandName=sampleBrand?'':cleanFooterDraftText(c.brandName);
+  if(!c.brandName.trim())c.brandName=[store?.name,store?.businessName,theme?.store?.name,theme?.store?.businessName].map(value=>cleanFooterDraftText(value)).find(value=>value.trim() && !isSampleBrand(value)) || '';
+  if(sampleBrand && c.brandMode==='text')c.brandMode='store';
+  if(isSampleBrand(c.watermarkText))c.watermarkText='';
+  c.watermarkText=cleanFooterDraftText(c.watermarkText);
   return c;
 }
 const defaults=[
-  {title:'Explora',links:[{label:'Nuestra historia',href:'/nuestra-historia'},{label:'Catálogo',href:'/#categorias'}]},
-  {title:'Ayuda',links:[{label:'Envíos',href:'/politicas'},{label:'Cambios y devoluciones',href:'/cambios-devoluciones'},{label:'Contacto',href:'/#informacion'}]},
-  {title:'Legal',links:[{label:'Privacidad',href:'/privacidad'},{label:'Términos y condiciones',href:'/terminos'}]},
+  {title:'Nuestra tienda',links:[{label:'Nuestra historia',href:'/nuestra-historia'},{label:'Catálogo',href:'/#categorias'}]},
+  {title:'Atención al cliente',links:[{label:'Envíos',href:'/politicas'},{label:'Cambios y devoluciones',href:'/cambios-devoluciones'},{label:'Contacto',href:'/#informacion'}]},
+  {title:'Información legal',links:[{label:'Privacidad',href:'/privacidad'},{label:'Términos y condiciones',href:'/terminos'}]},
 ];
 export const FOOTER_SOCIALS=[{key:'instagram',label:'Instagram'},{key:'tiktok',label:'TikTok'},{key:'facebook',label:'Facebook'},{key:'whatsapp',label:'WhatsApp'}];
 export function footerColumns(footer={}) {
-  return defaults.map((item,i)=>({id:'column'+(i+1),title:typeof footer['column'+(i+1)+'Title']==='string'?footer['column'+(i+1)+'Title']:item.title,
+  return defaults.map((item,i)=>({id:'column'+(i+1),title:cleanFooterDraftText(footer['column'+(i+1)+'Title'],item.title),
     links:(Array.isArray(footer['column'+(i+1)+'Links'])?footer['column'+(i+1)+'Links']:item.links).filter(link=>link && typeof link.label==='string' && link.label.trim() && safeFooterLink(link.href)).map(link=>({...link,href:safeFooterLink(link.href)})),
   }));
 }

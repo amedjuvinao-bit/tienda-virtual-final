@@ -548,6 +548,7 @@ router.get('/appearance', requireAdmin, requirePermission('appearance:view'), as
     res.json({
       theme: safe.theme,
       menus: safe.menus,
+      store: { name: safe.store?.name || "", businessName: safe.store?.businessName || "" },
       appearanceRevision: Number(safe.appearanceRevision || 0),
     });
   } catch (error) {

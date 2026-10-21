@@ -125,7 +125,7 @@ function GlobalFloatingButtons({ theme }) {
   );
 }
 
-function Home({ theme }) {
+function Home({ theme, store }) {
   const sectionsRef = useRef(null);
 
   useEffect(() => mountStorefrontSectionMotion(sectionsRef.current), [theme]);
@@ -142,7 +142,7 @@ function Home({ theme }) {
         {isStorefrontSectionVisible(theme, 'instagram') && <section id="instagram" className="storefront-section-shell w-full"><InstagramSection theme={theme} posts={[]} /></section>}
         {isStorefrontSectionVisible(theme, 'tiktok') && <section id="tiktok" className="storefront-section-shell w-full"><TiktokSection theme={theme} posts={[]} /></section>}
         {isStorefrontSectionVisible(theme, 'informacion') && <section id="informacion" className="storefront-section-shell w-full"><InformacionSection theme={theme} /></section>}
-        <section id="footer" className="w-full"><FooterSection theme={theme} /></section>
+        <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
       </div>
     </div>
   );
@@ -256,7 +256,7 @@ export default function App() {
 
                 <AdminLogoutGate>
                 {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
-                  <Route path="/" element={<Home theme={themeFromServer} />} />
+                  <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/p/:id" element={<ProductDetail />} />

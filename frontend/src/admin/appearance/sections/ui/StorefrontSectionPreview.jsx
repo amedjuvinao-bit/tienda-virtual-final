@@ -43,7 +43,7 @@ function previewDevice(mode = 'auto') {
   return { width: 1280, label: 'Escritorio' };
 }
 
-export default function StorefrontSectionPreview({ section, theme }) {
+export default function StorefrontSectionPreview({ section, theme, store }) {
   const viewportRef = useRef(null);
   const canvasRef = useRef(null);
   const [viewMode, setViewMode] = useState('auto');
@@ -153,7 +153,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
             <div ref={canvasRef} className="section-real-preview__canvas" style={{ width: frame.width, left: frame.left || 0, transform: `scale(${frame.scale})` }}>
               <StorefrontPreviewBoundary key={section.id}>
                 <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>
-                  <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} preview={section.id === 'footer'} />
+                  <PublicSection theme={previewTheme} store={store} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} preview={section.id === 'footer'} />
                 </Suspense>
               </StorefrontPreviewBoundary>
             </div>

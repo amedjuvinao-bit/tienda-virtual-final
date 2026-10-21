@@ -4,7 +4,7 @@ import SectionEditorCardTabs from '../sections/ui/SectionEditorCardTabs';
 import StorefrontSectionPreview from '../sections/ui/StorefrontSectionPreview';
 import { ColorField } from '../sections/ui/SectionsPanelUI';
 import { INFO_FONT_OPTIONS } from '../sections/info/infoSectionHelpers';
-import { FOOTER_EDITORIAL_DEFAULTS, FOOTER_SOCIALS, footerColumns, normalizeEditorialOptions, safeFooterImage, safeFooterLink } from '../../../components/footer/footerEditorialConfig';
+import { FOOTER_EDITORIAL_DEFAULTS, FOOTER_SOCIALS, footerColumns, footerLegalText, normalizeEditorialOptions, safeFooterImage, safeFooterLink } from '../../../components/footer/footerEditorialConfig';
 import { TextField, NumberField, SelectField, CheckField, ImageField, FooterLinkEditor } from './FooterEditorFields';
 import './footerEditor.css';
 
@@ -14,11 +14,14 @@ const sizes={
   typography:[['headlineSize','Título principal (px)',28,110],['brandSize','Nombre de la marca (px)',24,100],['columnTitleSize','Títulos de columna (px)',18,42],['bodySize','Texto y enlaces (px)',12,24],['watermarkSize','Tamaño del grabado (px)',80,400],['watermarkOpacity','Intensidad del grabado (%)',0,90]],
   mobile:[['mobilePadding','Margen lateral en móvil (px)',14,40],['mobileHeadlineSize','Título en móvil (px)',26,60],['mobileBrandSize','Marca en móvil (px)',24,64],['mobileWatermarkSize','Grabado en móvil (px)',48,140]],
 };
-export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryViaBackend,uploading,setUploading}) {
-  const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer), columns=footerColumns(footer);
+export default function FooterEditorialEditor({theme,store,setPath,uploadToCloudinaryViaBackend,uploading,setUploading}) {
+  const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), columns=footerColumns(footer);
   const [step,setStep]=useState('content'), [column,setColumn]=useState('column1'), [social,setSocial]=useState('instagram');
   const [pending,setPending]=useState(false), [error,setError]=useState(''), [restored,setRestored]=useState(false);
-  const write=(field,value)=>setPath?.('footer.'+field,value), edit=(field,value)=>write('editorial.'+field,value);
+  const write=(field,value)=>setPath?.('footer.'+field,value);
+  // Persist the presentation shown by the editor before a content change can
+  // revive the legacy text mode or the removed heavy social relief.
+  const edit=(field,value)=>write('editorial',{...footer.editorial,brandMode:c.brandMode,socialIconStyle:c.socialIconStyle,[field]:value});
   const col=columns.find(item=>item.id===column) || columns[0], links=Array.isArray(footer[column+'Links'])?footer[column+'Links']:col.links;
   async function upload(field,file) {
     if(!file || !uploadToCloudinaryViaBackend)return;
@@ -34,7 +37,7 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
     <div className="section-editor-layout__form footer-editor__form">
       <div className="footer-editor__card"><div className="footer-editor__heading"><div><strong>Pie de página · Firma editorial</strong><p>Modelo 3 · Textos, cristal y enlaces configurables.</p></div><CheckField label="Mostrar footer" checked={footer.enabled!==false} onChange={value=>write('enabled',value)}/></div>
         <button type="button" className="footer-editor__restore" onClick={restore}>Aplicar apariencia del modelo aprobado</button>
-        {restored && <p role="status">Apariencia aplicada: firma grande, iconos en relieve y cristal compacto. Guarda los cambios para publicarla. Se conservaron tus textos y enlaces.</p>}
+        {restored && <p role="status">Apariencia aplicada con el logo y las redes configuradas de la tienda. Guarda los cambios para publicarla. Se conservaron tus enlaces.</p>}
         <SectionEditorSteps sectionName="Pie de página" value={step} onChange={setStep} items={[{value:'content',label:'Contenido',hint:'Edita un grupo a la vez. Todos los textos de la tienda son configurables.'},{value:'design',label:'Diseño',hint:'Ajusta el material, los colores y los tamaños. Comprueba cada dispositivo en la vista previa.'}]}/>
       </div>
       {error && <p role="alert">{error}</p>}
@@ -49,21 +52,21 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar marca" checked={c.brandEnabled} onChange={value=>edit('brandEnabled',value)}/>
-          <TextField label="Nombre de la marca" value={c.brandName} onChange={value=>edit('brandName',value)}/>
-          <SelectField label="Presentación de la marca" value={c.brandMode} onChange={value=>edit('brandMode',value)} options={[["text","Nombre como en la referencia"],["image","Logo de la tienda"],["both","Logo y nombre"]]}/>
-          {c.brandMode!=='text' && <>{image('Imagen del logo','logoUrl')}<NumberField label="Ancho del logo (px)" value={footer.logoSizePx??144} min={60} max={260} onChange={value=>write('logoSizePx',value)}/></>}
+          <TextField label="Nombre de la marca" value={footer.editorial?.brandName===''?'':c.brandName} placeholder={store?.name || ''} onChange={value=>edit('brandName',value)}/>
+          <SelectField label="Presentación de la marca" value={c.brandMode} onChange={value=>edit('brandMode',value)} options={[["store","Logo configurado de la tienda"],["text","Nombre de la tienda"],["image","Solo logo"],["both","Logo y nombre"]]}/>
+          {c.brandMode!=='text' && <>{image('Imagen del logo','logoUrl')}<NumberField label="Ancho del logo (px)" value={footer.logoSizePx??220} min={60} max={260} onChange={value=>write('logoSizePx',value)}/><p>Si no eliges otro logo, se utiliza el del encabezado. El nombre se toma de Configuración → Tienda cuando este campo queda vacío.</p></>}
           <TextField label="Texto bajo la marca (opcional)" area value={c.brandTagline} onChange={value=>edit('brandTagline',value)}/>
           <CheckField label="Mostrar nombre grabado al fondo" checked={c.watermarkEnabled} onChange={value=>edit('watermarkEnabled',value)}/>
           <TextField label="Texto del grabado (vacío usa la marca)" value={c.watermarkText} onChange={value=>edit('watermarkText',value)}/>
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar redes sociales" checked={c.socialsEnabled} onChange={value=>edit('socialsEnabled',value)}/>
-          <SelectField label="Estilo de los iconos sociales" value={c.socialIconStyle} onChange={value=>edit('socialIconStyle',value)} options={[["relief","Dorado en relieve del modelo"],["custom","Mis imágenes personalizadas"]]}/>
+          <SelectField label="Estilo de los iconos sociales" value={c.socialIconStyle} onChange={value=>edit('socialIconStyle',value)} options={[["custom","Logos configurados de la tienda"],["minimal","Iconos simples"]]}/>
           <SelectField label="Configurar red social" value={social} onChange={setSocial} options={FOOTER_SOCIALS.map(item=>[item.key,item.label])}/>
           <TextField label={'Enlace de '+FOOTER_SOCIALS.find(item=>item.key===social).label} value={footer[social] || ''} onChange={value=>write(social,value)} placeholder="https://…"/>
           {footer[social] && !/^https?:\/\//i.test(safeFooterLink(footer[social])) && <p role="alert">Introduce un enlace http o https válido para mostrar esta red.</p>}
           {c.socialIconStyle==='custom' && image('Imagen del icono (opcional)',social+'Icon')}
-          <p>Las imágenes guardadas se conservan y se usan al elegir Mis imágenes personalizadas. Las redes sin un enlace válido se ocultan.</p>
+          <p>Se usan las imágenes de cada red sin relieve añadido. Si no hay imagen, aparece un icono simple. Las redes sin un enlace válido se ocultan.</p>
           <div className="footer-editor__grid"><NumberField label="Tamaño de los iconos (px)" min={36} max={90} value={c.socialSize} onChange={value=>edit('socialSize',value)}/><NumberField label="Separación entre iconos (px)" min={4} max={32} value={c.socialGap} onChange={value=>edit('socialGap',value)}/></div>
         </div>
         <div className="footer-editor__card">
@@ -75,7 +78,7 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
         </div>
         <div className="footer-editor__card">
           <CheckField label="Mostrar texto legal" checked={c.legalEnabled} onChange={value=>edit('legalEnabled',value)}/>
-          <TextField label="Texto legal inferior" area value={footer.copyright?.trim()?footer.copyright:('© '+c.brandName+' · Todos los derechos reservados.')} onChange={value=>write('copyright',value)}/>
+          <TextField label="Texto legal inferior" area value={footerLegalText(footer,c.brandName)} onChange={value=>write('copyright',value)}/>
           <CheckField label="Mostrar botón para volver arriba" checked={c.backToTopEnabled} onChange={value=>edit('backToTopEnabled',value)}/>
           <TextField label="Nombre accesible del botón" value={c.backToTopLabel} onChange={value=>edit('backToTopLabel',value)}/>
         </div>
@@ -105,6 +108,6 @@ export default function FooterEditorialEditor({theme,setPath,uploadToCloudinaryV
         <div className="footer-editor__card"><SelectField label="Animación al pasar el cursor" value={c.hoverMotion} onChange={value=>edit('hoverMotion',value)} options={[["lift","Elevar el cristal"],["shine","Reflejo de luz"],["tilt","Perspectiva suave"],["none","Sin animación"]]}/><NumberField label="Duración de las animaciones (ms)" value={c.animationDuration} min={150} max={1000} onChange={value=>edit('animationDuration',value)}/><p>Se respeta la preferencia de movimiento reducido del dispositivo.</p></div>
       </SectionEditorCardTabs>}
     </div>
-    <aside className="section-editor-layout__preview"><StorefrontSectionPreview section={{id:'footer',enabled:footer.enabled!==false}} theme={theme}/></aside>
+    <aside className="section-editor-layout__preview"><StorefrontSectionPreview section={{id:'footer',enabled:footer.enabled!==false}} theme={theme} store={store}/></aside>
   </div>;
 }

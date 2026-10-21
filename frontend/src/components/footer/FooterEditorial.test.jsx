@@ -34,24 +34,51 @@ describe('footer Firma editorial',()=>{
     fireEvent.submit(screen.getByRole('form',{name:'Suscripción a novedades'}));
     expect(await screen.findByRole('status')).toHaveTextContent('Vista previa');expect(post).not.toHaveBeenCalled();
   });
-  it('usa la firma y el relieve del modelo aunque existan imágenes del footer anterior',()=>{
+  it('usa el logo de la tienda y las imágenes sociales configuradas, con iconos simples como alternativa',()=>{
     const footer={logoUrl:'/mi-logo.png',instagram:'https://instagram.com/demo',instagramIcon:'/icono-anterior.png'};
     const {rerender}=render(<FooterSection theme={makeTheme(footer)}/>);
-    expect(screen.getByText('Tu marca',{selector:'.footer-ed__brand-name'})).toBeInTheDocument();
-    expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toBeNull();
-    rerender(<FooterSection theme={makeTheme({...footer,editorial:{brandMode:'image',socialIconStyle:'custom'}})}/>);
-    expect(screen.getByRole('img',{name:'Tu marca'})).toHaveAttribute('src','/mi-logo.png');
+    expect(screen.getByRole('img',{name:'Logo de la tienda'})).toHaveAttribute('src','/mi-logo.png');
     expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toHaveAttribute('src','/icono-anterior.png');
+    rerender(<FooterSection theme={makeTheme({...footer,editorial:{brandName:'Mi tienda',brandMode:'text',socialIconStyle:'minimal'}})}/>);
+    expect(screen.getByText('Mi tienda',{selector:'.footer-ed__brand-name'})).toBeInTheDocument();
+    expect(screen.getByRole('link',{name:'Instagram'}).querySelector('img')).toBeNull();
+  });
+  it('reemplaza las letras de prueba de la captura por textos comerciales y toma la identidad real de la tienda',()=>{
+    const footer={subscribeText:'ASDADASDASDASD',column1Title:'ERWRWERWERWERWERW',column2Title:'WERWERWERWERWER',column3Title:'WRWERWERWERWER',editorial:{brandName:'Tu marca',brandMode:'text',watermarkText:'TU MARCA',socialIconStyle:'relief'},copyright:'© Tu marca · Todos los derechos reservados.'};
+    render(<FooterSection theme={{...makeTheme(footer),header:{logoLight:'/marca-real.png'}}} store={{name:'Mi negocio'}}/>);
+    expect(screen.getByRole('img',{name:'Mi negocio'})).toHaveAttribute('src','/marca-real.png');
+    expect(screen.getByText('Conoce nuestras novedades, nuevas colecciones y promociones.')).toBeInTheDocument();
+    for(const title of ['Nuestra tienda','Atención al cliente','Información legal'])expect(screen.getByRole('button',{name:title})).toBeInTheDocument();
+    expect(screen.getByText('© Mi negocio · Todos los derechos reservados.')).toBeInTheDocument();
+    expect(document.querySelector('.footer-ed__watermark')).toHaveTextContent('MI NEGOCIO');
+    expect(document.body).not.toHaveTextContent(/TU MARCA|ASDADASDASDASD|ERWRWERWER/);
+  });
+  it('mantiene el mismo nombre del negocio en la vista previa del panel',async()=>{
+    let saved;
+    function Harness(){const [theme,setTheme]=useState({...makeTheme({editorial:{brandName:'Tu marca',brandMode:'text'}}),header:{logoLight:'/marca-real.png'}});saved=theme;return <FooterPanel theme={theme} store={{name:'Negocio global'}} setPath={(path,value)=>setTheme(old=>({...old,footer:{...old.footer,[path.slice(7)]:value}}))}/>;}
+    render(<Harness/>);
+    expect(await screen.findByRole('img',{name:'Negocio global'})).toHaveAttribute('src','/marca-real.png');
+    fireEvent.click(within(screen.getByRole('navigation',{name:'Contenido del footer'})).getByRole('button',{name:'Marca'}));
+    expect(screen.getByRole('textbox',{name:'Nombre de la marca'})).toHaveValue('Negocio global');
+    fireEvent.change(screen.getByRole('textbox',{name:'Nombre de la marca'}),{target:{value:'Negocio actualizado'}});
+    expect(screen.getByRole('img',{name:'Negocio actualizado'})).toHaveAttribute('src','/marca-real.png');
+    expect(saved.footer.editorial.brandMode).toBe('store');
+  });
+  it('no inventa una marca cuando el negocio aún no tiene nombre o logo',()=>{
+    render(<FooterSection theme={null}/>);
+    expect(document.querySelector('.footer-ed__brand')).toBeNull();
+    expect(document.querySelector('.footer-ed__watermark')).toBeNull();
+    expect(screen.getByText('© Todos los derechos reservados.')).toBeInTheDocument();
   });
   it('recupera la apariencia aprobada sin borrar contenido, enlaces ni imágenes guardadas',()=>{
     let saved;
     const initial={editorial:{brandName:'Mi negocio',brandMode:'image',socialIconStyle:'custom',titleFont:'Georgia, serif',depth:1},logoUrl:'/mi-logo.png',instagramIcon:'/mi-icono.png',column1Title:'Descubre',column1Links:[{label:'Mi catálogo',href:'/catalogo'}]};
     function Harness(){const [theme,setTheme]=useState(makeTheme(initial));saved=theme;return <FooterPanel theme={theme} setPath={(path,value)=>setTheme(old=>({...old,footer:{...old.footer,[path.slice(7)]:value}}))}/>;}
     render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Aplicar apariencia del modelo aprobado'}));
-    expect(saved.footer.editorial).toMatchObject({brandName:'Mi negocio',brandMode:'text',socialIconStyle:'relief',depth:12});
+    expect(saved.footer.editorial).toMatchObject({brandName:'Mi negocio',brandMode:'store',socialIconStyle:'custom',depth:12});
     expect(saved.footer.editorial.titleFont).toContain('Bodoni');
     expect(saved.footer).toMatchObject({logoUrl:'/mi-logo.png',instagramIcon:'/mi-icono.png',column1Title:'Descubre',column1Links:initial.column1Links});
-    expect(screen.getByText(/Apariencia aplicada:/)).toHaveTextContent('Guarda los cambios');
+    expect(screen.getByText(/Apariencia aplicada/)).toHaveTextContent('Guarda los cambios');
   });
   it('edita la marca, los enlaces y el material por grupos y muestra los tres dispositivos',async()=>{
     let saved;

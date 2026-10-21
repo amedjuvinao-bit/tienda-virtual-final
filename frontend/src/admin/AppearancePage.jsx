@@ -515,6 +515,7 @@ export default function AppearancePage() {
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [serverSnapshot, setServerSnapshot] = useState(null);
+  const [storeIdentity, setStoreIdentity] = useState({});
   const [appearanceRevision, setAppearanceRevision] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveConflict, setSaveConflict] = useState(false);
@@ -600,6 +601,7 @@ export default function AppearancePage() {
         if (cancelled) return;
         const merged = buildThemeFromServer(settings?.theme);
         setTheme(merged);
+        setStoreIdentity(settings.store || {});
         setServerSnapshot(merged);
         setAppearanceRevision(settings.appearanceRevision);
         setSaveConflict(false);
@@ -1255,6 +1257,7 @@ export default function AppearancePage() {
           {activeTab === "footer" && (
             <fieldset disabled={!canEditAppearance}>
             <FooterPanel
+              store={storeIdentity}
               theme={theme}
               setPath={setPath}
               uploading={uploading}

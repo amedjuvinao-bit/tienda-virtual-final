@@ -25,6 +25,23 @@ assert.deepStrictEqual(appearanceVersionFilter('site-1', 0), {
 });
 
 async function run() {
+  // Appearance previews need the store identity, without expanding access to
+  // contact, billing or other store configuration fields.
+  const SiteSettings = require('../models/SiteSettings');
+  const originalFindOne = SiteSettings.findOne, originalUpdate = SiteSettings.findByIdAndUpdate;
+  const identityFixture = new SiteSettings({store:{name:'Negocio de prueba',businessName:'Razón social',email:'privado@example.com'}}).toObject();
+  try {
+    SiteSettings.findOne = () => ({select(){return this;},async lean(){return identityFixture;}});
+    SiteSettings.findByIdAndUpdate = async () => identityFixture;
+    const getAppearance = siteSettingsRouter.stack.find(layer => layer.route?.path === '/appearance' && layer.route.methods.get).route.stack.at(-1).handle;
+    let response;
+    await getAppearance({}, {set(){return this;},json(value){response=value;}}, error => {throw error;});
+    assert.deepStrictEqual(response.store,{name:'Negocio de prueba',businessName:'Razón social'});
+    assert(!Object.hasOwn(response.store,'email'));
+  } finally {
+    SiteSettings.findOne = originalFindOne;
+    SiteSettings.findByIdAndUpdate = originalUpdate;
+  }
   const putHandler = siteSettingsRouter.stack.find((layer) => layer.route?.path === '/' && layer.route.methods.put).route.stack.at(-1).handle;
   async function responseFor(body) {
     const result = { status: 200, body: null };
