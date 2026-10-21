@@ -116,6 +116,7 @@ requireCritical('./services/electronicInvoiceRecoveryBootstrapService');
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
+const newsletterRoutes = requireCritical('./routes/newsletter');
 const couponRoutes = tryRequire('./routes/coupons');
 const orderEmailRoutes = requireCritical('./routes/orderEmailRoutes');
 const orderCustomerNotificationRoutes = requireCritical(
@@ -172,6 +173,7 @@ const digitalDeliveryRoutes = tryRequire('./routes/digitalDeliveries');
 if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
 if (digitalDeliveryRoutes) {
   app.use('/api/digital-deliveries', digitalDeliveryRoutes);

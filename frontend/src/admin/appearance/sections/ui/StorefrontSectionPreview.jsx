@@ -11,6 +11,7 @@ const PUBLIC_SECTIONS = {
   instagram: lazy(() => import('../../../../components/InstagramSection')),
   tiktok: lazy(() => import('../../../../components/TiktokSection')),
   informacion: lazy(() => import('../../../../components/InformacionSection')),
+  footer: lazy(() => import('../../../../components/FooterSection')),
 };
 
 class StorefrontPreviewBoundary extends React.Component {
@@ -47,13 +48,13 @@ export default function StorefrontSectionPreview({ section, theme }) {
   const canvasRef = useRef(null);
   const [viewMode, setViewMode] = useState('auto');
   const [frame, setFrame] = useState(() => ({ ...previewDevice(), scale: 1, height: 320 }));
-  const canChooseDevice = ['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion'].includes(section.id);
-  const fitWholeSection = section.id === 'informacion';
+  const canChooseDevice = ['tendencia', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion', 'footer'].includes(section.id);
+  const fitWholeSection = ['informacion', 'footer'].includes(section.id);
   const sections = theme.sections || [];
   const previewSections = sections.map((entry) => entry.id === section.id
     ? { ...(section.id === 'complementos' ? normalizeComplementosSection(entry) : entry), enabled: true } : entry);
   const previewSection = previewSections.find((entry) => entry.id === section.id);
-  const overview = getSectionOverview(previewSection, previewSections);
+  const overview = section.id === 'footer' ? {status:'ready'} : getSectionOverview(previewSection, previewSections);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -137,6 +138,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
       {section.enabled === false && <p className="section-real-preview__notice">Esta sección está oculta en la tienda. La mostramos aquí para que puedas diseñarla.</p>}
       <div ref={viewportRef} className="section-real-preview__viewport" data-admin-storefront-preview="true" style={previewStyle} onClickCapture={(event) => {
         if (section.id === 'informacion' && event.target.closest('.info-glass button')) return;
+        if (section.id === 'footer' && event.target.closest('.footer-ed button,.footer-ed input,.footer-ed label')) return;
         if (section.id === 'tiktok' && event.target.closest('.tk-stage button, .tk-stage input')) return;
         if (section.id === 'instagram' && event.target.closest('.ig-journal button, .ig-journal__connection-state button')) return;
         if (section.id === 'look' && event.target.closest('.look-editorial__card-image, .look-editorial__hero-controls button, .look-editorial__rail-controls button')) return;
@@ -151,7 +153,7 @@ export default function StorefrontSectionPreview({ section, theme }) {
             <div ref={canvasRef} className="section-real-preview__canvas" style={{ width: frame.width, left: frame.left || 0, transform: `scale(${frame.scale})` }}>
               <StorefrontPreviewBoundary key={section.id}>
                 <Suspense fallback={<p className="section-real-preview__loading">Preparando vista de la tienda…</p>}>
-                  <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} />
+                  <PublicSection theme={previewTheme} posts={[]} imageSrc="/SeccionComplementos/Complementos.png" previewProducts={previewProducts} preview={section.id === 'footer'} />
                 </Suspense>
               </StorefrontPreviewBoundary>
             </div>

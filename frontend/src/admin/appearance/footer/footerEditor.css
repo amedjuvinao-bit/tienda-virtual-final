@@ -1,0 +1,18 @@
+.footer-editor{min-width:0}
+.footer-editor__form{display:grid;gap:16px;min-width:0}
+.footer-editor__card{display:grid;gap:16px;min-width:0;padding:18px;border:1px solid var(--admin-card-border,#ead6df);border-radius:20px;background:var(--admin-card-bg,#fff)}
+.footer-editor__card p,.footer-editor__heading p{margin:0;font-size:12px;line-height:1.5;color:var(--admin-card-muted-text,#795e6d)}
+.footer-editor__heading{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;color:var(--admin-card-text,#332139)}
+.footer-editor__heading strong{display:block;margin-bottom:5px;font-size:16px}
+.footer-editor__field{display:grid;gap:6px;min-width:0;color:var(--admin-card-text,#332139);font-size:13px}
+.footer-editor__field>span{font-weight:600}
+.footer-editor__field :is(input,textarea,select){width:100%;min-width:0;min-height:42px;border:1px solid var(--admin-input-border,#e5d5df);border-radius:10px;background:var(--admin-input-bg,#fff);padding:10px 12px;color:var(--admin-card-text,#332139);font:400 13px/1.5 Inter,system-ui,sans-serif}
+.footer-editor__field :is(input,textarea,select):focus-visible{outline:2px solid var(--admin-primary,#aa3567);outline-offset:2px}
+.footer-editor__check{display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:13px;color:var(--admin-card-text,#332139)}
+.footer-editor__check input{width:20px;height:20px;accent-color:var(--admin-primary,#aa3567);flex-shrink:0}
+.footer-editor__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.footer-editor__image,.footer-editor__links{display:grid;gap:12px;min-width:0}
+.footer-editor__actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
+.footer-editor__actions button,.footer-editor__restore{border:1px solid var(--admin-card-border,#e1cbd8);background:var(--admin-card-bg,#fff);color:var(--admin-card-text,#5b2844);border-radius:10px;min-height:40px;padding:8px 12px;font-size:12px;cursor:pointer}
+.footer-editor__actions button:disabled{opacity:.4;cursor:default}
+@media(max-width:600px){.footer-editor__grid{grid-template-columns:minmax(0,1fr)}.footer-editor__card{padding:14px}}

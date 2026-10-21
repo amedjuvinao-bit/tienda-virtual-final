@@ -440,8 +440,17 @@ const ThemeSchema = new Schema(
     },
 
     footer: {
-      bgColor: String,
-      textColor: String,
+      type: new Schema({
+        enabled: Boolean, layout: String, bgColor: String, textColor: String,
+        logoUrl: String, logoSizePx: Number, subscribeText: String,
+        inputPlaceholder: String, buttonText: String, copyright: String,
+        facebook: String, instagram: String, tiktok: String, whatsapp: String,
+        facebookIcon: String, instagramIcon: String, tiktokIcon: String, whatsappIcon: String,
+        column1Title: String, column2Title: String, column3Title: String,
+        column1Links: Schema.Types.Mixed, column2Links: Schema.Types.Mixed, column3Links: Schema.Types.Mixed,
+        editorial: Schema.Types.Mixed,
+      }, { _id: false, strict: false }),
+      default: () => ({}),
     },
 
     banner: BannerSchema,
