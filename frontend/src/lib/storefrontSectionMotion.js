@@ -1,4 +1,4 @@
-import { clampStory, normalizeStoryConfig, storyVisual, STORY_VISIBILITY_EVENT } from './storefrontStoryConfig';
+import { clampStory, normalizeStoryConfig, storyVisual, storyContentFrames, STORY_VISIBILITY_EVENT } from './storefrontStoryConfig';
 
 function pauseCoveredMedia(node) {
   const fullscreen=node.ownerDocument.fullscreenElement;
@@ -27,7 +27,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   const viewportHeight=()=>scroller?scroller.clientHeight:view.innerHeight;
   const isMobile=()=>typeof mobileOverride==='boolean'?mobileOverride:mobile?.matches;
   const enabled=()=>config.enabled && !reduce?.matches && !(isMobile() && config.mobileMode==='off');
-  const strength=()=>config.intensity/100*(isMobile() && config.mobileMode==='adapted' ? .55 : 1);
+  const strength=()=>config.intensity/100*(isMobile() && config.mobileMode==='adapted' ? .66 : 1);
   const header=()=>scroller?0:Math.min(180,parseFloat(view.getComputedStyle(container.ownerDocument.documentElement).getPropertyValue('--site-header-height'))||0);
   const cancelGroups=chapter=>chapter.groups.forEach(item=>item.animation.cancel());
   const clear=()=>{
@@ -36,7 +36,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       for(const key of ['storyTop','storyIndex','storyVisible','sectionMotion','sectionDirection'])delete chapter.node.dataset[key];
       chapter.node.style.removeProperty('--story-pin-top');
       chapter.node.style.removeProperty('--story-layer');
-      for(const key of ['transform','opacity','clip-path','border-radius','box-shadow'])chapter.surface.style.removeProperty(key);
+      for(const key of ['transform','transform-origin','opacity','clip-path','border-radius','box-shadow','--story-light','--story-edge','--story-sweep','--story-portal-x','--story-portal-y','will-change'])chapter.surface.style.removeProperty(key);
     });
     delete container.dataset.storyPreset;
     delete container.dataset.storyActive;
@@ -50,20 +50,22 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       const surface=node.querySelector(':scope > .storefront-chapter-surface') || node;
       observer?.observe(node);
       const rect=node.getBoundingClientRect(), height=rect.height || node.offsetHeight;
-      const chapter={node,surface,top:rootTop+rect.top-rootRect.top,height,groups:[]};
+      const chapter={node,surface,top:rootTop+rect.top-rootRect.top,height,groups:[],side:index%2?-1:1};
       node.dataset.storyTop=String(chapter.top);
       node.dataset.storyIndex=String(index);
       node.style.setProperty('--story-layer',index+1);
       node.style.setProperty('--story-pin-top',Math.min(0,viewportHeight()-height)+'px');
       if(enabled() && typeof surface.animate==='function') {
         const headings=Array.from(surface.querySelectorAll('h1,h2')).slice(0,1);
-        const blocks=Array.from(surface.querySelectorAll('[data-story-visual],article,figure')).filter(el=>!el.parentElement.closest('article,figure'));
+        const blockSelector='[data-story-visual],article,figure';
+        const blocks=Array.from(surface.querySelectorAll(blockSelector)).filter(el=>!el.parentElement.closest(blockSelector));
         const media=blocks.length?blocks:Array.from(surface.querySelectorAll('picture,img,video')).filter(el=>{const box=el.getBoundingClientRect();return !el.parentElement.closest('picture') && box.width>=100 && box.height>=80;});
-        const visuals=media.slice(0,config.preset==='cascade'?4:1);
+        const visuals=media.slice(0,config.preset==='cascade'?4:config.preset==='depth'?3:2);
         const actions=Array.from(surface.querySelectorAll('[data-story-action],a,button')).filter(el=>!el.closest('article,figure,nav,[role="tablist"]') && !el.closest('.footer-ed__navigation') && !el.querySelector('img,picture,video')).slice(0,1);
-        const targets=[...new Set([...headings,...visuals,...actions])];
-        chapter.groups=targets.map((element,order)=>{
-          const animation=element.animate([{opacity:.12,translate:`0 ${strength()*(config.preset==='cascade'?48:22)}px`},{opacity:1,translate:'0 0'}],{duration:1000,fill:'both',easing:'cubic-bezier(.16,1,.3,1)'});
+        const seen=new Set();
+        const targets=[...headings.map(element=>({element,kind:'heading'})),...visuals.map(element=>({element,kind:'visual'})),...actions.map(element=>({element,kind:'action'}))].filter(({element})=>{if(seen.has(element))return false;seen.add(element);return true;});
+        chapter.groups=targets.map(({element,kind},order)=>{
+          const animation=element.animate(storyContentFrames(config.preset,kind,strength(),chapter.side*(order%2?-1:1)),{duration:1000,fill:'both',easing:'cubic-bezier(.22,.68,.2,1)'});
           animation.pause();
           return {animation,order,complete:false};
         });
@@ -79,7 +81,8 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
     if(dirty)measure();
     if(!enabled())return;
     const y=scroll(), vh=viewportHeight(), offset=header();
-    const range=vh*({quick:.32,balanced:.5,leisurely:.7}[config.pace]);
+    const range=vh*({quick:.72,balanced:.92,leisurely:1}[config.pace]);
+    const maxScroll=Math.max(0,(scroller?scroller.scrollHeight:container.ownerDocument.documentElement.scrollHeight)-vh);
     const anchor=y+vh*.42;
     const current=[...chapters].reverse().find(chapter=>chapter.top<=anchor) || chapters[0];
     if(current && current!==active) {
@@ -90,24 +93,33 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       active=current;
     }
     chapters.forEach((chapter,index)=>{
-      const enter=index===0?1:clampStory((y+vh-chapter.top)/range);
+      // A short last chapter must finish its entrance at the real page bottom.
+      const availableRange=Math.max(1,Math.min(range,maxScroll+vh-chapter.top));
+      const enter=index===0?1:clampStory((y+vh-chapter.top)/availableRange);
       const next=chapters[index+1];
-      const visible=chapter.top<y+vh && (config.preset==='stack'?(!next || next.top>y):chapter.top+chapter.height>y);
+      const visible=chapter.top<y+vh && (!next || next.top>y);
       if(chapter.node.dataset.storyVisible!==String(visible)) {
         chapter.node.dataset.storyVisible=String(visible);
         if(!visible)pauseCoveredMedia(chapter.node);
         chapter.node.dispatchEvent(new view.CustomEvent(STORY_VISIBILITY_EVENT,{detail:{visible}}));
       }
       const exit=next?clampStory((y+vh-next.top)/Math.max(1,vh-offset)):0;
-      const visual=storyVisual(config.preset,enter,exit,strength());
+      const visual=storyVisual(config.preset,enter,exit,strength(),chapter.side);
       chapter.surface.style.transform=visual.transform;
+      chapter.surface.style.transformOrigin=`50% ${Math.min(chapter.height,Math.max(0,y-chapter.top)+vh*.5)}px`;
+      chapter.surface.style.setProperty('--story-light',visual.light.toFixed(3));
+      chapter.surface.style.setProperty('--story-edge',visual.edge.toFixed(3));
+      chapter.surface.style.setProperty('--story-sweep',visual.sweep+'%');
+      chapter.surface.style.setProperty('--story-portal-x',visual.portalX+'%');
+      chapter.surface.style.setProperty('--story-portal-y',visual.portalY+'%');
+      chapter.surface.style.willChange=visible && (enter<1 || exit>0)?'transform,clip-path':'auto';
       chapter.surface.style.opacity=String(visual.opacity);
       chapter.surface.style.clipPath=visual.clip;
-      chapter.surface.style.borderRadius=visual.radius?`${visual.radius}px ${visual.radius}px 0 0`:'0px';
-      chapter.surface.style.boxShadow=config.preset==='stack' && index>0?'0 -12px 34px -18px #56233550':'none';
+      chapter.surface.style.borderRadius=visual.radius?`${visual.radius}px`:'0px';
+      chapter.surface.style.boxShadow=(visual.edge>.005 || (index>0 && enter<1))?'0 -22px 70px -28px var(--story-shadow), 0 32px 90px -30px var(--story-shadow), inset 0 1px 0 #fff9':'none';
       chapter.groups.forEach(group=>{
         const {animation,order}=group;
-        const delay=order*(config.preset==='cascade' ? .16 : .09);
+        const delay=Math.min(.42,order*(config.preset==='cascade' ? .1 : .07));
         const time=clampStory((enter-delay)/(1-delay))*1000, complete=time>=1000;
         // Return control to the section's own hover, slider and media effects
         // once its entrance finishes; restore the timeline when scrolling back.
@@ -119,7 +131,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   function schedule(){if(!disposed && !frame)frame=view.requestAnimationFrame(update);}
   function resize(){dirty=true;schedule();}
   function focus(event) {
-    if(!enabled() || config.preset!=='stack')return;
+    if(!enabled())return;
     const chapter=chapters.find(item=>item.node.contains(event.target));
     const index=chapters.indexOf(chapter), next=chapters[index+1];
     if(chapter && next && next.top<scroll()+header()+40) {

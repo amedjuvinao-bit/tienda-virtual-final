@@ -1,13 +1,21 @@
-/* Every section remains visible if scripting or motion is disabled. */
-.storefront-sections{position:relative;display:block;min-width:0;overflow-x:clip}
+/* The document keeps its natural heights; each scene only pins after its last
+   content has been read. No scroll interception or artificial spacer panels. */
+.storefront-sections{position:relative;display:block;min-width:0;overflow:clip;isolation:isolate;--story-shadow:color-mix(in srgb,var(--color-primary,#8d3458) 32%,#28151c99);background:var(--color-bg,#fff)}
 .storefront-section-shell:empty,.storefront-sections>section:has(>.storefront-chapter-surface:empty){display:none}
 .storefront-sections>section{margin:0;min-width:0}
-.storefront-chapter-surface{display:flow-root;min-width:0;height:100%;transform-origin:50% 0;background:var(--color-bg,#fff)}
+.storefront-chapter-surface{position:relative;display:flow-root;min-width:0;height:100%;background:var(--color-bg,#fff);--story-light:0;--story-edge:0;--story-sweep:-40%}
+/* Scroll-driven reflections leave each component's design untouched at rest. */
+.storefront-sections[data-story-preset]>section>.storefront-chapter-surface::before{content:"";position:absolute;inset:0;z-index:4;border-radius:inherit;pointer-events:none;opacity:var(--story-edge);box-shadow:inset 0 2px 0 #fff9,inset 1px 0 0 #fff6,inset -1px 0 0 #fff4}
+.storefront-sections[data-story-preset]>section>.storefront-chapter-surface::after{content:"";position:absolute;inset:0;z-index:4;border-radius:inherit;pointer-events:none;opacity:var(--story-light);background:linear-gradient(115deg,transparent 12%,#fff0 30%,#fff6 45%,#fff1 52%,transparent 68%);background-size:180% 100%;background-position:var(--story-sweep) 0;mix-blend-mode:soft-light}
+.storefront-sections[data-story-preset="cinema"]>section>.storefront-chapter-surface::before{background:radial-gradient(ellipse var(--story-portal-x,120%) var(--story-portal-y,150%) at 50% 14%,transparent calc(100% - 9px),#fff6 calc(100% - 3px),#ffe4bf 100%,transparent calc(100% + 1px));box-shadow:none}
+.storefront-sections[data-story-preset="depth"]>section>.storefront-chapter-surface::after{background-image:linear-gradient(100deg,transparent 10%,#fff8 45%,transparent 78%)}
+.storefront-sections[data-story-preset="cascade"]>section>.storefront-chapter-surface::after{background-image:linear-gradient(130deg,transparent 25%,#ffedd677 48%,transparent 65%)}
 @media(prefers-reduced-motion:no-preference){
- .storefront-sections[data-story-preset="stack"]>section{position:sticky;top:var(--story-pin-top,0px);z-index:var(--story-layer,1)}
+ .storefront-sections[data-story-preset]>section{position:sticky;top:var(--story-pin-top,0px);z-index:var(--story-layer,1)}
  .storefront-sections[data-story-preset]>section>.storefront-chapter-surface{backface-visibility:hidden}
 }
 @media(prefers-reduced-motion:reduce){
  .storefront-sections>section{position:relative!important;top:auto!important}
  .storefront-chapter-surface{transform:none!important;opacity:1!important;clip-path:none!important;border-radius:0!important;box-shadow:none!important}
+ .storefront-chapter-surface::before,.storefront-chapter-surface::after{display:none!important}
 }

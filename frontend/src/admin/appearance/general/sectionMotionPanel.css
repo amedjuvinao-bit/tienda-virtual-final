@@ -40,7 +40,7 @@
 .story-preview__screen{margin:0 10px;border:1px solid #e1bdcc;border-radius:15px;overflow:hidden;background:#f5d1c6}
 .story-preview__screen[data-device="mobile"]{width:76%;margin-inline:auto;border-radius:23px}
 .story-preview__viewport{height:340px;overflow:hidden;position:relative;isolation:isolate;--color-bg:#f2c8bf;scroll-behavior:auto;overflow-anchor:none}
-.story-preview .storefront-sections{overflow:visible}
+.story-preview .storefront-sections{overflow:clip}
 .story-preview__content{height:340px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:22px;gap:11px;color:#691f38;background:linear-gradient(130deg,#fcd9c56b,#dc937b22),url('/footer/editorial-satin-v2.webp') center/cover}
 .story-preview__chapter[data-tone="1"] .story-preview__content{background-position:70% 65%}
 .story-preview__chapter[data-tone="2"] .story-preview__content{background-position:25% 30%}
@@ -59,3 +59,22 @@
 @media(max-width:540px){.story-editor__settings{grid-template-columns:1fr}.story-editor__choice{padding:8px}.story-editor__choice strong{font-size:11px}.story-editor__illustration{height:65px}}
 @media(max-width:1050px){.appearance-general__workspace[data-tool="motion"]>.appearance-general__preview{order:0}.story-preview__viewport,.story-preview__content{height:280px}.story-preview__content{padding:17px;gap:8px}.story-preview h2{font-size:24px}.story-preview article{height:100px;flex-shrink:0}}
 @media(max-width:680px){.appearance-general .appearance-general__tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.appearance-general .appearance-panel-main-tab{padding:9px 8px;gap:7px;text-align:left}.appearance-general .appearance-general__tab-status{display:none}.appearance-general .appearance-general__tab-icon{width:30px;height:34px;border-radius:10px}.appearance-general .appearance-panel-main-tab strong{font-size:11px}.appearance-general .appearance-panel-main-tab small{font-size:10px;line-height:1.35}}
+
+/* Distinct compositions make the four real timelines legible in the miniature. */
+.story-preview__chapter[data-tone="1"] .story-preview__content{background-image:linear-gradient(135deg,#b46b5f77,#fde1caaa),url('/footer/editorial-satin-v2.webp');color:#5c2337}
+.story-preview__chapter[data-tone="2"] .story-preview__content{background-image:linear-gradient(150deg,#5b1d3b99,#994c5355),url('/footer/editorial-satin-v2.webp');color:#fff1e1}
+.story-preview__visuals{display:flex;gap:9px;width:100%;align-items:center;min-height:112px}
+.story-preview__visuals article{height:112px;flex:1;min-width:0}
+.story-preview__visuals article:nth-child(2){height:84px;flex:.6;background:linear-gradient(135deg,#d28a6588,#fff4)}
+.story-preview__visuals article:nth-child(2) span{border-radius:8px 8px 28px 28px;background:linear-gradient(125deg,#a35065,#e8a389)}
+.story-preview__chapter[data-tone="1"] .story-preview__visuals{flex-direction:row-reverse}
+.story-preview__chapter[data-tone="2"] .story-preview__action{border-color:#f2d2ac}
+@media(prefers-reduced-motion:no-preference){
+ .story-editor__choice:hover .story-editor__illustration i{transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+ .story-editor__choice[data-preset="stack"]:hover i:first-child{transform:translateY(-16px) scale(.78) rotateX(20deg)}
+ .story-editor__choice[data-preset="stack"]:hover i:nth-child(3){transform:translateY(4px) scale(1.05)}
+ .story-editor__choice[data-preset="cinema"]:hover i:nth-child(3){transform:scaleX(2);border-radius:40%}
+ .story-editor__choice[data-preset="depth"]:hover i:nth-child(3){transform:perspective(140px) rotateY(18deg) translateX(22px) scale(1.1)}
+ .story-editor__choice[data-preset="cascade"]:hover i:first-child{transform:translateX(-13px)}
+ .story-editor__choice[data-preset="cascade"]:hover i:nth-child(3){transform:translateX(13px)}
+}

@@ -31,7 +31,7 @@ export default function SectionMotionPreview({config,theme={}}) {
   useEffect(()=>{
     if(!playing || reduced)return;
     let frame=0, start;
-    const duration={quick:5500,balanced:8000,leisurely:11000}[c.pace];
+    const duration=chapters.length*({quick:1400,balanced:2100,leisurely:2800}[c.pace]);
     const animate=time=>{
       start??=time;
       const next=Math.min(100,(time-start)/duration*100);setProgress(next);
@@ -41,7 +41,7 @@ export default function SectionMotionPreview({config,theme={}}) {
     document.addEventListener('visibilitychange',hide);
     frame=requestAnimationFrame(animate);
     return ()=>{cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',hide);};
-  },[playing,c.pace,reduced]);
+  },[playing,c.pace,reduced,chapters.length]);
   const current=Math.min(chapters.length-1,Math.floor(progress/100*(chapters.length-1)));
   return <aside className="appearance-general__preview story-preview" aria-label="Vista previa de la animación global">
     <div className="appearance-general__preview-header"><span className="appearance-general__preview-live" aria-hidden="true"/><strong>Vista previa del movimiento</strong><small>{STORY_PRESETS.find(item=>item.id===c.preset).name}</small></div>
@@ -50,13 +50,13 @@ export default function SectionMotionPreview({config,theme={}}) {
       <div ref={viewport} className="story-preview__viewport" aria-label="Demostración de las transiciones">
         <StorefrontStory config={c} viewportRef={viewport} mobileOverride={device==='mobile'}>
           {chapters.map((chapter,index)=><section key={chapter.id} id={'story-preview-'+uid+'-'+chapter.id} className="story-preview__chapter" data-tone={index%3}>
-            <div className="story-preview__content"><span className="story-preview__counter">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2><article aria-label="Imagen de demostración"><span/></article><span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
+            <div className="story-preview__content"><span className="story-preview__counter">{String(index+1).padStart(2,'0')} / {String(chapters.length).padStart(2,'0')}</span><h2>{chapter.title}</h2><div className="story-preview__visuals"><article aria-label="Imagen de demostración"><span/></article><article aria-label="Detalle de demostración"><span/></article></div><span className="story-preview__action" data-story-action>Explorar sección <span aria-hidden="true">→</span></span></div>
           </section>)}
         </StorefrontStory>
       </div>
     </div>
     <div className="story-preview__controls"><button type="button" disabled={reduced} onClick={()=>{if(!playing)setProgress(0);setPlaying(!playing);}}>{playing?<Pause size={15}/>:<Play size={15}/>} {playing?'Pausar':'Reproducir recorrido'}</button><button type="button" aria-label="Reiniciar recorrido" onClick={()=>{setPlaying(false);setProgress(0);}}><RotateCcw size={15}/></button></div>
     <label className="story-preview__scrubber">Recorrer secciones<input type="range" min="0" max="100" value={progress} onChange={event=>{setPlaying(false);setProgress(Number(event.target.value));}}/><span>{chapters[current]?.title}</span></label>
-    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Mueve el control o reproduce la secuencia. Esta miniatura muestra el movimiento; cada sección conserva su diseño en la tienda.'}</p>
+    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para ver la transición completa. Las escenas alternan su composición para apreciar el relevo; la tienda conserva sus propios diseños.'}</p>
   </aside>;
 }

@@ -9,6 +9,7 @@ function fixture(config={}) {
   vi.stubGlobal('matchMedia',vi.fn(query=>query.includes('reduced')?reduce:mobile));
   vi.spyOn(window,'innerHeight','get').mockReturnValue(800);
   vi.spyOn(window,'scrollY','get').mockImplementation(()=>y);
+  vi.spyOn(document.documentElement,'scrollHeight','get').mockImplementation(()=>heights.reduce((a,b)=>a+b,0));
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{frame=callback;return 1;});
   vi.spyOn(window,'cancelAnimationFrame').mockImplementation(()=>{});
   const root=document.createElement('div');
@@ -18,7 +19,7 @@ function fixture(config={}) {
   [...root.children].forEach((node,index)=>{
     Object.defineProperty(node,'offsetHeight',{get:()=>heights[index]});
     node.getBoundingClientRect=()=>({top:heights.slice(0,index).reduce((a,b)=>a+b,0)-y,height:heights[index]});
-    node.querySelectorAll('*').forEach(element=>{element.animate=()=>{const a={pause:vi.fn(),cancel:vi.fn(),currentTime:0};animations.push(a);return a;};});
+    node.querySelectorAll('*').forEach(element=>{element.animate=()=>{const a={pause:vi.fn(),cancel:vi.fn(),effect:{updateTiming:vi.fn()},currentTime:0};animations.push(a);return a;};});
   });
   document.body.append(root);
   const stop=mountStorefrontSectionMotion(root,config);
@@ -36,6 +37,27 @@ describe('recorrido global de la tienda',()=>{
     const styles=['stack','cinema','depth','cascade'].map(id=>storyVisual(id,.2,.3));
     expect(new Set(styles.map(style=>JSON.stringify(style))).size).toBe(4);
     for(const id of ['cinema','depth','cascade'])expect(storyVisual(id,1,0)).toMatchObject({transform:'none',opacity:1,clip:'none'});
+  });
+  it.each(['stack','cinema','depth','cascade'])('mantiene la puesta en escena de %s hasta que termina de entrar y la libera al leer',preset=>{
+    const f=fixture({preset});
+    f.scroll(350);
+    expect(f.nodes[1].firstChild.style.transform).not.toBe('none');
+    const heading=f.animations[3];
+    expect(heading.currentTime).toBeLessThan(1000);
+    f.scroll(900);
+    expect(f.nodes[1].firstChild.style.transform).toBe('none');
+    expect(heading.effect.updateTiming).toHaveBeenLastCalledWith({fill:'none'});
+    f.scroll(350);
+    expect(heading.effect.updateTiming).toHaveBeenLastCalledWith({fill:'both'});
+    f.stop();
+    expect(f.nodes[1].firstChild.style.getPropertyValue('--story-edge')).toBe('');
+  });
+  it.each(['stack','cinema','depth','cascade'])('termina el efecto de %s aunque el footer sea más corto que la pantalla',preset=>{
+    const f=fixture({preset});f.heights[2]=300;
+    window.dispatchEvent(new Event('resize'));f.flush();f.scroll(2300);
+    expect(f.nodes[2].firstChild.style.transform).toBe('none');
+    expect(f.nodes[2].firstChild.style.clipPath).toBe('none');
+    expect(f.nodes[2].firstChild.style.opacity).toBe('1');f.stop();
   });
   it('coordina avance y regreso y conserva las coordenadas de las secciones largas',()=>{
     const f=fixture();
@@ -71,8 +93,8 @@ describe('recorrido global de la tienda',()=>{
     f.mobile.matches=false;f.mobile.dispatchEvent(new Event('change'));f.flush();
     expect(f.root.dataset.storyPreset).toBe('stack');f.stop();
   });
-  it('pausa los videos y el reproductor de TikTok cuando otra tarjeta los cubre',()=>{
-    const f=fixture();
+  it.each(['stack','cinema','depth','cascade'])('pausa los videos y TikTok al quedar cubiertos en %s',preset=>{
+    const f=fixture({preset});
     const video=document.createElement('video');Object.defineProperty(video,'paused',{value:false});video.pause=vi.fn();
     const frame=document.createElement('iframe');frame.src='https://www.tiktok.com/player/v1/7000000000000000001';
     f.nodes[0].firstChild.append(video,frame);
