@@ -38,6 +38,40 @@ describe('recorrido global de la tienda',()=>{
     expect(new Set(styles.map(style=>JSON.stringify(style))).size).toBe(4);
     for(const id of ['cinema','depth','cascade'])expect(storyVisual(id,1,0)).toMatchObject({transform:'none',opacity:1,clip:'none'});
   });
+  it('diferencia una baraja, una apertura central, una bisagra lateral y nueve ventanas reales',()=>{
+    const stack=fixture({preset:'stack'});stack.scroll(350);
+    expect(stack.nodes[1].firstChild.style.transform).toContain('rotateZ');stack.stop();
+    const curtain=fixture({preset:'cinema'});curtain.scroll(350);
+    expect(curtain.nodes[1].firstChild.style.clipPath).toMatch(/^inset\(0 /);
+    expect(curtain.nodes[1].firstChild.style.transform).toContain('-450px');curtain.stop();
+    const book=fixture({preset:'depth',intensity:20});book.scroll(350);
+    expect(book.nodes[1].firstChild.style.transformOrigin).toContain('0%');
+    const angle=Number(book.nodes[1].firstChild.style.transform.match(/rotateY\(([-\d.]+)/)[1]);
+    expect(Math.abs(angle)).toBeGreaterThan(20);book.stop();
+    const mosaic=fixture({preset:'cascade'});mosaic.scroll(350);
+    const clip=mosaic.nodes[1].firstChild.style.clipPath;
+    // Nine independent windows and one intact rectangle below the viewport.
+    expect(clip).toMatch(/^path\(/);expect(clip.match(/M/g)).toHaveLength(10);
+    mosaic.scroll(900);expect(mosaic.nodes[1].firstChild.style.clipPath).toBe('none');
+    mosaic.scroll(350);expect(mosaic.nodes[1].firstChild.style.clipPath).toBe(clip);mosaic.stop();
+  });
+  it('abre el contenido al enfocar un control y devuelve el efecto al salir del foco',()=>{
+    vi.spyOn(window,'scrollTo').mockImplementation(()=>{});
+    const f=fixture({preset:'cascade'});f.scroll(350);
+    const button=f.nodes[1].querySelector('button');button.focus();f.flush();
+    expect(f.nodes[1].firstChild.style.clipPath).toBe('none');
+    expect(f.nodes[1].firstChild.style.transform).toBe('none');
+    button.blur();f.flush();expect(f.nodes[1].firstChild.style.clipPath).toMatch(/^path\(/);f.stop();
+  });
+  it.each(['stack','cinema','depth','cascade'])('deja %s completamente abierto al regresar debajo del encabezado',preset=>{
+    const header=document.createElement('header');header.className='theme-header';header.dataset.visible='true';
+    header.getBoundingClientRect=()=>({height:80});document.body.prepend(header);
+    const f=fixture({preset});f.scroll(720);
+    expect(f.nodes[1].firstChild.style.transform).toBe('none');
+    expect(f.nodes[1].firstChild.style.clipPath).toBe('none');
+    header.dataset.visible='false';f.scroll(720);
+    expect(f.nodes[1].firstChild.style.transform).not.toBe('none');f.stop();
+  });
   it.each(['stack','cinema','depth','cascade'])('mantiene la puesta en escena de %s hasta que termina de entrar y la libera al leer',preset=>{
     const f=fixture({preset});
     f.scroll(350);

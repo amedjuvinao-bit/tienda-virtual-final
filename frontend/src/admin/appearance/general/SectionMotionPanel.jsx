@@ -11,7 +11,7 @@ export default function SectionMotionPanel({config,onChange}) {
     <fieldset className="story-editor__themes"><legend>Tema de animación</legend>
       <div className="story-editor__choices">{STORY_PRESETS.map((item,index)=><label key={item.id} className="story-editor__choice" data-selected={c.preset===item.id} data-preset={item.id}>
         <input type="radio" name={name} value={item.id} checked={c.preset===item.id} onChange={()=>edit('preset',item.id)}/>
-        <span className="story-editor__illustration" aria-hidden="true"><i/><i/><i/><b>0{index+1}</b></span>
+        <span className="story-editor__illustration" aria-hidden="true">{Array.from({length:item.id==='cascade'?9:3},(_,i)=><i key={i}/>)}<b>0{index+1}</b></span>
         <strong>{item.name}</strong><small>{item.description}</small>
       </label>)}</div>
     </fieldset>

@@ -26,7 +26,7 @@ export default function SectionMotionPreview({config,theme={}}) {
     if(el)observer?.observe(el);return ()=>observer?.disconnect();
   },[]);
   useEffect(()=>{
-    setPlaying(false);
+    setProgress(0);setPlaying(c.enabled && !reduced);
   },[c.preset,c.enabled,device,reduced]);
   useEffect(()=>{
     if(!playing || reduced)return;

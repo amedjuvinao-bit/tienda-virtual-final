@@ -3,16 +3,19 @@
 .storefront-sections{position:relative;display:block;min-width:0;overflow:clip;isolation:isolate;--story-shadow:color-mix(in srgb,var(--color-primary,#8d3458) 32%,#28151c99);background:var(--color-bg,#fff)}
 .storefront-section-shell:empty,.storefront-sections>section:has(>.storefront-chapter-surface:empty){display:none}
 .storefront-sections>section{margin:0;min-width:0}
-.storefront-chapter-surface{position:relative;display:flow-root;min-width:0;height:100%;background:var(--color-bg,#fff);--story-light:0;--story-edge:0;--story-sweep:-40%}
+.storefront-chapter-surface{position:relative;display:flow-root;min-width:0;height:100%;background:var(--color-bg,#fff);--story-light:0;--story-edge:0;--story-sweep:-40%;--story-opening:0%;--story-fold:0}
 /* Scroll-driven reflections leave each component's design untouched at rest. */
 .storefront-sections[data-story-preset]>section>.storefront-chapter-surface::before{content:"";position:absolute;inset:0;z-index:4;border-radius:inherit;pointer-events:none;opacity:var(--story-edge);box-shadow:inset 0 2px 0 #fff9,inset 1px 0 0 #fff6,inset -1px 0 0 #fff4}
 .storefront-sections[data-story-preset]>section>.storefront-chapter-surface::after{content:"";position:absolute;inset:0;z-index:4;border-radius:inherit;pointer-events:none;opacity:var(--story-light);background:linear-gradient(115deg,transparent 12%,#fff0 30%,#fff6 45%,#fff1 52%,transparent 68%);background-size:180% 100%;background-position:var(--story-sweep) 0;mix-blend-mode:soft-light}
-.storefront-sections[data-story-preset="cinema"]>section>.storefront-chapter-surface::before{background:radial-gradient(ellipse var(--story-portal-x,120%) var(--story-portal-y,150%) at 50% 14%,transparent calc(100% - 9px),#fff6 calc(100% - 3px),#ffe4bf 100%,transparent calc(100% + 1px));box-shadow:none}
-.storefront-sections[data-story-preset="depth"]>section>.storefront-chapter-surface::after{background-image:linear-gradient(100deg,transparent 10%,#fff8 45%,transparent 78%)}
-.storefront-sections[data-story-preset="cascade"]>section>.storefront-chapter-surface::after{background-image:linear-gradient(130deg,transparent 25%,#ffedd677 48%,transparent 65%)}
+.storefront-sections[data-story-preset="cinema"]>section>.storefront-chapter-surface::before{box-shadow:none;background:linear-gradient(90deg,transparent calc(var(--story-opening) - 6px),#e8b58d66 calc(var(--story-opening) - 3px),#fff4dc var(--story-opening),#fff5 calc(var(--story-opening) + 3px),transparent calc(var(--story-opening) + 10px)),linear-gradient(270deg,transparent calc(var(--story-opening) - 6px),#e8b58d66 calc(var(--story-opening) - 3px),#fff4dc var(--story-opening),#fff5 calc(var(--story-opening) + 3px),transparent calc(var(--story-opening) + 10px))}
+.storefront-sections[data-story-preset="depth"]>section>.storefront-chapter-surface::before{opacity:var(--story-fold);box-shadow:none;background:linear-gradient(90deg,#431123b3,transparent 28%,transparent 75%,#fff8);border-inline:1px solid #ffe6c6aa}
+.storefront-sections[data-story-preset="depth"]>section:nth-child(even)>.storefront-chapter-surface::before{transform:scaleX(-1)}
+.storefront-sections[data-story-preset="depth"]>section>.storefront-chapter-surface::after{background-image:linear-gradient(90deg,transparent 15%,#fff8 48%,transparent 85%)}
+.storefront-sections[data-story-preset="cascade"]>section>.storefront-chapter-surface::before{box-shadow:inset 0 1px 0 #fff8;background:linear-gradient(90deg,transparent 33.15%,#ffe7cc99 33.3%,transparent 33.5%,transparent 66.45%,#ffe7cc99 66.6%,transparent 66.8%)}
+.storefront-sections[data-story-preset="cascade"]>section>.storefront-chapter-surface::after{background-image:linear-gradient(135deg,transparent 20%,#fff6 48%,transparent 75%)}
 @media(prefers-reduced-motion:no-preference){
- .storefront-sections[data-story-preset]>section{position:sticky;top:var(--story-pin-top,0px);z-index:var(--story-layer,1)}
- .storefront-sections[data-story-preset]>section>.storefront-chapter-surface{backface-visibility:hidden}
+ .storefront-sections[data-story-preset]>section{position:sticky;top:var(--story-pin-top,0px);z-index:var(--story-layer,1);pointer-events:none}
+ .storefront-sections[data-story-preset]>section>.storefront-chapter-surface{backface-visibility:hidden;pointer-events:auto}
 }
 @media(prefers-reduced-motion:reduce){
  .storefront-sections>section{position:relative!important;top:auto!important}

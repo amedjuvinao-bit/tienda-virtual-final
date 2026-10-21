@@ -1,8 +1,8 @@
 export const STORY_PRESETS = [
-  { id: 'stack', name: 'Tarjetas superpuestas', description: 'Una tarjeta avanza sobre otra, que se hunde y se inclina entre bordes de luz.' },
-  { id: 'cinema', name: 'Recorrido cinematográfico', description: 'Un portal ovalado se expande y descubre la siguiente escena con un acercamiento de cámara.' },
-  { id: 'depth', name: 'Profundidad 3D', description: 'Escenarios que giran desde los lados, avanzan hacia el frente y desplazan al anterior.' },
-  { id: 'cascade', name: 'Cascada editorial', description: 'Páginas que se cruzan en diagonal, con títulos recortados e imágenes que entran por turnos.' },
+  { id: 'stack', name: 'Baraja en relieve', description: 'Una tarjeta se desliza de lado y ocupa la pantalla; la anterior queda detrás, inclinada y con sombra.' },
+  { id: 'cinema', name: 'Apertura de cristal', description: 'La nueva sección se abre desde el centro, entre dos bordes de cristal que se separan.' },
+  { id: 'depth', name: 'Libro 3D', description: 'Cada sección gira sobre un borde como una página; el pliegue proyecta luz y sombra.' },
+  { id: 'cascade', name: 'Mosaico por bloques', description: 'Nueve ventanas descubren la siguiente sección por turnos, con un recorrido diagonal.' },
 ];
 export const STORY_DEFAULTS = { enabled: true, preset: 'stack', intensity: 65, pace: 'balanced', mobileMode: 'adapted' };
 export const STORY_VISIBILITY_EVENT='storefront:chapter-visibility';
@@ -23,64 +23,43 @@ export function storySectionOrder(sections) {
   return [...new Set([...ordered,...STORY_SECTION_IDS])];
 }
 export const clampStory = value=>Math.max(0,Math.min(1,value));
-// Entry and handoff share one scroll timeline. Strength changes the staging,
-// while a completely read scene always returns control to its native design.
+// Each preset has its own mechanism. Intensity changes the depth, while even
+// low settings retain the defining gesture. A fully read scene has no effects.
 export function storyVisual(preset, enter, exit, strength=1, side=1) {
-  const p=clampStory(enter), reveal=p*p*(3-2*p), incoming=1-reveal;
-  const e=clampStory(exit), leaving=e*e*(3-2*e), s=strength;
-  const moving=incoming>.001 || leaving>.001;
-  const energy=Math.sin(p*Math.PI)*s;
-  const base={transform:'none',opacity:1,clip:'none',radius:0,light:energy,edge:0,sweep:(p*160-40)*side,portalX:120,portalY:150};
-  if(!moving)return base;
+  const p=clampStory(enter), e=clampStory(exit), reveal=p*p*(3-2*p), incoming=1-reveal;
+  const leaving=e*e*(3-2*e), s=.45+.55*clampStory(strength);
+  const base={transform:'none',opacity:1,clip:'none',radius:0,light:0,edge:0,sweep:(p*160-40)*side,opening:0,fold:0,originX:'50%'};
+  if(p===1 && e===0)return base;
+  const arrival=clampStory(p/.12), edge=Math.sin(p*Math.PI);
   if(preset==='stack')return {...base,
-    transform:`perspective(1600px) translate3d(0,${(70*incoming-65*leaving)*s}px,${-150*leaving*s}px) rotateX(${(5*incoming+9*leaving)*s}deg) scale(${1-(.055*incoming+.11*leaving)*s})`,
-    opacity:1-.26*leaving*s,
-    radius:(52*incoming+38*leaving)*s,
-    edge:Math.max(incoming,leaving)*s,
-    light:Math.max(energy,.3*leaving*s),
+    transform:`perspective(1500px) translate3d(${side*(46*incoming-8*leaving)*s}%,${(110*incoming-50*leaving)*s}px,${-260*leaving*s}px) rotateX(${(12*incoming+12*leaving)*s}deg) rotateZ(${side*(12*incoming-5*leaving)*s}deg) scale(${1-(.24*incoming+.18*leaving)*s})`,
+    opacity:arrival*(1-.22*leaving),radius:(38*incoming+28*leaving)*s,
+    clip:`inset(0 round ${(38*incoming+28*leaving)*s}px)`,
+    edge:Math.max(incoming,leaving)*s,light:edge*.6*s,
   };
-  if(preset==='cinema') {
-    // Hold the aperture until the scene is on screen, then open it broadly.
-    // A linear radius becomes full-width while it is still below the fold.
-    const aperture=Math.pow(p,2.8);
-    const portalX=120-(90+12*s)*(1-aperture);
-    const portalY=150-(120+16*s)*(1-aperture);
-    return {...base,
-      transform:`translate3d(0,${-35*incoming*s}px,0) scale(${1+(.18*incoming+.07*leaving)*s})`,
-      opacity:1-.42*leaving*s,
-      clip:incoming>.001?`ellipse(${portalX}% ${portalY}% at 50% 14%)`:'none',
-      portalX,portalY,
-      light:energy*.8,
-      edge:incoming*s,
-    };
-  }
+  if(preset==='cinema')return {...base,
+    transform:leaving?`scale(${1+.14*leaving*s})`:'none',
+    clip:p<1?`inset(0 ${50*incoming}% 0 ${50*incoming}%)`:'none',
+    opening:50*incoming,edge:edge*s,light:edge*.28,
+    opacity:1-.18*leaving,
+  };
   if(preset==='depth')return {...base,
-    transform:`perspective(1400px) translate3d(${side*(14*incoming-9*leaving)*s}%,${(95*incoming-28*leaving)*s}px,${-(240*incoming+150*leaving)*s}px) rotateX(${(14*incoming-5*leaving)*s}deg) rotateY(${side*(-24*incoming+17*leaving)*s}deg) rotateZ(${side*(-4*incoming+2*leaving)*s}deg) scale(${1-(.08*incoming+.06*leaving)*s})`,
-    opacity:1-.35*leaving*s,
-    radius:(48*incoming+32*leaving)*s,
-    light:energy*.7,
-    edge:Math.max(incoming,leaving)*s,
+    transform:`perspective(1200px) rotateY(${side*(-86*incoming+42*leaving)*s}deg)`,
+    originX:side>0?'100%':'0%',opacity:arrival,
+    fold:Math.max(incoming,leaving)*s,edge:Math.max(incoming,leaving)*s,
+    light:edge*.45*s,
   };
-  return {...base,
-    transform:`translate3d(${side*(17*incoming-5*leaving)*s}%,${(75*incoming-35*leaving)*s}px,0) rotate(${side*(5*incoming-2*leaving)*s}deg) scale(${1-(.07*incoming+.04*leaving)*s})`,
-    opacity:1-.2*leaving*s,
-    clip:incoming>.001?`inset(0 ${7*incoming*s}% 0 round ${40*incoming*s}px)`:'none',
-    radius:(40*incoming+22*leaving)*s,
-    edge:Math.max(incoming,leaving)*s,
-  };
+  return {...base,edge:edge*.4,light:edge*.35,opacity:1};
 }
 
-// Individual translate/scale/rotate compose with each section's own transforms.
-// The engine releases these keyframes once the entrance finishes.
+// Content participates in the chosen scene instead of repeating one fade/zoom.
+// Individual transforms compose with the component's own hover and media styles.
 export function storyContentFrames(preset,kind,strength,side=1) {
-  const s=strength;
-  let from={opacity:.2,translate:`0 ${65*s}px`};
-  if(kind==='heading')from={opacity:0,translate:`${preset==='cascade'?-12*s:0}% ${90*s}%`,clipPath:'inset(0 0 100% 0)'};
-  else if(kind==='action')from={opacity:0,translate:`${18*side*s}px ${35*s}px`};
-  else if(preset==='stack')from={opacity:.35,translate:`0 ${100*s}px`,scale:String(1-.12*s),rotate:`${-3*side*s}deg`};
-  else if(preset==='cinema')from={opacity:.4,translate:`0 ${10*s}%`,scale:String(1+.25*s)};
-  else if(preset==='depth')from={opacity:.3,translate:`${-14*side*s}% ${80*s}px`,scale:String(1-.12*s),rotate:`${6*side*s}deg`};
-  else from={opacity:.15,translate:`${28*side*s}% ${70*s}px`,scale:String(1+.12*s),rotate:`${-7*side*s}deg`};
-  const to=Object.fromEntries(Object.keys(from).map(key=>[key,({opacity:1,translate:'0 0',scale:'1',rotate:'0deg',clipPath:'inset(0 0 0 0)'})[key]]));
+  const s=.45+.55*clampStory(strength);
+  let from={opacity:1};
+  if(preset==='stack')from=kind==='heading'?{opacity:0,translate:`${-28*side*s}px 0`}:kind==='visual'?{opacity:1,translate:`0 ${55*s}px`,rotate:`${-4*side*s}deg`}:{opacity:0,translate:`0 ${20*s}px`};
+  if(preset==='cinema' && kind==='heading')from={opacity:1,clipPath:'inset(0 50% 0 50%)'};
+  if(preset==='depth' && kind==='visual')from={opacity:1,translate:`${18*side*s}px 0`};
+  const to=Object.fromEntries(Object.keys(from).map(key=>[key,({opacity:1,translate:'0 0',rotate:'0deg',clipPath:'inset(0 0 0 0)'})[key]]));
   return [from,to];
 }
