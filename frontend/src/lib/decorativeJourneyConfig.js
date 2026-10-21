@@ -1,0 +1,24 @@
+export const JOURNEY_FLOWERS='/story/floral-spray-v1.webp';
+export const DECORATIVE_JOURNEY_DEFAULTS={
+  image:JOURNEY_FLOWERS,secondaryImage:'',backgroundImage:'/footer/editorial-satin-v2.webp',
+  unifyBackground:true,path:'flowing',size:190,density:22,opacity:90,depth:65,
+  mobileSize:86,mobileDensity:10,stemVisible:true,stemColor:'#b99466',
+};
+const number=(value,min,max,fallback)=>Number.isFinite(Number(value))?Math.min(max,Math.max(min,Number(value))):fallback;
+export function journeyImageUrl(value,fallback=''){
+  if(typeof value!=='string')return fallback;
+  const url=value.trim();
+  return url.length<=2048 && !/[\u0000-\u001f]/.test(url) && /^(?:\/(?!\/)|https?:\/\/)/i.test(url)?url:'';
+}
+export function normalizeDecorativeJourney(raw){
+  const c=raw && typeof raw==='object' && !Array.isArray(raw)?raw:{}, d=DECORATIVE_JOURNEY_DEFAULTS;
+  return {
+    image:journeyImageUrl(c.image,d.image),secondaryImage:journeyImageUrl(c.secondaryImage),
+    backgroundImage:journeyImageUrl(c.backgroundImage,d.backgroundImage),unifyBackground:c.unifyBackground!==false,
+    path:c.path==='edges'?'edges':'flowing',
+    size:number(c.size,60,320,d.size),density:Math.round(number(c.density,8,28,d.density)),
+    opacity:number(c.opacity,20,100,d.opacity),depth:number(c.depth,0,100,d.depth),
+    mobileSize:number(c.mobileSize,36,150,d.mobileSize),mobileDensity:Math.round(number(c.mobileDensity,4,14,d.mobileDensity)),
+    stemVisible:c.stemVisible!==false,stemColor:/^#[\da-f]{6}$/i.test(c.stemColor)?c.stemColor:d.stemColor,
+  };
+}

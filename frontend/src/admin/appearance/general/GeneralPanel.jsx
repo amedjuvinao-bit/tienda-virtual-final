@@ -187,7 +187,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
               status={tab.id === "whatsapp"
                 ? (globalConfig.whatsapp.enabled ? (globalConfig.whatsapp.phone ? "Activo" : "Falta número") : "Apagado")
                 : tab.id === "scroll" ? (globalConfig.scrollButtons.enabled ? "Activo" : "Apagado")
-                : tab.id === "motion" ? (globalConfig.sectionMotion.enabled ? "4 temas" : "Apagado")
+                : tab.id === "motion" ? (globalConfig.sectionMotion.enabled ? (globalConfig.sectionMotion.experience==='journey'?"Camino":"4 temas") : "Apagado")
                 : (globalConfig.loader.enabled ? "Activo" : "Apagado")}
               onClick={() => setActiveMainTab(tab.id)}
             />
@@ -196,7 +196,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
 
         <div className="appearance-general__workspace" data-tool={activeMainTab}>
           <div className="appearance-general__form">
-        {activeMainTab === 'motion' && <SectionMotionPanel config={globalConfig.sectionMotion} onChange={value=>setPath('global.sectionMotion',value)}/>}
+        {activeMainTab === 'motion' && <SectionMotionPanel uploading={uploading} setUploading={setUploading} savedRevision={savedRevision} uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend} config={globalConfig.sectionMotion} onChange={value=>setPath('global.sectionMotion',value)}/>}
 
         {activeMainTab === "whatsapp" && (
           <section className="appearance-general__section">

@@ -8,3 +8,7 @@
 - `cascade`: Enfoque cinematográfico — macro framing and rack focus resolve into the natural layout.
 
 Preset identifiers and existing saved settings remain compatible. There are no added covers or blank opening panels. Desktop and mobile previews in the administration panel use the same production engine; the automatic preview pauses at each section so its sequence can finish.
+
+## Continuous floral journey
+
+`floral-journey.mp4` shows the default continuous ornament world, using the real Home components and repository imagery. Categories and Information share the same mounted ornaments while the page scrolls between them. See `docs/motion/decorative-journey.md` for the controls, resource prompt and behavior.

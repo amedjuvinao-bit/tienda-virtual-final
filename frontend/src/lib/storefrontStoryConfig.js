@@ -1,16 +1,19 @@
+import { DECORATIVE_JOURNEY_DEFAULTS, normalizeDecorativeJourney } from './decorativeJourneyConfig';
 export const STORY_PRESETS = [
   { id: 'stack', name: 'Pop-up escultórico', description: 'Los objetos se levantan sobre su propia base con pliegues tridimensionales, como una tarjeta pop-up.' },
   { id: 'cinema', name: 'Iris de enfoque', description: 'Una apertura circular descubre las imágenes en su sitio; después se revelan el título y la acción.' },
   { id: 'depth', name: 'Trama de imágenes', description: 'Franjas de las imágenes reales se entrelazan y reconstruyen cada pieza. Los reproductores se revelan sin duplicarse.' },
   { id: 'cascade', name: 'Enfoque cinematográfico', description: 'Un primer plano desenfocado retrocede y gana nitidez. La tipografía entra después, como un cambio de foco de cámara.' },
 ];
-export const STORY_DEFAULTS = { enabled: true, preset: 'stack', intensity: 65, pace: 'balanced', mobileMode: 'adapted' };
+export const STORY_DEFAULTS = { enabled: true, experience:'journey',journey:DECORATIVE_JOURNEY_DEFAULTS,preset: 'stack', intensity: 65, pace: 'balanced', mobileMode: 'adapted' };
 export const STORY_VISIBILITY_EVENT='storefront:chapter-visibility';
 export function normalizeStoryConfig(raw) {
   const value=raw && typeof raw==='object' && !Array.isArray(raw)?raw:{};
   const intensity=Number(value.intensity);
   return {
     enabled:value.enabled!==false,
+    experience:value.experience==='entrances'?'entrances':'journey',
+    journey:normalizeDecorativeJourney(value.journey),
     preset:STORY_PRESETS.some(item=>item.id===value.preset)?value.preset:STORY_DEFAULTS.preset,
     intensity:Number.isFinite(intensity)?Math.max(20,Math.min(100,intensity)):STORY_DEFAULTS.intensity,
     pace:['quick','balanced','leisurely'].includes(value.pace)?value.pace:STORY_DEFAULTS.pace,

@@ -31,7 +31,7 @@ function fixture(config={}) {
       Object.defineProperty(element,'offsetParent',{value:surface});Object.defineProperty(element,'offsetTop',{value:actorTop});Object.defineProperty(element,'offsetLeft',{value:150});Object.defineProperty(element,'offsetWidth',{value:width});Object.defineProperty(element,'offsetHeight',{value:height});
     });
   });
-  document.body.append(root);const stop=mountStorefrontSectionMotion(root,config);
+  document.body.append(root);const stop=mountStorefrontSectionMotion(root,{experience:'entrances',...config});
   const flush=()=>{const callback=frame;frame=null;callback?.();};
   const scroll=top=>{y=top;window.dispatchEvent(new Event('scroll'));flush();};
   const finishVisible=()=>animations.filter(a=>a.playState==='running').forEach(a=>a.finish());
@@ -39,7 +39,7 @@ function fixture(config={}) {
 }
 describe('presentaciones globales por objetos',()=>{
   it('conserva los cuatro identificadores y los ajustes guardados',()=>{
-    expect(normalizeStoryConfig({preset:'bad',intensity:999,pace:'bad',mobileMode:'bad',enabled:false})).toEqual({enabled:false,preset:'stack',intensity:100,pace:'balanced',mobileMode:'adapted'});
+    expect(normalizeStoryConfig({preset:'bad',intensity:999,pace:'bad',mobileMode:'bad',enabled:false})).toMatchObject({experience:'journey',enabled:false,preset:'stack',intensity:100,pace:'balanced',mobileMode:'adapted'});
     expect(storySectionOrder([{id:'tiktok'},{id:'categorias'},{id:'tiktok'}]).slice(0,3)).toEqual(['tiktok','categorias','tendencia']);
   });
   it.each(['stack','cinema','depth','cascade'])('abre %s y presenta título, pieza principal y acción sin transformar la sección',preset=>{

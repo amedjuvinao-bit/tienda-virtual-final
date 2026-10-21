@@ -29,7 +29,7 @@ export default function SectionMotionPreview({config,theme={}}) {
   },[]);
   useEffect(()=>{
     setProgress(0);setPlaying(c.enabled && !reduced);
-  },[c.preset,c.enabled,device,reduced]);
+  },[c.preset,c.experience,c.enabled,device,reduced]);
   useEffect(()=>{
     if(!playing || reduced)return;
     let frame=0, start;
@@ -38,7 +38,7 @@ export default function SectionMotionPreview({config,theme={}}) {
       start??=time;
       const elapsed=time-start, index=Math.min(chapters.length-1,Math.floor(elapsed/period));
       const local=elapsed-index*period, ratio=Math.max(0,Math.min(1,(local-hold)/travel));
-      const ease=ratio*ratio*(3-2*ratio), nodes=[...viewport.current.querySelector('.storefront-sections').children];
+      const ease=ratio*ratio*(3-2*ratio), nodes=[...viewport.current.querySelector('.storefront-sections').children].filter(node=>node.tagName==='SECTION');
       const max=viewport.current.scrollHeight-viewport.current.clientHeight;
       const position=i=>Math.max(0,Math.min(max,Number(nodes[i]?.dataset.storyTop)||0));
       const from=position(index), to=position(Math.min(index+1,chapters.length-1));
@@ -52,7 +52,7 @@ export default function SectionMotionPreview({config,theme={}}) {
   },[playing,c.pace,reduced,chapters.length]);
   const current=Math.min(chapters.length-1,Math.floor(progress/100*(chapters.length-1)));
   return <aside className="appearance-general__preview story-preview" aria-label="Vista previa de la animación global">
-    <div className="appearance-general__preview-header"><span className="appearance-general__preview-live" aria-hidden="true"/><strong>Vista previa del movimiento</strong><small>{STORY_PRESETS.find(item=>item.id===c.preset).name}</small></div>
+    <div className="appearance-general__preview-header"><span className="appearance-general__preview-live" aria-hidden="true"/><strong>Vista previa del movimiento</strong><small>{c.experience==='journey'?'Camino continuo':STORY_PRESETS.find(item=>item.id===c.preset).name}</small></div>
     <div className="story-preview__devices" role="group" aria-label="Dispositivo del recorrido">{[['desktop','Escritorio',Monitor],['mobile','Móvil',Smartphone]].map(([id,label,Icon])=><button key={id} type="button" aria-label={'Recorrido en '+label.toLowerCase()} aria-pressed={device===id} onClick={()=>setDevice(id)}><Icon size={15}/>{label}</button>)}</div>
     <div className="story-preview__screen" data-device={device}>
       <div ref={viewport} className="story-preview__viewport" aria-label="Demostración de las transiciones">
@@ -65,6 +65,6 @@ export default function SectionMotionPreview({config,theme={}}) {
     </div>
     <div className="story-preview__controls"><button type="button" disabled={reduced} onClick={()=>{if(!playing)setProgress(0);setPlaying(!playing);}}>{playing?<Pause size={15}/>:<Play size={15}/>} {playing?'Pausar':'Reproducir recorrido'}</button><button type="button" aria-label="Reiniciar recorrido" onClick={()=>{setPlaying(false);setProgress(0);setReplay(value=>value+1);}}><RotateCcw size={15}/></button></div>
     <label className="story-preview__scrubber">Recorrer secciones<input type="range" min="0" max="100" value={progress} onChange={event=>{setPlaying(false);setProgress(Number(event.target.value));}}/><span>{chapters[current]?.title}</span></label>
-    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para ver la transición completa. El efecto usa las imágenes y los objetos de la sección, con un mecanismo y un ritmo propios. La presentación termina aunque detengas el recorrido.'}</p>
+    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para recorrer la tienda. En Camino continuo, los mismos adornos viajan entre las secciones siguiendo el desplazamiento. Al subir, recorren el camino en sentido contrario.'}</p>
   </aside>;
 }

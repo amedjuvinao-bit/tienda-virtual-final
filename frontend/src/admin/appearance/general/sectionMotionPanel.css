@@ -77,3 +77,19 @@
 @keyframes story-icon-weave{0%,12%{translate:0 calc((var(--stripe) - 2)*20px);opacity:0}70%,100%{translate:0 0;transform:none;opacity:1}}
 @keyframes story-icon-focus{0%,12%{filter:blur(5px);scale:1.4;opacity:.4}70%,100%{filter:blur(0);scale:1;opacity:1}}
 @media(max-width:1050px){.story-preview__visuals{min-height:138px;gap:8px}.story-preview__visuals>.story-preview__hero{height:138px}.story-preview__details article,.story-preview__details article:last-child{height:60px}}
+
+.journey-editor{min-width:0;display:grid;gap:14px}
+.journey-editor__experience,.journey-editor__tabs{display:flex;gap:5px;padding:4px;border:1px solid #e7c5d3;border-radius:12px;background:var(--admin-card-bg,#fff4f6)}
+.journey-editor__experience button,.journey-editor__tabs button{flex:1;min-width:0;border:0;background:transparent;color:var(--tool-muted,#806272);font-size:11px;line-height:1.3;padding:9px 6px;border-radius:8px;cursor:pointer}
+.journey-editor__experience button[aria-pressed="true"],.journey-editor__tabs button[aria-pressed="true"]{background:color-mix(in srgb,var(--tool-accent,#a32960) 13%,var(--admin-card-bg,#f8dfeb));color:var(--tool-ink,#52243a);font-weight:700;box-shadow:0 2px 7px #73344414}
+.journey-editor__fields{display:grid;gap:14px;min-width:0}
+.journey-editor__fields p{font-size:12px;line-height:1.5;color:var(--tool-muted,#806272);margin:0}
+.journey-editor__fields>label{display:block;font-size:12px;font-weight:600;min-width:0}
+.journey-editor__fields select{display:block;width:100%;margin-top:6px;padding:9px;border:1px solid #dec4d1;border-radius:9px;background:var(--admin-card-bg,#fffc);color:inherit;font:400 12px system-ui}
+.journey-editor__range output{float:right;font-weight:400}.journey-editor__range input{display:block;width:100%;margin:8px 0 0}
+.journey-editor__fields .journey-editor__check,.journey-editor__fields .journey-editor__color{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.journey-editor__check input{width:18px;height:18px;flex-shrink:0}.journey-editor__color input{width:46px;height:30px;border:0;background:transparent}
+.journey-editor__restore{justify-self:start;background:transparent;border:0;border-bottom:1px solid currentColor;font-size:11px;padding:2px 0;color:var(--tool-accent,#a32960);cursor:pointer}
+.journey-editor details{border:1px solid #e7c5d3;border-radius:12px;padding:12px;font-size:12px}
+.journey-editor summary{cursor:pointer;font-weight:650}.journey-editor details[open] summary{margin-bottom:12px}
+.journey-editor .appearance-general__upload-field{grid-column:auto;min-width:0}

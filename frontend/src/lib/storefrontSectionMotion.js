@@ -24,7 +24,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   const viewport=()=>scroller?scroller.clientHeight:view.innerHeight;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:mobile?.matches;
   const enabled=()=>config.enabled && !reduce?.matches && !(compact() && config.mobileMode==='off');
-  const canAnimate=()=>enabled() && typeof container.animate==='function';
+  const canAnimate=()=>config.experience==='entrances' && enabled() && typeof container.animate==='function';
   const headerClearance=()=>{
     const header=!scroller && doc.querySelector('.theme-header');
     return header && header.dataset.visible!=='false'?header.getBoundingClientRect().height+(parseFloat(view.getComputedStyle(header).top)||0):0;
@@ -110,7 +110,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       observer?.observe(node);return chapter;
     });
     prior.forEach(releaseChapter);
-    if(enabled())container.dataset.storyPreset=config.preset;
+    if(enabled() && config.experience==='entrances')container.dataset.storyPreset=config.preset;
     dirty=false;
   }
   function update() {
