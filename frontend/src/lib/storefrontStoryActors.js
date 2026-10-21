@@ -16,7 +16,7 @@ const rank={eyebrow:0,title:1,copy:2,hero:3,product:4,detail:5,action:6,signatur
 export function collectStoryActors(surface,viewport) {
   const view=surface.ownerDocument.defaultView, candidates=new Map();
   const add=(element,role)=>{
-    if(element.closest('.storefront-card-opening,[hidden],dialog,[role="dialog"],[data-story-ignore]'))return;
+    if(element.closest('[data-story-fragments],[hidden],dialog,[role="dialog"],[data-story-ignore]'))return;
     const css=view.getComputedStyle(element),rect=element.getBoundingClientRect();
     if(css.display==='none'||css.visibility==='hidden'||rect.width<2||rect.height<2)return;
     if(!candidates.has(element))candidates.set(element,role);
@@ -32,32 +32,45 @@ export function collectStoryActors(surface,viewport) {
   return selected.sort((a,b)=>(rank[a[1]]??5)-(rank[b[1]]??5)).slice(0,32).map(([element,role])=>({element,role,index:counts[role]=(counts[role]??-1)+1,geometry:actorGeometry(element,surface,surface.offsetWidth || surface.getBoundingClientRect().width,viewport)}));
 }
 
+// Each preset owns a different rendering mechanism and its own sequence.
+// Saved preset IDs stay stable; there are no shared directional entrance frames.
 export function actorPresentation(preset,actor,intensity=65,compact=false) {
-  const {role,index,geometry:g}=actor, strength=.55+.45*intensity/100, mobile=compact ? .72 : 1;
-  const visual=['hero','product','detail'].includes(role), side=index%2?-1:1;
-  let x=0,y=24,scale=.98,rotate='0deg',origin='50% 50%';
-  if(visual){
-    if(preset==='stack'){x=role==='hero'?0:g.fromX*.74;y=role==='hero'?76:Math.max(40,g.fromY);scale=.76;rotate=`1 ${side*.18} 0 ${role==='hero'?58:46}deg`;origin='50% 100%';}
-    if(preset==='cinema'){x=role==='hero'?0:side*(80+index*10);y=role==='hero'?-48:24;scale=.82;rotate=`0 1 0 ${side*(role==='hero'?14:28)}deg`;}
-    if(preset==='depth'){x=role==='hero'?-45:side*62;y=16;scale=.94;rotate=`0 1 0 ${role==='hero'?52:side*38}deg`;origin=role==='hero'?'0% 50%':side>0?'0% 50%':'100% 50%';}
-    if(preset==='cascade'){x=g.fromX;y=Math.max(28,g.fromY);scale=.68;rotate=`${side*(role==='hero'?6:16-index*.7)}deg`;}
-  }else if(role==='title'){y=32;scale=1;rotate=preset==='stack'?'1 0 0 18deg':'0deg';origin='50% 100%';}
-  else if(role==='signature'){y=20;scale=.97;}
-  const from={opacity:0,translate:`${x*strength*mobile}px ${y*strength*mobile}px`,scale:String(1-(1-scale)*strength),rotate,transformOrigin:origin};
-  const settle={opacity:1,translate:'0 0',scale:visual?'1.012':'1',rotate:'0deg',transformOrigin:origin,offset:.82};
-  const to={opacity:1,translate:'0 0',scale:'1',rotate:'0deg',transformOrigin:origin};
-  const delays={eyebrow:120,title:210,copy:340,hero:340,product:440,detail:570,action:760,signature:850};
-  const durations={eyebrow:520,title:760,copy:680,hero:1050,product:950,detail:780,action:620,signature:850};
-  return {frames:[from,settle,to],delay:(delays[role]??500)+Math.min(index,7)*(preset==='cascade'?95:65),duration:durations[role]??760};
-}
-
-export function openingPresentation(preset,part) {
-  const first=part==='first';
-  const end={opacity:0,transform:'none'};
-  if(part==='bed')return [{opacity:.9},{opacity:.65,offset:.35},{opacity:0}];
-  if(part==='light')return [{opacity:0,transform:'translateX(-60%)'},{opacity:.55,offset:.4},{opacity:0,transform:'translateX(65%)'}];
-  if(preset==='stack')return [{opacity:1,transform:'rotateY(0deg)'},{opacity:.9,offset:.58},{...end,transform:`rotateY(${first?116:-116}deg)`}];
-  if(preset==='cinema')return [{opacity:1,transform:'rotateX(0deg)'},{opacity:.9,offset:.5},{...end,transform:'rotateX(-112deg) translateY(-12%)'}];
-  if(preset==='depth')return [{opacity:1,transform:'rotateY(0deg)'},{opacity:.9,offset:.6},{...end,transform:'rotateY(118deg)'}];
-  return [{opacity:1,transform:'translateY(0) rotateX(0deg)'},{opacity:.85,offset:.5},{...end,transform:`translateY(${first?'-':''}38%) rotateX(${first?-108:108}deg)`}];
+  const {role,index}=actor;
+  const strength=(.55+.45*intensity/100)*(compact ? .78 : 1);
+  const visual=['hero','product','detail','signature'].includes(role);
+  const stagger=Math.min(index,7);
+  if(preset==='cinema') {
+    // An iris reveals the content in place. No translation, tilt or flying cards.
+    const frames=visual
+      ? [{clipPath:'circle(0% at 50% 50%)',opacity:1},{clipPath:'circle(76% at 50% 50%)',opacity:1}]
+      : [{clipPath:'inset(0 0 100% 0)',opacity:1},{clipPath:'inset(0 0 0% 0)',opacity:1}];
+    const delays={eyebrow:70,hero:100,product:330,title:440,copy:570,detail:680,action:940,signature:700};
+    return {mechanism:'iris',frames,delay:(delays[role]??400)+stagger*110,duration:visual?1000+intensity*5:650,easing:'cubic-bezier(.65,0,.25,1)'};
+  }
+  if(preset==='depth') {
+    // The image is rebuilt by independently cropped strips of its own pixels.
+    // Other objects stay in place; text appears after the image assembles.
+    const delays={eyebrow:0,title:90,hero:180,product:400,copy:800,detail:600,action:1130,signature:900};
+    return {mechanism:'weave',fragments:visual,frames:visual
+      ? [{opacity:1},{opacity:1}]
+      : [{opacity:0},{opacity:1}],delay:(delays[role]??450)+stagger*100,duration:visual?1450:540,easing:'linear'};
+  }
+  if(preset==='cascade') {
+    // An optical rack focus and macro pull-back, with no position or rotation.
+    const blur=(visual?19:8)*strength, zoom=visual?1+.25*strength:1;
+    const delays={hero:0,product:150,eyebrow:340,title:460,copy:650,detail:460,action:1050,signature:700};
+    return {mechanism:'focus',frames:[
+      {opacity:visual ? .25 : 0,scale:String(zoom),filter:`blur(${blur}px) saturate(.65) contrast(.85)`},
+      {opacity:1,scale:String(1+(zoom-1)*.12),filter:'blur(0px) saturate(1) contrast(1)',offset:.76},
+      {opacity:1,scale:'1',filter:'blur(0px) saturate(1) contrast(1)'},
+    ],delay:(delays[role]??400)+stagger*130,duration:visual?1700:900,easing:'cubic-bezier(.22,.65,.25,1)'};
+  }
+  const origin=visual?'50% 100%':'50% 50%';
+  const angle=(visual?78:role==='title'?55:25)*strength;
+  const delays={eyebrow:0,title:110,copy:300,hero:210,product:410,detail:610,action:850,signature:700};
+  return {mechanism:'fold',frames:[
+    {opacity:0,rotate:`1 0 0 ${angle}deg`,scale:String(visual ? .82 : 1),transformOrigin:origin},
+    {opacity:1,rotate:'1 0 0 -3deg',scale:'1',transformOrigin:origin,offset:.8},
+    {opacity:1,rotate:'1 0 0 0deg',scale:'1',transformOrigin:origin},
+  ],delay:(delays[role]??400)+stagger*95,duration:visual?1250:750,easing:'cubic-bezier(.2,.65,.2,1)'};
 }

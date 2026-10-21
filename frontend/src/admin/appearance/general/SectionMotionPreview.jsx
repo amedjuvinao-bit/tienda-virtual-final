@@ -33,11 +33,17 @@ export default function SectionMotionPreview({config,theme={}}) {
   useEffect(()=>{
     if(!playing || reduced)return;
     let frame=0, start;
-    const duration=chapters.length*({quick:1400,balanced:2100,leisurely:2800}[c.pace]);
+    const hold={quick:1850,balanced:2600,leisurely:3400}[c.pace], travel=650, period=hold+travel;
     const animate=time=>{
       start??=time;
-      const next=Math.min(100,(time-start)/duration*100);setProgress(next);
-      if(next<100)frame=requestAnimationFrame(animate);else setPlaying(false);
+      const elapsed=time-start, index=Math.min(chapters.length-1,Math.floor(elapsed/period));
+      const local=elapsed-index*period, ratio=Math.max(0,Math.min(1,(local-hold)/travel));
+      const ease=ratio*ratio*(3-2*ratio), nodes=[...viewport.current.querySelector('.storefront-sections').children];
+      const max=viewport.current.scrollHeight-viewport.current.clientHeight;
+      const position=i=>Math.max(0,Math.min(max,Number(nodes[i]?.dataset.storyTop)||0));
+      const from=position(index), to=position(Math.min(index+1,chapters.length-1));
+      setProgress(max?(from+(to-from)*ease)/max*100:0);
+      if(elapsed<(chapters.length-1)*period+hold)frame=requestAnimationFrame(animate);else setPlaying(false);
     };
     const hide=()=>{if(document.hidden)setPlaying(false);};
     document.addEventListener('visibilitychange',hide);
@@ -59,6 +65,6 @@ export default function SectionMotionPreview({config,theme={}}) {
     </div>
     <div className="story-preview__controls"><button type="button" disabled={reduced} onClick={()=>{if(!playing)setProgress(0);setPlaying(!playing);}}>{playing?<Pause size={15}/>:<Play size={15}/>} {playing?'Pausar':'Reproducir recorrido'}</button><button type="button" aria-label="Reiniciar recorrido" onClick={()=>{setPlaying(false);setProgress(0);setReplay(value=>value+1);}}><RotateCcw size={15}/></button></div>
     <label className="story-preview__scrubber">Recorrer secciones<input type="range" min="0" max="100" value={progress} onChange={event=>{setPlaying(false);setProgress(Number(event.target.value));}}/><span>{chapters[current]?.title}</span></label>
-    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para ver la transición completa. La tarjeta abre y presenta su imagen, sus piezas y su acción en secuencia. La presentación termina aunque detengas el recorrido.'}</p>
+    <p className="appearance-general__preview-note">{reduced?'El dispositivo solicita movimiento reducido: el recorrido aparece sin animaciones.':!c.enabled?'La animación global está apagada. Puedes recorrer las secciones sin efectos.':'Reproduce o arrastra el control para ver la transición completa. El efecto usa las imágenes y los objetos de la sección, con un mecanismo y un ritmo propios. La presentación termina aunque detengas el recorrido.'}</p>
   </aside>;
 }

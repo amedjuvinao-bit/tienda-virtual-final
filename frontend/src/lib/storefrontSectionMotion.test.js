@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mountStorefrontSectionMotion, storefrontSectionTop } from './storefrontSectionMotion';
 import { normalizeStoryConfig, storySectionOrder } from './storefrontStoryConfig';
-import { actorPresentation, openingPresentation } from './storefrontStoryActors';
+import { actorPresentation } from './storefrontStoryActors';
 
 const originalAnimate=Element.prototype.animate;
 afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();if(originalAnimate)Element.prototype.animate=originalAnimate;else delete Element.prototype.animate;});
@@ -18,7 +18,7 @@ function fixture(config={}) {
     animations.push(animation);return animation;
   };
   const root=document.createElement('div');root.className='storefront-sections';root.getBoundingClientRect=()=>({top:-y,left:0,width:1200});
-  root.innerHTML=heights.map((_,i)=>`<section id="${i===0?'banner':'chapter-'+i}"><div class="storefront-chapter-surface"><h2 data-story-actor="title">Capítulo ${i}</h2><p data-story-actor="copy">Descripción</p><figure data-story-actor="hero"><article><img alt="Imagen real"/><button>Ver foto</button></article></figure><article data-story-actor="product">Producto A</article><article data-story-actor="product">Producto B</article><div data-story-actor="detail">Detalle</div><button data-story-actor="action">Explorar</button><div data-story-actor="signature">Última pieza</div><div class="storefront-card-opening"><span class="storefront-card-opening__bed"></span><span data-leaf="first"></span><span data-leaf="second"></span><span class="storefront-card-opening__light"></span></div></div></section>`).join('');
+  root.innerHTML=heights.map((_,i)=>`<section id="${i===0?'banner':'chapter-'+i}"><div class="storefront-chapter-surface"><h2 data-story-actor="title">Capítulo ${i}</h2><p data-story-actor="copy">Descripción</p><figure data-story-actor="hero"><article><img alt="Imagen real"/><button>Ver foto</button></article></figure><article data-story-actor="product">Producto A</article><article data-story-actor="product">Producto B</article><div data-story-actor="detail">Detalle</div><button data-story-actor="action">Explorar</button><div data-story-actor="signature">Última pieza</div></div></section>`).join('');
   [...root.children].forEach((node,index)=>{
     const top=()=>heights.slice(0,index).reduce((a,b)=>a+b,0);
     Object.defineProperty(node,'offsetHeight',{get:()=>heights[index]});Object.defineProperty(node,'offsetWidth',{value:1200});
@@ -44,12 +44,14 @@ describe('presentaciones globales por objetos',()=>{
   });
   it.each(['stack','cinema','depth','cascade'])('abre %s y presenta título, pieza principal y acción sin transformar la sección',preset=>{
     const f=fixture({preset});f.scroll(800);
-    const chapter=f.nodes[1];expect(chapter.dataset.storyStage).toBe('opening');
+    const chapter=f.nodes[1];expect(chapter.dataset.storyStage).toBe('presented');
     expect(f.animations.some(a=>a.element===chapter.firstChild)).toBe(false);
     expect(chapter.firstChild.style.transform).toBe('');expect(chapter.firstChild.style.clipPath).toBe('');
     const actors=f.animations.filter(a=>a.element.closest('#chapter-1')&&a.id.startsWith('story:')&&!a.id.startsWith('story:cover:'));
     const timing=role=>actors.find(a=>a.id.startsWith('story:'+role+':')).options.delay;
-    expect(timing('title')).toBeLessThan(timing('hero'));expect(timing('hero')).toBeLessThan(timing('action'));
+    expect(timing('hero')).toBeLessThan(timing('action'));
+    if(['cinema','cascade'].includes(preset))expect(timing('hero')).toBeLessThan(timing('title'));else expect(timing('title')).toBeLessThan(timing('hero'));
+    expect(chapter.querySelector('.storefront-card-opening')).toBeNull();
     expect(actors.filter(a=>a.id.startsWith('story:product:'))).toHaveLength(2);
     f.finishVisible();expect(chapter.dataset.storyStage).toBe('presented');
     expect(chapter.hasAttribute('data-story-performing')).toBe(false);
@@ -91,7 +93,7 @@ describe('presentaciones globales por objetos',()=>{
   it('vuelve a abrir la tarjeta al regresar a su cabecera, sin repetirla mientras se lee',()=>{
     const f=fixture();f.scroll(800);f.finishVisible();const before=f.animations.length;
     f.scroll(1100);expect(f.animations).toHaveLength(before);
-    f.scroll(2850);f.scroll(720);expect(f.nodes[1].dataset.storyStage).toBe('opening');expect(f.animations.length).toBeGreaterThan(before);f.stop();
+    f.scroll(2850);f.scroll(720);expect(f.nodes[1].dataset.storyStage).toBe('presented');expect(f.animations.length).toBeGreaterThan(before);f.stop();
   });
   it('respeta movimiento reducido, permite apagarlo en móvil y limpia los efectos',()=>{
     const f=fixture({mobileMode:'off'});f.scroll(800);
@@ -100,11 +102,36 @@ describe('presentaciones globales por objetos',()=>{
     f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();expect(f.root.dataset.storyPreset).toBeUndefined();
     f.stop();expect(f.nodes[1].dataset.storyTop).toBeUndefined();expect(f.animations.every(a=>a.playState==='idle')).toBe(true);
   });
-  it('da un desarrollo diferente a los objetos y a las hojas de cada modelo',()=>{
+  it('usa mecanismos excluyentes: pliegue, iris, franjas y foco; no cambia solo la dirección',()=>{
     const actor={role:'hero',index:0,geometry:{fromX:150,fromY:80}};
-    const modes=['stack','cinema','depth','cascade'];
-    expect(new Set(modes.map(id=>JSON.stringify(actorPresentation(id,actor).frames))).size).toBe(4);
-    expect(new Set(modes.map(id=>JSON.stringify(openingPresentation(id,'first')))).size).toBe(4);
+    const fold=actorPresentation('stack',actor),iris=actorPresentation('cinema',actor),weave=actorPresentation('depth',actor),focus=actorPresentation('cascade',actor);
+    expect(fold.frames[0].rotate).toMatch(/deg/);expect(fold.frames[0].clipPath).toBeUndefined();expect(fold.frames[0].filter).toBeUndefined();
+    expect(iris.frames[0].clipPath).toMatch(/^circle/);expect(iris.frames[0].rotate).toBeUndefined();expect(iris.frames[0].scale).toBeUndefined();
+    expect(weave.fragments).toBe(true);expect(weave.frames[0].rotate).toBeUndefined();expect(weave.frames[0].scale).toBeUndefined();
+    expect(focus.frames[0].filter).toMatch(/blur/);expect(focus.frames[0].clipPath).toBeUndefined();expect(focus.frames[0].rotate).toBeUndefined();
+    for(const plan of [fold,iris,weave,focus])expect(plan.frames.some(frame=>'translate' in frame)).toBe(false);
+  });
+  it('reconstruye fotos con sus propios píxeles y limpia las copias inertes al interactuar',()=>{
+    const f=fixture({preset:'depth'}),surface=f.nodes[1].firstChild,hero=surface.querySelector('figure'),image=hero.querySelector('img');
+    image.src='/real-photo.webp';image.getBoundingClientRect=()=>({top:980,left:150,width:550,height:300});
+    // Reload the actor after the real photo becomes available.
+    f.reduce.matches=true;f.reduce.dispatchEvent(new Event('change'));f.flush();
+    f.reduce.matches=false;f.reduce.dispatchEvent(new Event('change'));f.flush();f.scroll(800);
+    const overlay=surface.querySelector('[data-story-fragments]');expect(overlay).not.toBeNull();
+    expect(overlay.querySelectorAll('img')).toHaveLength(8);
+    expect(overlay.parentElement).toBe(hero);expect(hero.dataset.storyWeave).toBe('true');
+    expect([...overlay.querySelectorAll('img')].every(img=>img.src===image.src)).toBe(true);
+    expect(overlay.querySelector('video,iframe')).toBeNull();expect(overlay.inert).toBe(true);expect(overlay.querySelector('[data-story-role],[data-story-actor],#chapter-1')).toBeNull();
+    hero.querySelector('button').focus();expect(surface.querySelector('[data-story-fragments]')).toBeNull();expect(f.nodes[1].dataset.storyStage).toBe('ready');expect(hero.dataset.storyWeave).toBeUndefined();
+    f.stop();
+  });
+  it('revela un reproductor mediante franjas sin duplicarlo',()=>{
+    const f=fixture({preset:'depth'}),hero=f.nodes[1].querySelector('figure'),image=hero.querySelector('img');
+    image.src='/poster.webp';image.getBoundingClientRect=()=>({top:980,left:150,width:550,height:300});
+    f.reduce.matches=true;f.reduce.dispatchEvent(new Event('change'));f.flush();f.reduce.matches=false;f.reduce.dispatchEvent(new Event('change'));f.flush();
+    const video=document.createElement('video');video.pause=vi.fn();hero.append(video);f.scroll(800);
+    expect(f.nodes[1].querySelector('[data-story-fragments]')).toBeNull();expect(f.nodes[1].querySelectorAll('video')).toHaveLength(1);
+    const animation=f.animations.filter(a=>a.element===hero).at(-1);expect(animation.frames[0].clipPath).toMatch(/^polygon/);f.stop();
   });
   it('pausa videos y TikTok al quedar la sección cubierta, sin duplicar reproductores',()=>{
     const f=fixture();const video=document.createElement('video');Object.defineProperty(video,'paused',{value:false});video.pause=vi.fn();

@@ -9,7 +9,7 @@ export default function StorefrontStory({children,config,viewportRef,mobileOverr
   return <div ref={root} className={'storefront-sections min-w-0 max-w-full flex-grow '+className}>
     {Children.toArray(children).filter(isValidElement).map(child=>cloneElement(child,{
       'data-story-chapter':'true',
-      children:<div className="storefront-chapter-surface">{child.props.children}<div className="storefront-card-opening" aria-hidden="true"><span className="storefront-card-opening__bed"/><span className="storefront-card-opening__leaf" data-leaf="first"/><span className="storefront-card-opening__leaf" data-leaf="second"/><span className="storefront-card-opening__light"/></div></div>,
+      children:<div className="storefront-chapter-surface">{child.props.children}</div>,
     }))}
   </div>;
 }

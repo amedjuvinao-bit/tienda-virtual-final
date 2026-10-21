@@ -1,5 +1,6 @@
 import { normalizeStoryConfig, STORY_VISIBILITY_EVENT } from './storefrontStoryConfig';
-import { collectStoryActors, actorPresentation, openingPresentation } from './storefrontStoryActors';
+import { collectStoryActors, actorPresentation } from './storefrontStoryActors';
+import { startStoryFragments, storyFragmentImage, storyWeaveFallback } from './storefrontStoryFragments';
 
 function pauseCoveredMedia(node) {
   const fullscreen=node.ownerDocument.fullscreenElement;
@@ -30,25 +31,27 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   };
   function releaseActor(actor) {
     if(actor.animation){actor.animation.onfinish=null;actor.animation.cancel();actor.animation=null;}
-    actor.state='done';delete actor.element.dataset.storyActing;
+    actor.fragments?.();actor.fragments=null;
+    actor.state='done';delete actor.element.dataset.storyActing;delete actor.element.dataset.storyWeave;
   }
   function finishChapter(chapter) {
     chapter.phase='ready';chapter.node.dataset.storyStage='ready';
     chapter.actors.forEach(releaseActor);
-    chapter.covers.forEach(a=>{a.onfinish=null;a.cancel();});chapter.covers=[];
     delete chapter.node.dataset.storyPerforming;
   }
   function releaseChapter(chapter) {
     finishChapter(chapter);
     chapter.actors.forEach(actor=>{delete actor.element.dataset.storyRole;});
     for(const key of ['storyTop','storyIndex','storyVisible','sectionMotion','sectionDirection','storyStage','storyPerforming'])delete chapter.node.dataset[key];
-    for(const key of ['--story-pin-top','--story-layer','--story-cover-height'])chapter.node.style.removeProperty(key);
+    for(const key of ['--story-pin-top','--story-layer'])chapter.node.style.removeProperty(key);
   }
   function prepareActor(actor) {
     if(!canAnimate() || !actor.element.animate){actor.state='done';return;}
     const plan=actorPresentation(config.preset,actor,config.intensity,compact() && config.mobileMode==='adapted');
+    if(plan.fragments && !storyFragmentImage(actor)){plan.frames=storyWeaveFallback();plan.fragments=false;plan.easing='cubic-bezier(.65,0,.25,1)';}
+    if(plan.fragments)actor.element.dataset.storyWeave='true';
     actor.plan=plan;actor.state='waiting';
-    actor.animation=actor.element.animate(plan.frames,{duration:plan.duration*pace,delay:plan.delay*pace,fill:'both',easing:'cubic-bezier(.16,1,.3,1)'});
+    actor.animation=actor.element.animate(plan.frames,{duration:plan.duration*pace,delay:plan.delay*pace,fill:'both',easing:plan.easing});
     actor.animation.id=`story:${actor.role}:${actor.index}`;
     actor.animation.pause();actor.animation.currentTime=0;
   }
@@ -58,30 +61,25 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   }
   function startActor(chapter,actor,deferred=false) {
     if(actor.state!=='waiting'||!actor.animation)return;
+    if(actor.plan.mechanism==='weave' && Boolean(storyFragmentImage(actor))!==actor.plan.fragments){
+      actor.animation.cancel();delete actor.element.dataset.storyWeave;prepareActor(actor);
+    }
     actor.state='playing';actor.element.dataset.storyActing='true';chapter.node.dataset.storyPerforming='true';
-    if(deferred)actor.animation.effect?.updateTiming({delay:Math.min(100+actor.index*35,240)*pace});
+    const delay=deferred?Math.min(100+actor.index*35,240):actor.plan.delay;
+    if(deferred)actor.animation.effect?.updateTiming({delay:delay*pace});
+    if(actor.plan.fragments)actor.fragments=startStoryFragments(actor,chapter.surface,{delay:delay*pace,duration:actor.plan.duration*pace,compact:compact(),intensity:config.intensity});
     actor.animation.onfinish=()=>{
       releaseActor(actor);
       if(!chapter.actors.some(a=>a.state==='playing'))delete chapter.node.dataset.storyPerforming;
-      if(chapter.phase==='presented' && chapter.actors.every(a=>a.state==='done'))chapter.node.dataset.storyStage='ready';
+      if(chapter.phase==='presented' && chapter.actors.every(a=>a.state==='done')){chapter.phase='ready';chapter.node.dataset.storyStage='ready';}
     };
     actor.animation.play();
   }
   function openChapter(chapter) {
     if(chapter.phase!=='waiting')return;
-    chapter.phase='opening';chapter.openedAt=view.performance.now();chapter.node.dataset.storyStage='opening';
-    const parts=chapter.surface.querySelectorAll('.storefront-card-opening>span');
-    const actual=[...parts].filter(el=>!(['cinema','depth'].includes(config.preset)&&el.dataset.leaf==='second'));
-    let remaining=actual.length;
-    const complete=()=>{if(--remaining>0)return;chapter.phase='presented';chapter.node.dataset.storyStage='presented';chapter.covers.forEach(a=>{a.onfinish=null;a.cancel();});chapter.covers=[];};
-    chapter.covers=actual.map(el=>{
-      const part=el.dataset.leaf || (el.classList.contains('storefront-card-opening__bed')?'bed':'light');
-      const animation=el.animate(openingPresentation(config.preset,part),{duration:(part==='light'?1200:960)*pace,fill:'both',easing:'cubic-bezier(.42,0,.18,1)'});
-      animation.id=`story:cover:${part}`;
-      animation.onfinish=complete;return animation;
-    });
-    if(!remaining){chapter.phase='presented';chapter.node.dataset.storyStage='presented';}
+    chapter.openedAt=view.performance.now();chapter.phase='presented';chapter.node.dataset.storyStage='presented';
   }
+
   function measure() {
     const prior=new Map(chapters.map(chapter=>[chapter.node,chapter]));
     // Read natural section positions without resetting an ongoing presentation.
@@ -91,11 +89,10 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
     chapters=[...container.children].filter(node=>node.tagName==='SECTION' && node.offsetHeight>0).map((node,index)=>{
       const surface=node.querySelector(':scope>.storefront-chapter-surface') || node, rect=node.getBoundingClientRect();
       const old=prior.get(node);prior.delete(node);
-      const chapter=old || {node,surface,actors:[],covers:[],phase:'waiting',visible:false,replayArmed:false};
+      const chapter=old || {node,surface,actors:[],phase:'waiting',visible:false,replayArmed:false};
       Object.assign(chapter,{top:rootTop+rect.top-rootRect.top,height:rect.height || node.offsetHeight,index});
       node.dataset.storyTop=String(chapter.top);node.dataset.storyIndex=String(index);
       node.style.setProperty('--story-layer',index+1);node.style.setProperty('--story-pin-top',Math.min(0,vh-chapter.height)+'px');
-      node.style.setProperty('--story-cover-height',Math.max(0,Math.min(chapter.height-24,vh-24))+'px');
       const existing=new Map(chapter.actors.map(actor=>[actor.element,actor]));
       const nativeBanner=!scroller && node.id==='banner';
       chapter.actors=collectStoryActors(surface,vh).map(item=>{

@@ -1,8 +1,8 @@
 export const STORY_PRESETS = [
-  { id: 'stack', name: 'Tarjeta desplegable', description: 'Se abren dos hojas de cristal; la imagen se levanta y las piezas salen del pliegue hacia su lugar.' },
-  { id: 'cinema', name: 'Escaparate en capas', description: 'Una tapa se eleva y presenta primero la pieza principal, después los detalles y la invitación a explorar.' },
-  { id: 'depth', name: 'Álbum editorial', description: 'La cubierta abre desde un lateral; las imágenes y los textos componen una página con profundidad.' },
-  { id: 'cascade', name: 'Composición en abanico', description: 'La tarjeta se despliega y sus piezas se separan desde un punto común hasta formar la composición.' },
+  { id: 'stack', name: 'Pop-up escultórico', description: 'Los objetos se levantan sobre su propia base con pliegues tridimensionales, como una tarjeta pop-up.' },
+  { id: 'cinema', name: 'Iris de enfoque', description: 'Una apertura circular descubre las imágenes en su sitio; después se revelan el título y la acción.' },
+  { id: 'depth', name: 'Trama de imágenes', description: 'Franjas de las imágenes reales se entrelazan y reconstruyen cada pieza. Los reproductores se revelan sin duplicarse.' },
+  { id: 'cascade', name: 'Enfoque cinematográfico', description: 'Un primer plano desenfocado retrocede y gana nitidez. La tipografía entra después, como un cambio de foco de cámara.' },
 ];
 export const STORY_DEFAULTS = { enabled: true, preset: 'stack', intensity: 65, pace: 'balanced', mobileMode: 'adapted' };
 export const STORY_VISIBILITY_EVENT='storefront:chapter-visibility';

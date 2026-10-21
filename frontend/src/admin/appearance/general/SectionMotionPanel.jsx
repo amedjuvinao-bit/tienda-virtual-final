@@ -6,7 +6,7 @@ export default function SectionMotionPanel({config,onChange}) {
   const c=normalizeStoryConfig(config), name=useId();
   const edit=(key,value)=>onChange({...c,[key]:value});
   return <section className="story-editor" aria-label="Animación global de las secciones">
-    <header><h3>Presentaciones por objetos</h3><p>Cada sección abre como una tarjeta y presenta sus propios elementos: título, imagen principal, detalles y acción.</p></header>
+    <header><h3>Cuatro formas de contar el recorrido</h3><p>Elige un mecanismo: pliegue 3D, apertura circular, trama de imágenes o enfoque de cámara. Cada uno tiene su propia secuencia; todos usan el contenido de la tienda.</p></header>
     <label className="story-editor__toggle"><span>Activar animación global</span><input type="checkbox" checked={c.enabled} onChange={event=>edit('enabled',event.target.checked)}/></label>
     <fieldset className="story-editor__themes"><legend>Tema de animación</legend>
       <div className="story-editor__choices">{STORY_PRESETS.map((item,index)=><label key={item.id} className="story-editor__choice" data-selected={c.preset===item.id} data-preset={item.id}>
