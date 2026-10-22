@@ -10,7 +10,7 @@ export function cinematicBeat(phase){
 }
 // Rigid scenery travels on parallel camera planes, never along a deforming curve.
 // Wraps happen outside the viewport, making the same choreography reversible.
-export function cinematicOrnament(index,{phase,width,height,size,aspect=1,depth=.65,compact=false,intensity=65,count=6,cameraPhase}){
+export function cinematicOrnament(index,{phase,width,height,size,aspect=1,depth=.65,compact=false,intensity=65,count=6,cameraPhase,length=100}){
   // Alternate left/right arrivals, then continue to the next depth plane.
   // Delay is driven by scroll phase, so reversing scroll reverses the sequence.
   const delay=index*.06;
@@ -19,19 +19,25 @@ export function cinematicOrnament(index,{phase,width,height,size,aspect=1,depth=
   phase=Number.isFinite(cameraPhase)?cameraPhase:cinematicBeat(Math.max(0,phase-delay)).position;
   const right=index%2===1,plane=Math.floor(index/2),planes=Math.ceil(count/2);
   const rate=(right?.34:.29)*(.65+intensity/200);
-  const cycle=CINEMATIC_CYCLE,position=mod(.3+plane*cycle/planes+(right?.24:0)-phase*rate,cycle)-.4;
   const camera=phase*1.2+plane*1.7+(right?.65:0),relief=depth*(compact?.68:1),approach=(Math.sin(camera)+1)/2;
   const requestedScale=size/100*(compact?1.3:1.55)*[1,.78,1.12][plane%3]*(1+depth*(plane===2?.12:0))*(1+approach*relief*.24);
   // Pieces share a camera speed but arrive at staggered times.
   // Reserve enough room for the whole tilted/projected silhouette and a gap.
   // During staggered arrivals a neighbour can be one destination ahead.
   // Reserve that full travel distance to prevent the pieces bunching up.
-  const slotHeight=height*(cycle/planes-rate)-Math.max(32,height*.12);
+  const slotHeight=height*(CINEMATIC_CYCLE/planes-rate)-Math.max(32,height*.12);
   const projectedHeight=100*(Math.sqrt(aspect)+.14/Math.sqrt(aspect))*1.16;
   const scale=Math.min(requestedScale,Math.max(.1,slotHeight/projectedHeight));
+  const lengthScale=Math.max(.5,Math.min(2.5,length/100));
+  // Reserve the extra vertical silhouette without shrinking the ornament's
+  // width. Recycling still happens beyond the enlarged silhouette's edges.
+  const extraHeight=Math.max(0,slotHeight)*(Math.max(1,lengthScale)-1);
+  const cycle=CINEMATIC_CYCLE+planes*extraHeight/height;
+  const margin=lengthScale>1?Math.max(.4+extraHeight/(2*height),slotHeight*lengthScale/(2*height)+.12):.4;
+  const position=mod(.3+margin-.4+plane*cycle/planes+(right?.24:0)-phase*rate,cycle)-margin;
   const halfWidth=50/Math.sqrt(aspect)*scale;
   const inset=Math.min(width*(compact?.045:.035),halfWidth*.28);
-  return {x:right?width-inset:inset,y:position*height,scale,
+  return {x:right?width-inset:inset,y:position*height,scale,lengthScale,cycle,
     tiltY:(right?-1:1)*(10+Math.sin(camera)*18)*relief,tiltX:Math.cos(camera*.8)*12*relief,
     lift:approach*relief*42,shadowX:(right?-1:1)*(3+approach*13)*relief,
     shadowY:5+approach*relief*16,shadowBlur:5+approach*relief*12,light:1+Math.cos(camera-.6)*relief*.07,

@@ -86,7 +86,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
         if(Math.abs(targetPhase-camera.position)>.0001 || Math.abs(camera.velocity)>.001)settling=true;
         else{camera.position=targetPhase;camera.velocity=0;}
       }
-      const pose=cinematicOrnament(i,{phase:desired,cameraPhase:camera.position,width,height,size,aspect,depth,compact:compact(),intensity:config.intensity,count});
+      const pose=cinematicOrnament(i,{phase:desired,cameraPhase:camera.position,width,height,size,aspect,depth,compact:compact(),intensity:config.intensity,count,length:adapted?c.mobileLength:c.length});
       const settings=c.sectionSettings || {};
       const sideWeight=id=>{const side=settings[id]?.placement;return side==='left'?(i%2?.15:1):side==='right'?(i%2?1:.15):1;};
       const emphasis=sideWeight(visualScene.id)*(1-visualScene.handoff)+sideWeight(visualScene.nextId)*visualScene.handoff;
@@ -95,7 +95,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
       const artwork=piece.querySelector('[data-journey-rigid]');
       if(artwork){
         artwork.style.transformBox='fill-box';artwork.style.transformOrigin='center';
-        artwork.style.transform=`perspective(700px) rotateY(${pose.tiltY.toFixed(2)}deg) rotateX(${pose.tiltX.toFixed(2)}deg) translateZ(${pose.lift.toFixed(2)}px)`;
+        artwork.style.transform=`perspective(700px) rotateY(${pose.tiltY.toFixed(2)}deg) rotateX(${pose.tiltX.toFixed(2)}deg) translateZ(${pose.lift.toFixed(2)}px) scaleY(${pose.lengthScale})`;
         artwork.style.filter=`drop-shadow(${(pose.shadowX*previewScale).toFixed(2)}px ${(pose.shadowY*previewScale).toFixed(2)}px ${(pose.shadowBlur*previewScale).toFixed(2)}px rgb(0 0 0 / .2)) brightness(${pose.light.toFixed(3)})`;
       }
       piece.setAttribute('transform',`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${scale.toFixed(3)})`);

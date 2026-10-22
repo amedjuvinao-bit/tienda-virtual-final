@@ -75,3 +75,17 @@ it('does not make a lateral excursion and return after arriving',()=>{
   expect(Math.max(...poses.map(p=>p.x))-Math.min(...poses.map(p=>p.x))).toBeLessThan(.01);
  }
 });
+
+it('extends the vertical silhouette without narrowing it and separates longer neighbours',()=>{
+ for(const compact of [false,true])for(const aspect of [1,3,5])for(const length of [50,100,180,250])for(let phase=0;phase<12;phase+=.2){
+  const height=compact?844:800,count=compact?4:6,base={phase,width:compact?390:1280,height,size:320,aspect,compact,count,length};
+  const poses=Array.from({length:count},(_,i)=>cinematicOrnament(i,base));
+  expect(poses[0].scale).toBe(cinematicOrnament(0,{...base,length:100}).scale);
+  expect(poses[0].lengthScale).toBe(length/100);
+  for(let i=0;i<count;i++)for(let j=i+2;j<count;j+=2){
+   const distance=Math.abs(poses[i].y-poses[j].y),gap=Math.min(distance,height*poses[i].cycle-distance);
+   const extent=100*(Math.sqrt(aspect)+.14/Math.sqrt(aspect))*1.16*(poses[i].scale+poses[j].scale)/2*length/100;
+   expect(gap-extent).toBeGreaterThanOrEqual(Math.max(32,height*.12)-.001);
+  }
+ }
+});

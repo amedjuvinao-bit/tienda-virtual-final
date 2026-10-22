@@ -22,6 +22,8 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
     {tab==='recorrido' && <div className="journey-editor__fields">
       <p>Composición cinematográfica: flotación 3D con entradas encadenadas y frenado suave al llegar a su posición.</p>
       <Range label="Tamaño de los adornos" value={c.size} min={60} max={320} step={5} suffix=" px" onChange={value=>edit('size',value)}/>
+      <Range label="Largo vertical de los adornos" value={c.length ?? 100} min={50} max={250} step={5} suffix=" %" onChange={value=>edit('length',value)}/>
+      <p>100 % conserva el largo original. Aumenta este valor para alargar la imagen sin cambiar su ancho.</p>
       <Range label="Densidad de adornos" value={c.density} min={8} max={28} onChange={value=>edit('density',value)}/>
       <Range label="Profundidad 3D del marco" value={c.depth} min={0} max={100} step={5} suffix=" %" onChange={value=>edit('depth',value)}/>
       <Range label="Opacidad de los adornos" value={c.opacity} min={20} max={100} step={5} suffix=" %" onChange={value=>edit('opacity',value)}/>
@@ -44,6 +46,7 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
     {tab==='movil' && <div className="journey-editor__fields">
       <p>En el modo adaptado, el camino utiliza estos tamaños y esta cantidad para dejar espacio al contenido.</p>
       <Range label="Tamaño de adornos en móvil" value={c.mobileSize} min={36} max={150} step={2} suffix=" px" onChange={value=>edit('mobileSize',value)}/>
+      <Range label="Largo vertical en móvil" value={c.mobileLength ?? 100} min={50} max={250} step={5} suffix=" %" onChange={value=>edit('mobileLength',value)}/>
       <Range label="Densidad de adornos en móvil" value={c.mobileDensity} min={4} max={14} onChange={value=>edit('mobileDensity',value)}/>
     </div>}
   </div>;

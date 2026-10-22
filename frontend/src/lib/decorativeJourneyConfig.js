@@ -1,8 +1,8 @@
 export const JOURNEY_SECTION_IDS=['banner','tendencia','look','complementos','categorias','instagram','tiktok','informacion','footer'];
 export const DECORATIVE_JOURNEY_DEFAULTS={
   image:'',secondaryImage:'',backgroundImage:'',
-  unifyBackground:false,path:'flowing',size:190,density:22,opacity:90,depth:65,
-  mobileSize:86,mobileDensity:10,stemVisible:false,trailLine:false,stemColor:'',sectionSettings:{},
+  unifyBackground:false,path:'flowing',size:190,length:100,density:22,opacity:90,depth:65,
+  mobileSize:86,mobileLength:100,mobileDensity:10,stemVisible:false,trailLine:false,stemColor:'',sectionSettings:{},
 };
 const number=(value,min,max,fallback)=>Number.isFinite(Number(value))?Math.min(max,Math.max(min,Number(value))):fallback;
 export function journeyImageUrl(value,fallback=''){
@@ -24,6 +24,7 @@ export function normalizeDecorativeJourney(raw){
     backgroundMode:c.backgroundMode==='individual'?'individual':'continuous',
     path:c.path==='edges'?'edges':'flowing',
     size:number(c.size,60,320,d.size),density:Math.round(number(c.density,8,28,d.density)),
+    length:number(c.length,50,250,d.length),mobileLength:number(c.mobileLength,50,250,d.mobileLength),
     opacity:number(c.opacity,20,100,d.opacity),depth:number(c.depth,0,100,d.depth),
     mobileSize:number(c.mobileSize,36,150,d.mobileSize),mobileDensity:Math.round(number(c.mobileDensity,4,14,d.mobileDensity)),
     trailLine:false,

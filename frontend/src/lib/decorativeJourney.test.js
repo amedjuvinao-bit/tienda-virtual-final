@@ -63,6 +63,22 @@ it('limita la carga visual y rechaza imágenes con protocolos que no son de imag
   expect(c).toMatchObject({density:28,mobileDensity:14,size:320,image:'',backgroundImage:'',stemColor:''});
 });
 
+it('conserva los largos guardados, limita sus valores y respeta el largo original en tiendas existentes',()=>{
+ expect(normalizeDecorativeJourney({})).toMatchObject({length:100,mobileLength:100});
+ expect(normalizeDecorativeJourney({length:'180',mobileLength:135})).toMatchObject({length:180,mobileLength:135});
+ expect(normalizeDecorativeJourney({length:999,mobileLength:-10})).toMatchObject({length:250,mobileLength:50});
+});
+
+it('aplica el largo al adorno de escritorio y el ajuste independiente al móvil adaptado',()=>{
+ const f=fixture({journey:{length:180,mobileLength:135}}),artwork=f.root.querySelector('[data-journey-rigid]');
+ expect(artwork.style.transform).toContain('scaleY(1.8)');
+ f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();
+ expect(artwork.style.transform).toContain('scaleY(1.35)');f.stop();
+ const same=fixture({mobileMode:'same',journey:{length:180,mobileLength:135}});
+ same.mobile.matches=true;same.mobile.dispatchEvent(new Event('change'));same.flush();
+ expect(same.root.querySelector('[data-journey-rigid]').style.transform).toContain('scaleY(1.8)');same.stop();
+});
+
 it('empieza sin recursos de un negocio y conserva los fondos de cada sección',()=>{
   expect(normalizeDecorativeJourney()).toMatchObject({image:'',secondaryImage:'',backgroundImage:'',unifyBackground:false,stemVisible:false,stemColor:''});
   const f=fixture({journey:{image:''}});
