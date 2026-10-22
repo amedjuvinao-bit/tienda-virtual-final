@@ -28,6 +28,7 @@ import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, re
 import { storefrontSectionTop } from './lib/storefrontSectionMotion';
 import { storySectionOrder } from './lib/storefrontStoryConfig';
 import StorefrontStory from './components/StorefrontStory';
+import StorefrontActionFeedback from './components/StorefrontActionFeedback';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
@@ -243,6 +244,7 @@ export default function App() {
         <CartProvider>
           <BrowserRouter>
             <AdminDocumentRoute />
+            <StorefrontActionFeedback />
             <BackupMaintenanceNotice adminPanelReady={themeReady} />
             <AppConfirmProvider>
               <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
