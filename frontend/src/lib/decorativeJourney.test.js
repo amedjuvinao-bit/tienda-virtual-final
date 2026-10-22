@@ -41,9 +41,9 @@ it('oculta visualmente el adorno detrás de los controles sin duplicar contenido
   expect(f.root.querySelectorAll('video')).toHaveLength(1);expect(f.root.querySelectorAll('iframe')).toHaveLength(1);
   const click=vi.fn();f.root.querySelector('button').addEventListener('click',click);f.root.querySelector('button').click();expect(click).toHaveBeenCalledOnce();f.stop();
 });
-it('adapta la cantidad en móvil, congela el recorrido con movimiento reducido y permite apagarlo',()=>{
+it('mantiene un solo adorno en móvil, congela el recorrido con movimiento reducido y permite apagarlo',()=>{
   const f=fixture({journey:{density:24,mobileDensity:6}}),visible=()=>[...f.root.querySelectorAll('[data-journey-piece]')].filter(node=>Number(node.getAttribute('opacity'))>0);
-  expect(visible()).toHaveLength(4);f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();expect(visible()).toHaveLength(2);
+  expect(visible()).toHaveLength(1);f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();expect(visible()).toHaveLength(1);
   f.reduce.matches=true;f.reduce.dispatchEvent(new Event('change'));f.flush();const pose=visible()[0].getAttribute('transform');f.scroll(1200);expect(visible()[0].getAttribute('transform')).toBe(pose);f.stop();
   const off=fixture({mobileMode:'off'});off.mobile.matches=true;off.mobile.dispatchEvent(new Event('change'));off.flush();expect(off.root.dataset.journeyActive).toBe('false');expect(off.root.dataset.journeyShared).toBe('false');off.stop();
 });
@@ -79,7 +79,7 @@ it('mantiene los recursos de cada tienda y no restaura imágenes al quitarlas',(
 });
 
 it('conserva los adornos nítidos a máxima profundidad y adapta la sombra en móvil',()=>{
-  const f=fixture({journey:{depth:100}}),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],art=f.root.querySelector('[data-journey-ornaments]');
+  const f=fixture({journey:{depth:100}}),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],art=f.root.querySelector('[data-journey-lead]');
   const initialScales=pieces.map(node=>node.getAttribute('transform'));
   for(const y of [0,300,1200,2300]){
     f.scroll(y);
@@ -100,5 +100,6 @@ it('mantiene una imagen principal visible al pasar por todas las secciones',()=>
     expect(Number(lead.getAttribute('opacity'))).toBeGreaterThan(.8);
     expect(f.root.querySelector('[data-journey-lead]')).toContainElement(lead);
   }
-  expect(f.root.querySelector('[data-journey-text-occluder]').getAttribute('width')).not.toBeNull();f.stop();
+  expect(f.root.querySelectorAll('[data-journey-piece]')).toHaveLength(1);
+  expect(lead.closest('[mask]')).toBeTruthy();f.stop();
 });

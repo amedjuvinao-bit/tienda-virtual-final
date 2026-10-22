@@ -1,34 +1,32 @@
 # Continuous decorative journey
 
-The storefront uses one persistent lead image and a restrained supporting trail of store-configured images across its sections. Each section has its own composition, with a continuous handoff to the next one. The path changes continuously with scroll; scrolling back restores the same pose. The ornament nodes stay mounted, and no product content or media players are cloned.
+One store-owned transparent image follows a continuous, reversible path between the real storefront sections. The same SVG image stays mounted throughout the journey; no content or media players are duplicated. Artwork and backgrounds remain store-specific, with no built-in business motif.
+
+## Background composition
+
+The ornament uses empty background space. Photographs, product cards, complete Instagram panels (including every highlight), text, controls and the visible header are protected. A placement pass searches for a whole free pocket near the section's intended path and reduces the image to fit. Text protection follows actual text lines rather than the full block width. A hidden header does not reserve an invisible exclusion area.
+
+There is one ornament, without repeated small copies. During a passage behind dense content, the whole image is concealed instead of showing cut-up fragments or placing it over photos. The configured artwork stays sharp; its shadow is separate. Movement settles with bounded interpolation and stops when scrolling stops. The SVG never intercepts input.
+
+Each section retains its own path, measured order, actual height, position override, relative scale and enable switch. The main image continues between them, including reordered sections and short footers. Mobile has adapted compositions. Reduced motion freezes the pose, and the mobile off mode removes the effect. Observers and listeners are released on unmount.
 
 ## Administration
 
 Apariencia → General → Animación global → Camino continuo.
 
-- **Adornos**: upload a transparent PNG/WebP as the main decoration, optionally add a second one. There is no business-specific preset or restore button.
-- **Recorrido**: choose enveloping curves or side paths, size, supporting density, depth, opacity and the connecting thread. Density now controls a restrained accompaniment (at most six small accents), rather than filling the viewport with repeated large images.
-- **Secciones**: adjust one section at a time. Select the section using its configured title, keep its automatic composition or frame the left/right/lower edge, change its relative scale and supporting accents, or disable its ornament. Reset affects only the selected section.
-- **Fondo**: use one continuous background image, the store background color, or the individual section backgrounds.
-- **Móvil**: set the size and density used by the adapted mobile mode.
+- **Adornos**: upload one transparent PNG/WebP. A previously saved secondary image remains a fallback if there is no primary image; replacing or clearing the displayed resource clears that fallback too.
+- **Recorrido**: path, maximum size, depth, opacity and optional path line, with the store accent color or an override.
+- **Secciones**: select a section, choose automatic/left/right/lower composition, adjust relative scale or disable that section's ornament.
+- **Fondo**: keep individual backgrounds or opt into a shared store image/color.
+- **Móvil**: maximum size in adapted mode.
 
-The existing intensity, pace, mobile mode and global enable controls remain available. The old section entrance presets can be selected under “Entradas por sección”. Their identifiers and saved values remain compatible. Existing configurations without an `experience` field use the continuous journey mode. Its initial state has no images, no connecting line and no shared background. Nothing decorative appears until the store configures it. Explicitly saved resources remain intact.
+The maximum size adapts to the available background space. Old density and accompaniment values are retained in saved configuration for compatibility, but no longer generate repeated artwork or appear as inactive controls. Existing legacy entrance presets remain selectable.
 
-Settings are stored under `theme.global.sectionMotion.experience` and `theme.global.sectionMotion.journey`, using the existing appearance save endpoint. No account credentials or backend setup are required for the decoration.
+Settings use the existing appearance save endpoint under `theme.global.sectionMotion.journey`. The admin preview uses the production engine and current store resources. No credentials or backend setup are required.
 
-The admin preview uses the production journey engine, the current store’s images and its configured colors. It does not fall back to a boutique catalog or stock background. The preview scales decoration sizes to its viewport; changing sections keeps the same ornaments. The mobile navigation still targets the natural section starts.
+## Verification
 
-The connecting line follows the store accent color unless the administrator selects an override. Its color can be reset to the store color. A shared background is opt-in and can use a store-uploaded image or its background color. Clearing an image leaves it empty rather than restoring stock artwork.
-
-## Rendering and accessibility
-
-A single SVG world is pinned within the storefront. The same lead DOM node follows a section-specific cubic composition and a continuous handoff arc. The measured section order and actual heights determine the timing, including tall sections and reordered or disabled sections. The image is sized and positioned inside the visible area of its owning section; it does not borrow the next section’s space when its section is shorter than the screen. The final composition remains reachable for a short footer. Mobile has separate compositions for stacked galleries, images, social posts and information cards. Each structure has its own path: opening arc, gallery sweep, image framing, accessory orbit, category fan arc, social columns, video framing, information sweep and a closing composition. These are layout roles; no business artwork or brand text is built into the engine.
-
-The lead is placed within the visible viewport below the header and around actual text/control geometry. Text masks follow individual text lines, rather than the entire width of a heading. Supporting images pass behind cards and product media. The lead remains in the foreground at the framing edge and does not disappear wholesale near headings. The configured images are never blurred. Shadows are composed separately after the transforms, with viewport dimensions adapted to preview and mobile sizes. The layer never intercepts input.
-
-Scroll events schedule a frame. Layout-dependent position changes settle with a bounded, speed-limited animation so the lead does not jump between poses. Rendering stops once it reaches its target; there is no idle loop. A viewport resize immediately fits the composition to the new screen. Short-lived component transitions update the protection geometry while they run. Normalized per-section controls are stored under `journey.sectionSettings`, using the existing appearance save endpoint. Explicitly configured resources and legacy settings remain intact.
-
-Reduced motion keeps a static decorative pose. The mobile “off” mode removes the decoration and restores the individual backgrounds. The desktop and mobile density limits bound the rendering cost. Changing to a different route, disabling the effect or unmounting releases its observers and listeners.
+Placement tests cover occupied photos, full social panels, resizing into free space and complete concealment during a covered passage. Engine tests cover a single persistent node, reversible scroll, mobile/reduced motion, input behavior and cleanup. Admin tests verify resource replacement and persistence. Browser review uses the actual Home components with a controlled catalog; it does not represent the user's live store configuration.
 
 ## Optional demonstration resource
 
