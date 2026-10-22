@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Play, ArrowUpRight, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Play, ArrowUpRight, ChevronLeft, ChevronRight, RefreshCw, Disc3 } from 'lucide-react';
 import selection from '@shared/tiktok-selection';
 import { normalizeTiktokSection } from '../../admin/appearance/sections/tiktok/tiktokSectionHelpers';
 import { normalizeStage, stagePosts, stageIdentity, stagePlan, safeStageAsset, rgba } from '../../admin/appearance/sections/tiktok/tiktokStageHelpers';
@@ -10,6 +10,8 @@ import useTiktokFeed from './useTiktokFeed';
 import { TiktokEditorFeed } from './TiktokEditorFeed';
 import './tiktokStage.css';
 import { STORY_VISIBILITY_EVENT } from '../../lib/storefrontStoryConfig';
+
+const videoDuration=value=>{const seconds=Math.floor(Number(value));return Number.isFinite(seconds)&&seconds>0?`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`:'';};
 
 export default function TiktokStage({theme, posts:fallback=[]}) {
   const raw = theme?.sections?.find(s=>s?.id==='tiktok'||s?.type==='tiktok');
@@ -85,13 +87,20 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
           </div>
         </div>
         {s.stageShowList && <aside className="tk-stage__playlist tk-glass" onPointerMove={light} aria-label={s.stageListTitle || 'Lista de videos'}>
-          {s.stageListTitle && <h3>{s.stageListTitle}<i/><span aria-hidden="true">✦</span></h3>}
-          <div className="tk-stage__items">{shown.map(post=><article className="tk-stage__item tk-glass" key={post.id} data-active={post.id===current?.id}>
+          <div className="tk-stage__list-heading">
+            <div><span className="tk-stage__list-eyebrow">La colección en movimiento</span>{s.stageListTitle && <h3>{s.stageListTitle}</h3>}</div>
+            <span className="tk-stage__list-brand" aria-hidden="true"><TiktokBrand wordmark={false}/></span>
+          </div>
+          <div className="tk-stage__items">{shown.map((post,index)=><article className="tk-stage__item" key={post.id} data-active={post.id===current?.id}>
             <button type="button" className="tk-stage__select" aria-label={`Seleccionar video: ${post.title}`} aria-pressed={post.id===current?.id} onClick={()=>choose(post.id)}>
-              <span className="tk-stage__thumb">{post.image?<img src={post.image} alt="" loading="lazy" style={{objectPosition:`${post.positionX}% ${post.positionY}%`}}/>:<span className="tk-stage__no-cover">♪</span>}<span className="tk-stage__mini-play"><Play size={20} fill="currentColor"/></span></span>
-              <span className="tk-stage__summary"><span className="tk-stage__item-title">{post.title}</span><span className="tk-stage__wave" aria-hidden="true">{Array.from({length:27},(_,i)=><i key={i} style={{height:`${6+(i*7%21)}px`,animationDelay:`${i*-35}ms`}}/>)}</span></span>
+              <span className="tk-stage__thumb">{post.image?<img src={post.image} alt="" loading="lazy" style={{objectPosition:`${post.positionX}% ${post.positionY}%`}}/>:<span className="tk-stage__no-cover">♪</span>}<span className="tk-stage__mini-play"><Play size={13} fill="currentColor"/></span>{s.stageShowDuration && videoDuration(post.duration) && <span className="tk-stage__duration">{videoDuration(post.duration)}</span>}</span>
+              <span className="tk-stage__summary">
+                <span className="tk-stage__item-meta"><span>{String(activePage*s.stageListSize+index+1).padStart(2,'0')}</span><span className="tk-stage__item-state">{post.id===current?.id?'En pantalla':'Video'}</span></span>
+                <span className="tk-stage__item-title">{post.title}</span>
+                <span className="tk-stage__sound"><Disc3 size={16} aria-hidden="true"/><span>{identity.user || 'TikTok'}</span></span>
+              </span>
             </button>
-            {post.link && <a className="tk-stage__item-link" href={post.link} target="_blank" rel="noopener noreferrer" aria-label={`${s.stageVideoText}: ${post.title}`}><ArrowUpRight size={25}/></a>}
+            {post.link && <a className="tk-stage__item-link" href={post.link} target="_blank" rel="noopener noreferrer" aria-label={`${s.stageVideoText}: ${post.title}`} title={s.stageVideoText}><ArrowUpRight size={17}/></a>}
           </article>)}</div>
           {!shown.length && <p className="tk-stage__list-empty" role="status">{state}</p>}
           {(maxPage>0 || connected && (feed.nextCursor || feed.error)) && <nav className="tk-stage__pages" aria-label="Páginas de videos"><button aria-label="Videos anteriores" disabled={activePage===0} onClick={()=>setPage(activePage-1)}><ChevronLeft size={18}/></button><span>{activePage+1} / {maxPage+1}</span><button aria-label="Videos siguientes" disabled={activePage===maxPage} onClick={()=>setPage(activePage+1)}><ChevronRight size={18}/></button>{connected && feed.nextCursor && <button disabled={feed.loading} onClick={feed.loadMore}>{feed.loading?'Cargando…':'Cargar más'}</button>}{feed.error && <button onClick={feed.retry} aria-label="Volver a cargar TikTok"><RefreshCw size={16}/></button>}</nav>}
