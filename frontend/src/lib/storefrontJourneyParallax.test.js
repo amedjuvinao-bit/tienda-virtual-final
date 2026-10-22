@@ -4,7 +4,7 @@ import {journeyLayerPose,mountJourneyParallax} from './storefrontJourneyParallax
 afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 function fixture(config={},options={}){
-  let y=0,clock=0,id=0;const queue=new Map();
+  let y=options.initialScroll || 0,clock=0,id=0;const queue=new Map();
   const reduced=new EventTarget(),mobile=new EventTarget();reduced.matches=false;mobile.matches=false;
   vi.stubGlobal('matchMedia',vi.fn(query=>query.includes('reduced')?reduced:mobile));
   vi.spyOn(performance,'now').mockImplementation(()=>clock);
@@ -40,6 +40,12 @@ it('moves photographs and type on different planes, settles once, and preserves 
   f.scroll(800);f.flush();expect(hero.style.translate).toBe('');expect(title.style.translate).toBe('');expect(f.queue.size).toBe(0);
   expect(chapter.offsetHeight).toBe(1500);expect(chapter.dataset.storyTop).toBe('800');expect(chapter.style.getPropertyValue('--story-pin-top')).toBe('-700px');
   f.scroll(1900);f.flush();expect(hero.style.translate).not.toBe('');f.scroll(800);f.flush();expect(hero.style.translate).toBe('');f.stop();
+});
+it('returns to the current chapter already settled while keeping later parallax entrances active',()=>{
+  const f=fixture({}, {restored:true,initialScroll:900}),chapter=f.nodes[1];f.flush();
+  expect(chapter.querySelector('figure').style.translate).toBe('');expect(chapter.querySelector('h2').style.translate).toBe('');
+  expect(f.root.dataset.journeyParallaxSettled).toBe('true');
+  f.scroll(1900);expect(f.nodes[2].querySelector('figure').style.translate).not.toBe('');f.stop();
 });
 
 it('keeps a pointer gesture stable and finishes the interactive chapter after the click',()=>{

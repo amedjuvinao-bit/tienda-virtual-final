@@ -25,10 +25,10 @@ import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAd
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
-import { storefrontSectionTop } from './lib/storefrontSectionMotion';
 import { storySectionOrder } from './lib/storefrontStoryConfig';
 import StorefrontStory from './components/StorefrontStory';
 import StorefrontActionFeedback from './components/StorefrontActionFeedback';
+import StorefrontScrollRestoration from './components/StorefrontScrollRestoration';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
@@ -86,18 +86,6 @@ const OrdersAdmin = lazy(loadOrdersAdmin);
 const AppearancePage = lazy(() => import('./admin/AppearancePage'));
 
 const RB_SETTINGS_TICK_KEY = 'rb_site_settings_tick';
-
-function ScrollToHash() {
-  const { hash, pathname } = useLocation();
-
-  useEffect(() => {
-    if (!hash) return;
-    const el = document.getElementById(hash.replace('#', ''));
-    if (el) window.scrollTo({top:Math.max(0,storefrontSectionTop(el)-(parseFloat(window.getComputedStyle(el).scrollMarginTop)||0)),behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches?'instant':'smooth'});
-  }, [hash, pathname]);
-
-  return null;
-}
 
 function AdminDocumentRoute() {
   const { pathname } = useLocation();
@@ -244,11 +232,11 @@ export default function App() {
         <CartProvider>
           <BrowserRouter>
             <AdminDocumentRoute />
+            <StorefrontScrollRestoration ready={themeReady} />
             <StorefrontActionFeedback />
             <BackupMaintenanceNotice adminPanelReady={themeReady} />
             <AppConfirmProvider>
               <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
-                <ScrollToHash />
                 <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
                 <GlobalFloatingButtons theme={themeFromServer} />
                 {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}

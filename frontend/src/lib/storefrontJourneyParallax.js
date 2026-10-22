@@ -36,13 +36,14 @@ function collectLayers(surface,height){
   return [...layers.values()].filter(actor=>![...layers.keys()].some(parent=>parent!==actor.element && parent.contains(actor.element)));
 }
 
-export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOverride}={}){
+export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOverride,restored=false}={}){
   if(!container)return ()=>{};
   const config=normalizeStoryConfig(rawConfig),view=container.ownerDocument.defaultView,doc=container.ownerDocument;
   const reduced=view.matchMedia?.('(prefers-reduced-motion: reduce)'),mobile=view.matchMedia?.('(max-width:767px)');
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
   const enabled=()=>config.enabled && config.experience==='journey' && !reduced?.matches && !(compact() && config.mobileMode==='off');
   const target=scroller || view,scroll=()=>scroller?scroller.scrollTop:view.scrollY;
+  const restoredTop=restored?scroll():null;
   const viewport=()=>scroller?scroller.clientHeight:view.innerHeight;
   const pace={quick:.78,balanced:1,leisurely:1.28}[config.pace];
   let chapters=[],frame=0,dirty=true,disposed=false,lastTime=0,held=null;
@@ -87,7 +88,7 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
       node.style.setProperty('--story-pin-top',Math.min(0,height-node.offsetHeight)+'px');
       return {node,surface,top,height:node.offsetHeight,actors,originalStyles,
         originalClip:old?.originalClip ?? surface.style.getPropertyValue('clip-path'),originalClipPriority:old?.originalClipPriority ?? surface.style.getPropertyPriority('clip-path'),
-        entryAt:old?.entryAt ?? null,released:old?.released || false};
+        entryAt:old?.entryAt ?? null,released:old?.released || restoredTop!==null && top<=restoredTop+1};
     });
     previous.forEach(clearChapter);dirty=false;container.dataset.journeyParallax='true';
   }

@@ -5,8 +5,8 @@ import { actorPresentation } from './storefrontStoryActors';
 
 const originalAnimate=Element.prototype.animate;
 afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();if(originalAnimate)Element.prototype.animate=originalAnimate;else delete Element.prototype.animate;});
-function fixture(config={}) {
-  let y=0, heights=[800,2000,300], frame;
+function fixture(config={},options={}) {
+  let y=options.initialScroll || 0, heights=[800,2000,300], frame;
   const reduce=new EventTarget(),mobile=new EventTarget();reduce.matches=false;mobile.matches=false;
   vi.stubGlobal('matchMedia',vi.fn(query=>query.includes('reduced')?reduce:mobile));
   vi.spyOn(window,'innerHeight','get').mockReturnValue(800);vi.spyOn(window,'scrollY','get').mockImplementation(()=>y);
@@ -31,13 +31,19 @@ function fixture(config={}) {
       Object.defineProperty(element,'offsetParent',{value:surface});Object.defineProperty(element,'offsetTop',{value:actorTop});Object.defineProperty(element,'offsetLeft',{value:150});Object.defineProperty(element,'offsetWidth',{value:width});Object.defineProperty(element,'offsetHeight',{value:height});
     });
   });
-  document.body.append(root);const stop=mountStorefrontSectionMotion(root,{experience:'entrances',...config});
+  document.body.append(root);const stop=mountStorefrontSectionMotion(root,{experience:'entrances',...config},options);
   const flush=()=>{const callback=frame;frame=null;callback?.();};
   const scroll=top=>{y=top;window.dispatchEvent(new Event('scroll'));flush();};
   const finishVisible=()=>animations.filter(a=>a.playState==='running').forEach(a=>a.finish());
   return {root,nodes:[...root.children],reduce,mobile,stop,flush,scroll,animations,heights,finishVisible};
 }
 describe('presentaciones globales por objetos',()=>{
+  it('restores visible content without replaying its entrances and leaves future chapters ready to animate',()=>{
+    const f=fixture({}, {restored:true,initialScroll:1000});
+    expect(f.nodes[1].dataset.storyStage).toBe('ready');
+    expect(f.animations.filter(a=>a.element.closest('#chapter-1')).every(a=>a.playState==='idle' && a.play.mock.calls.length===0)).toBe(true);
+    expect(f.animations.some(a=>a.element.closest('#chapter-2') && a.playState==='paused')).toBe(true);f.stop();
+  });
   it('emite un relevo por sección en el camino sin girar ni transformar su contenido',()=>{
     const f=fixture({experience:'journey'}),change=vi.fn();f.root.addEventListener(STORY_CHAPTER_CHANGE_EVENT,change);
     expect(f.animations).toHaveLength(0);f.scroll(800);

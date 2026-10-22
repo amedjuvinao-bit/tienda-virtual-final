@@ -14,7 +14,7 @@ export function storefrontSectionTop(element) {
   let top=0;for(let node=element;node;node=node.offsetParent)top+=node.offsetTop;return top;
 }
 
-export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,mobileOverride}={}) {
+export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,mobileOverride,restored=false}={}) {
   if(!container)return ()=>{};
   const view=container.ownerDocument.defaultView, doc=container.ownerDocument, config=normalizeStoryConfig(rawConfig);
   const reduce=view.matchMedia?.('(prefers-reduced-motion: reduce)'), mobile=view.matchMedia?.('(max-width: 767px)');
@@ -103,8 +103,9 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
         return actor;
       });
       existing.forEach(actor=>{releaseActor(actor);delete actor.element.dataset.storyRole;});
+      if(!old && restored && chapter.top<scroll()+vh){finishChapter(chapter);chapter.replayArmed=false;}
       if(!canAnimate() || (!scroller && node.id==='banner'))finishChapter(chapter);
-      else if(!old){
+      else if(!old && !(restored && chapter.top<scroll()+vh)){
         node.dataset.storyStage='waiting';
         if(chapter.top<scroll()-vh*.15){finishChapter(chapter);chapter.replayArmed=true;}
       }

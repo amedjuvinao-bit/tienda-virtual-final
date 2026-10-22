@@ -1,0 +1,2 @@
+html[data-storefront-restoring="true"] { scroll-behavior: auto !important; overflow-anchor: none; }
+html[data-storefront-restoring="true"] .storefront-sections { visibility: hidden; }
