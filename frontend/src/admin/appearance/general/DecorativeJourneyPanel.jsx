@@ -20,7 +20,7 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <details><summary>Segundo adorno · opcional</summary><CloudinaryImageField label="Adorno secundario" value={c.secondaryImage} onChange={value=>edit('secondaryImage',value)} transparentOnly {...uploadProps}/></details>
     </div>}
     {tab==='recorrido' && <div className="journey-editor__fields">
-      <p>Composición cinematográfica: entrada 3D durante el cambio de sección y posición estable mientras se aprecia el contenido.</p>
+      <p>Composición cinematográfica: entrada 3D secuencial: primero un lateral, después el otro y luego los siguientes planos. Cada marco llega a su posición sin parpadeos.</p>
       <Range label="Tamaño de los adornos" value={c.size} min={60} max={320} step={5} suffix=" px" onChange={value=>edit('size',value)}/>
       <Range label="Densidad de adornos" value={c.density} min={8} max={28} onChange={value=>edit('density',value)}/>
       <Range label="Profundidad 3D del marco" value={c.depth} min={0} max={100} step={5} suffix=" %" onChange={value=>edit('depth',value)}/>
