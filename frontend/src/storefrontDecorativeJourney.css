@@ -4,9 +4,10 @@
 .story-journey-world image{pointer-events:none}
 .storefront-sections[data-journey-shared="true"]{background-color:var(--color-bg,Canvas);background-image:var(--journey-shared-image);background-size:cover;background-repeat:no-repeat;background-position:center top;background-attachment:fixed}
 .storefront-sections[data-journey-shared="true"] .storefront-chapter-surface{background:transparent}
-/* Only background artwork is unified. Product images, glass, layout and local
+/* Looks retains its configured background; the global journey must not restyle it.
+   Only background artwork is unified. Product images, glass, layout and local
    component interactions continue to be rendered by their own components. */
-.storefront-sections[data-journey-shared="true"] :is(.trending-section--floating-glass,.look-editorial,.complementos-look-section,.categories-fan,.ig-journal,.tk-stage,.info-glass,.footer-ed,.story-preview__content){background:none!important}
+.storefront-sections[data-journey-shared="true"] :is(.trending-section--floating-glass,.complementos-look-section,.categories-fan,.ig-journal,.tk-stage,.info-glass,.footer-ed,.story-preview__content){background:none!important}
 .storefront-sections[data-journey-shared="true"] .categories-fan__background,
 .storefront-sections[data-journey-shared="true"] :is(.ig-journal,.tk-stage,.footer-ed,.trending-section--floating-glass)::before,
 .storefront-sections[data-journey-shared="true"] :is(.ig-journal,.footer-ed,.trending-section--floating-glass)::after{display:none!important}
