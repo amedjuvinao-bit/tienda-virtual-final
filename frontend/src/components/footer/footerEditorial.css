@@ -180,3 +180,6 @@
 /* Press feedback also exists without hover, on touch and keyboard activation. */
 .footer-ed__links a{display:inline-block}
 .footer-ed :is(.footer-ed__social,.footer-ed__subscribe,.footer-ed__top-button,.footer-ed__accordion):active{filter:brightness(.93)}
+
+.footer-ed__press-light{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:4;mix-blend-mode:screen}
+.footer-ed__press-light>i{position:absolute;inset:-30%;background:linear-gradient(110deg,transparent 28%,#fff3 40%,#fffc 48%,#fff4 56%,transparent 68%);transform:translateX(-130%);opacity:0;pointer-events:none}

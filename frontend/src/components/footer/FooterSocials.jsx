@@ -25,6 +25,7 @@ function Social({item,glass,motion}) {
   const metalId='footer-social-'+useId().replace(/:/g,'');
   return <a href={item.href} className="footer-ed__social" aria-label={item.label} title={item.label} target="_blank" rel="noopener noreferrer" onPointerMove={glass && motion!=='none'?moveGlassLight:undefined} onPointerLeave={glass?resetGlassLight:undefined} style={glass?{'--fe-social-metal':`url(#${metalId})`}:undefined}>
     {glass && <svg className="footer-ed__metal-defs" aria-hidden="true" width="0" height="0"><defs><linearGradient id={metalId} x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stopColor="var(--fe-social-ink)"/><stop offset=".3" stopColor="color-mix(in srgb,var(--fe-social-ink) 60%,#ffdf9a)"/><stop offset=".5" stopColor="var(--fe-social-ink)"/><stop offset=".7" stopColor="color-mix(in srgb,var(--fe-social-ink) 65%,#48200c)"/><stop offset="1" stopColor="var(--fe-social-ink)"/></linearGradient></defs></svg>}
+    <span className="footer-ed__press-light" aria-hidden="true"><i/></span>
     <span className="footer-ed__social-emblem" aria-hidden="true">{item.image && failed!==item.image?<img src={item.image} alt="" onError={()=>setFailed(item.image)}/>:<Glyph name={item.key} solid={glass}/>}</span>
   </a>;
 }

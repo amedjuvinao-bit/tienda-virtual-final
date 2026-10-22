@@ -23,7 +23,7 @@ it('restarts repeated presses and supports keyboard-generated clicks',()=>{
  link.addEventListener('click',event=>event.preventDefault());fireEvent.click(link,{detail:0});
  const first=animations.slice();fireEvent.click(link);
  expect(first.every(a=>a.animation.cancel.mock.calls.length===1)).toBe(true);
- expect(animations.filter(a=>a.node===link)).toHaveLength(2);
+ expect(animations.filter(a=>a.node===link && a.frames[0].scale)).toHaveLength(2);
  const toggle=screen.getByRole('button',{name:'Nuestra tienda'});fireEvent.click(toggle,{detail:0});expect(toggle).toHaveAttribute('aria-expanded','true');
  expect(animations.some(a=>a.node===toggle)).toBe(true);
 });
