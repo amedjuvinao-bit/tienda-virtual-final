@@ -31,6 +31,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
   const eligible=node=>{
+    if(node.matches('.footer-ed__logo'))return false;
     if(node.closest('[data-journey-pin],[aria-hidden="true"],[hidden]'))return false;
     const closed=node.closest('details:not([open])');
     return !closed || Boolean(closed.querySelector(':scope > summary')?.contains(node));
@@ -83,6 +84,14 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
         for(const icon of node.querySelectorAll('svg'))if(visible(icon.getBoundingClientRect()))boxes.push(boxFor(icon.getBoundingClientRect(),4,2));
       }else boxes.push(boxFor(rect,4,Math.min(48,(parseFloat(css.borderTopLeftRadius)||0)+4)));
       if(boxes.length>=masks.length-1)break;
+    }
+    const logo=container.querySelector('.footer-ed__logo'),logoCutout=world.querySelector('[data-journey-logo-cutout]');
+    if(logoCutout){
+      const rect=logo?.getBoundingClientRect();
+      if(rect && visible(rect) && logo.complete && logo.naturalWidth){
+        logoCutout.setAttribute('href',logo.currentSrc || logo.src);
+        const box=boxFor(rect,0);for(const key of ['x','y','width','height'])logoCutout.setAttribute(key,box[key].toFixed(2));
+      }else logoCutout.setAttribute('width','0');
     }
     const header=scroller?null:doc.querySelector('.theme-header');
     if(header && visible(header.getBoundingClientRect()))boxes.push(boxFor(header.getBoundingClientRect(),4));

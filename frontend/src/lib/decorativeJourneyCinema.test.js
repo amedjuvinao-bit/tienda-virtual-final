@@ -26,3 +26,15 @@ it('adds reversible perspective and light controlled by depth',()=>{
  expect(cinematicOrnament(0,base)).toEqual(a);
  const flat=cinematicOrnament(0,{...base,depth:0});expect(flat.tiltY).toBe(0);expect(flat.tiltX).toBe(0);expect(flat.lift).toBe(0);
 });
+
+it('keeps tall ornaments separated on each edge throughout the scroll',()=>{
+ for(const compact of [false,true])for(const aspect of [1,3,5])for(let phase=0;phase<20;phase+=.1){
+  const height=compact?844:800,count=compact?4:6;
+  const poses=Array.from({length:count},(_,i)=>cinematicOrnament(i,{phase,width:compact?390:1280,height,size:320,aspect,depth:1,compact,count}));
+  for(let i=0;i<count;i++)for(let j=i+2;j<count;j+=2){
+   const distance=Math.abs(poses[i].y-poses[j].y),gap=Math.min(distance,height*1.8-distance);
+   const extent=100*(Math.sqrt(aspect)+.14/Math.sqrt(aspect))*1.16*(poses[i].scale+poses[j].scale)/2;
+   expect(gap-extent).toBeGreaterThanOrEqual(Math.max(32,height*.12)-.001);
+  }
+ }
+});

@@ -32,7 +32,7 @@
 .footer-ed__brand-name{font:400 var(--fe-brand-size)/1 var(--fe-title-font);text-transform:uppercase;letter-spacing:-.065em;color:var(--fe-ink);margin:0;overflow-wrap:anywhere}
 .footer-ed__brand:after{content:"";width:38px;height:1px;background:var(--fe-accent);display:block;margin-top:15px}
 .footer-ed__tagline{font-size:var(--fe-body-size);line-height:1.45;white-space:pre-line;overflow-wrap:anywhere;margin:14px 0 0;color:var(--fe-body)}
-.footer-ed__logo{width:var(--fe-logo-size);height:auto;max-height:200px;max-width:100%;object-fit:contain;display:block}
+.footer-ed__logo{background:transparent;border:0;border-radius:0;box-shadow:none;backdrop-filter:none;width:var(--fe-logo-size);height:auto;max-height:200px;max-width:100%;object-fit:contain;display:block}
 .footer-ed__navigation{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:28px;min-width:0}
 .footer-ed__column{min-width:0}
 .footer-ed__column h3{font:400 var(--fe-column-title-size)/1.15 var(--fe-title-font);color:var(--fe-ink);margin:0 0 17px;overflow-wrap:anywhere}

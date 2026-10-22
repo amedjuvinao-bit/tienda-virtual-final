@@ -21,6 +21,11 @@ function fixture(raw={},options={}){
   [...root.querySelectorAll('section')].forEach(node=>Object.defineProperty(node,'offsetHeight',{value:800}));
   root.querySelector('[data-journey-world]').getBoundingClientRect=()=>({top:0,left:0,width:1200,height:800});
   root.querySelector('button').getBoundingClientRect=()=>({top:600-y,left:450,right:650,bottom:650-y,width:200,height:50});
+  if(options.logo){
+    const logo=document.createElement('img');logo.className='footer-ed__logo';logo.src='/transparent-logo.png';
+    Object.defineProperty(logo,'naturalWidth',{value:220});Object.defineProperty(logo,'complete',{value:true});
+    logo.getBoundingClientRect=()=>({top:400,left:80,right:300,bottom:560,width:220,height:160});root.append(logo);
+  }
   document.body.append(root);
   const stop=mountDecorativeJourney(root,config,options);
   const flush=()=>{for(let i=0;frame && i<140;i++){const cb=frame;frame=null;clock+=16;cb(clock);}};
@@ -124,4 +129,12 @@ it('loads each artwork aspect independently and releases its metadata callbacks'
   expect(mapped.every(part=>part.getAttribute('transform')?.startsWith('matrix('))).toBe(true);
   const image=tall.querySelector('image'),dimensionsBefore=[image.getAttribute('width'),image.getAttribute('height')];f.scroll(1000);expect([image.getAttribute('width'),image.getAttribute('height')]).toEqual(dimensionsBefore);expect(image.style.transform).toContain('perspective(700px)');
   f.stop();expect(probes.every(image=>image.onload===null)).toBe(true);
+});
+
+it('protects the transparent logo with its alpha silhouette instead of a rectangular cutout',()=>{
+ const f=fixture({}, {logo:true}),cutout=f.root.querySelector('[data-journey-logo-cutout]');
+ expect(cutout.getAttribute('href')).toContain('/transparent-logo.png');expect(cutout.getAttribute('width')).toBe('220.00');
+ expect(cutout.getAttribute('filter')).toContain('-silhouette');
+ expect([...f.root.querySelectorAll('[data-journey-occluder]')].some(n=>+n.getAttribute('x')===76&&+n.getAttribute('width')===228)).toBe(false);
+ f.stop();
 });

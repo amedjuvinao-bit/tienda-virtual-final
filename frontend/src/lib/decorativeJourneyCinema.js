@@ -4,10 +4,15 @@ const smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
 // Wraps happen outside the viewport, making the same choreography reversible.
 export function cinematicOrnament(index,{phase,width,height,size,aspect=1,depth=.65,compact=false,intensity=65,count=6}){
   const right=index%2===1,plane=Math.floor(index/2),planes=Math.ceil(count/2);
-  const rate=[.22,.15,.1][plane%3]*(.65+intensity/200);
+  const rate=(right?.19:.16)*(.65+intensity/200);
   const cycle=1.8,position=mod(.3+plane*cycle/planes+(right?.24:0)-phase*rate,cycle)-.4;
   const camera=phase*.9+plane*1.7+(right?.65:0),relief=depth*(compact?.68:1),approach=(Math.sin(camera)+1)/2;
-  const scale=size/100*(compact?1.3:1.55)*[1,.78,1.12][plane%3]*(1+depth*(plane===2?.12:0))*(1+approach*relief*.24);
+  const requestedScale=size/100*(compact?1.3:1.55)*[1,.78,1.12][plane%3]*(1+depth*(plane===2?.12:0))*(1+approach*relief*.24);
+  // Pieces on the same side share one camera speed, so they cannot overtake.
+  // Reserve enough room for the whole tilted/projected silhouette and a gap.
+  const slotHeight=height*cycle/planes-Math.max(32,height*.12);
+  const projectedHeight=100*(Math.sqrt(aspect)+.14/Math.sqrt(aspect))*1.16;
+  const scale=Math.min(requestedScale,Math.max(.1,slotHeight/projectedHeight));
   const halfWidth=50/Math.sqrt(aspect)*scale;
   const inset=Math.min(width*(compact?.045:.035),halfWidth*.28);
   return {x:right?width-inset:inset,y:position*height,scale,

@@ -8,8 +8,10 @@ export default function StorefrontDecorativeJourney({config}){
   return <div className="story-journey-pin" data-journey-pin aria-hidden="true">
     <svg className="story-journey-world" data-journey-world viewBox="0 0 1440 900" preserveAspectRatio="none" focusable="false">
       <defs>
+        <filter id={uid+'-silhouette'} colorInterpolationFilters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter>
         <mask id={mask} maskUnits="userSpaceOnUse" x="0" y="0" width="1440" height="900" data-journey-mask>
           <rect width="100%" height="100%" fill="white"/>
+          <image data-journey-logo-cutout width="0" height="0" preserveAspectRatio="xMidYMid meet" filter={`url(#${uid}-silhouette)`}/>
           <g fill="black">{Array.from({length:128},(_,i)=><rect data-journey-occluder key={i} width="0" height="0"/>)}</g>
         </mask>
       </defs>
