@@ -29,6 +29,7 @@ import { storySectionOrder } from './lib/storefrontStoryConfig';
 import StorefrontStory from './components/StorefrontStory';
 import StorefrontActionFeedback from './components/StorefrontActionFeedback';
 import StorefrontScrollRestoration from './components/StorefrontScrollRestoration';
+import { StorefrontSettingsContext } from './context/StorefrontSettingsContext';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
@@ -230,6 +231,7 @@ export default function App() {
     <AuthProvider>
       <FavoritesProvider>
         <CartProvider>
+          <StorefrontSettingsContext.Provider value={siteSettingsFromServer}>
           <BrowserRouter>
             <AdminDocumentRoute />
             <StorefrontScrollRestoration ready={themeReady} />
@@ -317,6 +319,7 @@ export default function App() {
               </Suspense>
             </AppConfirmProvider>
           </BrowserRouter>
+          </StorefrontSettingsContext.Provider>
         </CartProvider>
       </FavoritesProvider>
     </AuthProvider>

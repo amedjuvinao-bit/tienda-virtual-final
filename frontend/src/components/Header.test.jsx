@@ -1,9 +1,10 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import Header from './Header';
+import { StorefrontSettingsContext } from '../context/StorefrontSettingsContext';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 
 vi.mock('../lib/siteSettingsApi', () => ({ fetchSiteSettings: vi.fn() }));
@@ -20,10 +21,58 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
+  it('espera la configuración antes de mostrar el encabezado', async () => {
+    let resolve;
+    fetchSiteSettings.mockReturnValue(new Promise((done) => { resolve = done; }));
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Rosa Boutique' })).not.toBeInTheDocument();
+    await act(async () => resolve(settings('Colección configurada')));
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Colección configurada' })).toBeInTheDocument();
+    expect(within(header).getAllByAltText('Logo Rosa Boutique')[0]).toHaveAttribute('src', '/claro.png');
+    expect(screen.queryByRole('img', { name: 'Rosa Boutique' })).not.toBeInTheDocument();
+  });
+
+  it('conserva el diseño configurado durante una actualización fallida', async () => {
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const header = await screen.findByRole('banner');
+    fetchSiteSettings.mockRejectedValue(new Error('Sin conexión'));
+    await act(async () => fireEvent(window, new Event('rb_site_settings_updated')));
+    expect(header).toBeInTheDocument();
+    expect(within(header).getByRole('link', { name: 'Lo Nuevo' })).toBeInTheDocument();
+    expect(within(header).getAllByAltText('Logo Rosa Boutique')[0]).toHaveAttribute('src', '/claro.png');
+  });
+
+  it('permanece oculto si falla la carga inicial y aparece al recuperar la configuración', async () => {
+    fetchSiteSettings.mockRejectedValue(new Error('Sin conexión'));
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await act(async () => {});
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    fetchSiteSettings.mockResolvedValue(settings('Recuperado'));
+    fireEvent(window, new Event('rb_site_settings_updated'));
+    expect(await screen.findByRole('link', { name: 'Recuperado' })).toBeInTheDocument();
+  });
+
+  it('usa la configuración compartida desde el primer render y al cambiar de ruta', () => {
+    const view = (value, key) => <MemoryRouter><StorefrontSettingsContext.Provider value={value}><Header key={key} /></StorefrontSettingsContext.Provider></MemoryRouter>;
+    const { rerender } = render(view(null, 'inicio'));
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(fetchSiteSettings).not.toHaveBeenCalled();
+    rerender(view(settings('Configurado'), 'inicio'));
+    expect(screen.getByRole('link', { name: 'Configurado' })).toBeInTheDocument();
+    rerender(view(settings('Configurado'), 'producto'));
+    expect(screen.getByRole('link', { name: 'Configurado' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Rosa Boutique' })).not.toBeInTheDocument();
+    rerender(view(settings('Actualizado desde panel'), 'producto'));
+    expect(screen.getByRole('link', { name: 'Actualizado desde panel' })).toBeInTheDocument();
+    expect(fetchSiteSettings).not.toHaveBeenCalled();
+  });
+
   it('muestra la presión antes de navegar con el menú animado', async () => {
     function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
+    const navigation = await screen.findByRole('navigation', { name: 'Navegación principal' });
     const link = await within(navigation).findByRole('link', { name: 'Lo Nuevo' });
     fireEvent.click(link);
     expect(link).toHaveClass('rb-header-menu-link--pressed');
@@ -34,7 +83,7 @@ describe('encabezado de la tienda', () => {
     fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: { menuAnimation: 'none' } } });
     function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    const link = await within(screen.getByRole('navigation', { name: 'Navegación principal' })).findByRole('link', { name: 'Lo Nuevo' });
+    const link = await within(await screen.findByRole('navigation', { name: 'Navegación principal' })).findByRole('link', { name: 'Lo Nuevo' });
     fireEvent.click(link);
     expect(link).not.toHaveClass('rb-header-menu-link--pressed');
     expect(screen.getByTestId('location')).toHaveTextContent('/lo-nuevo');
@@ -45,7 +94,7 @@ describe('encabezado de la tienda', () => {
       menus: { header: [{ title: 'Inicio', ref: '/' }, { title: 'Revista', ref: 'https://example.com' }] },
     });
     render(<MemoryRouter><Header /></MemoryRouter>);
-    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
+    const navigation = await screen.findByRole('navigation', { name: 'Navegación principal' });
     await waitFor(() => expect(within(navigation).getAllByRole('link')).toHaveLength(2));
     expect(within(navigation).getAllByRole('link').every((link) => link.classList.contains('rb-metallic-text'))).toBe(true);
     expect(within(navigation).getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page');
@@ -54,7 +103,7 @@ describe('encabezado de la tienda', () => {
   });
   it('deja el menú sin efecto cuando la opción no está activada', async () => {
     render(<MemoryRouter><Header /></MemoryRouter>);
-    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' });
+    const navigation = await screen.findByRole('navigation', { name: 'Navegación principal' });
     await waitFor(() => expect(within(navigation).getByRole('link', { name: 'Lo Nuevo' })).toBeInTheDocument());
     expect(navigation.querySelector('.rb-metallic-text')).toBeNull();
   });
@@ -65,7 +114,7 @@ describe('encabezado de la tienda', () => {
     });
     const user = userEvent.setup();
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     const icon = within(drawer).getByRole('navigation', { name: 'Navegación móvil' }).querySelector('[data-menu-icon="gown"]');
     expect(icon).toHaveStyle({ color: '#754153' });
@@ -78,7 +127,7 @@ describe('encabezado de la tienda', () => {
     });
     const user = userEvent.setup();
     render(<MemoryRouter><Header /></MemoryRouter>);
-    const trigger = screen.getByRole('button', { name: 'Abrir menú' });
+    const trigger = await screen.findByRole('button', { name: 'Abrir menú' });
     await waitFor(() => expect(trigger).toHaveAttribute('data-icon', 'editorial'));
     expect(trigger).toHaveAttribute('data-motion', 'glass');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -90,7 +139,7 @@ describe('encabezado de la tienda', () => {
     const user = userEvent.setup();
     function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    const buttons = screen.getAllByRole('button', { name: 'Buscar productos' });
+    const buttons = (await screen.findAllByRole('button', { name: 'Buscar productos' }));
     expect(buttons).toHaveLength(2);
     expect(buttons[0].querySelector('img').getAttribute('src')).toContain('gold-search');
     expect(buttons[0].querySelector('img')).toHaveAttribute('data-icon-source', 'builtin');
@@ -115,7 +164,7 @@ describe('encabezado de la tienda', () => {
   it('cierra el widget compacto al pulsar fuera de la lupa', async () => {
     const user = userEvent.setup();
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
+    await user.click((await screen.findAllByRole('button', { name: 'Buscar productos' }))[0]);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -128,7 +177,7 @@ describe('encabezado de la tienda', () => {
     const user = userEvent.setup();
     function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
+    await user.click((await screen.findAllByRole('button', { name: 'Buscar productos' }))[0]);
     await user.type(screen.getByRole('combobox', { name: 'Buscar productos' }), 'vest');
     const option = await screen.findByRole('option', { name: /Vestido Rosa/ });
     expect(global.fetch.mock.calls[0][0]).toContain('/api/products?q=vest&page=1&limit=5');
@@ -148,7 +197,7 @@ describe('encabezado de la tienda', () => {
     const user = userEvent.setup();
     function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[1]);
+    await user.click((await screen.findAllByRole('button', { name: 'Buscar productos' }))[1]);
     const input = screen.getByRole('combobox', { name: 'Buscar productos' });
     await user.type(input, 'ves');
     expect(await screen.findByRole('option', { name: /Vestido Rosa/ })).toBeInTheDocument();
@@ -164,7 +213,7 @@ describe('encabezado de la tienda', () => {
     const user = userEvent.setup();
     function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    await user.click(screen.getAllByRole('button', { name: 'Buscar productos' })[0]);
+    await user.click((await screen.findAllByRole('button', { name: 'Buscar productos' }))[0]);
     await user.type(screen.getByRole('combobox', { name: 'Buscar productos' }), 'inexistente');
     expect(await screen.findByText('No encontramos productos para “inexistente”.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Ver todos los resultados/ }));
@@ -176,7 +225,7 @@ describe('encabezado de la tienda', () => {
       searchBgColor: '#254254', searchTextColor: '#f0f0f0', searchAccentColor: '#facc15', searchBorderColor: '#efefef',
     } } });
     render(<MemoryRouter><Header /></MemoryRouter>);
-    const header = screen.getByRole('banner');
+    const header = await screen.findByRole('banner');
     await waitFor(() => expect(header.style.getPropertyValue('--header-search-bg')).toBe('#254254'));
     expect(header.style.getPropertyValue('--header-search-text')).toBe('#f0f0f0');
     expect(header.style.getPropertyValue('--header-search-accent')).toBe('#facc15');
@@ -204,7 +253,7 @@ describe('encabezado de la tienda', () => {
     const user = userEvent.setup();
     render(<MemoryRouter><Header /></MemoryRouter>);
     await waitFor(() => expect(fetchSiteSettings).toHaveBeenCalled());
-    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     expect(drawer).toHaveAttribute('aria-hidden', 'false');
     expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument();
@@ -232,7 +281,7 @@ describe('encabezado de la tienda', () => {
     const user = userEvent.setup();
     function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}</output>; }
     render(<MemoryRouter><Header /><Location /></MemoryRouter>);
-    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     expect(drawer).toHaveAttribute('aria-hidden', 'false');
     expect(drawer).toHaveStyle({ bottom: '0px', width: '100%' });
@@ -254,7 +303,7 @@ describe('encabezado de la tienda', () => {
   it('ancla el encabezado y el menú al viewport aunque la página contenga un panel recortado', async () => {
     const user = userEvent.setup();
     render(<MemoryRouter><div style={{ overflow: 'hidden', width: 420 }}><Header /></div></MemoryRouter>);
-    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     expect(screen.getByRole('banner').parentElement).toBe(document.body);
     expect(drawer.parentElement).toBe(document.body);
@@ -273,7 +322,7 @@ describe('encabezado de la tienda', () => {
     });
     const user = userEvent.setup();
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     const link = within(drawer).getByRole('link', { name: 'Contactar por WhatsApp' });
     expect(link).toHaveAttribute('href', 'https://wa.me/573001234567?text=Quiero%20informaci%C3%B3n');
@@ -292,7 +341,7 @@ describe('encabezado de la tienda', () => {
     });
     const user = userEvent.setup();
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
     const drawer = document.getElementById('storefront-mobile-menu');
     expect(within(drawer).getByRole('link', { name: 'Contactar por WhatsApp' })).toHaveAttribute('href', 'https://wa.me/573001234567');
   });
@@ -322,7 +371,7 @@ describe('encabezado de la tienda', () => {
       theme: { header: { ...settings('Lo Nuevo').theme.header, surfaceShape: 'floating', cornerRadiusPx: 38, liquidGlassEnabled: true, glassStrength: 90, bgOpacity: 1 } },
     });
     render(<MemoryRouter><Header /></MemoryRouter>);
-    const header = screen.getByRole('banner');
+    const header = await screen.findByRole('banner');
     await waitFor(() => expect(header).toHaveAttribute('data-shape', 'floating'));
     expect(header).toHaveAttribute('data-glass', 'true');
     expect(header.style.getPropertyValue('--header-surface-radius')).toBe('38px');
@@ -373,8 +422,9 @@ describe('encabezado de la tienda', () => {
       ...settings('Lo Nuevo').theme.header, iconSet: 'gold', iconOverrides: { gold: { search: image } },
     } } });
     render(<MemoryRouter><Header /></MemoryRouter>);
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Buscar productos' })[0].querySelector('img')).toHaveAttribute('src', image));
-    screen.getAllByRole('button', { name: 'Buscar productos' }).forEach((button) => {
+    const buttons = await screen.findAllByRole('button', { name: 'Buscar productos' });
+    expect(buttons[0].querySelector('img')).toHaveAttribute('src', image);
+    (await screen.findAllByRole('button', { name: 'Buscar productos' })).forEach((button) => {
       expect(button.querySelector('img')).toHaveAttribute('data-icon-source', 'custom');
     });
   });

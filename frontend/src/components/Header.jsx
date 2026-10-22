@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from 'react-dom';
 import {
@@ -11,6 +11,7 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import CartSidebar from "./CartSidebar";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
+import { StorefrontSettingsContext } from "../context/StorefrontSettingsContext";
 import { isDarkHeaderBackground, normalizeHeaderMenu, resolveHeaderLogo, resolveHeaderSurface, headerMenuDestination } from './headerPresentation';
 import HeaderBrand from './HeaderBrand';
 import { HeaderActionGlyph, resolveHeaderIcons } from './HeaderActionIcons';
@@ -44,63 +45,38 @@ function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [logoLight, setLogoLight] = useState("");
-  const [logoDark, setLogoDark] = useState("");
-  const [headerBgHex, setHeaderBgHex] = useState("");
-  const [logoHeightPx, setLogoHeightPx] = useState(80);
-  const [menuItems, setMenuItems] = useState([]);
-  const [headerConfig, setHeaderConfig] = useState({});
-  const [themeColors, setThemeColors] = useState({});
+  const sharedSettings = useContext(StorefrontSettingsContext);
+  const [standaloneSettings, setStandaloneSettings] = useState(null);
+  const settings = sharedSettings === undefined ? standaloneSettings : sharedSettings;
+  const theme = settings?.theme || {};
+  const headerConfig = theme.header || {};
+  const logoLight = headerConfig.logoLight || theme.logo?.light || '';
+  const logoDark = headerConfig.logoDark || theme.logo?.dark || '';
+  const headerBgHex = String(headerConfig.bgColor || '').trim();
+  const configuredLogoHeight = Number(headerConfig.logoHeightPx);
+  const logoHeightPx = configuredLogoHeight >= 30 && configuredLogoHeight <= 160 ? configuredLogoHeight : 80;
+  const menuItems = useMemo(() => normalizeHeaderMenu(settings?.menus?.header), [settings?.menus?.header]);
+  const themeColors = theme.colors || {};
   const iconPresentation = resolveHeaderIcons(headerConfig);
-  const [footerConfig, setFooterConfig] = useState({});
-  const [mobileMenuFeatureImage, setMobileMenuFeatureImage] = useState('');
-  const [storeName, setStoreName] = useState('Rosa Boutique');
-  const [whatsappConfig, setWhatsAppConfig] = useState(null);
+  const footerConfig = theme.footer || {};
+  const mobileMenuFeatureImage = headerConfig.mobileMenuFeatureImage || '';
+  const storeName = settings?.store?.name || 'Rosa Boutique';
+  const whatsappConfig = theme.global?.whatsapp || null;
 
   useEffect(() => {
+    // The app owns loading and updates, so every route uses the same snapshot.
+    if (sharedSettings !== undefined) return;
     let cancelled = false;
     let sequence = 0;
     const refresh = async () => {
       const requestId = ++sequence;
       try {
-        const s = await fetchSiteSettings();
+        const nextSettings = await fetchSiteSettings();
         if (cancelled || requestId !== sequence) return;
-
-        const t = s?.theme || {};
-        const h = t?.header || {};
-
-        const hl = h?.logoLight || t?.logo?.light || "";
-        const hd = h?.logoDark || t?.logo?.dark || "";
-        setLogoLight(hl);
-        setLogoDark(hd);
-
-        const bg = String(h?.bgColor || "").trim();
-        setHeaderBgHex(bg);
-
-        const lh = Number(h?.logoHeightPx);
-        if (!Number.isNaN(lh) && lh >= 30 && lh <= 160) setLogoHeightPx(lh);
-        else setLogoHeightPx(80);
-
-        setHeaderConfig(h);
-        setThemeColors(t?.colors || {});
-        setFooterConfig(t?.footer || {});
-        setMobileMenuFeatureImage(h?.mobileMenuFeatureImage || '');
-        setStoreName(s?.store?.name || 'Rosa Boutique');
-        setWhatsAppConfig(t?.global?.whatsapp || null);
-        setMenuItems(normalizeHeaderMenu(s?.menus?.header));
+        setStandaloneSettings(nextSettings);
       } catch {
-        if (cancelled || requestId !== sequence) return;
-        setLogoLight("");
-        setLogoDark("");
-        setHeaderBgHex("");
-        setLogoHeightPx(80);
-        setMenuItems([]);
-        setHeaderConfig({});
-        setThemeColors({});
-        setFooterConfig({});
-        setMobileMenuFeatureImage('');
-        setStoreName('Rosa Boutique');
-        setWhatsAppConfig(null);
+        // Keep the last configured header if a refresh fails. On initial load,
+        // stay hidden instead of displaying a different, provisional design.
       }
     };
     refresh();
@@ -114,7 +90,7 @@ function Header() {
       window.removeEventListener('rb_site_settings_updated', refresh);
       window.removeEventListener('storage', onStorage);
     };
-  }, []);
+  }, [sharedSettings]);
 
   useEffect(() => {
     let previousY = window.scrollY;
@@ -411,6 +387,8 @@ function Header() {
       if (!item.isExternal) navigate(item.to);
     }, 240);
   };
+
+  if (!settings) return null;
 
   return createPortal(
     <>
