@@ -1,7 +1,7 @@
 import { journeyScene } from './decorativeJourneyScenes';
-import { journeyCurve, pointOnJourney, journeyOrnamentVisibility, journeyTextVisibility } from './decorativeJourneyGeometry';
+import { journeyOrnamentVisibility, journeyTextVisibility } from './decorativeJourneyGeometry';
 import { journeyArtworkLayout, applyJourneyArtworkLayout } from './decorativeJourneyArtwork';
-import { JOURNEY_ARTWORK_BANDS, journeyArtworkMesh } from './decorativeJourneyMesh';
+import { cinematicOrnament } from './decorativeJourneyCinema';
 
 const occlusionSelector='.info-glass-dialog-backdrop,[role=dialog],dialog,[data-story-actor],.categories-fan__category,.look-editorial__hero,.look-editorial__card-surface,.ig-journal__main,.tk-stage__hero,.tk-stage__item,.info-glass-card,.footer-ed__social,.footer-ed__watermark,h1,h2,h3,p,a,button,input,textarea,select,article,picture,img,video,iframe';
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
@@ -23,11 +23,10 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   if(previousShared!==undefined)container.dataset.journeyShared=previousShared;
   if(!c.backgroundImage)container.style.setProperty('--journey-shared-image',inheritedBackground);
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')];
-  const meshes=pieces.map(piece=>({group:piece.querySelector('[data-journey-mesh]'),rigid:piece.querySelector('[data-journey-rigid]'),parts:[...piece.querySelectorAll('[data-journey-mesh-part]')],bent:null}));
   const masks=[...world.querySelectorAll('[data-journey-occluder]')];
   const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]'),mask=world.querySelector('[data-journey-mask]');
   const ornaments=world.querySelector('[data-journey-ornaments]');
-  const artworkProbes=[],artworkLayouts=new Map();
+  const artworkProbes=[];
   let frame=0,dirty=true,disposed=false,chapters=[],candidates=[],width=0,height=0,movingUntil=0,displayPhase=null,lastPaint=0,ornamentCount=0;
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
@@ -55,13 +54,8 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     mask?.setAttribute('width',width);mask?.setAttribute('height',height);
     world.style.height=height+'px';dirty=false;
     const adapted=compact() && config.mobileMode==='adapted',previewScale=scroller?Math.min(1,width/(compact()?390:1440)):1;
-    const size=(adapted?c.mobileSize:c.size)*previewScale,density=adapted?c.mobileDensity:c.density;
-    const referenceLength=Math.min(...Array.from({length:20},(_,i)=>journeyCurve(i*.4,width,height,c.path,config.intensity,{compact:compact()}).length));
-    const longest=Math.max(1,...[...artworkLayouts.values()].map(layout=>Math.sqrt(Math.max(layout.ratio,1/layout.ratio))));
-    const spacing=size*Math.max(3.4-density/28,longest*(2.3-density/35));
-    // Calculate a stable count for the entire tour. Recounting every frame
-    // redistributes the chain and makes ornaments jump between positions.
-    ornamentCount=Math.max(1,Math.min(density,28,Math.floor(referenceLength/Math.max(1,spacing))));
+    const density=adapted?c.mobileDensity:c.density;
+    ornamentCount=adapted?(density>=12?6:4):(density>=20?6:4);
   }
   function paint(){
     frame=0;if(disposed)return;
@@ -101,53 +95,24 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
       settling=Math.abs(desired-displayPhase)>.0001;if(!settling)displayPhase=desired;
     }
     const size=(adapted?c.mobileSize:c.size)*previewScale*scene.scale;
-    const settings=c.sectionSettings || {};
-    const path=journeyCurve(displayPhase*.8,width,height,c.path,config.intensity,{
-      section:scene.id,nextSection:scene.nextId,handoff:scene.handoff,compact:compact(),
-      placement:settings[scene.id]?.placement,nextPlacement:settings[scene.nextId]?.placement,
-    });
     const count=ornamentCount;
     const depth=c.depth/100,shadowScale=previewScale*(adapted ? .6 : 1);
     if(ornaments)ornaments.style.filter=`drop-shadow(0 ${(3+depth*5)*shadowScale}px ${(3+depth*3)*shadowScale}px rgb(0 0 0 / .14))`;
     const presence=Math.sin(scene.accent*Math.PI/2)*scene.opacity;
     const opacity=c.opacity/100*presence;
-    stem.setAttribute('d',path.d);stem.style.opacity='0';
-    stem.setAttribute('stroke-width',String((adapted?1.4:2)*previewScale));
-    trace?.setAttribute('d',path.d);trace?.setAttribute('stroke-dashoffset',(-displayPhase*180).toFixed(3));
-    if(trace){trace.style.opacity='0';trace.setAttribute('stroke-width',String((adapted?2.4:3)*previewScale));}
+    if(stem)stem.style.opacity='0';if(trace)trace.style.opacity='0';
     pieces.forEach((piece,i)=>{
       if(i>=count || !(c.image || c.secondaryImage)){piece.setAttribute('opacity','0');return;}
-      // Nodes keep their identity. Equal arc-length spacing prevents clusters;
-      // the phase moves the entire chain, including when scrolling backwards.
-      const u=((i/count+displayPhase*.085)%1+1)%1,p=pointOnJourney(path,u);
-      const z=Math.sin(u*Math.PI*2+displayPhase*.45);
-      const scale=size/100*(.88+(i*7%9)/40)*(1+z*depth*.14);
-      const aspect=Number(piece.dataset.journeyAspect)||1,axis=Number(piece.dataset.journeyAxis)||0;
-      const angle=p.angle-axis;
-      piece.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${scale.toFixed(3)})`);
-      const visible=journeyOrnamentVisibility(p.x,p.y,scale*100,angle,boxes,width,height,aspect)*journeyTextVisibility(p.x,p.y,scale*45/Math.sqrt(Math.max(aspect,1/aspect)),headlines,16*previewScale);
-      const mesh=meshes[i],bent=aspect>=1.25 || aspect<=.8;
-      if(mesh.group){
-        if(mesh.bent!==bent){
-          piece.dataset.journeyBent=String(bent);mesh.group.style.display=bent?'':'none';mesh.rigid.style.display=bent?'none':'';mesh.bent=bent;
-          mesh.parts.forEach((part,index)=>part.firstElementChild.setAttribute('clip-path',`url(#${piece.dataset.journeyMeshPrefix}-${axis===90?'vertical':'horizontal'}-${index})`));
-        }
-        if(bent && visible>0){
-          if(!mesh.parts.length){
-            const fragment=doc.createDocumentFragment();
-            for(let index=0;index<JOURNEY_ARTWORK_BANDS*2;index++){
-              const part=doc.createElementNS('http://www.w3.org/2000/svg','g'),use=doc.createElementNS('http://www.w3.org/2000/svg','use');
-              part.setAttribute('data-journey-mesh-part','');use.setAttribute('href',`#${piece.dataset.journeyArtworkSource}`);
-              use.setAttribute('clip-path',`url(#${piece.dataset.journeyMeshPrefix}-${axis===90?'vertical':'horizontal'}-${index})`);
-              part.append(use);fragment.append(part);mesh.parts.push(part);
-            }
-            mesh.group.append(fragment);
-          }
-          const matrices=journeyArtworkMesh(path,u,journeyArtworkLayout(1,aspect),scale,p,angle);
-          mesh.parts.forEach((part,index)=>part.setAttribute('transform',`matrix(${matrices[index].map(value=>value.toFixed(5)).join(' ')})`));
-        }
-      }
-      piece.setAttribute('opacity',String(opacity*(.94+z*depth*.06)*visible));
+      const aspect=Number(piece.dataset.journeyAspect)||1;
+      const pose=cinematicOrnament(i,{phase:displayPhase,width,height,size,aspect,depth,compact:compact(),intensity:config.intensity,count});
+      const settings=c.sectionSettings || {};
+      const sideWeight=id=>{const side=settings[id]?.placement;return side==='left'?(i%2?.15:1):side==='right'?(i%2?1:.15):1;};
+      const emphasis=sideWeight(scene.id)*(1-scene.handoff)+sideWeight(scene.nextId)*scene.handoff;
+      const {x,y,scale,angle}=pose;
+      piece.dataset.journeyBent='false';
+      piece.setAttribute('transform',`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${scale.toFixed(3)})`);
+      const visible=journeyOrnamentVisibility(x,y,scale*100,angle,boxes,width,height,aspect)*journeyTextVisibility(x,y,scale*45/Math.sqrt(Math.max(aspect,1/aspect)),headlines,16*previewScale);
+      piece.setAttribute('opacity',String(opacity*pose.opacity*visible*emphasis));
     });
     const writeMask=(nodes,values)=>nodes.forEach((rect,i)=>{const box=values[i];if(!box){rect.setAttribute('width','0');return;}for(const key of ['x','y','width','height'])rect.setAttribute(key,box[key].toFixed(2));rect.setAttribute('rx',box.radius);});
     writeMask(masks,boxes);
@@ -164,7 +129,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     const image=new view.Image();artworkProbes.push(image);
     const loaded=()=>{
       if(disposed || !image.naturalWidth || !image.naturalHeight)return;
-      const layout=journeyArtworkLayout(image.naturalWidth,image.naturalHeight);artworkLayouts.set(source,layout);
+      const layout=journeyArtworkLayout(image.naturalWidth,image.naturalHeight);
       for(const piece of pieces)if(piece.querySelector('image')?.getAttribute('href')===source)applyJourneyArtworkLayout(piece,layout);
       resize();
     };

@@ -19,7 +19,6 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   await waitFor(()=>expect(saved.global.sectionMotion.journey.image).toBe('https://cdn.example.test/adorno.webp'));
   expect(upload).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('button',{name:'Recorrido',exact:true}));
-  fireEvent.change(screen.getByRole('combobox',{name:'Forma del camino'}),{target:{value:'edges'}});
   fireEvent.change(screen.getByRole('slider',{name:'Tamaño de los adornos'}),{target:{value:'230'}});
   fireEvent.change(screen.getByRole('slider',{name:'Densidad de adornos'}),{target:{value:'26'}});
   fireEvent.change(screen.getByRole('slider',{name:'Profundidad del camino'}),{target:{value:'90'}});
@@ -31,7 +30,7 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   fireEvent.click(screen.getByRole('button',{name:'Móvil',exact:true}));
   fireEvent.change(screen.getByRole('slider',{name:'Tamaño de adornos en móvil'}),{target:{value:'100'}});
   fireEvent.change(screen.getByRole('slider',{name:'Densidad de adornos en móvil'}),{target:{value:'8'}});
-  expect(saved.global.sectionMotion).toMatchObject({experience:'journey',journey:{image:'https://cdn.example.test/adorno.webp',path:'edges',size:230,density:26,depth:90,opacity:75,stemVisible:false,stemColor:'',unifyBackground:true,backgroundImage:'',mobileSize:100,mobileDensity:8}});
+  expect(saved.global.sectionMotion).toMatchObject({experience:'journey',journey:{image:'https://cdn.example.test/adorno.webp',path:'flowing',size:230,density:26,depth:90,opacity:75,stemVisible:false,stemColor:'',unifyBackground:true,backgroundImage:'',mobileSize:100,mobileDensity:8}});
   fireEvent.click(screen.getByRole('button',{name:'Secciones',exact:true}));
   fireEvent.change(screen.getByRole('combobox',{name:'Sección del recorrido'}),{target:{value:'instagram'}});
   fireEvent.change(screen.getByRole('combobox',{name:'Composición de esta sección'}),{target:{value:'right'}});

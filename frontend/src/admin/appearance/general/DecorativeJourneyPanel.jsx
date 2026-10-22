@@ -20,7 +20,7 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <details><summary>Segundo adorno · opcional</summary><CloudinaryImageField label="Adorno secundario" value={c.secondaryImage} onChange={value=>edit('secondaryImage',value)} transparentOnly {...uploadProps}/></details>
     </div>}
     {tab==='recorrido' && <div className="journey-editor__fields">
-      <label>Forma del camino<select value={c.path} onChange={event=>edit('path',event.target.value)}><option value="flowing">Curvas envolventes</option><option value="edges">Por los laterales</option></select></label>
+      <p>Composición cinematográfica: piezas intactas que pasan por los bordes en distintos planos de profundidad.</p>
       <Range label="Tamaño de los adornos" value={c.size} min={60} max={320} step={5} suffix=" px" onChange={value=>edit('size',value)}/>
       <Range label="Densidad de adornos" value={c.density} min={8} max={28} onChange={value=>edit('density',value)}/>
       <Range label="Profundidad del camino" value={c.depth} min={0} max={100} step={5} suffix=" %" onChange={value=>edit('depth',value)}/>
@@ -31,7 +31,7 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <p>El camino completo continúa entre secciones. Ajusta aquí su posición, tamaño y presencia en cada una.</p>
       <label>Sección del recorrido<select value={sectionId} onChange={event=>setSectionId(event.target.value)}>{JOURNEY_SECTION_IDS.map(id=><option key={id} value={id}>{(theme.sections?.find(section=>section.id===id)?.title || theme.sections?.find(section=>section.id===id)?.name || theme.sections?.find(section=>section.id===id)?.label) || (id==='banner'?theme.banner?.title:'') || labels[id]}</option>)}</select></label>
       <label className="journey-editor__check"><span>Mostrar el camino en esta sección</span><input type="checkbox" checked={current.enabled} onChange={event=>editSection('enabled',event.target.checked)}/></label>
-      <label>Composición de esta sección<select value={current.placement} onChange={event=>editSection('placement',event.target.value)}><option value="auto">Adaptada a su estructura</option><option value="left">Enmarcar por la izquierda</option><option value="right">Enmarcar por la derecha</option><option value="bottom">Acompañar el borde inferior</option></select></label>
+      <label>Composición de esta sección<select value={current.placement} onChange={event=>editSection('placement',event.target.value)}><option value="auto">Adaptada a su estructura</option><option value="left">Enmarcar por la izquierda</option><option value="right">Enmarcar por la derecha</option></select></label>
       <Range label="Tamaño relativo en esta sección" value={current.scale} min={60} max={150} step={5} suffix=" %" onChange={value=>editSection('scale',value)}/>
       <Range label="Presencia del camino en esta sección" value={current.accent} min={0} max={100} step={5} suffix=" %" onChange={value=>editSection('accent',value)}/>
       <button type="button" className="journey-editor__restore" onClick={()=>{const next={...c.sectionSettings};delete next[sectionId];edit('sectionSettings',next);}}>Restablecer composición de esta sección</button>
