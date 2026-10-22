@@ -8,6 +8,20 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   const view=container.ownerDocument.defaultView,doc=container.ownerDocument,world=container.querySelector('[data-journey-world]');
   if(!world)return ()=>{};
   const c=config.journey,reduce=view.matchMedia?.('(prefers-reduced-motion: reduce)'),mobile=view.matchMedia?.('(max-width:767px)');
+  // Capture the store's existing artwork before shared-surface CSS hides local layers.
+  // No business-specific image or colour is introduced by the journey.
+  const backgroundNodes=[...container.querySelectorAll('.trending-section--floating-glass,.look-editorial,.complementos-look-section,.categories-fan__background,.ig-journal,.tk-stage,.info-glass,.footer-ed,.story-preview__content')];
+  const previousShared=container.dataset.journeyShared;
+  delete container.dataset.journeyShared;
+  let inheritedBackground='none';
+  for(const node of backgroundNodes){
+    const candidates=[view.getComputedStyle(node).backgroundImage];
+    if(!/jsdom/i.test(view.navigator.userAgent))candidates.unshift(view.getComputedStyle(node,'::before').backgroundImage);
+    const image=candidates.find(value=>value && value.includes('url('));
+    if(image){inheritedBackground=image;break;}
+  }
+  if(previousShared!==undefined)container.dataset.journeyShared=previousShared;
+  if(!c.backgroundImage)container.style.setProperty('--journey-shared-image',inheritedBackground);
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')];
   const meshes=pieces.map(piece=>({group:piece.querySelector('[data-journey-mesh]'),rigid:piece.querySelector('[data-journey-rigid]'),parts:[...piece.querySelectorAll('[data-journey-mesh-part]')],bent:null}));
   const masks=[...world.querySelectorAll('[data-journey-occluder]')];
@@ -44,7 +58,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     const size=(adapted?c.mobileSize:c.size)*previewScale,density=adapted?c.mobileDensity:c.density;
     const referenceLength=Math.min(...Array.from({length:20},(_,i)=>journeyCurve(i*.4,width,height,c.path,config.intensity,{compact:compact()}).length));
     const longest=Math.max(1,...[...artworkLayouts.values()].map(layout=>Math.sqrt(Math.max(layout.ratio,1/layout.ratio))));
-    const spacing=size*Math.max(2.6-density/28,longest*(1.8-density/35));
+    const spacing=size*Math.max(3.4-density/28,longest*(2.3-density/35));
     // Calculate a stable count for the entire tour. Recounting every frame
     // redistributes the chain and makes ornaments jump between positions.
     ornamentCount=Math.max(1,Math.min(density,28,Math.floor(referenceLength/Math.max(1,spacing))));
@@ -97,10 +111,10 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     if(ornaments)ornaments.style.filter=`drop-shadow(0 ${(3+depth*5)*shadowScale}px ${(3+depth*3)*shadowScale}px rgb(0 0 0 / .14))`;
     const presence=Math.sin(scene.accent*Math.PI/2)*scene.opacity;
     const opacity=c.opacity/100*presence;
-    stem.setAttribute('d',path.d);stem.style.opacity=c.stemVisible?String(opacity*.64):'0';
+    stem.setAttribute('d',path.d);stem.style.opacity='0';
     stem.setAttribute('stroke-width',String((adapted?1.4:2)*previewScale));
     trace?.setAttribute('d',path.d);trace?.setAttribute('stroke-dashoffset',(-displayPhase*180).toFixed(3));
-    if(trace){trace.style.opacity=c.stemVisible?String(opacity*.95):'0';trace.setAttribute('stroke-width',String((adapted?2.4:3)*previewScale));}
+    if(trace){trace.style.opacity='0';trace.setAttribute('stroke-width',String((adapted?2.4:3)*previewScale));}
     pieces.forEach((piece,i)=>{
       if(i>=count || !(c.image || c.secondaryImage)){piece.setAttribute('opacity','0');return;}
       // Nodes keep their identity. Equal arc-length spacing prevents clusters;

@@ -11,7 +11,6 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
   const current={placement:'auto',scale:100,accent:65,enabled:true,...c.sectionSettings?.[sectionId]};
   const editSection=(key,value)=>edit('sectionSettings',{...c.sectionSettings,[sectionId]:{...current,[key]:value}});
   const edit=(key,value)=>onChange({...config,journey:{...c,[key]:value}});
-  const themeAccent=/^#[\da-f]{6}$/i.test(theme.colors?.accent)?theme.colors.accent:'#111827';
   const uploadProps={onUpload:uploadToCloudinaryViaBackend,uploading,setUploading,savedRevision};
   return <div className="journey-editor">
     <div className="journey-editor__tabs" role="group" aria-label="Ajustes del camino">{[['adornos','Adornos'],['recorrido','Recorrido'],['secciones','Secciones'],['fondo','Fondo'],['movil','Móvil']].map(([id,label])=><button type="button" key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}>{label}</button>)}</div>
@@ -26,8 +25,7 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <Range label="Densidad de adornos" value={c.density} min={8} max={28} onChange={value=>edit('density',value)}/>
       <Range label="Profundidad del camino" value={c.depth} min={0} max={100} step={5} suffix=" %" onChange={value=>edit('depth',value)}/>
       <Range label="Opacidad de los adornos" value={c.opacity} min={20} max={100} step={5} suffix=" %" onChange={value=>edit('opacity',value)}/>
-      <label className="journey-editor__check"><span>Mostrar línea del recorrido</span><input type="checkbox" checked={c.stemVisible} onChange={event=>onChange({...config,journey:{...c,stemVisible:event.target.checked,trailLine:event.target.checked}})}/></label>
-      {c.stemVisible && <><label className="journey-editor__color">Color del hilo<input type="color" value={c.stemColor || themeAccent} onChange={event=>edit('stemColor',event.target.value)}/></label><button type="button" className="journey-editor__restore" onClick={()=>edit('stemColor','')}>Usar el color de la tienda</button></>}
+      <p>Los adornos recorren la tienda sin líneas de conexión visibles.</p>
     </div>}
     {tab==='secciones' && <div className="journey-editor__fields">
       <p>El camino completo continúa entre secciones. Ajusta aquí su posición, tamaño y presencia en cada una.</p>
@@ -39,9 +37,9 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <button type="button" className="journey-editor__restore" onClick={()=>{const next={...c.sectionSettings};delete next[sectionId];edit('sectionSettings',next);}}>Restablecer composición de esta sección</button>
     </div>}
     {tab==='fondo' && <div className="journey-editor__fields">
-      <label className="journey-editor__check"><span>Usar un fondo continuo para toda la tienda</span><input type="checkbox" checked={c.unifyBackground} onChange={event=>edit('unifyBackground',event.target.checked)}/></label>
-      <p>El fondo continuo une las secciones y da espacio al adorno en movimiento. Las fotografías de productos conservan su imagen.</p>
-      {c.unifyBackground && <><CloudinaryImageField label="Fondo continuo" value={c.backgroundImage} onChange={value=>edit('backgroundImage',value)} {...uploadProps}/><button type="button" className="journey-editor__restore" onClick={()=>edit('backgroundImage','')}>Usar solo el color de la tienda</button></>}
+      <label className="journey-editor__check"><span>Usar un fondo continuo para toda la tienda</span><input type="checkbox" checked={c.unifyBackground} onChange={event=>onChange({...config,journey:{...c,unifyBackground:event.target.checked,backgroundMode:event.target.checked?'continuous':'individual'}})}/></label>
+      <p>El fondo continuo une las secciones y da espacio al adorno en movimiento. Se reutiliza el primer fondo de las secciones, o la imagen que elijas aquí. Las fotografías de productos conservan su imagen.</p>
+      {c.unifyBackground && <><CloudinaryImageField label="Fondo continuo" value={c.backgroundImage} onChange={value=>edit('backgroundImage',value)} {...uploadProps}/><button type="button" className="journey-editor__restore" onClick={()=>edit('backgroundImage','')}>Usar el fondo actual de la tienda</button></>}
     </div>}
     {tab==='movil' && <div className="journey-editor__fields">
       <p>En el modo adaptado, el camino utiliza estos tamaños y esta cantidad para dejar espacio al contenido.</p>

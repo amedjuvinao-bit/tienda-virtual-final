@@ -7,7 +7,7 @@ export default function SectionMotionPanel({config,onChange,...uploadProps}) {
   const c=normalizeStoryConfig(config), name=useId();
   const edit=(key,value)=>onChange({...c,[key]:value});
   return <section className="story-editor" aria-label="Animación global de las secciones">
-    <header><h3>Un recorrido que conecta la tienda</h3><p>Los adornos siguen una curva continua entre secciones y una línea muestra su avance. Al subir, recorren el mismo camino en sentido contrario.</p></header>
+    <header><h3>Un recorrido que conecta la tienda</h3><p>Los adornos siguen una curva continua entre secciones. Al subir, recorren el mismo camino en sentido contrario.</p></header>
     <label className="story-editor__toggle"><span>Activar animación global</span><input type="checkbox" checked={c.enabled} onChange={event=>edit('enabled',event.target.checked)}/></label>
     <div className="journey-editor__experience" role="group" aria-label="Tipo de experiencia"><button type="button" aria-pressed={c.experience==='journey'} onClick={()=>edit('experience','journey')}>Camino continuo</button><button type="button" aria-pressed={c.experience==='entrances'} onClick={()=>edit('experience','entrances')}>Entradas por sección</button></div>
     {c.experience==='journey'?<DecorativeJourneyPanel config={c} onChange={onChange} {...uploadProps}/>:<fieldset className="story-editor__themes"><legend>Tema de animación</legend>

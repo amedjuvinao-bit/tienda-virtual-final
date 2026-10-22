@@ -63,18 +63,17 @@ it('empieza sin recursos de un negocio y conserva los fondos de cada sección',(
   expect(f.root.dataset.journeyActive).toBe('false');expect(f.root.dataset.journeyShared).toBe('false');
   expect(f.root.querySelector('[data-journey-stem]').getAttribute('d')).toBeNull();f.stop();
 });
-it('permite elegir solo un fondo compartido o solo la línea sin imágenes obligatorias',()=>{
-  const background=fixture({journey:{image:'',unifyBackground:true,backgroundImage:'/store-background.webp'}});
-  expect(background.root.dataset.journeyActive).toBe('false');expect(background.root.dataset.journeyShared).toBe('true');background.stop();
-  const line=fixture({journey:{image:'',stemVisible:true}});
-  expect(line.root.dataset.journeyActive).toBe('true');expect(line.root.querySelector('[data-journey-stem]').getAttribute('d')).toBeTruthy();
-  expect([...line.root.querySelectorAll('[data-journey-piece]')].every(node=>node.getAttribute('opacity')==='0')).toBe(true);line.stop();
+it('comparte el fondo sin adornos y descarta las líneas de configuraciones antiguas',()=>{
+  const f=fixture({journey:{image:'',unifyBackground:true,backgroundImage:'/store-background.webp'}});
+  expect(f.root.dataset.journeyShared).toBe('true');f.stop();
+  expect(normalizeDecorativeJourney({image:'/art.png',stemVisible:true,trailLine:true})).toMatchObject({stemVisible:false,trailLine:false,unifyBackground:true});
+  expect(normalizeDecorativeJourney({image:'/art.png',backgroundMode:'individual'}).unifyBackground).toBe(false);
 });
 it('mantiene los recursos de cada tienda y no restaura imágenes al quitarlas',()=>{
   const first=normalizeDecorativeJourney({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemVisible:true,stemColor:'#1286aa',unifyBackground:true});
   const second=normalizeDecorativeJourney({image:'https://cdn.example.test/second-store.png'});
   expect(first).toMatchObject({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemColor:'#1286aa',unifyBackground:true});
-  expect(second).toMatchObject({image:'https://cdn.example.test/second-store.png',backgroundImage:'',stemVisible:true,unifyBackground:false});
+  expect(second).toMatchObject({image:'https://cdn.example.test/second-store.png',backgroundImage:'',stemVisible:false,unifyBackground:true});
   expect(normalizeDecorativeJourney({...first,image:'',backgroundImage:''})).toMatchObject({image:'',backgroundImage:''});
 });
 
@@ -95,7 +94,7 @@ it('conserva los adornos nítidos a máxima profundidad y adapta la sombra en m�
 it('recupera varios adornos y traza la misma curva al avanzar y volver',()=>{
   const f=fixture(),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],stem=f.root.querySelector('[data-journey-stem]'),trace=f.root.querySelector('[data-journey-trace]');
   const initial=stem.getAttribute('d'),offset=trace.getAttribute('stroke-dashoffset');
-  expect(pieces).toHaveLength(28);expect(Number(stem.style.opacity)).toBeGreaterThan(.4);
+  expect(pieces).toHaveLength(28);expect(Number(stem.style.opacity)).toBe(0);
   expect(pieces.filter(p=>+p.getAttribute('opacity')>0).length).toBeGreaterThan(1);
   f.scroll(800);expect(stem.getAttribute('d')).not.toBe(initial);expect(trace.getAttribute('stroke-dashoffset')).not.toBe(offset);
   expect(trace.getAttribute('d')).toBe(stem.getAttribute('d'));
@@ -103,7 +102,7 @@ it('recupera varios adornos y traza la misma curva al avanzar y volver',()=>{
 });
 it('muestra la línea con los recursos guardados y conserva la decisión de apagarla',()=>{
   const restored=normalizeDecorativeJourney({image:'/store-art.png',stemVisible:false});
-  expect(restored.stemVisible).toBe(true);
+  expect(restored.stemVisible).toBe(false);
   const off=normalizeDecorativeJourney({...restored,trailLine:false,stemVisible:false});
   expect(normalizeDecorativeJourney(off).stemVisible).toBe(false);
   expect(normalizeDecorativeJourney().stemVisible).toBe(false);
