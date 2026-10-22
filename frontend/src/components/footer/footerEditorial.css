@@ -82,7 +82,7 @@
 .footer-ed__engraving-light{stroke:#fff3df;transform:translate(.35px,.7px);stroke-width:.7!important;opacity:.95}
 .footer-ed__engraving-edge{stroke:color-mix(in srgb,var(--fe-accent) 48%,#ffe5d4);opacity:.8}
 
-.footer-ed :is(a,button):focus-visible{outline:3px solid var(--fe-ink);outline-offset:4px}
+.footer-ed :is(a,button):focus-visible{outline:2px solid var(--fe-accent);outline-offset:4px}
 @media(hover:hover) and (pointer:fine){
  .footer-ed:not([data-motion="none"]) .footer-ed__subscribe:hover svg{transform:translateX(4px)}
  .footer-ed[data-motion="lift"] .footer-ed__social:hover,.footer-ed[data-motion="lift"] .footer-ed__top-button:hover{transform:translateY(-5px)}
@@ -179,7 +179,9 @@
 
 /* Press feedback also exists without hover, on touch and keyboard activation. */
 .footer-ed__links a{display:inline-block}
-.footer-ed :is(.footer-ed__social,.footer-ed__subscribe,.footer-ed__top-button,.footer-ed__accordion):active{filter:brightness(.93)}
 
 .footer-ed__press-light{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:4;mix-blend-mode:screen}
 .footer-ed__press-light>i{position:absolute;inset:-30%;background:linear-gradient(110deg,transparent 28%,#fff3 40%,#fffc 48%,#fff4 56%,transparent 68%);transform:translateX(-130%);opacity:0;pointer-events:none}
+
+/* Specular highlights stay light even when the store accent is dark. */
+.footer-ed__press-light>b{position:absolute;inset:5%;border:1.5px solid #fffe;border-radius:inherit;background:radial-gradient(ellipse at 22% 14%,#fff6,transparent 58%);box-shadow:inset 0 0 10px #fff9,0 0 9px #fff8;transform:scale(.35);opacity:0;pointer-events:none}
