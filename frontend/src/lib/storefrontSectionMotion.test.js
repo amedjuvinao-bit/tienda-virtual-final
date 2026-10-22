@@ -42,6 +42,38 @@ describe('presentaciones globales por objetos',()=>{
     expect(normalizeStoryConfig({preset:'bad',intensity:999,pace:'bad',mobileMode:'bad',enabled:false})).toMatchObject({experience:'journey',enabled:false,preset:'stack',intensity:100,pace:'balanced',mobileMode:'adapted'});
     expect(storySectionOrder([{id:'tiktok'},{id:'categorias'},{id:'tiktok'}]).slice(0,3)).toEqual(['tiktok','categorias','tendencia']);
   });
+  it('abre las secciones del camino continuo en profundidad y presenta sus objetos en secuencia',()=>{
+    const f=fixture({experience:'journey'}),chapter=f.nodes[1],surface=chapter.firstChild;
+    const opening=f.animations.find(a=>a.element===surface);
+    expect(opening.id).toBe('story:journey:chapter');expect(opening.playState).toBe('paused');
+    expect(opening.frames[0].transform).toContain('perspective');expect(opening.frames[0].transform).not.toBe(opening.frames[1].transform);
+    f.scroll(400);expect(chapter.dataset.storyStage).toBe('presented');expect(opening.play).toHaveBeenCalledOnce();
+    f.scroll(800);
+    const actors=f.animations.filter(a=>a.element.closest('#chapter-1') && a.element!==surface);
+    const actor=role=>actors.find(a=>a.id.startsWith('story:'+role+':'));
+    expect(actor('title').options.delay).toBeLessThan(actor('hero').options.delay);
+    expect(actor('hero').options.delay).toBeLessThan(actor('action').options.delay);
+    expect(actor('hero').frames[0].rotate).toContain('0 1 0');
+    expect(actor('product').frames[0].translate).not.toBe('0 0 0');
+    expect(f.root.dataset.storyPreset).toBeUndefined();expect(storefrontSectionTop(f.nodes[2])).toBe(2800);
+    expect(surface.querySelector('[data-story-fragments]')).toBeNull();
+    opening.finish();expect(surface.dataset.journeyOpening).toBe('true');
+    f.finishVisible();expect(surface.dataset.journeyOpening).toBeUndefined();expect(opening.cancel).toHaveBeenCalledOnce();
+    const count=f.animations.length;f.scroll(1100);expect(f.animations).toHaveLength(count);
+    f.scroll(2850);f.scroll(720);expect(f.animations.filter(a=>a.element===surface)).toHaveLength(2);
+    f.stop();expect(f.animations.every(a=>a.playState==='idle')).toBe(true);
+  });
+  it('libera la apertura del camino al interactuar y respeta movimiento reducido y apagado móvil',()=>{
+    const f=fixture({experience:'journey',mobileMode:'off'}),surface=f.nodes[1].firstChild;
+    f.scroll(800);surface.querySelector('[data-story-actor="action"]').focus();
+    expect(surface.dataset.journeyOpening).toBeUndefined();expect(f.nodes[1].dataset.storyStage).toBe('ready');
+    f.reduce.matches=true;f.reduce.dispatchEvent(new Event('change'));f.flush();
+    expect(f.animations.every(a=>a.playState==='idle')).toBe(true);
+    const count=f.animations.length;f.scroll(1000);expect(f.animations).toHaveLength(count);
+    f.reduce.matches=false;f.reduce.dispatchEvent(new Event('change'));f.flush();
+    f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();
+    expect(f.animations.every(a=>a.playState==='idle')).toBe(true);f.stop();
+  });
   it.each(['stack','cinema','depth','cascade'])('abre %s y presenta título, pieza principal y acción sin transformar la sección',preset=>{
     const f=fixture({preset});f.scroll(800);
     const chapter=f.nodes[1];expect(chapter.dataset.storyStage).toBe('presented');
