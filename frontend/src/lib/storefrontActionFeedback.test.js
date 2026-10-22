@@ -47,7 +47,7 @@ it('animates the nearest action once, preserves transforms and lets the original
 
 it('covers controls mounted after startup and bounds repeated click effects', () => {
   const { calls } = setup('');
-  const link = document.createElement('a'); link.href = '#coleccion'; link.textContent = 'Colección'; document.body.append(link);
+  const link = document.createElement('a'); link.href = '#coleccion'; link.textContent = 'Colección'; link.style.borderRadius = '24px'; document.body.append(link);
   for (let i = 0; i < 20; i++) link.click();
   expect(calls).toHaveLength(20); expect(calls[0].animation.cancel).toHaveBeenCalledOnce();
   expect(document.querySelectorAll('.storefront-action-light')).toHaveLength(1);
@@ -70,11 +70,34 @@ it('adds hover lift only when a control has no native movement and ignores movem
   const { calls, button } = setup();
   pointer(button, 'pointerover'); pointer(button.querySelector('svg'), 'pointerover', { relatedTarget: button });
   expect(calls).toHaveLength(1); expect(calls[0].options.fill).toBe('forwards');
+  expect(document.querySelector('.storefront-action-light')).toBeNull();
   pointer(button, 'pointerout', { relatedTarget: document.body });
   expect(calls).toHaveLength(2); expect(calls[1].frames.at(-1).transform).toBe('none');
   button.style.transform = 'translateY(-3px)';
   pointer(button, 'pointerover'); pointer(button, 'pointerout', { relatedTarget: document.body });
   expect(calls).toHaveLength(2);
+});
+
+it('never draws a rectangular pane over hover or keyboard focus in any section', () => {
+  const { calls } = setup(['tendencia', 'look', 'categorias', 'instagram', 'tiktok', 'informacion'].map(id => `<section id="${id}"><a href="#detalle"><article style="border-radius:28px">Tarjeta</article></a></section>`).join(''));
+  document.querySelectorAll('article').forEach(card => {
+    pointer(card, 'pointerover'); pointer(card, 'pointerout', { relatedTarget: document.body });
+    card.parentElement.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    card.parentElement.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: document.body }));
+  });
+  expect(calls.length).toBeGreaterThan(0); expect(document.querySelector('.storefront-action-light')).toBeNull();
+});
+
+it('keeps card clicks animated without adding a pane across their separate surfaces', () => {
+  const { calls } = setup('<a href="#detalle"><div class="trending-card--floating-glass"><figure style="border-radius:28px"></figure><div class="trending-card__dock"></div></div></a>');
+  const card = document.querySelector('a'); card.getBoundingClientRect = () => ({ left: 30, top: 50, width: 300, height: 520 });
+  card.click(); expect(calls).toHaveLength(1); expect(document.querySelector('.storefront-action-light')).toBeNull();
+});
+
+it('omits external click lights on clipped, inclined, perspective and text-only controls', () => {
+  const { calls } = setup('<div style="overflow:hidden"><button>A</button></div><div style="transform:rotate(6deg)"><button>B</button></div><div style="perspective:600px"><button>C</button></div><button style="clip-path:circle(40%)">D</button><a href="#texto">Texto</a><button style="transform:matrix(.99,.05,-.05,.99,0,0)">E</button>');
+  document.querySelectorAll('button,a').forEach(control => control.click());
+  expect(calls).toHaveLength(6); expect(document.querySelector('.storefront-action-light')).toBeNull();
 });
 
 it('responds to touch presses but cancels a scroll gesture without a click flash', () => {

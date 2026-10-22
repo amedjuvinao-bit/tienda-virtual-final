@@ -1,5 +1,5 @@
-/* Temporary, non-interactive light follows the actual control, even inside
-   clipped glass cards. It never adds children or pseudo-elements to controls. */
+/* Click-only light for compact controls with simple, unobstructed geometry.
+   Cards and hover states keep their native glass surfaces. */
 .storefront-action-light {
   position: fixed;
   z-index: 2147483000;
@@ -7,9 +7,8 @@
   pointer-events: none;
   overflow: clip;
   contain: paint;
-  animation: storefront-action-light-out 520ms ease both;
+  animation: storefront-action-light-out 640ms ease both;
 }
-.storefront-action-light[data-phase="press"] { animation-duration: 640ms; }
 .storefront-action-light > i { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
 .storefront-action-light__rim {
   border: 1px solid #fff9;

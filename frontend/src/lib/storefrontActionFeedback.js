@@ -51,14 +51,31 @@ export function mountStorefrontActionFeedback(root = document) {
       : { hover: 'translateY(-2px) scale(1.035)', press: 'scale(.93)', rebound: 'translateY(-1px) scale(1.045)' };
   }
 
-  function illuminate(control, event, mode) {
+  function illuminate(control, event) {
+    const visual = visualFor(control), rect = visual.getBoundingClientRect(), css = view.getComputedStyle(visual);
+    // A viewport-aligned rectangle cannot represent a card's inner rounded
+    // surfaces, clipping or perspective. Keep its own glass and movement.
+    if (rect.height > 96 || rect.width > 360) return;
+    if (control.matches('a') && (!css.borderRadius || /^0(?:px)?(?:\s+0(?:px)?)*$/.test(css.borderRadius))) return;
+    for (let node = visual; node && node !== doc.body; node = node.parentElement) {
+      const style = view.getComputedStyle(node);
+      if (style.clipPath && style.clipPath !== 'none' || style.perspective && style.perspective !== 'none' || /hidden|clip|auto|scroll/.test(`${style.overflow} ${style.overflowX} ${style.overflowY}`)) return;
+      // A control's own press is uniformly scaled and centered. Transformed
+      // parents can rotate or skew it, making an external light inaccurate.
+      if (node !== visual && style.transform && style.transform !== 'none') return;
+      if (style.transform && style.transform !== 'none') {
+        const matrix = style.transform.match(/^matrix\(([^)]+)\)$/)?.[1].split(',').map(Number);
+        if (matrix ? Math.abs(matrix[1]) > .0001 || Math.abs(matrix[2]) > .0001 : /rotate|skew|perspective|matrix3d/.test(style.transform)) return;
+      }
+      if (node !== visual && style.scale && style.scale !== 'none' && style.scale !== '1') return;
+      if (style.rotate && style.rotate !== 'none' && style.rotate !== '0deg') return;
+    }
     // One temporary surface per control; rapid taps never build an overlay queue.
     for (const light of lights) if (light.control === control) light.remove();
     if (lights.size >= 6) lights.values().next().value.remove();
-    const visual = visualFor(control), rect = visual.getBoundingClientRect(), css = view.getComputedStyle(visual);
     const surface = doc.createElement('span');
     surface.className = 'storefront-action-light';
-    surface.dataset.phase = mode;
+    surface.dataset.phase = 'press';
     surface.setAttribute('aria-hidden', 'true');
     surface.style.borderRadius = css.borderRadius || '12px';
     surface.style.setProperty('--action-ink', css.color);
@@ -89,7 +106,7 @@ export function mountStorefrontActionFeedback(root = document) {
     lights.add(light);
     doc.body.append(surface);
     follow();
-    timer = view.setTimeout(light.remove, mode === 'press' ? 640 : 520);
+    timer = view.setTimeout(light.remove, 640);
   }
 
   function leave(control) {
@@ -112,7 +129,6 @@ export function mountStorefrontActionFeedback(root = document) {
     if (hoverMoved) {
       motion(control, ['none', poses(control).hover], 240, true);
     }
-    illuminate(control, event, 'hover');
   }
 
   function exit(event) {
@@ -148,7 +164,7 @@ export function mountStorefrontActionFeedback(root = document) {
     hovered = null;
     const pose = poses(control);
     motion(control, pressed ? [pose.press, pose.rebound, 'none'] : ['none', pose.press, pose.rebound, 'none'], pressed ? 420 : 460);
-    illuminate(control, event, 'press');
+    illuminate(control, event);
   }
 
   function clear() {
