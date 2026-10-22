@@ -83,7 +83,8 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   function measure() {
     const prior=new Map(chapters.map(chapter=>[chapter.node,chapter]));
     // Read natural section positions without resetting an ongoing presentation.
-    delete container.dataset.storyPreset;
+    const parallax=container.dataset.journeyParallax;
+    delete container.dataset.storyPreset;delete container.dataset.journeyParallax;
     const rootRect=container.getBoundingClientRect(), rootTop=rootRect.top+(scroller?scroller.scrollTop-scroller.getBoundingClientRect().top:scroll());
     const vh=viewport();
     chapters=[...container.children].filter(node=>node.tagName==='SECTION' && node.offsetHeight>0).map((node,index)=>{
@@ -111,6 +112,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
     });
     prior.forEach(releaseChapter);
     if(enabled() && config.experience==='entrances')container.dataset.storyPreset=config.preset;
+    if(parallax!==undefined)container.dataset.journeyParallax=parallax;
     dirty=false;
   }
   function update() {

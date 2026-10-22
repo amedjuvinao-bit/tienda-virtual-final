@@ -1,28 +1,28 @@
 # Continuous decorative journey
 
-The storefront shares one continuous curved route, a chain of store-configured ornaments and a moving trace between its sections. The same ornament nodes remain mounted. Scrolling forward advances the chain and the illuminated line; scrolling back reverses both. No product content or media players are cloned.
+The storefront uses the selected **Capas con parallax** handover: photographs, type and secondary pieces move on different planes as sections overlap. The shared store background and configured ornaments remain continuous. No product content or media players are cloned.
 
 ## Composition and rendering
 
-The original multi-ornament route is restored. Artwork keeps its configured size, with moderate perspective variation; it is not shrunk into isolated empty pockets. Arc-length spacing and a stable count derived from density and artwork size prevent overlapping clusters and redistribution between frames. Density changes the chain's spacing, rather than promising an exact number of visible pieces.
+`storefrontJourneyParallax.js` translates the real content without changing its dimensions, opacity, rotation or native component transforms. Photographs lead the arrival, type follows, and secondary pieces travel on a separate plane. Arrival combines scroll progress with a finishing timeline, so stopping the scroll does not leave the incoming content displaced indefinitely. Outgoing movement reverses when scrolling back. Frames stop scheduling when settled.
 
-Each section frames the shared curve according to its structure. The measured section order and actual heights control progress. Compositions morph during handoff, including custom left/right/lower placement. Relative size, presence and the section enable switch remain configurable. Mobile has its own artwork size and density.
+Sections pin at the end of their natural height, preserving long-section reading and navigation targets. Only outgoing content is clipped as the next section arrives; no opaque cover hides the shared ornament layer. Completed sections remain covered until revisited. Layout measurements temporarily release pinning and use local element dimensions, including the optical rims in Looks.
 
-Artwork is measured from its intrinsic dimensions. Long portrait or landscape resources retain their aspect ratio and visual area, and their long axis follows the path tangent instead of an arbitrary rotation. Elongated artwork also bends along the actual curve: a texture ribbon shares sampled row vertices with the route, so its ends follow the line as well as its center. Texture faces are created only when the artwork first becomes visible. Primary and secondary images are measured independently; metadata callbacks are released on cleanup. No store-specific asset or motif is inserted.
+Carousels and footer columns move as whole interactive groups. Pointer gestures hold their current position through release; keyboard focus restores the readable layout. Preview viewports, reduced motion and disabled mobile motion use the same engine and cleanup path. Saved entrance presets remain separate from the journey.
 
-A base line connects the ornaments, and a brighter segment traces its progress. The trace reverses with scroll and shares the exact same curve as the chain. Configured resources automatically restore the line, including legacy settings that had it off. The administrator can explicitly turn it off using `trailLine:false`; this choice survives normalization and reloading. Empty stores still have no art or line until configured.
+Artwork keeps the existing rigid cinematic movement, intrinsic image proportions, independent vertical length, 3D depth and spacing controls. The connecting cord remains hidden. Primary and secondary resources remain store-configured; this effect introduces no default business images or branding.
 
-Photographs, cards, highlights, text and controls protect their pixels with an SVG mask. Text protection follows actual text lines, not full-width heading blocks. Small remnants behind a photograph fade as whole ornaments. The images remain sharp; shadows are applied separately. The SVG never intercepts input. Scroll smoothing settles and stops without an idle animation loop. Reduced motion freezes the decorative world; mobile off removes it. Observers and listeners are released on unmount.
+The curved background curtain is no longer mounted by `StorefrontStory`. The administration preview renders the same parallax layers as the storefront. Existing curtain source files remain available without affecting this selected experience.
 
 ## Administration
 
 Apariencia → General → Animación global → Camino continuo.
 
 - **Adornos**: primary transparent PNG/WebP and optional secondary artwork. No fixed brand, business motif or stock image is inserted.
-- **Recorrido**: curve style, artwork size, density, depth, opacity, line enable and line color. The line uses the store accent unless overridden.
+- **Recorrido**: artwork size, independent vertical length, density, depth and opacity. Global intensity controls layer travel; pace controls arrival and smoothing.
 - **Secciones**: section selection, enable switch, automatic/left/right/lower framing, relative size and presence.
 - **Fondo**: individual backgrounds or an opt-in shared store image/color.
-- **Móvil**: size and density in adapted mode.
+- **Móvil**: artwork size, independent vertical length and density in adapted mode. Content travel is moderated on narrow viewports.
 
 All settings use the existing appearance save endpoint under `theme.global.sectionMotion.journey`. Legacy entrance presets remain selectable. The admin preview uses the production engine and current store assets. No credentials or backend setup are needed.
 
