@@ -10,7 +10,10 @@ export default function LookGlassRim({ variant = "hero", radius = 26 }) {
     const element = host.current;
     if (!element) return undefined;
     const measure = () => {
-      const { width, height } = element.getBoundingClientRect();
+      // Screen bounds include temporary ancestor animation transforms. Those
+      // do not trigger ResizeObserver when they end, leaving a distorted SVG.
+      // Local layout dimensions remain correct throughout the animation.
+      const width = element.clientWidth, height = element.clientHeight;
       setSize((current) => current.width === width && current.height === height
         ? current : { width, height });
     };
