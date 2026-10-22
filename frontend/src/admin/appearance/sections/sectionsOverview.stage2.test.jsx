@@ -40,8 +40,8 @@ describe('vista general de Secciones', () => {
   it('permite ocultar una sección desde la lista y pasa el cambio al guardado global', async () => {
     const setPath = vi.fn();
     render(<SectionsPanel theme={{ sections }} setPath={setPath} />);
-    const lookCard = screen.getByRole('heading', { name: 'Looks' }).closest('article');
-    const toggle = within(lookCard).getByRole('switch', { name: 'Mostrar Looks en la tienda' });
+    const lookCard = screen.getByRole('heading', { name: 'Selección de productos' }).closest('article');
+    const toggle = within(lookCard).getByRole('switch', { name: 'Mostrar Selección de productos en la tienda' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'false');

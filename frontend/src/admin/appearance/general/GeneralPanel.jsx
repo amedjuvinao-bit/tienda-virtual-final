@@ -784,7 +784,7 @@ export default function GeneralPanel({ theme, setPath, uploading, setUploading, 
                     label="Texto de carga"
                     value={globalConfig.loader?.text || ""}
                     onChange={(e) => setPath("global.loader.text", e.target.value)}
-                    placeholder="Cargando colección..."
+                    placeholder="Cargando contenido…"
                   />}
                 </PanelBlock>
               )}

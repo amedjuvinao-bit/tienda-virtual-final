@@ -45,7 +45,7 @@ export function getBannerPreviewModel(banner, slides, selectedIdx, device) {
   };
 }
 
-export default function BannerDevicePreview({ banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard, onPreviousSlide, onNextSlide }) {
+export default function BannerDevicePreview({ store, banner, sections, slides, selectedIdx, device, onEdit, onTemplateSelect, selectedTemplatePart, placingCard, onPlaceCard, onMoveCard, onPreviousSlide, onNextSlide }) {
   const model = getBannerPreviewModel(banner, slides, selectedIdx, device);
   const { viewport, frameHeight, type, mediaUrl, fit, objectPosition, heroHeight, heightPercent, foldPercent } = model;
   const viewportRef = useRef(null);
@@ -71,7 +71,7 @@ export default function BannerDevicePreview({ banner, sections, slides, selected
     <div className="banner-preview-shell" data-device={device}>
       <div ref={viewportRef} className="banner-preview-viewport" data-admin-storefront-preview="true" data-device={device} style={{ aspectRatio: `${viewport.width} / ${frameHeight}` }} aria-label={`Vista previa ${viewport.label}: ${viewport.width} por ${viewport.height} píxeles`}>
         <div className="banner-preview-stage" style={{ width: viewport.width, height: frameHeight, transform: `scale(${previewWidth ? previewWidth / viewport.width : 0})` }}>
-        <div className="banner-preview-mini-header"><span>ROSA BOUTIQUE</span><span>⌕ · ≡</span></div>
+        <div className="banner-preview-mini-header"><span>{store?.name?.trim() || 'Tu tienda'}</span><span>⌕ · ≡</span></div>
         <div className="banner-preview-hero" style={{ height: `${heightPercent}%` }}>
           {useTemplate ? <BannerTemplateView banner={banner} sections={sections} preview device={device} onSelect={onTemplateSelect} selectedPart={selectedTemplatePart} placingCard={placingCard} onPlaceCard={onPlaceCard} onMoveCard={onMoveCard}>{media}</BannerTemplateView> : media}
           {!useTemplate && buttons.map((button, index) => {

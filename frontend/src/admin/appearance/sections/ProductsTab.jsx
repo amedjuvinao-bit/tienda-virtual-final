@@ -141,7 +141,7 @@ export default function ProductsTab({ section, onChange, uploadToCloudinary }) {
 
           <Field label="Buscar en el catálogo" hint="Escribe el nombre de un producto.">
             <div className="flex gap-2">
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ej: vestido..." />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre del producto…" />
               <Button
                 kind="ghost"
                 type="button"

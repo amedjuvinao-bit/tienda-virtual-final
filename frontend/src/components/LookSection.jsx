@@ -290,7 +290,7 @@ export default function LookSection({ theme, previewProducts }) {
     return products.find((p) => String(p.id) === String(selectedId)) || products[0] || null;
   }, [products, selectedId]);
   const mainImage = hasCustomHero && !selectedId ? config.heroImage : selected?.image;
-  const mainImageAlt = hasCustomHero && !selectedId ? (config.titleText || "Imagen principal de Looks") : selected?.subtitle;
+  const mainImageAlt = hasCustomHero && !selectedId ? (config.titleText || "Imagen principal de la sección") : selected?.subtitle;
 
   const titleStyle = useMemo(() => buildTextStyleFrom(style, "title"), [style]);
   const descStyle = useMemo(() => buildTextStyleFrom(style, "desc"), [style]);
@@ -384,7 +384,7 @@ export default function LookSection({ theme, previewProducts }) {
             boxShadow: style.thumbShadow ? "0 10px 24px rgba(0,0,0,0.12)" : "none",
           }}
         >
-          <img src={config.heroImage} alt="Portada de Looks" className="h-full w-full object-cover" draggable={false} />
+          <img src={config.heroImage} alt="Portada de la sección" className="h-full w-full object-cover" draggable={false} />
         </span>
         <span className="mt-2 block leading-tight" style={thumbTitleStyle}>Imagen principal</span>
       </button>

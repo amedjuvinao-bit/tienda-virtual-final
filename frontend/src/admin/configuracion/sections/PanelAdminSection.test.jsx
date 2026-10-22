@@ -173,7 +173,7 @@ describe('PanelAdminSection Nivel Plus', () => {
     render(<PanelAdminSection />);
     await screen.findByText('Configuración sincronizada');
 
-    await user.click(screen.getByRole('button', { name: /Dorado boutique/i }));
+    await user.click(screen.getByRole('button', { name: /Dorado elegante/i }));
     const sidebarControls = screen.getByRole('group', {
       name: 'Amplitud del menú lateral',
     });
@@ -238,7 +238,7 @@ describe('PanelAdminSection Nivel Plus', () => {
       name: 'Tipografía del panel',
     });
     await user.click(
-      within(typographyControls).getByRole('button', { name: /Boutique editorial/i })
+      within(typographyControls).getByRole('button', { name: /Estilo editorial/i })
     );
 
     expect(document.documentElement.dataset.adminFontPreset).toBe('boutiqueEditorial');

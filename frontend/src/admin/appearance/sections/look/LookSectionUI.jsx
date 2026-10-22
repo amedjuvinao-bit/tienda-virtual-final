@@ -8,6 +8,7 @@ import {
   RangeNumberField,
   ToggleChip,
 } from "../ui/SectionsPanelUI";
+import { ADMIN_SECTION_LABELS } from "../../appearanceLabels";
 import LookProductPicker from "./LookProductPicker";
 import SectionEditorSteps from "../ui/SectionEditorSteps";
 import SectionEditorCardTabs from "../ui/SectionEditorCardTabs";
@@ -231,13 +232,13 @@ export default function LookSectionUI({
         <div className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-base font-extrabold text-neutral-900">Editor de sección LOOK</div>
+              <div className="text-base font-extrabold text-neutral-900">Editor de {ADMIN_SECTION_LABELS.look.toLowerCase()}</div>
               <div className="text-sm text-neutral-500 mt-1">
                 Elige la imagen grande, agrega productos y ajusta las fotos de sus tarjetas.
               </div>
             </div>
 
-            <SectionEditorSteps value={["slider-movil", "acciones"].includes(tab) ? "estilos" : tab} onChange={setTab} sectionName="LOOK" items={[
+            <SectionEditorSteps value={["slider-movil", "acciones"].includes(tab) ? "estilos" : tab} onChange={setTab} sectionName={ADMIN_SECTION_LABELS.look} items={[
               { value: "contenido", label: "Contenido", hint: "Elige productos y define los textos e imágenes que mostrarás." },
               { value: "estilos", label: "Diseño", hint: "Ajusta la apariencia, el slider móvil y los botones." },
             ]} />
@@ -254,7 +255,7 @@ export default function LookSectionUI({
 
         {tab === "contenido" && (
           <>
-            <nav className="section-editor-substeps" aria-label="Editar contenido de Looks">
+            <nav className="section-editor-substeps" aria-label={`Editar contenido de ${ADMIN_SECTION_LABELS.look.toLowerCase()}`}>
               {[
                 { value: "principal", label: "1 · Imagen grande" },
                 { value: "products", label: `2 · Productos (${selectedItems.length})` },
@@ -266,8 +267,8 @@ export default function LookSectionUI({
 
             {contentStep === "principal" && <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
               <div>
-                <h3 className="text-base font-extrabold text-neutral-900">Imagen grande al abrir Looks</h3>
-                <p className="mt-1 text-xs text-neutral-600">Puede ser una foto independiente del catálogo. También quedará como primera tarjeta de la galería para volver a verla al tocar una prenda.</p>
+                <h3 className="text-base font-extrabold text-neutral-900">Imagen principal de la sección</h3>
+                <p className="mt-1 text-xs text-neutral-600">Puede ser una foto independiente del catálogo. También quedará como primera tarjeta de la galería para volver a verla al tocar un producto.</p>
               </div>
               <div className="grid grid-cols-2 gap-2" role="group" aria-label="Origen de la imagen grande">
                 <button type="button" aria-pressed={config.heroMode === "custom"} onClick={() => patchConfig({ heroMode: "custom" })}
@@ -307,9 +308,9 @@ export default function LookSectionUI({
             {contentStep === "principal" && style.layoutPreset === "editorialGlass" && <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
               <h3 className="text-sm font-extrabold text-neutral-900">Mensaje junto a la foto</h3>
               <Field label="Texto pequeño"><Input value={config.editorialEyebrow || ""} onChange={(e) => patchConfig({ editorialEyebrow: e.target.value })} /></Field>
-              <Field label="Título editorial"><Input value={config.editorialHeadline || ""} onChange={(e) => patchConfig({ editorialHeadline: e.target.value })} /></Field>
+              <Field label="Título público" hint="Escribe el título que verá tu cliente; puedes usar el nombre que prefieras."><Input value={config.editorialHeadline || ""} onChange={(e) => patchConfig({ editorialHeadline: e.target.value })} /></Field>
               <Field label="Descripción de la sección"><textarea className="w-full min-h-[84px] rounded-xl border border-neutral-200 px-3 py-2 text-sm" value={config.description || ""}
-                onChange={(e) => patchConfig({ description: e.target.value })} placeholder="Texto descriptivo de la sección LOOK…" /></Field>
+                onChange={(e) => patchConfig({ description: e.target.value })} placeholder="Describe el contenido de esta sección…" /></Field>
               <Field label="Visibilidad"><div className="flex gap-2">
                 <ToggleChip active={section.enabled !== false} onClick={() => setLookSection({ ...section, enabled: true })}>Activa</ToggleChip>
                 <ToggleChip active={section.enabled === false} onClick={() => setLookSection({ ...section, enabled: false })}>Desactivada</ToggleChip>
@@ -345,7 +346,7 @@ export default function LookSectionUI({
                   <Input
                     value={config.titleImage || ""}
                     onChange={(e) => patchConfig({ titleImage: e.target.value })}
-                    placeholder="/ImgSEccionLook/Titulo.png o https://..."
+                    placeholder="URL de la imagen del título"
                   />
 
                   <div className="flex flex-wrap items-center gap-3">
@@ -372,7 +373,7 @@ export default function LookSectionUI({
                       <div className="w-28 h-14 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-50">
                         <img
                           src={config.titleImage}
-                          alt="Título look"
+                          alt="Imagen del título de la sección"
                           className="w-full h-full object-contain"
                         />
                       </div>
@@ -388,7 +389,7 @@ export default function LookSectionUI({
                 <Input
                   value={config.titleText || ""}
                   onChange={(e) => patchConfig({ titleText: e.target.value })}
-                  placeholder="Ej: Looks para bautizo"
+                  placeholder="Ej: Nuestra selección"
                 />
               </Field>
 
@@ -397,14 +398,14 @@ export default function LookSectionUI({
                   className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400 min-h-[100px]"
                   value={config.description || ""}
                   onChange={(e) => patchConfig({ description: e.target.value })}
-                  placeholder="Texto descriptivo de la sección LOOK…"
+                  placeholder="Describe el contenido de esta sección…"
                 />
               </Field>
               </div>
             </details>}
 
             {contentStep === "products" && <LookProductPicker
-              title="Productos de la sección LOOK"
+              title="Productos de la sección"
               value={selectedItems}
               maxItems={LOOK_MAX_PRODUCTS}
               onChange={setProducts}
@@ -460,9 +461,9 @@ export default function LookSectionUI({
         )}
 
         {tab === "estilos" && (
-          <SectionEditorCardTabs label="Diseño de Looks" labels={['Composición', 'Espacio', 'Textos', 'Imagen principal', 'Miniaturas']}>
+          <SectionEditorCardTabs label="Diseño de la selección de productos" labels={['Composición', 'Espacio', 'Textos', 'Imagen principal', 'Miniaturas']}>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
-              <div><h3 className="text-sm font-extrabold text-neutral-900">Composición de Looks</h3>
+              <div><h3 className="text-sm font-extrabold text-neutral-900">Composición de la sección</h3>
                 <p className="mt-1 text-xs text-neutral-600">El diseño editorial coloca la foto a la izquierda y las tarjetas en una franja de cristal que se superpone a su borde inferior. En móvil se apilan para conservar la lectura.</p></div>
               <Field label="Diseño de la sección"><div className="flex flex-wrap gap-2">
                 <ToggleChip active={style.layoutPreset === "editorialGlass"} onClick={() => patchStyle({ layoutPreset: "editorialGlass" })}>Editorial de cristal</ToggleChip>
@@ -473,7 +474,7 @@ export default function LookSectionUI({
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900">
                       {uploadingBackground ? "Subiendo…" : "Cargar fondo"}
-                      <input type="file" accept="image/*" aria-label="Cargar fondo de Looks" className="sr-only" disabled={uploadingBackground} onChange={uploadBackground} />
+                      <input type="file" accept="image/*" aria-label="Cargar fondo de la selección de productos" className="sr-only" disabled={uploadingBackground} onChange={uploadBackground} />
                     </label>
                     {config.editorialBackgroundImage && <button type="button" className="text-xs text-rose-900 underline" onClick={() => patchConfig({ editorialBackgroundImage: "" })}>Usar fondo incluido</button>}
                     <img src={config.editorialBackgroundImage || "/looks-editorial-background.webp"} alt="Fondo seleccionado" className="h-12 w-24 rounded-lg object-cover" />

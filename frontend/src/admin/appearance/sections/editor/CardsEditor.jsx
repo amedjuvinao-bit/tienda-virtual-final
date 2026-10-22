@@ -388,7 +388,7 @@ export default function CardsEditor({
               <Input
                 value={it.title}
                 onChange={(e) => patchItem?.(safeOpenIdx, { title: e.target.value })}
-                placeholder="Vestido..."
+                placeholder="Nombre del producto…"
               />
             </Field>
 
@@ -396,7 +396,7 @@ export default function CardsEditor({
               <Input
                 value={it.subtitle}
                 onChange={(e) => patchItem?.(safeOpenIdx, { subtitle: e.target.value })}
-                placeholder="Talla..."
+                placeholder="Tamaño…"
               />
             </Field>
           </div>

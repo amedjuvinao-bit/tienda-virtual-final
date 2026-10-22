@@ -455,6 +455,7 @@ export default function AppearancePage() {
           {activeTab === "header" && (
             <HeaderPanel
               theme={theme}
+              store={storeIdentity}
               setPath={setPath}
               menus={menus}
               routeOptions={routeOptions}
@@ -476,6 +477,7 @@ export default function AppearancePage() {
             <fieldset disabled={!canEditAppearance}>
             <BannerPanel
               theme={theme}
+              store={storeIdentity}
               setPath={setPath}
               disabled={saving || !canEditAppearance}
               uploading={uploading}

@@ -1145,7 +1145,7 @@ export default function ThanksPageEditor() {
                         onChange={(e) =>
                           updateSlide(slide.id, { badge: e.target.value })
                         }
-                        placeholder="Ej: Nueva colección"
+                        placeholder="Ej: Descubre las novedades"
                       />
 
                       <Textarea

@@ -141,7 +141,7 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
           {slider('sectionPaddingTopPx', 'Espacio superior (px)', 0, 200)}{slider('sectionPaddingBottomPx', 'Espacio inferior (px)', 0, 160)}
         </DesignCard>
         <DesignCard title="Fondo de la sección" hint="El fondo cubre también los márgenes, para conservar la continuidad visual de la tienda.">
-          {choice('fanBackgroundMode', 'Origen del fondo', [['continuity', 'Continuar fondo de Looks'], ['global', 'Fondo general'], ['custom', 'Imagen propia'], ['color', 'Color propio']])}
+          {choice('fanBackgroundMode', 'Origen del fondo', [['continuity', 'Continuar fondo de la selección de productos'], ['global', 'Fondo general'], ['custom', 'Imagen propia'], ['color', 'Color propio']])}
           {s.fanBackgroundMode === 'custom' && <SectionImageUpload label="Fondo de Categorías" value={c.backgroundImage} onChange={(backgroundImage) => config({ backgroundImage })} uploadToCloudinary={uploadToCloudinary} />}
           {['custom','color'].includes(s.fanBackgroundMode) && color('fanBackgroundColor', 'Color de fondo')}
           {slider('fanBackgroundWash', 'Suavidad sobre el fondo (%)', 0, 80)}

@@ -8,7 +8,7 @@ import React, { useId } from "react";
 export default function RosaCoutureMark({
   size = 96,
   className = "",
-  title = "Emblema Rosa Boutique",
+  title = "Emblema de la tienda",
 }) {
   const rawId = useId();
   const gradientId = `rosa-couture-${rawId.replace(/:/g, "")}`;

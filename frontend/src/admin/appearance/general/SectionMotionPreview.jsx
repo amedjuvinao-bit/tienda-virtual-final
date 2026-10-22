@@ -1,3 +1,4 @@
+import { ADMIN_SECTION_LABELS } from '../appearanceLabels';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Monitor, Smartphone, Play, Pause, RotateCcw } from 'lucide-react';
 import StorefrontStory from '../../../components/StorefrontStory';
@@ -5,7 +6,7 @@ import { STORY_PRESETS, normalizeStoryConfig, storySectionOrder } from '../../..
 import './sectionMotionPanel.css';
 
 function sceneImages(theme,id){const config=theme.sections?.find(item=>item.id===id)?.config || {};const values=[config.heroImage,config.imageSrc,config.image,config.fanImage,theme.banner?.imageUrl];const found=values.filter(value=>typeof value==='string'&&/^(?:\/(?!\/)|https:\/\/)/i.test(value));return [...new Set(found)];}
-const labels={tendencia:'Tendencias',look:'Looks',complementos:'Complementos',categorias:'Categorías',instagram:'Instagram',tiktok:'TikTok',informacion:'Información'};
+const labels=ADMIN_SECTION_LABELS;
 export default function SectionMotionPreview({config,theme={}}) {
   const c=normalizeStoryConfig(config), viewport=useRef(null), uid=useId().replace(/:/g,'');
   const [device,setDevice]=useState('desktop'), [progress,setProgress]=useState(0), [playing,setPlaying]=useState(false),[replay,setReplay]=useState(0);

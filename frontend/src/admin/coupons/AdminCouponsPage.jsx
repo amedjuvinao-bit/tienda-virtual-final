@@ -690,7 +690,7 @@ function CouponFormModal({
                   <div className="grid gap-3 md:grid-cols-3">
                     {[
                       { value: 'all', title: 'Toda la tienda', helper: 'El descuento aplica a cualquier producto elegible.' },
-                      { value: 'categories', title: 'Categorías concretas', helper: 'Ejemplo: vestidos, accesorios o belleza.' },
+                      { value: 'categories', title: 'Categorías concretas', helper: 'Selecciona las categorías que participan en la promoción.' },
                       { value: 'products', title: 'Productos concretos', helper: 'Elige artículos individuales de la tienda.' },
                     ].map((option) => (
                       <label key={option.value} className="cursor-pointer rounded-2xl border p-4 transition" style={{ borderColor: form.appliesTo === option.value ? 'var(--admin-primary)' : 'var(--admin-card-border)', background: form.appliesTo === option.value ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)' }}>

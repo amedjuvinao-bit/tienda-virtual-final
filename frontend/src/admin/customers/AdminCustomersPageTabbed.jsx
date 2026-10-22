@@ -144,7 +144,7 @@ const FOLLOW_UP_TYPES = [
   ['whatsapp', 'WhatsApp'],
   ['call', 'Llamada'],
   ['payment', 'Pago pendiente'],
-  ['size_request', 'Solicitud de talla'],
+  ['size_request', 'Consulta de variante'],
   ['reminder', 'Recordatorio'],
   ['complaint', 'Reclamo'],
   ['task', 'Tarea'],
@@ -859,14 +859,14 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                 <section className="grid h-full gap-4 overflow-hidden lg:grid-cols-[0.82fr_1.18fr]">
                   <form onSubmit={saveFollowUp} className="overflow-y-auto rounded-[26px] border bg-white p-5" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
                     <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Nueva gestión</h3>
-                    <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Registra una acción concreta: WhatsApp, llamada, pago, talla o tarea.</p>
+                    <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Registra una acción concreta: WhatsApp, llamada, pago, variante o tarea.</p>
                     {followError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{followError}</div> : null}
                     <div className="mt-5 grid gap-4 sm:grid-cols-3">
                       <Field label="Tipo"><select value={followForm.type} onChange={(event) => updateFollowField('type', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
                       <Field label="Prioridad"><select value={followForm.priority} onChange={(event) => updateFollowField('priority', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
                       <Field label="Responsable"><select value={followForm.assignedToAdmin} onChange={(event) => updateFollowField('assignedToAdmin', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="">Sin responsable</option>{crmAssignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select></Field>
                     </div>
-                    <div className="mt-4"><Field label="Nota"><TextArea value={followForm.note} onChange={(event) => updateFollowField('note', event.target.value)} placeholder="Ej: Cliente pidió talla 6. Confirmar disponibilidad mañana." /></Field></div>
+                    <div className="mt-4"><Field label="Nota"><TextArea value={followForm.note} onChange={(event) => updateFollowField('note', event.target.value)} placeholder="Ej: Cliente consultó una variante. Confirmar disponibilidad mañana." /></Field></div>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <Field label="Próxima acción"><TextInput value={followForm.nextAction} onChange={(event) => updateFollowField('nextAction', event.target.value)} placeholder="Ej: escribir por WhatsApp" /></Field>
                       <Field label="Fecha"><TextInput type="datetime-local" value={followForm.dueAt} onChange={(event) => updateFollowField('dueAt', event.target.value)} /></Field>

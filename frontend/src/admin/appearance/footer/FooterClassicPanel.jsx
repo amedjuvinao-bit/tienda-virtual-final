@@ -1033,7 +1033,7 @@ export default function FooterPanel({
                     label="Título columna 1"
                     value={footer.column1Title || ""}
                     onChange={(e) => setFooterPath("column1Title", e.target.value)}
-                    placeholder="Rosa Boutique"
+                    placeholder="Nombre de tu negocio"
                   />
                   <FooterLinkEditor
                     title="Enlaces columna 1"
@@ -1093,7 +1093,7 @@ export default function FooterPanel({
                 rows={3}
                 value={footer.copyright || ""}
                 onChange={(e) => setFooterPath("copyright", e.target.value)}
-                placeholder="© Rosa Boutique 2025. Todos los derechos reservados..."
+                placeholder="© Tu negocio. Todos los derechos reservados…"
               />
             </PanelCard>
           ) : null}

@@ -25,7 +25,7 @@ const PALETTES = [
 const GROUPS = [
   { id: "text", name: "Textos", fields: [
     ["mobileTitleColor", "Título de la sección"], ["mobileProductColor", "Nombre del producto"],
-    ["mobilePriceColor", "Precio"], ["mobileMetaColor", "Texto de tallas y colores"],
+    ["mobilePriceColor", "Precio"], ["mobileMetaColor", "Texto de tamaños y colores"],
     ["mobileMutedColor", "Precio anterior"], ["mobileDescriptionColor", "Descripción"],
   ] },
   { id: "button", name: "Botón", fields: [
@@ -37,7 +37,7 @@ const GROUPS = [
     ["mobileIndicatorInactiveColor", "Otros indicadores"],
   ] },
   { id: "background", name: "Fondo y detalles", fields: [
-    ["mobileSizeBackgroundColor", "Fondo de las tallas"], ["mobilePhotoBorderColor", "Borde de las fotos"],
+    ["mobileSizeBackgroundColor", "Fondo de los tamaños"], ["mobilePhotoBorderColor", "Borde de las fotos"],
   ] },
 ];
 
@@ -121,7 +121,7 @@ export default function TrendingMobileColorsEditor({ presentation, onChange, upl
       </div>
       <span className="trending-mobile-colors__sample-product">Nombre del producto</span>
       <span className="trending-mobile-colors__sample-price">Precio <del>Precio anterior</del></span>
-      <span className="trending-mobile-colors__sample-meta">TALLAS Y COLORES <i>Talla</i></span>
+      <span className="trending-mobile-colors__sample-meta">TAMAÑOS Y COLORES <i>Tamaño</i></span>
       <span className="trending-mobile-colors__sample-description">Descripción del producto</span>
       <span className="trending-mobile-colors__sample-dots" aria-hidden="true"><i /><i /><i /></span>
       <span className="trending-mobile-colors__sample-button trending-liquid-button"><span className="trending-liquid-button__glint" aria-hidden="true" /><ShoppingBag size={18} aria-hidden="true" />Ver producto</span>

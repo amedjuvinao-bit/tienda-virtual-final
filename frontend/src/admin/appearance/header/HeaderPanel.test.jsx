@@ -6,7 +6,7 @@ import HeaderPanel from './HeaderPanel';
 
 afterEach(cleanup);
 
-function Editor({ upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' }] }) {
+function Editor({ store, upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' }] }) {
   const [theme, setTheme] = useState({ header: { bgColor: '#18181b', logoLight: '/claro.png', logoDark: '/oscuro.png', logoHeightPx: 80 } });
   const [menus, setMenus] = useState({ header: initialLinks });
   const setPath = (path, value) => setTheme((previous) => {
@@ -17,7 +17,7 @@ function Editor({ upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' 
     target[parts.at(-1)] = value;
     return next;
   });
-  return <HeaderPanel theme={theme} setPath={setPath} menus={menus}
+  return <HeaderPanel store={store} theme={theme} setPath={setPath} menus={menus}
     routeOptions={{ public: [{ label: 'Inicio', value: '/' }, { label: 'Lo Nuevo', value: '/lo-nuevo' }] }}
     uploading={false} setUploading={() => {}} savedRevision={1} uploadToCloudinaryViaBackend={upload}
     addHeaderMenuItem={() => setMenus((previous) => ({ header: [...previous.header, { title: 'Nuevo', ref: '/lo-nuevo' }] }))}
@@ -31,6 +31,19 @@ function Editor({ upload = vi.fn(), initialLinks = [{ title: 'Inicio', ref: '/' 
 }
 
 describe('edición del encabezado', () => {
+  it('usa el nombre configurado en el logo alternativo y el menú móvil', async () => {
+    render(<Editor store={{ name: 'Ferretería Central' }} />);
+    const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
+    const logo = within(preview).getByAltText('Logo Ferretería Central');
+    fireEvent.error(logo);
+    fireEvent.error(within(preview).getByAltText('Logo Ferretería Central'));
+    expect(within(preview).getByRole('img', { name: 'Ferretería Central' })).toHaveTextContent('Ferretería Central');
+    await userEvent.click(within(preview).getByRole('button', { name: 'Móvil' }));
+    await userEvent.click(within(preview).getByRole('button', { name: 'Abrir menú de vista previa' }));
+    expect(preview).toHaveTextContent('Ferretería Central');
+    expect(preview).not.toHaveTextContent('Rosa Boutique');
+  });
+
   it('permite comprobar la presión de los enlaces en la vista previa', async () => {
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
@@ -73,17 +86,17 @@ describe('edición del encabezado', () => {
     const user = userEvent.setup();
     render(<Editor />);
     const preview = screen.getByText('Vista previa en vivo').closest('.appearance-header__preview');
-    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/claro.png');
+    expect(within(preview).getByAltText('Logo Tu tienda')).toHaveAttribute('src', '/claro.png');
     await user.click(screen.getByRole('button', { name: /Fondo/ }));
     await user.clear(screen.getByPlaceholderText('#FFFFFF'));
     await user.type(screen.getByPlaceholderText('#FFFFFF'), '#ffffff');
-    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/oscuro.png');
+    expect(within(preview).getByAltText('Logo Tu tienda')).toHaveAttribute('src', '/oscuro.png');
     await user.click(screen.getByRole('button', { name: 'Logo' }));
     await user.click(screen.getByRole('button', { name: /Logo claro Siempre priorizar claro/ }));
-    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/claro.png');
+    expect(within(preview).getByAltText('Logo Tu tienda')).toHaveAttribute('src', '/claro.png');
     expect(screen.getByRole('button', { name: /Logo claro Siempre priorizar claro/ })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: /Logo oscuro Siempre priorizar oscuro/ }));
-    expect(within(preview).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', '/oscuro.png');
+    expect(within(preview).getByAltText('Logo Tu tienda')).toHaveAttribute('src', '/oscuro.png');
     await user.click(screen.getByRole('button', { name: /Enlaces Destinos/ }));
     await user.clear(screen.getByPlaceholderText('Ej: Lo Nuevo'));
     await user.type(screen.getByPlaceholderText('Ej: Lo Nuevo'), 'Colección');
@@ -259,7 +272,7 @@ describe('edición del encabezado', () => {
     const file = new File(['imagen'], 'logo.png', { type: 'image/png' });
     await user.upload(input, file);
     expect(upload).toHaveBeenCalledWith(file, 'image');
-    expect(within(screen.getByText('Vista previa en vivo').closest('.appearance-header__preview')).getByAltText('Logo Rosa Boutique')).toHaveAttribute('src', 'https://res.cloudinary.com/tienda/logo.png');
+    expect(within(screen.getByText('Vista previa en vivo').closest('.appearance-header__preview')).getByAltText('Logo Tu tienda')).toHaveAttribute('src', 'https://res.cloudinary.com/tienda/logo.png');
     expect(screen.getByText(/Pulsa “Guardar cambios”/)).toBeInTheDocument();
   });
 

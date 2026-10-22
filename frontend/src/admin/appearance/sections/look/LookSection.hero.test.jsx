@@ -15,8 +15,8 @@ beforeEach(() => { vi.stubGlobal('matchMedia', () => ({ matches: false, addListe
 const imageUrl = 'https://res.cloudinary.com/tienda/image/upload/v1/portada-look.jpg';
 const products = [{ productId: 'p1', title: 'Vestido azul', mainImage: '/vestido.jpg', price: 100000 }];
 
-function Editor({ onSave, uploadToCloudinary }) {
-  const [theme, setTheme] = useState({ sections: [{ id: 'look', config: { products } }] });
+function Editor({ onSave, uploadToCloudinary, initialSection }) {
+  const [theme, setTheme] = useState({ sections: [initialSection || { id: 'look', config: { products } }] });
   return <>
     <LookSectionUI theme={theme} setPath={(_, sections) => setTheme({ sections })} uploadToCloudinary={uploadToCloudinary} />
     <button type="button" onClick={() => onSave(theme.sections[0])}>Guardar</button>
@@ -24,6 +24,25 @@ function Editor({ onSave, uploadToCloudinary }) {
 }
 
 describe('imagen principal independiente de Looks', () => {
+  it.each(['Looks para cada ocasión', 'Herramientas para tu proyecto'])(
+    'mantiene un editor global y permite el título público %s', (publicTitle) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ products: [] }) }));
+      const onSave = vi.fn();
+      const genericProducts = [{ productId: 'p1', title: 'Kit de herramientas', mainImage: '/kit.jpg', price: 100000 }];
+      const { unmount } = render(<Editor onSave={onSave} initialSection={{
+        id: 'look', name: 'Looks', config: { products: genericProducts, editorialHeadline: 'Título anterior' },
+      }} />);
+      expect(screen.getByText('Editor de selección de productos')).toBeInTheDocument();
+      fireEvent.change(screen.getByDisplayValue('Título anterior'), { target: { value: publicTitle } });
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+      const saved = onSave.mock.calls[0][0];
+      expect(saved).toMatchObject({ id: 'look', name: 'Looks', config: { editorialHeadline: publicTitle, products: genericProducts } });
+      unmount();
+      render(<LookSection theme={{ sections: [saved] }} previewProducts={genericProducts} />);
+      expect(screen.getByText(publicTitle)).toBeInTheDocument();
+    },
+  );
+
   it('sube la imagen desde el editor y la conserva en la configuración guardada', async () => {
     const onSave = vi.fn();
     const uploadToCloudinary = vi.fn().mockResolvedValue(imageUrl);
@@ -50,25 +69,25 @@ describe('imagen principal independiente de Looks', () => {
       { _id: 'p1', title: 'Vestido azul', image: '/vestido.jpg', price: 100000 },
     ] }) }));
     const view = render(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: imageUrl } }] }} previewProducts={products} />);
-    expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
+    expect(screen.getByAltText('Imagen principal de la sección')).toHaveAttribute('src', imageUrl);
     expect(document.querySelector('.look-editorial__hero-photo')).toHaveAttribute('src', imageUrl);
     const hero = document.querySelector('.look-editorial__hero');
-    Object.defineProperties(screen.getByAltText('Imagen principal de Looks'), { naturalWidth: { value: 800 }, naturalHeight: { value: 1000 } });
-    fireEvent.load(screen.getByAltText('Imagen principal de Looks'));
+    Object.defineProperties(screen.getByAltText('Imagen principal de la sección'), { naturalWidth: { value: 800 }, naturalHeight: { value: 1000 } });
+    fireEvent.load(screen.getByAltText('Imagen principal de la sección'));
     expect(hero.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '800 / 1000' });
     expect(screen.getByRole('button', { name: 'Mostrar imagen principal' }).closest('.look-editorial__rail')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Productos del look' }).querySelector('.keen-slider')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Productos de la selección' }).querySelector('.keen-slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tarjeta siguiente' })).toBeInTheDocument();
     expect(interval).toHaveBeenCalledWith(expect.any(Function), 5200);
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Vestido azul' }));
     expect(document.querySelector('.look-editorial__hero img')).toHaveAttribute('src', '/vestido.jpg');
     expect(hero.closest('.look-editorial')).toHaveStyle({ '--look-hero-aspect': '800 / 1000' });
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar imagen principal' }));
-    expect(screen.getByAltText('Imagen principal de Looks')).toHaveAttribute('src', imageUrl);
+    expect(screen.getByAltText('Imagen principal de la sección')).toHaveAttribute('src', imageUrl);
 
     const replacementCover = '/portada-horizontal.jpg';
     view.rerender(<LookSection theme={{ sections: [{ id: 'look', config: { products, heroMode: 'custom', heroImage: replacementCover } }] }} previewProducts={products} />);
-    const updatedPhoto = screen.getByAltText('Imagen principal de Looks');
+    const updatedPhoto = screen.getByAltText('Imagen principal de la sección');
     expect(updatedPhoto).toHaveAttribute('src', replacementCover);
     Object.defineProperties(updatedPhoto, { naturalWidth: { value: 1200 }, naturalHeight: { value: 800 } });
     fireEvent.load(updatedPhoto);
@@ -124,7 +143,7 @@ describe('imagen principal independiente de Looks', () => {
       const section = normalizeLookSection({ config: { products, heroMode: 'custom', heroImage: imageUrl },
         style: { editorialHeroTransition: value } });
       const view = render(<LookSection theme={{ sections: [section] }} previewProducts={products} />);
-      const firstPhoto = screen.getByAltText('Imagen principal de Looks');
+      const firstPhoto = screen.getByAltText('Imagen principal de la sección');
       Object.defineProperties(firstPhoto, { naturalWidth: { value: 800 }, naturalHeight: { value: 1000 } });
       fireEvent.load(firstPhoto);
       const scene = document.querySelector('.look-editorial__scene');
@@ -198,7 +217,7 @@ describe('imagen principal independiente de Looks', () => {
   it('guarda el fondo, textos y profundidad elegidos en el panel', async () => {
     const onSave = vi.fn();
     render(<Editor onSave={onSave} uploadToCloudinary={vi.fn()} />);
-    fireEvent.change(screen.getByPlaceholderText('Texto descriptivo de la sección LOOK…'), { target: { value: 'Una historia nueva' } });
+    fireEvent.change(screen.getByPlaceholderText('Describe el contenido de esta sección…'), { target: { value: 'Una historia nueva' } });
     fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Composición' }));
     const depthField = screen.getByText('Profundidad del cristal').parentElement;
@@ -249,7 +268,7 @@ describe('imagen principal independiente de Looks', () => {
     }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ products: [] }) }));
     render(<PreviewEditor />);
-    fireEvent.click(screen.getByRole('button', { name: 'Editar Looks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Selección de productos' }));
     fireEvent.click(screen.getByRole('button', { name: /Diseño/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Composición' }));
     await waitFor(() => expect(document.querySelector('.section-real-preview .look-editorial')).toBeInTheDocument());

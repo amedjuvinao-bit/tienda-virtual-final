@@ -114,6 +114,7 @@ const PanelBlock = ({ title, children, columns = 2 }) => (
 
 export default function HeaderPanel({
   theme,
+  store,
   setPath,
   menus,
   routeOptions,
@@ -211,7 +212,7 @@ export default function HeaderPanel({
           ))}
         </div>
 
-        <div data-admin-storefront-preview="true"><HeaderPreview theme={theme} menus={menus} /></div>
+        <div data-admin-storefront-preview="true"><HeaderPreview theme={theme} menus={menus} store={store} /></div>
 
         <fieldset disabled={!canEditTheme}>
         {activeMainTab === "branding" && (
@@ -416,13 +417,13 @@ export default function HeaderPanel({
                         aria-pressed={theme.header?.fontPreset === key && !theme.header?.fontFamily}
                         onClick={() => { setPath('header.fontPreset', key); setPath('header.fontFamily', ''); }}>
                         <span className="appearance-header__font-option-heading"><strong>{preset.label}</strong><small>{preset.description}</small></span>
-                        <span className="appearance-header__font-example" style={{ fontFamily: preset.family, fontWeight: preset.weight, fontStyle: preset.style, letterSpacing: preset.spacing, textTransform: preset.transform }}>Lo Nuevo · Boutique</span>
+                        <span className="appearance-header__font-example" style={{ fontFamily: preset.family, fontWeight: preset.weight, fontStyle: preset.style, letterSpacing: preset.spacing, textTransform: preset.transform }}>Inicio · Productos</span>
                       </button>
                     ))}
                   </div>
                   <div className="appearance-header__font-detail">
                     <strong>Texto seleccionado · tamaño real</strong>
-                    <span style={{ ...resolveHeaderTypography(theme.header), fontSize: `${theme.header?.fontSizePx ?? 16}px` }}>Lo Nuevo · Colecciones · Boutique</span>
+                    <span style={{ ...resolveHeaderTypography(theme.header), fontSize: `${theme.header?.fontSizePx ?? 16}px` }}>Inicio · Productos · Contacto</span>
                   </div>
                   <Input label="Tamaño del texto del menú (px)" type="number" min={12} max={30} step="1"
                     value={theme.header?.fontSizePx ?? 16}

@@ -3,15 +3,8 @@ import { CATEGORIAS_SECTION_DEFAULTS } from './categorias/categoriasSectionHelpe
 import { INFO_SECTION_DEFAULTS } from './info/infoSectionHelpers';
 import { stagePosts } from './tiktok/tiktokStageHelpers';
 
-export const SECTION_LABELS = {
-  tendencia: 'En tendencia',
-  look: 'Looks',
-  complementos: 'Complementos',
-  categorias: 'Categorías',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  informacion: 'Información',
-};
+import { ADMIN_SECTION_LABELS as SECTION_LABELS } from '../appearanceLabels';
+export { SECTION_LABELS };
 
 const count = (value, valid) => Array.isArray(value) ? value.filter(valid).length : 0;
 const validProduct = (product) => String(typeof product === 'string' ? product : product?.productId || '').trim();

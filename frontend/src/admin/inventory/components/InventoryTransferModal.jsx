@@ -751,7 +751,7 @@ export default function InventoryTransferModal({
                   <PanelTitle
                     icon={<Boxes size={18} />}
                     title="Inventario origen"
-                    description="Selecciona la fila exacta que tiene el producto, sede, talla, color y stock disponible."
+                    description="Selecciona la fila exacta que tiene el producto, sede, tamaño, color y stock disponible."
                   />
 
                   {referenceLoading && (
@@ -775,7 +775,7 @@ export default function InventoryTransferModal({
 
                       {sourceOptions.map((row) => (
                         <option key={getStockRowId(row)} value={getStockRowId(row)}>
-                          {getProductTitle(row)} · {getBranchName(row)} · Talla{' '}
+                          {getProductTitle(row)} · {getBranchName(row)} · Tamaño{' '}
                           {getVariantSize(row)} · Color {getVariantColor(row)} · Disponible{' '}
                           {formatNumber(getAvailableStock(row))}
                         </option>
@@ -810,7 +810,7 @@ export default function InventoryTransferModal({
                       />
 
                       <StockInfoBox
-                        label="Talla"
+                        label="Tamaño"
                         value={getVariantSize(selectedSourceStock)}
                         helper="Variante exacta"
                       />

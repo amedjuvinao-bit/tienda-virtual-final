@@ -13,7 +13,7 @@ const slides = [
   { image: '/second.jpg', fit: 'contain', posX: 70, posY: 50, button: { enabled: false } },
 ];
 
-function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520, sliderIntervalMs: 4500, sliderShowProgress: true, slides }, upload = vi.fn(), sections = [] }) {
+function Editor({ store, initial = { type: 'slider', heightMode: 'auto', heightPx: 520, sliderIntervalMs: 4500, sliderShowProgress: true, slides }, upload = vi.fn(), sections = [] }) {
   const [theme, setTheme] = useState({ banner: initial, sections });
   const setPath = (path, value) => setTheme((previous) => {
     const next = structuredClone(previous);
@@ -23,10 +23,17 @@ function Editor({ initial = { type: 'slider', heightMode: 'auto', heightPx: 520,
     cursor[keys.at(-1)] = typeof value === 'function' ? value(cursor[keys.at(-1)], previous) : value;
     return next;
   });
-  return <><output data-testid="banner-values">{JSON.stringify(theme.banner)}</output><BannerPanel theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={upload} onPreview={() => {}} /></>;
+  return <><output data-testid="banner-values">{JSON.stringify(theme.banner)}</output><BannerPanel store={store} theme={theme} setPath={setPath} uploading={false} setUploading={() => {}} uploadToCloudinaryViaBackend={upload} onPreview={() => {}} /></>;
 }
 
 describe('editor de Portada', () => {
+  it('identifica la vista previa con el negocio configurado', () => {
+    render(<Editor store={{ name: 'Librería Central' }} />);
+    const preview = screen.getByRole('region', { name: 'Vista previa de portada' });
+    expect(preview.querySelector('.banner-preview-mini-header')).toHaveTextContent('Librería Central');
+    expect(preview).not.toHaveTextContent('ROSA BOUTIQUE');
+  });
+
   it('conserva la galería al alternar entre solo imágenes y un diseño común', async () => {
     const user = userEvent.setup();
     render(<Editor />);

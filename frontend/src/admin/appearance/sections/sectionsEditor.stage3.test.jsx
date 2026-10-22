@@ -46,7 +46,7 @@ describe('editor de secciones, etapa 3', () => {
   it.each(['tendencia', 'look', 'complementos', 'categorias', 'instagram', 'tiktok', 'informacion'])(
     'muestra vista previa permanente al editar contenido y diseño de %s', (id) => {
       render(<Harness id={id} onSave={vi.fn()} />);
-      fireEvent.click(screen.getByRole('button', { name: `Editar ${id === 'categorias' ? 'Categorías' : id === 'informacion' ? 'Información' : id === 'tiktok' ? 'TikTok' : id === 'look' ? 'Looks' : id === 'complementos' ? 'Complementos' : id === 'instagram' ? 'Instagram' : 'En tendencia'}` }));
+      fireEvent.click(screen.getByRole('button', { name: `Editar ${id === 'categorias' ? 'Categorías' : id === 'informacion' ? 'Información' : id === 'tiktok' ? 'TikTok' : id === 'look' ? 'Selección de productos' : id === 'complementos' ? 'Complementos' : id === 'instagram' ? 'Instagram' : 'En tendencia'}` }));
       const steps = screen.getByRole('navigation', { name: 'Pasos de edición' });
       expect(screen.getByRole('region', { name: 'Vista real de la tienda' })).toBeInTheDocument();
       fireEvent.click(within(steps).getByRole('button', { name: /Diseño/ }));
@@ -148,7 +148,7 @@ describe('editor de secciones, etapa 3', () => {
       config: { products: [{ productId: 'producto-1', title: 'Vestido rosa', mainImage: '/look-rosa.jpg', price: 98000 }] },
     }] };
     render(<SectionsPanel theme={theme} setPath={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Editar Looks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Selección de productos' }));
     const preview = screen.getByRole('region', { name: 'Vista real de la tienda' });
     await waitFor(() => expect(within(preview).getAllByAltText('Vestido rosa').length).toBeGreaterThan(0));
     await waitFor(() => expect(within(preview).getByRole('status')).toHaveTextContent('no están disponibles en el catálogo'));
@@ -196,7 +196,7 @@ describe('editor de secciones, etapa 3', () => {
 
   it.each([
     ['tendencia', 'En tendencia', 'Diseño de Tendencia', 'Tarjetas y espacio'],
-    ['look', 'Looks', 'Diseño de Looks', 'Miniaturas'],
+    ['look', 'Selección de productos', 'Diseño de la selección de productos', 'Miniaturas'],
     ['complementos', 'Complementos', 'Diseño de Complementos', 'Botón y efectos'],
     ['categorias', 'Categorías', 'Diseño de Categorías', 'Visibilidad'],
     ['informacion', 'Información', 'Diseño de Información', 'Animación'],

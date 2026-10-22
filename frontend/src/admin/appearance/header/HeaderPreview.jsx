@@ -10,7 +10,7 @@ import { MobileMenuLinkIcon } from '../../../components/mobileMenuIcons';
 import '../../../components/headerSearch.css';
 import '../../../components/metallicText.css';
 
-export default function HeaderPreview({ theme, menus }) {
+export default function HeaderPreview({ theme, menus, store }) {
   const [viewport, setViewport] = useState('desktop');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [failedLogo, setFailedLogo] = useState('');
@@ -19,6 +19,7 @@ export default function HeaderPreview({ theme, menus }) {
   const menuPressTimerRef = useRef(null);
   useEffect(() => () => window.clearTimeout(menuPressTimerRef.current), []);
   const header = theme?.header || {};
+  const storeName = store?.name?.trim() || theme?.store?.name?.trim() || 'Tu tienda';
   const previewMenuPress = (index) => {
     if (header.menuAnimation === 'none' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     window.clearTimeout(menuPressTimerRef.current);
@@ -62,7 +63,7 @@ export default function HeaderPreview({ theme, menus }) {
           data-shape={surface.shape} data-glass={surface.glass} data-tone={isDarkHeaderBackground(header.bgColor) ? 'dark' : 'light'} style={{ ...surface.style, ...headerSearchColorVariables(header, theme?.colors), '--header-menu-text': header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), '--header-menu-hover': header.linkColor || '#c2410c', '--header-icon-color': header.iconColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#9d4268'), '--header-icon-hover': header.iconHoverColor || '#c62d6a', '--storefront-action-size': `${Math.max(28, Math.min(40, Number(header.iconSizePx) || 34))}px`, backgroundColor: headerColor, color: header.textColor || (isDarkHeaderBackground(header.bgColor) ? '#ffffff' : '#1f1f1f'), fontFamily: typography.fontFamily, fontSize: `${header.fontSizePx || 16}px` }}>
           {mobile && <MobileMenuTrigger config={header} expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}
             aria-label={drawerOpen ? 'Cerrar menú de vista previa' : 'Abrir menú de vista previa'} />}
-          <HeaderBrand src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
+          <HeaderBrand name={storeName} src={logo} alternateSrc={alternateLogo} onUnavailable={setFailedLogo} style={{ maxHeight: `${mobile ? Math.min(46, Number(header.logoHeightPx) || 80) : Math.min(100, Number(header.logoHeightPx) || 80)}px` }} />
           {!mobile && <nav aria-label="Vista previa del menú" style={{ fontWeight: typography.fontWeight, fontStyle: typography.fontStyle, letterSpacing: typography.letterSpacing, textTransform: typography.textTransform }}>{links.length ? links.map((link, index) => <button type="button" className={`${header.metallicMenuText === true ? 'rb-metallic-text ' : ''}${pressedMenuIndex === index ? 'rb-header-menu-link--pressed' : ''}`} onClick={() => previewMenuPress(index)} key={`${link.to}-${index}`}>{link.name}</button>) : <em>Tu menú aparecerá aquí</em>}</nav>}
           <div className="appearance-header__actions">
             <div className="header-search-anchor">
@@ -75,14 +76,14 @@ export default function HeaderPreview({ theme, menus }) {
         </div>
         {mobile && drawerOpen && <div className="appearance-header__preview-overlay" style={{ backgroundColor: header.mobileMenuOverlayColor || (atelier ? '#54233d' : '#000000'), opacity: header.mobileMenuOverlayOpacity ?? (atelier ? 0.22 : 0.35), backdropFilter: atelier ? 'blur(4px)' : undefined }} />}
         {mobile && drawerOpen && atelier && <div className="appearance-header__atelier-preview" style={{ '--atelier-ink': header.mobileMenuTextColor || '#4e1e39', '--atelier-muted': header.mobileMenuMutedColor || '#815269', '--atelier-accent': header.mobileMenuAccentColor || '#ac7950', '--atelier-line': header.mobileMenuItemBorderColor || '#d2a997', '--atelier-surface': header.mobileMenuBgColor || '#fff4f3', '--atelier-font': header.mobileMenuFontFamily || 'Georgia, serif', '--atelier-separator-width': `${Math.max(0, Math.min(6, Number(header.mobileMenuItemBorderWidthPx ?? 1)))}px` }}>
-          <AtelierMobileMenu items={links} storeName={theme?.store?.name || 'Rosa Boutique'} featureImage={header.mobileMenuFeatureImage || ''} featureLink={header.mobileMenuFeatureRef || ''} whatsappConfig={theme?.global?.whatsapp} closeIconColor={header.mobileMenuCloseIconColor} preview
+          <AtelierMobileMenu items={links} storeName={storeName} featureImage={header.mobileMenuFeatureImage || ''} featureLink={header.mobileMenuFeatureRef || ''} whatsappConfig={theme?.global?.whatsapp} closeIconColor={header.mobileMenuCloseIconColor} preview
             onClose={() => setDrawerOpen(false)} onSelect={() => setDrawerOpen(false)}
             onSearch={() => { setDrawerOpen(false); setSearchPreviewOpen(true); }}
             onFavorites={() => setDrawerOpen(false)} onCart={() => setDrawerOpen(false)} />
         </div>}
         {mobile && drawerOpen && !atelier && <div className="appearance-header__drawer" style={{ backgroundColor: header.mobileMenuBgColor || '#fffdfd', color: header.mobileMenuTextColor || '#1f1f1f', fontFamily: header.mobileMenuFontFamily || typography.fontFamily, width: drawerLayout === 'full-screen' ? '100%' : `${Math.min(Number(header.mobileMenuWidthPercent ?? 88), 92)}%`, left: drawerLayout === 'drawer-right' ? 'auto' : drawerLayout === 'center-panel' ? '50%' : 0, right: drawerLayout === 'drawer-right' ? 0 : 'auto', transform: drawerLayout === 'center-panel' ? 'translateX(-50%)' : undefined, border: `${header.mobileMenuBorderWidthPx ?? 0}px solid ${header.mobileMenuBorderColor || '#e7c2cf'}`, borderRadius: `${header.mobileMenuRadiusPx ?? 0}px`, padding: `12px ${header.mobileMenuPaddingPx ?? 20}px` }}>
           <div className="appearance-header__drawer-head">
-            <strong>{theme?.store?.name || 'Rosa Boutique'}</strong>
+            <strong>{storeName}</strong>
             <button type="button" aria-label="Cerrar menú del panel de vista previa" onClick={() => setDrawerOpen(false)}
               style={{ color: header.mobileMenuCloseIconColor || '#8d5c6b', backgroundColor: header.mobileMenuCloseBgColor || '#fff', border: `${header.mobileMenuCloseBorderWidthPx ?? 1}px solid ${header.mobileMenuCloseBorderColor || '#e7c2cf'}`, borderRadius: `${header.mobileMenuCloseRadiusPx ?? 999}px` }}><X size={19} /></button>
           </div>

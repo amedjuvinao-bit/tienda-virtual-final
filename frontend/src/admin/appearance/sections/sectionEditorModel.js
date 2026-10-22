@@ -1,3 +1,4 @@
+import { ADMIN_SECTION_LABELS } from '../appearanceLabels';
 import { normalizeCategoriasSection } from "./categorias/categoriasSectionHelpers";
 import { normalizeComplementosSection } from "./complementos/complementosSectionHelpers";
 import { normalizeTrendingPresentation } from "../../../components/trendingPresentation";
@@ -45,15 +46,7 @@ export const CARD_FONT_OPTIONS = [
   { label: "Lora (editorial)", value: '"Lora", Georgia, serif' },
 ];
 
-export const SECTION_CATALOG = [
-  { id: "tendencia", label: "En tendencia — tendencia" },
-  { id: "look", label: "Look — look" },
-  { id: "complementos", label: "Complementos — complementos" },
-  { id: "categorias", label: "Categorías — categorias" },
-  { id: "instagram", label: "Instagram — instagram" },
-  { id: "tiktok", label: "TikTok — tiktok" },
-  { id: "informacion", label: "Información — informacion" },
-];
+export const SECTION_CATALOG = Object.entries(ADMIN_SECTION_LABELS).map(([id, label]) => ({ id, label }));
 
 export function moneyCOP(value) {
   const n = Number(value);
@@ -186,7 +179,7 @@ export function inferTypeFromId(id) {
 
 export function inferNameFromId(id) {
   const hit = SECTION_CATALOG.find((s) => s.id === id);
-  if (hit) return hit.label.split("—")[0].trim();
+  if (hit) return hit.label;
   if (!id) return "Sección";
   return id.charAt(0).toUpperCase() + id.slice(1);
 }

@@ -1541,7 +1541,7 @@ export default function CatalogPageEditor() {
                           allowedCategoriesText: normalizeCsvText(e.target.value),
                         })
                       }
-                      placeholder="Ej: Bautizos, Zapatos, Accesorios"
+                      placeholder="Ej: Novedades, Destacados, Ofertas"
                     />
                   </>
                 )}
@@ -1574,7 +1574,7 @@ export default function CatalogPageEditor() {
                           initialCategoriesText: normalizeCsvText(e.target.value),
                         })
                       }
-                      placeholder="Ej: Vestidos cortos, Jeans, Accesorios"
+                      placeholder="Ej: Categoría principal, Subcategoría"
                     />
                   </>
                 )}
@@ -1607,7 +1607,7 @@ export default function CatalogPageEditor() {
                         manualProductIdsText: normalizeCsvText(e.target.value),
                       })
                     }
-                    placeholder="Ej: 67a1bc..., vestido-luna-dorada, 67f9de..."
+                    placeholder="Ej: 67a1bc..., producto-destacado, 67f9de..."
                   />
                 </>
               )}

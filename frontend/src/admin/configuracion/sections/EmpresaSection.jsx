@@ -483,7 +483,7 @@ export default function EmpresaSection() {
             <div className="store-panel" data-testid="store-step-identity">
               <header><BadgeCheck size={22} /><div><h3>Identidad de la tienda</h3><p>Información comercial; los datos fiscales continúan exclusivamente en Facturación.</p></div></header>
               <div className="store-form-grid">
-                <Field label="Nombre comercial" required error={errors.name} help="El nombre que reconocerán tus clientes."><input value={store.name} onChange={(event) => updateField('name', event.target.value)} placeholder="Ej. Rosa Boutique" /></Field>
+                <Field label="Nombre comercial" required error={errors.name} help="El nombre que reconocerán tus clientes."><input value={store.name} onChange={(event) => updateField('name', event.target.value)} placeholder="Ej. Mi negocio" /></Field>
                 <Field label="Razón social" error={errors.businessName} help="Opcional. No reemplaza la configuración fiscal."><input value={store.businessName} onChange={(event) => updateField('businessName', event.target.value)} placeholder="Nombre legal registrado" /></Field>
                 <Field label="Página web" error={errors.website} help="Usa la URL completa con https://."><input type="url" value={store.website} onChange={(event) => updateField('website', event.target.value)} placeholder="https://mitienda.com" /></Field>
               </div>

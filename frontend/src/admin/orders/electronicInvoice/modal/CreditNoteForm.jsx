@@ -116,7 +116,7 @@ export default function CreditNoteForm({ controller }) {
           onChange={(event) => setCreditNoteObservation(event.target.value)}
           maxLength={250}
           rows={3}
-          placeholder="Ejemplo: Cliente solicita devolución por talla incorrecta. Se genera nota crédito parcial por el producto devuelto."
+          placeholder="Ejemplo: Cliente solicita devolución del producto. Se genera nota crédito parcial por el producto devuelto."
           className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
           style={{
             background: 'var(--admin-input-bg)',

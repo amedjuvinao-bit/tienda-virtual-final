@@ -12,7 +12,7 @@ export const ADMIN_FONT_PRESETS = Object.freeze([
   }),
   Object.freeze({
     value: 'boutiqueEditorial',
-    label: 'Boutique editorial',
+    label: 'Estilo editorial',
     description: 'Source Sans humanista con Cormorant de aire editorial.',
     body: "'Source Sans 3', 'Segoe UI', sans-serif",
     heading: "'Cormorant Garamond', Georgia, serif",

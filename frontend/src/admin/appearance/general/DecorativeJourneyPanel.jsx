@@ -1,3 +1,4 @@
+import { ADMIN_SECTION_LABELS } from '../appearanceLabels';
 import React, { useState } from 'react';
 import { JOURNEY_SECTION_IDS } from '../../../lib/decorativeJourneyConfig';
 import CloudinaryImageField from './CloudinaryImageField';
@@ -7,7 +8,7 @@ function Range({label,value,min,max,step=1,onChange,suffix=''}){
 }
 export default function DecorativeJourneyPanel({config,onChange,theme={},uploadToCloudinaryViaBackend,uploading,setUploading,savedRevision}){
   const [tab,setTab]=useState('adornos'),[sectionId,setSectionId]=useState('banner'),c=config.journey;
-  const labels={banner:'Portada',tendencia:'Tendencias',look:'Look',complementos:'Complementos',categorias:'Categorías',instagram:'Instagram',tiktok:'TikTok',informacion:'Información',footer:'Pie de página'};
+  const labels={banner:'Portada',...ADMIN_SECTION_LABELS,footer:'Pie de página'};
   const current={placement:'auto',scale:100,accent:65,enabled:true,...c.sectionSettings?.[sectionId]};
   const editSection=(key,value)=>edit('sectionSettings',{...c.sectionSettings,[sectionId]:{...current,[key]:value}});
   const edit=(key,value)=>onChange({...config,journey:{...c,[key]:value}});

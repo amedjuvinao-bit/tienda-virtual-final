@@ -133,7 +133,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     className={`look-editorial__card look-editorial__card--cover keen-slider__slide ${!selectedId ? "is-selected" : ""}`}>
     <div className="look-editorial__card-surface">
       <button type="button" className="look-editorial__card-image" aria-label="Mostrar imagen principal" onClick={() => onSelect("")}>
-        <img src={config.heroImage} alt="Portada de Looks" loading="lazy" />
+        <img src={config.heroImage} alt="Portada de la sección" loading="lazy" />
         <span className="look-editorial__cover-badge" aria-hidden="true">Portada</span>
       </button>
       <div className="look-editorial__card-details">
@@ -143,21 +143,21 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
     </div>
   </article>;
 
-  return <section className="look-editorial" style={css} aria-label="Looks">
+  return <section className="look-editorial" style={css} aria-label={config.editorialHeadline || config.titleText || "Selección de productos"}>
     <div className="look-editorial__scene" style={{ maxWidth: style.editorialContentWidthPx }}>
       <div className={`look-editorial__hero ${style.editorialHeroFit === "crop" ? "look-editorial__hero--crop" : ""}`}>
         {mainImage ? <img key={mainImage} className={`look-editorial__hero-photo look-editorial__hero-photo--${style.editorialHeroTransition}`}
-          src={mainImage} alt={mainImageAlt || "Imagen principal de Looks"}
+          src={mainImage} alt={mainImageAlt || "Imagen principal de la sección"}
           onLoad={(event) => {
             const { naturalWidth, naturalHeight } = event.currentTarget;
             if (!frameRatio && naturalWidth && naturalHeight) {
               setLoadedHero({ src: frameSource, ratio: `${naturalWidth} / ${naturalHeight}` });
             }
           }} />
-          : <div className="look-editorial__empty">{loading ? "Cargando looks…" : "Selecciona una portada o un producto"}</div>}
+          : <div className="look-editorial__empty">{loading ? "Cargando productos…" : "Selecciona una portada o un producto"}</div>}
         <div className="look-editorial__hero-controls">
-          <button type="button" aria-label="Look anterior" onClick={() => moveHero(-1)} disabled={options.length < 2}><ChevronLeft size={21} /></button>
-          <button type="button" aria-label="Look siguiente" onClick={() => moveHero(1)} disabled={options.length < 2}><ChevronRight size={21} /></button>
+          <button type="button" aria-label="Imagen anterior" onClick={() => moveHero(-1)} disabled={options.length < 2}><ChevronLeft size={21} /></button>
+          <button type="button" aria-label="Imagen siguiente" onClick={() => moveHero(1)} disabled={options.length < 2}><ChevronRight size={21} /></button>
         </div>
         <LookGlassRim radius={style.mainImageRadiusPx} />
       </div>
@@ -172,7 +172,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
           fontWeight: style.descWeight }}>{config.description}</p>}
       </div>
 
-      <div className="look-editorial__rail" role="region" aria-roledescription="carrusel" aria-label="Productos del look" onMouseEnter={() => { pausedRef.current = true; }}
+      <div className="look-editorial__rail" role="region" aria-roledescription="carrusel" aria-label="Productos de la selección" onMouseEnter={() => { pausedRef.current = true; }}
         onMouseLeave={() => { pausedRef.current = false; }} onFocusCapture={() => { pausedRef.current = true; }}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) pausedRef.current = false; }}>
         <div ref={railRef} className="look-editorial__cards keen-slider">
@@ -206,7 +206,7 @@ export default function LookEditorialGlass({ config, style, products, mainImage,
           <button type="button" aria-label="Tarjeta anterior" onClick={() => railInstanceRef.current?.prev()}><ChevronLeft size={17} /></button>
           <button type="button" aria-label="Tarjeta siguiente" onClick={() => railInstanceRef.current?.next()}><ChevronRight size={17} /></button>
         </div>}
-        {canSlide && <div className="look-editorial__rail-pagination" aria-label="Productos del look">
+        {canSlide && <div className="look-editorial__rail-pagination" aria-label="Productos de la selección">
           {mobileOptions.map((option, index) => <button key={option.id || "cover"} type="button"
             className={railIndex === index ? "is-active" : ""}
             aria-label={`Mostrar tarjeta ${index + 1} de ${cardCount}`}

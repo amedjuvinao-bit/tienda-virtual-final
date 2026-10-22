@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CircleAlert, CircleCheck, CircleHelp, Eye, EyeOff, Heart, Images, Info, Music2, Pencil, Shirt, Sparkles } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleHelp, Eye, EyeOff, Heart, Images, Info, Music2, Pencil, Layers, Sparkles } from "lucide-react";
 import LookSectionUI from "./look/LookSectionUI";
 import ComplementosSectionUI from "./complementos/ComplementosSectionUI";
 import CategoriasSectionUI from "./categorias/CategoriasSectionUI";
 import InstagramSectionUI from "./instagram/InstagramSectionUI";
 import TiktokSectionUI from "./tiktok/TiktokSectionUI";
 import InfoSectionUI from "./info/infoSectionUI";
+import { getAdminSectionLabel } from "../appearanceLabels";
 import { getSectionOverview } from "./sectionsOverviewModel";
 import SectionEditorSteps from "./ui/SectionEditorSteps";
 import StorefrontSectionPreview from "./ui/StorefrontSectionPreview";
@@ -21,7 +22,7 @@ import './sectionsOverview.css';
 
 const OVERVIEW_ICONS = {
   tendencia: Sparkles,
-  look: Shirt,
+  look: Layers,
   complementos: Heart,
   categorias: Images,
   instagram: Images,
@@ -211,7 +212,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
               <article className="sections-overview__card" data-status={status} key={section.id}>
                 <span className="sections-overview__icon" aria-hidden="true"><Icon /></span>
                 <div className="sections-overview__content">
-                  <h3 title={section.name}>{label}</h3>
+                  <h3 title={label}>{label}</h3>
                   <p>{detail}</p>
                   <span className="sections-overview__status" data-status={status}><StatusIcon aria-hidden="true" />{OVERVIEW_STATUS[status].label}</span>
                 </div>
@@ -241,7 +242,7 @@ export default function SectionsPanel({ theme, setPath, disabled = false, upload
       </section>
 
       {selected ? (
-      <ModalShell onClose={closeEditor} title={`Editar sección: ${selected.name}`} disabled={disabled}>
+      <ModalShell onClose={closeEditor} title={`Editar sección: ${getAdminSectionLabel(selected)}`} disabled={disabled}>
         <InstagramEditorFeedProvider enabled={isInstagramSection}>
         <TiktokEditorFeedProvider enabled={isTiktokSection}>
         <div className="section-editor-layout">

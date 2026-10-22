@@ -286,7 +286,7 @@ export default function StylesTab({ section, onChange, uploadToCloudinary }) {
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {colorPresentationField("cardTitleColor", "Nombre del producto")}
                 {colorPresentationField("cardPriceColor", "Precio")}
-                {colorPresentationField("cardMetaColor", "Tallas y colores")}
+                {colorPresentationField("cardMetaColor", "Tamaños y colores")}
                 {colorPresentationField("cardDescColor", "Descripción y características")}
                 {colorPresentationField("cardMutedColor", "Precio anterior")}
               </div>
@@ -399,7 +399,7 @@ export default function StylesTab({ section, onChange, uploadToCloudinary }) {
             Subtítulo de card / descripción
           </div>
           <div className="text-xs mt-1" style={cardTextStyle}>
-            Precio: $111.111 — Tallas: 6 / 8
+            Precio: $111.111 — Tamaños: pequeño / grande
           </div>
         </div>
       </div>
@@ -407,7 +407,7 @@ export default function StylesTab({ section, onChange, uploadToCloudinary }) {
       <div className="grid gap-3">
         <FieldStyleEditor title="Título del producto" prefix="cardTitle" defaultSize={12} sizeMin={10} sizeMax={20} weightDefault={800} />
         <FieldStyleEditor title="Precio" prefix="cardPrice" defaultSize={14} sizeMin={10} sizeMax={22} weightDefault={800} />
-        <FieldStyleEditor title="Tallas y colores" prefix="cardMeta" defaultSize={12} sizeMin={12} sizeMax={18} weightDefault={700} />
+        <FieldStyleEditor title="Tamaños y colores" prefix="cardMeta" defaultSize={12} sizeMin={12} sizeMax={18} weightDefault={700} />
         <FieldStyleEditor title="Descripción y características" prefix="cardDesc" defaultSize={11} sizeMin={9} sizeMax={18} weightDefault={600} />
       </div>
 
@@ -420,7 +420,7 @@ export default function StylesTab({ section, onChange, uploadToCloudinary }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2">
-              <span className="text-xs text-neutral-700">Mostrar Tallas</span>
+              <span className="text-xs text-neutral-700">Mostrar tamaños</span>
               <Toggle
                 checked={typeof cardFields.showSizes === "boolean" ? cardFields.showSizes : true}
                 onChange={(v) => patchCardFields({ showSizes: !!v })}
@@ -453,7 +453,7 @@ export default function StylesTab({ section, onChange, uploadToCloudinary }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label="Máximo tallas a mostrar" hint="2–20 (para evitar chorizo)" name="config.cardFields.maxSizesToShow">
+            <Field label="Máximo de tamaños a mostrar" hint="Entre 2 y 20 opciones para mantener la tarjeta legible" name="config.cardFields.maxSizesToShow">
               <Input
                 type="number"
                 min={2}

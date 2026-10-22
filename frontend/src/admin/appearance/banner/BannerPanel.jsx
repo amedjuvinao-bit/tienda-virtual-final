@@ -322,7 +322,7 @@ const Modal = ({ open, title, onClose, children }) => {
 /* =======================
    MAIN BannerPanel
 ======================= */
-export default function BannerPanel({ theme, setPath, uploading, setUploading, uploadToCloudinaryViaBackend, disabled = false }) {
+export default function BannerPanel({ theme, store, setPath, uploading, setUploading, uploadToCloudinaryViaBackend, disabled = false }) {
   const b = theme?.banner || {};
   const slides = useMemo(() => (Array.isArray(b.slides) ? b.slides : []), [b.slides]);
 
@@ -625,7 +625,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
   const previewCard = (
     <div className="banner-preview-pin" ref={previewCardRef}>
       <div className="banner-preview-head"><div><h2>Vista previa en vivo</h2><p>{templateActive ? 'Toca un elemento para editarlo. Arrastra las tarjetas de categoría para ubicarlas.' : 'Selecciona un tamaño para comprobar el encuadre.'}</p></div><div className="banner-device-tabs" role="group" aria-label="Tamaño de pantalla">{Object.entries(BANNER_DEVICES).map(([key, device]) => <button key={key} type="button" aria-pressed={previewDevice === key} onClick={() => setPreviewDevice(key)}>{device.label}</button>)}</div></div>
-      <BannerDevicePreview banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} onMoveCard={moveCard} onPreviousSlide={() => chooseSlide(-1)} onNextSlide={() => chooseSlide(1)} />
+      <BannerDevicePreview store={store} banner={b} sections={theme?.sections} slides={slides} selectedIdx={activeSlideIdx} device={previewDevice} onEdit={editCurrent} onTemplateSelect={(part) => { setTemplateSelection(part); setActivePanel('content'); }} selectedTemplatePart={templateSelection} placingCard={placingCard} onPlaceCard={placeCard} onMoveCard={moveCard} onPreviousSlide={() => chooseSlide(-1)} onNextSlide={() => chooseSlide(1)} />
       {bannerType === 'slider' && slides.length > 1 && <div className="banner-preview-navigation"><button type="button" onClick={() => chooseSlide(-1)}>‹ Anterior</button><span>{activeSlideIdx + 1} / {slides.length}</span><button type="button" onClick={() => chooseSlide(1)}>Siguiente ›</button></div>}
       <div className="banner-preview-actions"><button type="button" className="banner-btn banner-btn--primary" onClick={() => { setActivePanel('content'); if (legacyButtons) editCurrent(); }} disabled={bannerType === 'slider' && !slides.length && legacyButtons}>Editar {templateActive ? 'diseño' : plainMedia ? 'archivo' : bannerType === 'slider' ? 'este slide' : 'contenido'}</button></div>
       {compactPreview && <details className="banner-preview-compact-meta"><summary>{issues.length ? `${issues.length} ${issues.length === 1 ? 'aviso' : 'avisos'} antes de publicar` : 'Datos técnicos'}</summary>{issues.length > 0 && <ul>{issues.map((issue, index) => <li key={index}>{issue.text}</li>)}</ul>}<pre>{JSON.stringify(theme.banner || {}, null, 2)}</pre></details>}
@@ -708,7 +708,7 @@ export default function BannerPanel({ theme, setPath, uploading, setUploading, u
               <BannerDragPreview device={previewDevice} src={imageForDevice(b, previewDevice, true)} fit={b.imageFit === 'contain' ? 'contain' : 'cover'} posX={b[cropFields(previewDevice, true)[0]] ?? 50} posY={b[cropFields(previewDevice, true)[1]] ?? 50} onChange={({ posX, posY }) => { setPath(`banner.${cropFields(previewDevice, true)[0]}`, posX); setPath(`banner.${cropFields(previewDevice, true)[1]}`, posY); }} />
               <div className="banner-crop-editor__actions"><span>Posición: {Math.round(Number(b[cropFields(previewDevice, true)[0]] ?? 50))}% · {Math.round(Number(b[cropFields(previewDevice, true)[1]] ?? 50))}%</span><button type="button" className="banner-btn" onClick={() => { setPath(`banner.${cropFields(previewDevice, true)[0]}`, 50); setPath(`banner.${cropFields(previewDevice, true)[1]}`, 50); }}>Centrar imagen</button></div>
             </div>}
-            {legacyButtons && <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/coleccion o https://..." />}
+            {legacyButtons && <Input label="Destino al pulsar (opcional)" value={b.imageLink || ''} onChange={(e) => setPath('banner.imageLink', e.target.value)} placeholder="/productos o https://..." />}
           </div>
         )}
 

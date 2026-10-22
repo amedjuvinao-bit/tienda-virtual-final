@@ -94,8 +94,8 @@ export default function ComplementosSectionUI({ theme, setPath, uploadToCloudina
             {choose('imageShadow', 'Sombra del banner', [[true, 'Con sombra'], [false, 'Sin sombra']])}
           </Card>
           <Card title="Fondo de la sección">
-            {choose('sectionBackgroundMode', 'Fondo exterior de la sección', [['continuity', 'Continuar fondo de Looks'], ['global', 'Fondo general de la tienda'], ['custom', 'Imagen propia'], ['color', 'Color propio']])}
-            <p className="comp-editor__hint">El fondo cubre el espacio sobre el banner, los laterales y la parte inferior. Si cambias el fondo de Looks, la continuidad se actualiza automáticamente.</p>
+            {choose('sectionBackgroundMode', 'Fondo exterior de la sección', [['continuity', 'Continuar fondo de la selección de productos'], ['global', 'Fondo general de la tienda'], ['custom', 'Imagen propia'], ['color', 'Color propio']])}
+            <p className="comp-editor__hint">El fondo cubre el espacio sobre el banner, los laterales y la parte inferior. Si cambias el fondo de la selección de productos, la continuidad se actualiza automáticamente.</p>
             {s.sectionBackgroundMode === 'custom' && <ComplementosImageField label="Fondo de la sección" value={c.sectionBackgroundImage} onChange={(sectionBackgroundImage) => config({ sectionBackgroundImage })} uploadToCloudinary={uploadToCloudinary} />}
             {['custom', 'color'].includes(s.sectionBackgroundMode) && color('sectionBackgroundColor', 'Color del fondo exterior')}
           </Card>

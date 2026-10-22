@@ -1,3 +1,4 @@
+import { getAdminSectionLabel } from "../appearanceLabels";
 import { Field, Input, Toggle } from "./ui/UiComponents";
 import { buildSectionHref } from "./ui/sectionHelpers";
 import { SectionBadge } from "./ui/SectionsPanelUI";
@@ -19,7 +20,7 @@ export default function BasicTab({ section, onChange }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Tipo de sección" hint="Fijo para mantener el contenido de esta sección" name="type">
-          <Input value={section.type} readOnly />
+          <Input value={getAdminSectionLabel(section)} readOnly />
         </Field>
 
         <Field label="Nombre interno" hint="Cómo lo ves en el panel" name="name">
