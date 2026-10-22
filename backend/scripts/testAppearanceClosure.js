@@ -30,16 +30,24 @@ async function main() {
 
   // A configured store needs one read, without writes or repair queries.
   const originals = { findOne:SiteSettings.findOne, findByIdAndUpdate:SiteSettings.findByIdAndUpdate };
-  let reads=0,writes=0;
+  let reads=0,writes=0;const repairs=[];
   const fixture={_id:'settings-1',...buildDefaultSettings(),appearanceRevision:8};
   SiteSettings.findOne=()=>({async lean(){reads++;return structuredClone(fixture)}});
-  SiteSettings.findByIdAndUpdate=(_id, update)=>({async lean(){writes++;assert.equal(update.$set['theme.sections'].length,0);return {...fixture, repaired:true}}});
+  SiteSettings.findByIdAndUpdate=(_id, update)=>({async lean(){writes++;repairs.push(update.$set);return {...fixture, repaired:true}}});
   try {
     assert.equal((await loadSettingsDocument()).appearanceRevision,8);
     assert.equal(reads,1);assert.equal(writes,0);
     delete fixture.theme.sections;
     assert.equal((await loadSettingsDocument()).repaired,true);
     assert.equal(writes,1);
+    assert.deepEqual(repairs[0], { 'theme.sections': [] });
+    fixture.theme.sections=[];
+    fixture.billing.fiscalInfo.nit='900123456';
+    delete fixture.billing.fiscalInfo.businessName;
+    await loadSettingsDocument();
+    assert.equal(repairs[1]['billing.fiscalInfo.businessName'],'');
+    assert(!Object.hasOwn(repairs[1],'billing.fiscalInfo.nit'));
+    assert.equal(fixture.billing.fiscalInfo.nit,'900123456');
   } finally { Object.assign(SiteSettings, originals); }
 
   assert.equal(findAdminRoutePermission('POST','/api/uploads/many').permission,'media:upload');

@@ -93,6 +93,7 @@ function validateMenuAndPermissions() {
 function validateBillingAuthorityPreserved() {
   const configurationPage = readProjectFile('frontend/src/admin/ConfiguracionPage.jsx');
   const settingsRoutes = readProjectFile('backend/routes/siteSettings.js');
+  const settingsDocument = readProjectFile('backend/services/siteSettingsDocumentService.js');
 
   assert(
     !configurationPage.includes('import FacturacionSection'),
@@ -102,8 +103,9 @@ function validateBillingAuthorityPreserved() {
     !configurationPage.includes("case 'facturacion'"),
     'ConfiguracionPage volvió a exponer el caso retirado de Facturación'
   );
-  assertIncludes(settingsRoutes, 'billing:', 'siteSettings no conserva billing');
-  assertIncludes(settingsRoutes, 'ensureBillingExists', 'siteSettings no conserva autocorrección billing');
+  assertIncludes(settingsRoutes, 'loadSettingsDocument', 'siteSettings debe cargar el documento mediante su servicio');
+  assertIncludes(settingsDocument, 'billing:', 'El servicio de configuración no conserva billing');
+  assertIncludes(settingsDocument, "missingFields(doc.billing, defaults.billing", 'El servicio debe completar los campos fiscales heredados sin reemplazar los datos existentes');
 
   ok('Facturación conserva sus datos y autoridad sin duplicarse dentro de Configuración');
 }

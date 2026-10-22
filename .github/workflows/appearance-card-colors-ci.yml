@@ -31,6 +31,10 @@ jobs:
         working-directory: backend
       - run: npm ci
         working-directory: frontend
+      - name: Auditar dependencias de producción
+        run: |
+          node .github/scripts/audit-production-dependencies.cjs backend
+          node .github/scripts/audit-production-dependencies.cjs frontend
       - run: npm run test:appearance-closure
         working-directory: backend
       - run: npm run test:appearance-closure
