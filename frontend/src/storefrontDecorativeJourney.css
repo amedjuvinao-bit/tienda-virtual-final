@@ -1,4 +1,4 @@
-.story-journey-pin{position:sticky;top:0;z-index:70;width:100%;height:0;pointer-events:none!important;user-select:none}
+.story-journey-pin{position:sticky;top:0;z-index:0;width:100%;height:0;pointer-events:none!important;user-select:none}
 .story-journey-world{position:absolute;top:0;left:0;display:block;width:100%;overflow:hidden;pointer-events:none!important}
 .storefront-sections:not([data-journey-active="true"])>.story-journey-pin{display:none}
 .story-journey-world image{pointer-events:none}
@@ -14,3 +14,7 @@
 
 /* The route is geometry for the artwork, never a visible connecting cord. */
 [data-journey-stem],[data-journey-trace]{display:none}
+
+/* A genuine background layer avoids flickering masks as content scrolls past. */
+.storefront-sections[data-journey-active="true"]{position:relative;isolation:isolate}
+.storefront-sections[data-journey-active="true"]>section{position:relative;z-index:1}

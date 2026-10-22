@@ -1,9 +1,7 @@
 import { journeyScene } from './decorativeJourneyScenes';
-import { journeyOrnamentVisibility, journeyTextVisibility } from './decorativeJourneyGeometry';
 import { journeyArtworkLayout, applyJourneyArtworkLayout } from './decorativeJourneyArtwork';
 import { cinematicOrnament } from './decorativeJourneyCinema';
 
-const occlusionSelector='.info-glass-dialog-backdrop,[role=dialog],dialog,[data-story-actor],.categories-fan__category,.look-editorial__hero,.look-editorial__card-surface,.ig-journal__main,.tk-stage__hero,.tk-stage__item,.info-glass-card,.footer-ed__social,.footer-ed__watermark,h1,h2,h3,p,a,button,input,textarea,select,article,picture,img,video,iframe';
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
   const view=container.ownerDocument.defaultView,doc=container.ownerDocument,world=container.querySelector('[data-journey-world]');
   if(!world)return ()=>{};
@@ -23,19 +21,12 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   if(previousShared!==undefined)container.dataset.journeyShared=previousShared;
   if(!c.backgroundImage)container.style.setProperty('--journey-shared-image',inheritedBackground);
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')];
-  const masks=[...world.querySelectorAll('[data-journey-occluder]')];
-  const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]'),mask=world.querySelector('[data-journey-mask]');
+  const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]');
   const ornaments=world.querySelector('[data-journey-ornaments]');
   const artworkProbes=[];
-  let frame=0,dirty=true,disposed=false,chapters=[],candidates=[],width=0,height=0,movingUntil=0,displayPhase=null,lastPaint=0,ornamentCount=0;
+  let frame=0,dirty=true,disposed=false,chapters=[],width=0,height=0,movingUntil=0,displayPhase=null,lastPaint=0,ornamentCount=0;
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
-  const eligible=node=>{
-    if(node.matches('.footer-ed__logo'))return false;
-    if(node.closest('[data-journey-pin],[aria-hidden="true"],[hidden]'))return false;
-    const closed=node.closest('details:not([open])');
-    return !closed || Boolean(closed.querySelector(':scope > summary')?.contains(node));
-  };
   function measure(){
     const previousWidth=width,previousHeight=height;
     width=container.offsetWidth || container.getBoundingClientRect().width;height=scroller?scroller.clientHeight:view.innerHeight;
@@ -45,14 +36,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
       const saved=Number(node.dataset.storyTop);
       return {id:node.dataset.journeySection || node.id,top:node.dataset.storyTop!==undefined && Number.isFinite(saved)?saved:node.getBoundingClientRect().top+y-base,height:node.offsetHeight};
     });
-    const selected=new Set();
-    candidates=[...container.querySelectorAll(occlusionSelector)].filter(node=>{
-      if(!eligible(node))return false;
-      for(let parent=node.parentElement;parent && parent!==container;parent=parent.parentElement)if(selected.has(parent))return false;
-      selected.add(node);return true;
-    });
     world.setAttribute('viewBox',`0 0 ${width} ${height}`);
-    mask?.setAttribute('width',width);mask?.setAttribute('height',height);
     world.style.height=height+'px';dirty=false;
     const adapted=compact() && config.mobileMode==='adapted',previewScale=scroller?Math.min(1,width/(compact()?390:1440)):1;
     const density=adapted?c.mobileDensity:c.density;
@@ -66,35 +50,6 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     if(dirty)measure();if(width<1 || height<1)return;
     const adapted=compact() && config.mobileMode==='adapted',previewScale=scroller?Math.min(1,width/(compact()?390:1440)):1;
     const origin=world.getBoundingClientRect(),scene=journeyScene(scroll(),chapters,height,width,{...c,intensity:config.intensity,compact:compact(),originTop:origin.top},reduce?.matches);
-    const visible=rect=>rect.width>=2 && rect.height>=2 && rect.bottom>origin.top && rect.top<origin.top+height && rect.right>origin.left && rect.left<origin.left+width;
-    const boxFor=(rect,padding=2,radius=0)=>({x:rect.left-origin.left-padding,y:rect.top-origin.top-padding,width:rect.width+padding*2,height:rect.height+padding*2,radius});
-    const boxes=[],headlines=[],range=doc.createRange();
-    for(const node of candidates){
-      const rect=node.getBoundingClientRect();if(!visible(rect))continue;
-      const css=view.getComputedStyle(node);if(css.display==='none' || css.visibility==='hidden' || Number(css.opacity || 1)<.05)continue;
-      const textOnly=node.matches('h1,h2,h3,p,.ig-journal__profile');
-      if(textOnly && !node.querySelector('img,video,picture')){
-        const walker=doc.createTreeWalker(node,view.NodeFilter.SHOW_TEXT);
-        for(let text=walker.nextNode();text;text=walker.nextNode()){
-          if(!text.textContent.trim())continue;range.selectNodeContents(text);
-          for(const line of range.getClientRects?.() || [rect])if(visible(line)){
-            const box=boxFor(line,4,2);boxes.push(box);if(node.matches('h1,h2,h3'))headlines.push(box);
-          }
-        }
-        for(const icon of node.querySelectorAll('svg'))if(visible(icon.getBoundingClientRect()))boxes.push(boxFor(icon.getBoundingClientRect(),4,2));
-      }else boxes.push(boxFor(rect,4,Math.min(48,(parseFloat(css.borderTopLeftRadius)||0)+4)));
-      if(boxes.length>=masks.length-1)break;
-    }
-    const logo=container.querySelector('.footer-ed__logo'),logoCutout=world.querySelector('[data-journey-logo-cutout]');
-    if(logoCutout){
-      const rect=logo?.getBoundingClientRect();
-      if(rect && visible(rect) && logo.complete && logo.naturalWidth){
-        logoCutout.setAttribute('href',logo.currentSrc || logo.src);
-        const box=boxFor(rect,0);for(const key of ['x','y','width','height'])logoCutout.setAttribute(key,box[key].toFixed(2));
-      }else logoCutout.setAttribute('width','0');
-    }
-    const header=scroller?null:doc.querySelector('.theme-header');
-    if(header && visible(header.getBoundingClientRect()))boxes.push(boxFor(header.getBoundingClientRect(),4));
     const desired=reduce?.matches?0:scene.index+(scene.nextId?scene.progress:Math.min(scene.progress,.7));
     const now=view.performance.now(),dt=Math.min(34,Math.max(1,now-lastPaint));lastPaint=now;
     let settling=false;
@@ -126,11 +81,10 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
         artwork.style.filter=`drop-shadow(${(pose.shadowX*previewScale).toFixed(2)}px ${(pose.shadowY*previewScale).toFixed(2)}px ${(pose.shadowBlur*previewScale).toFixed(2)}px rgb(0 0 0 / .2)) brightness(${pose.light.toFixed(3)})`;
       }
       piece.setAttribute('transform',`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${scale.toFixed(3)})`);
-      const visible=journeyOrnamentVisibility(x,y,scale*100,angle,boxes,width,height,aspect)*journeyTextVisibility(x,y,scale*45/Math.sqrt(Math.max(aspect,1/aspect)),headlines,16*previewScale);
-      piece.setAttribute('opacity',String(opacity*pose.opacity*visible*emphasis));
+      // Layering protects the content. Scroll never hides the whole ornament
+      // or cuts rectangular holes around text, logos, photos or controls.
+      piece.setAttribute('opacity',String(opacity*pose.opacity*emphasis));
     });
-    const writeMask=(nodes,values)=>nodes.forEach((rect,i)=>{const box=values[i];if(!box){rect.setAttribute('width','0');return;}for(const key of ['x','y','width','height'])rect.setAttribute(key,box[key].toFixed(2));rect.setAttribute('rx',box.radius);});
-    writeMask(masks,boxes);
     container.dataset.journeyPhase=displayPhase.toFixed(4);container.dataset.journeySection=scene.id;container.dataset.journeyHandoff=scene.handoff.toFixed(4);container.dataset.journeySettled=String(!settling);
     if(settling || view.performance.now()<movingUntil)schedule();
   }

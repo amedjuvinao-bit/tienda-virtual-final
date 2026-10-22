@@ -41,8 +41,8 @@ it('mantiene los mismos adornos al cruzar secciones y revierte exactamente el ca
   expect(f.root.querySelectorAll('[data-journey-pin]')).toHaveLength(1);f.stop();
 });
 it('oculta visualmente el adorno detrás de los controles sin duplicar contenido ni reproductores',()=>{
-  const f=fixture(),mask=f.root.querySelector('[data-journey-occluder]');
-  expect(Number(mask.getAttribute('x'))).toBeLessThan(450);expect(Number(mask.getAttribute('width'))).toBeGreaterThan(200);
+  const f=fixture();
+  expect(f.root.querySelector('[data-journey-occluder]')).toBeNull();
   expect(f.root.querySelectorAll('video')).toHaveLength(1);expect(f.root.querySelectorAll('iframe')).toHaveLength(1);
   const click=vi.fn();f.root.querySelector('button').addEventListener('click',click);f.root.querySelector('button').click();expect(click).toHaveBeenCalledOnce();f.stop();
 });
@@ -131,10 +131,10 @@ it('loads each artwork aspect independently and releases its metadata callbacks'
   f.stop();expect(probes.every(image=>image.onload===null)).toBe(true);
 });
 
-it('protects the transparent logo with its alpha silhouette instead of a rectangular cutout',()=>{
- const f=fixture({}, {logo:true}),cutout=f.root.querySelector('[data-journey-logo-cutout]');
- expect(cutout.getAttribute('href')).toContain('/transparent-logo.png');expect(cutout.getAttribute('width')).toBe('220.00');
- expect(cutout.getAttribute('filter')).toContain('-silhouette');
- expect([...f.root.querySelectorAll('[data-journey-occluder]')].some(n=>+n.getAttribute('x')===76&&+n.getAttribute('width')===228)).toBe(false);
- f.stop();
+it('keeps the artwork visible as text and controls pass over the background layer',()=>{
+ const f=fixture({}, {logo:true});
+ const before=[...f.root.querySelectorAll('[data-journey-piece]')].map(n=>n.getAttribute('opacity'));
+ f.scroll(300);const after=[...f.root.querySelectorAll('[data-journey-piece]')].map(n=>n.getAttribute('opacity'));
+ expect(after).toEqual(before);expect(f.root.querySelector('mask')).toBeNull();
+ expect(f.root.querySelector('.footer-ed__logo')).toBeTruthy();f.stop();
 });

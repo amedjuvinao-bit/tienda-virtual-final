@@ -1,21 +1,11 @@
-import React, { useId } from 'react';
+import React from 'react';
 
 // A single, persistent ornament world belongs to the entire storefront.
-// Occlusion makes the configured ornaments pass behind the real content, even when a
-// section uses its own container queries or stacking contexts.
+// Real content is layered above this world; no per-element visibility masks.
 export default function StorefrontDecorativeJourney({config}){
-  const uid='journey-'+useId().replace(/:/g,''),mask=uid+'-mask';
   return <div className="story-journey-pin" data-journey-pin aria-hidden="true">
     <svg className="story-journey-world" data-journey-world viewBox="0 0 1440 900" preserveAspectRatio="none" focusable="false">
-      <defs>
-        <filter id={uid+'-silhouette'} colorInterpolationFilters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter>
-        <mask id={mask} maskUnits="userSpaceOnUse" x="0" y="0" width="1440" height="900" data-journey-mask>
-          <rect width="100%" height="100%" fill="white"/>
-          <image data-journey-logo-cutout width="0" height="0" preserveAspectRatio="xMidYMid meet" filter={`url(#${uid}-silhouette)`}/>
-          <g fill="black">{Array.from({length:128},(_,i)=><rect data-journey-occluder key={i} width="0" height="0"/>)}</g>
-        </mask>
-      </defs>
-      <g mask={`url(#${mask})`}>
+      <g>
         <path data-journey-stem className="story-journey-stem" pathLength="1000" fill="none" stroke={config.stemColor || 'var(--color-accent, currentColor)'} strokeWidth="2" strokeLinecap="round"/>
         <path data-journey-trace fill="none" pathLength="1000" stroke={config.stemColor || 'var(--color-accent, currentColor)'} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="125 875"/>
         <g data-journey-ornaments>{Array.from({length:28},(_,i)=>{

@@ -1,10 +1,9 @@
 const mod=(n,d)=>(n%d+d)%d;
-const smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
 const smoother=n=>{const t=Math.max(0,Math.min(1,n));return t*t*t*(t*(t*6-15)+10);};
 // Move during the handover, then lock the camera for the reading portion.
 // The window spans section boundaries, without a pose reset at the boundary.
 export function cinematicBeat(phase){
-  const shifted=Math.max(0,phase)+.28,chapter=Math.floor(shifted),t=Math.min(1,(shifted-chapter)/.46);
+  const shifted=Math.max(0,phase)+.38,chapter=Math.floor(shifted),t=Math.min(1,(shifted-chapter)/.7);
   const eased=smoother(t),position=Math.max(0,chapter-1+eased);
   return {position,arrival:position===0?0:Math.sin(Math.PI*eased),settled:t===1 || position===0};
 }
@@ -13,9 +12,9 @@ export function cinematicBeat(phase){
 export function cinematicOrnament(index,{phase,width,height,size,aspect=1,depth=.65,compact=false,intensity=65,count=6}){
   const beat=cinematicBeat(phase);phase=beat.position;
   const right=index%2===1,plane=Math.floor(index/2),planes=Math.ceil(count/2);
-  const rate=(right?.19:.16)*(.65+intensity/200);
+  const rate=(right?.34:.29)*(.65+intensity/200);
   const cycle=1.8,position=mod(.3+plane*cycle/planes+(right?.24:0)-phase*rate,cycle)-.4;
-  const camera=phase*.9+plane*1.7+(right?.65:0),relief=depth*(compact?.68:1),approach=(Math.sin(camera)+1)/2;
+  const camera=phase*1.2+plane*1.7+(right?.65:0),relief=depth*(compact?.68:1),approach=(Math.sin(camera)+1)/2;
   const punch=beat.arrival*relief;
   const requestedScale=size/100*(compact?1.3:1.55)*[1,.78,1.12][plane%3]*(1+depth*(plane===2?.12:0))*(1+approach*relief*.24)*(1+punch*.12);
   // Pieces on the same side share one camera speed, so they cannot overtake.
@@ -30,5 +29,5 @@ export function cinematicOrnament(index,{phase,width,height,size,aspect=1,depth=
     lift:approach*relief*42+punch*32,shadowX:(right?-1:1)*(3+approach*13)*relief,
     shadowY:5+approach*relief*16+punch*12,shadowBlur:5+approach*relief*12+punch*9,light:1+Math.cos(camera-.6)*relief*.07+punch*.08,
     angle:(right?-1:1)*([5,-4,2][plane%3]+Math.sin(phase*.18+plane)*1.5),
-    opacity:smooth((position+.3)/.2)*smooth((1.3-position)/.2)*[1,.72,.9][plane%3]};
+    opacity:[1,.88,.94][plane%3]};
 }

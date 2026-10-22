@@ -10,12 +10,10 @@ it('keeps rigid scenery at the edges with distinct camera speeds',()=>{
  }
  expect(new Set(displacement.map(n=>n.toFixed(2))).size).toBeGreaterThan(1);
 });
-it('wraps only while the ornament is outside the visible scene',()=>{
- const base={width:390,height:844,size:110,aspect:3,compact:true,count:4};let previous;
+it('never flashes or fades pieces during movement or recycling',()=>{
  for(let phase=0;phase<30;phase+=.01){
-  const pose=cinematicOrnament(0,{...base,phase});
-  if(previous&&Math.abs(pose.y-previous.y)>844){expect(previous.opacity).toBe(0);expect(pose.opacity).toBe(0);}
-  previous=pose;
+  const pose=cinematicOrnament(0,{phase,width:390,height:844,size:110,aspect:3,compact:true,count:4});
+  expect(pose.opacity).toBe(1);
  }
 });
 
@@ -41,8 +39,8 @@ it('keeps tall ornaments separated on each edge throughout the scroll',()=>{
 
 it('locks the frame at its destination and carries the arrival continuously across sections',()=>{
  const base={width:1280,height:800,size:230,aspect:3,depth:1};
- expect(cinematicOrnament(0,{...base,phase:2.3})).toEqual(cinematicOrnament(0,{...base,phase:2.65}));
+ expect(cinematicOrnament(0,{...base,phase:2.35})).toEqual(cinematicOrnament(0,{...base,phase:2.6}));
  const a=cinematicOrnament(0,{...base,phase:2.99999}),b=cinematicOrnament(0,{...base,phase:3.00001});
  expect(Math.abs(a.y-b.y)).toBeLessThan(.1);expect(Math.abs(a.tiltY-b.tiltY)).toBeLessThan(.1);
- expect(cinematicBeat(2.4).settled).toBe(true);expect(cinematicBeat(2.9).arrival).toBeGreaterThan(.5);
+ expect(cinematicBeat(2.4).settled).toBe(true);expect(cinematicBeat(2.95).arrival).toBeGreaterThan(.5);
 });
