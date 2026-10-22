@@ -5,6 +5,7 @@ import FooterNewsletter from './FooterNewsletter';
 import FooterNavigation from './FooterNavigation';
 import FooterSocials from './FooterSocials';
 import './footerEditorial.css';
+import { footerClickFeedback } from './footerClickFeedback';
 
 export default function FooterEditorial({ theme, store, preview=false }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
@@ -32,7 +33,7 @@ export default function FooterEditorial({ theme, store, preview=false }) {
     const view=root.current?.ownerDocument.defaultView;
     view?.scrollTo({top:0,behavior:view.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   }
-  return <div className="footer-ed-viewport"><footer ref={root} className="footer-ed" aria-label="Pie de página" style={style} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
+  return <div className="footer-ed-viewport"><footer ref={root} onClickCapture={footerClickFeedback} className="footer-ed" aria-label="Pie de página" style={style} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
     <div className="footer-ed__inner">
       {c.newsletterEnabled && <div className="footer-ed__top">
         <header className="footer-ed__invitation">{c.headline && <h2>{c.headline}</h2>}{c.description && <p>{c.description}</p>}</header>

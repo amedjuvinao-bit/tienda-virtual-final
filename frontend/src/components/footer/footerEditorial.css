@@ -176,3 +176,7 @@
 @media(prefers-reduced-motion:reduce){.footer-ed *{animation:none!important;transition:none!important;scroll-behavior:auto!important}.footer-ed[data-motion] .footer-ed__social:hover,.footer-ed[data-motion] .footer-ed__top-button:hover{transform:none}}
 
 .footer-ed__utility:empty{display:none}
+
+/* Press feedback also exists without hover, on touch and keyboard activation. */
+.footer-ed__links a{display:inline-block}
+.footer-ed :is(.footer-ed__social,.footer-ed__subscribe,.footer-ed__top-button,.footer-ed__accordion):active{filter:brightness(.93)}
