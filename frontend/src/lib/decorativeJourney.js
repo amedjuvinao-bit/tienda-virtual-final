@@ -1,6 +1,6 @@
 import { journeyScene } from './decorativeJourneyScenes';
 import { journeyArtworkLayout, applyJourneyArtworkLayout } from './decorativeJourneyArtwork';
-import { cinematicOrnament } from './decorativeJourneyCinema';
+import { cinematicOrnament, advanceCinematicCamera } from './decorativeJourneyCinema';
 
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
   const view=container.ownerDocument.defaultView,doc=container.ownerDocument,world=container.querySelector('[data-journey-world]');
@@ -24,7 +24,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]');
   const ornaments=world.querySelector('[data-journey-ornaments]');
   const artworkProbes=[];
-  let frame=0,dirty=true,disposed=false,chapters=[],width=0,height=0,movingUntil=0,displayPhase=null,lastPaint=0,ornamentCount=0;
+  let frame=0,dirty=true,disposed=false,chapters=[],width=0,height=0,movingUntil=0,displayPhase=null,cameraVelocity=0,lastPaint=0,ornamentCount=0;
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
   function measure(){
@@ -53,10 +53,12 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     const desired=reduce?.matches?0:scene.index+(scene.nextId?scene.progress:Math.min(scene.progress,.7));
     const now=view.performance.now(),dt=Math.min(34,Math.max(1,now-lastPaint));lastPaint=now;
     let settling=false;
-    if(displayPhase===null || reduce?.matches)displayPhase=desired;
+    if(displayPhase===null || reduce?.matches){displayPhase=desired;cameraVelocity=0;}
     else {
-      displayPhase+=(desired-displayPhase)*(1-Math.exp(-dt/65));
-      settling=Math.abs(desired-displayPhase)>.0001;if(!settling)displayPhase=desired;
+      const camera=advanceCinematicCamera(displayPhase,cameraVelocity,desired,dt);
+      displayPhase=camera.position;cameraVelocity=camera.velocity;
+      settling=Math.abs(desired-displayPhase)>.0001 || Math.abs(cameraVelocity)>.001;
+      if(!settling){displayPhase=desired;cameraVelocity=0;}
     }
     const size=(adapted?c.mobileSize:c.size)*previewScale*scene.scale;
     const count=ornamentCount;
