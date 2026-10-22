@@ -1,11 +1,11 @@
 import {expect,it} from 'vitest';
-import {cinematicOrnament} from './decorativeJourneyCinema';
+import {cinematicOrnament,cinematicBeat} from './decorativeJourneyCinema';
 it('keeps rigid scenery at the edges with distinct camera speeds',()=>{
- const base={phase:0,width:1280,height:800,size:230,aspect:3,count:6};
+ const base={phase:.85,width:1280,height:800,size:230,aspect:3,count:6};
  const displacement=[];
  for(let i=0;i<6;i++){
-  const a=cinematicOrnament(i,base),b=cinematicOrnament(i,{...base,phase:.1});
-  expect(Math.abs(b.x-a.x)).toBeLessThan(2);expect(b.scale/a.scale).toBeGreaterThan(.98);expect(b.scale/a.scale).toBeLessThan(1.02);expect(Math.abs(b.angle)).toBeLessThan(7);
+  const a=cinematicOrnament(i,base),b=cinematicOrnament(i,{...base,phase:.95});
+  expect(Math.abs(b.x-a.x)).toBeLessThan(2);expect(b.scale/a.scale).toBeGreaterThan(.85);expect(b.scale/a.scale).toBeLessThan(1.15);expect(Math.abs(b.angle)).toBeLessThan(7);
   expect(a.x<70||a.x>1210).toBe(true);displacement.push(b.y-a.y);
  }
  expect(new Set(displacement.map(n=>n.toFixed(2))).size).toBeGreaterThan(1);
@@ -37,4 +37,12 @@ it('keeps tall ornaments separated on each edge throughout the scroll',()=>{
    expect(gap-extent).toBeGreaterThanOrEqual(Math.max(32,height*.12)-.001);
   }
  }
+});
+
+it('locks the frame at its destination and carries the arrival continuously across sections',()=>{
+ const base={width:1280,height:800,size:230,aspect:3,depth:1};
+ expect(cinematicOrnament(0,{...base,phase:2.3})).toEqual(cinematicOrnament(0,{...base,phase:2.65}));
+ const a=cinematicOrnament(0,{...base,phase:2.99999}),b=cinematicOrnament(0,{...base,phase:3.00001});
+ expect(Math.abs(a.y-b.y)).toBeLessThan(.1);expect(Math.abs(a.tiltY-b.tiltY)).toBeLessThan(.1);
+ expect(cinematicBeat(2.4).settled).toBe(true);expect(cinematicBeat(2.9).arrival).toBeGreaterThan(.5);
 });

@@ -95,12 +95,12 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     }
     const header=scroller?null:doc.querySelector('.theme-header');
     if(header && visible(header.getBoundingClientRect()))boxes.push(boxFor(header.getBoundingClientRect(),4));
-    const desired=reduce?.matches?0:scene.index+scene.progress;
+    const desired=reduce?.matches?0:scene.index+(scene.nextId?scene.progress:Math.min(scene.progress,.7));
     const now=view.performance.now(),dt=Math.min(34,Math.max(1,now-lastPaint));lastPaint=now;
     let settling=false;
     if(displayPhase===null || reduce?.matches)displayPhase=desired;
     else {
-      displayPhase+=(desired-displayPhase)*(1-Math.exp(-dt/90));
+      displayPhase+=(desired-displayPhase)*(1-Math.exp(-dt/65));
       settling=Math.abs(desired-displayPhase)>.0001;if(!settling)displayPhase=desired;
     }
     const size=(adapted?c.mobileSize:c.size)*previewScale*scene.scale;

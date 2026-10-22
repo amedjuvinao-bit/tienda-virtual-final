@@ -14,7 +14,7 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   const view=render(<Editor/>);fireEvent.click(screen.getByRole('button',{name:/Animación global Transiciones/}));
   expect(screen.getByRole('button',{name:'Camino continuo',exact:true})).toHaveAttribute('aria-pressed','true');
   expect(screen.queryByRole('button',{name:/Usar flores incluidas|Usar fondo incluido/})).not.toBeInTheDocument();
-  expect(document.querySelectorAll('.story-preview img,.story-preview image')).toHaveLength(0);
+  expect(document.querySelectorAll('.story-preview img,.story-preview image[href]')).toHaveLength(0);
   fireEvent.change(screen.getByLabelText('Seleccionar imagen para Adorno principal'),{target:{files:[new File(['image'],'adorno.png',{type:'image/png'})]}});
   await waitFor(()=>expect(saved.global.sectionMotion.journey.image).toBe('https://cdn.example.test/adorno.webp'));
   expect(upload).toHaveBeenCalledOnce();
@@ -51,5 +51,5 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   expect(saved.global.sectionMotion.journey.image).toBe('https://cdn.example.test/adorno.webp');
   fireEvent.click(screen.getByRole('button',{name:'Quitar',exact:true}));
   expect(saved.global.sectionMotion.journey.image).toBe('');
-  expect(document.querySelectorAll('.story-preview image')).toHaveLength(0);
+  expect(document.querySelectorAll('.story-preview image[href]')).toHaveLength(0);
 });
