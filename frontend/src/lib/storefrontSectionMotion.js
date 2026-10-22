@@ -1,7 +1,6 @@
-import { normalizeStoryConfig, STORY_VISIBILITY_EVENT } from './storefrontStoryConfig';
+import { normalizeStoryConfig, STORY_VISIBILITY_EVENT, STORY_CHAPTER_CHANGE_EVENT } from './storefrontStoryConfig';
 import { collectStoryActors, actorPresentation } from './storefrontStoryActors';
 import { startStoryFragments, storyFragmentImage, storyWeaveFallback } from './storefrontStoryFragments';
-import { journeyActorPresentation, journeyChapterPresentation } from './storefrontJourneyPresentation';
 
 function pauseCoveredMedia(node) {
   const fullscreen=node.ownerDocument.fullscreenElement;
@@ -25,7 +24,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   const viewport=()=>scroller?scroller.clientHeight:view.innerHeight;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:mobile?.matches;
   const enabled=()=>config.enabled && !reduce?.matches && !(compact() && config.mobileMode==='off');
-  const canAnimate=()=>enabled() && typeof container.animate==='function';
+  const canAnimate=()=>config.experience==='entrances' && enabled() && typeof container.animate==='function';
   const headerClearance=()=>{
     const header=!scroller && doc.querySelector('.theme-header');
     return header && header.dataset.visible!=='false'?header.getBoundingClientRect().height+(parseFloat(view.getComputedStyle(header).top)||0):0;
@@ -36,8 +35,6 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
     actor.state='done';delete actor.element.dataset.storyActing;delete actor.element.dataset.storyWeave;
   }
   function finishChapter(chapter) {
-    if(chapter.transition){chapter.transition.onfinish=null;chapter.transition.cancel();chapter.transition=null;}
-    delete chapter.surface.dataset.journeyOpening;
     chapter.phase='ready';chapter.node.dataset.storyStage='ready';
     chapter.actors.forEach(releaseActor);
     delete chapter.node.dataset.storyPerforming;
@@ -50,8 +47,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   }
   function prepareActor(actor) {
     if(!canAnimate() || !actor.element.animate){actor.state='done';return;}
-    const adapted=compact() && config.mobileMode==='adapted';
-    const plan=config.experience==='journey'?journeyActorPresentation(actor,config.intensity,adapted):actorPresentation(config.preset,actor,config.intensity,adapted);
+    const plan=actorPresentation(config.preset,actor,config.intensity,compact() && config.mobileMode==='adapted');
     if(plan.fragments && !storyFragmentImage(actor)){plan.frames=storyWeaveFallback();plan.fragments=false;plan.easing='cubic-bezier(.65,0,.25,1)';}
     if(plan.fragments)actor.element.dataset.storyWeave='true';
     actor.plan=plan;actor.state='waiting';
@@ -62,18 +58,6 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   function armChapter(chapter) {
     finishChapter(chapter);chapter.phase='waiting';chapter.node.dataset.storyStage='waiting';
     chapter.actors.forEach(prepareActor);
-    prepareChapter(chapter);
-  }
-  function prepareChapter(chapter){
-    if(config.experience!=='journey' || !canAnimate() || !chapter.surface.animate || chapter.transition)return;
-    const plan=journeyChapterPresentation(config.intensity,compact() && config.mobileMode==='adapted');
-    chapter.transition=chapter.surface.animate(plan.frames,{duration:plan.duration*pace,fill:'both',easing:plan.easing});
-    chapter.transition.id='story:journey:chapter';chapter.transition.pause();chapter.transition.currentTime=0;
-    chapter.surface.dataset.journeyOpening='true';
-    chapter.transition.onfinish=()=>{
-      const transition=chapter.transition;chapter.transition=null;transition?.cancel();
-      if(!chapter.actors.some(actor=>actor.state==='playing'))delete chapter.surface.dataset.journeyOpening;
-    };
   }
   function startActor(chapter,actor,deferred=false) {
     if(actor.state!=='waiting'||!actor.animation)return;
@@ -81,16 +65,12 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       actor.animation.cancel();delete actor.element.dataset.storyWeave;prepareActor(actor);
     }
     actor.state='playing';actor.element.dataset.storyActing='true';chapter.node.dataset.storyPerforming='true';
-    if(config.experience==='journey')chapter.surface.dataset.journeyOpening='true';
     const delay=deferred?Math.min(100+actor.index*35,240):actor.plan.delay;
     if(deferred)actor.animation.effect?.updateTiming({delay:delay*pace});
     if(actor.plan.fragments)actor.fragments=startStoryFragments(actor,chapter.surface,{delay:delay*pace,duration:actor.plan.duration*pace,compact:compact(),intensity:config.intensity});
     actor.animation.onfinish=()=>{
       releaseActor(actor);
-      if(!chapter.actors.some(a=>a.state==='playing')){
-        delete chapter.node.dataset.storyPerforming;
-        if(!chapter.transition)delete chapter.surface.dataset.journeyOpening;
-      }
+      if(!chapter.actors.some(a=>a.state==='playing'))delete chapter.node.dataset.storyPerforming;
       if(chapter.phase==='presented' && chapter.actors.every(a=>a.state==='done')){chapter.phase='ready';chapter.node.dataset.storyStage='ready';}
     };
     actor.animation.play();
@@ -98,7 +78,6 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
   function openChapter(chapter) {
     if(chapter.phase!=='waiting')return;
     chapter.openedAt=view.performance.now();chapter.phase='presented';chapter.node.dataset.storyStage='presented';
-    chapter.transition?.play();
   }
 
   function measure() {
@@ -127,7 +106,6 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       else if(!old){
         node.dataset.storyStage='waiting';
         if(chapter.top<scroll()-vh*.15){finishChapter(chapter);chapter.replayArmed=true;}
-        else prepareChapter(chapter);
       }
       observer?.observe(node);return chapter;
     });
@@ -140,10 +118,12 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
     const y=scroll(),vh=viewport(),clearance=headerClearance();
     const atEnd=y>=Math.max(0,(scroller?scroller.scrollHeight:doc.documentElement.scrollHeight)-vh)-1;
     const direction=y<lastY?'up':'down';
-    const current=[...chapters].reverse().find(chapter=>chapter.top<=y+clearance+vh*.25) || chapters[0];
+    const current=(atEnd?chapters.at(-1):[...chapters].reverse().find(chapter=>chapter.top<=y+clearance+vh*.25)) || chapters[0];
     if(current && current!==active){
+      const previous=active;
       if(active){active.node.dataset.sectionMotion='leaving';active.node.dataset.sectionDirection=direction;}
       current.node.dataset.sectionMotion='entering';current.node.dataset.sectionDirection=direction;container.dataset.storyActive=current.node.id;active=current;
+      if(previous)container.dispatchEvent(new view.CustomEvent(STORY_CHAPTER_CHANGE_EVENT,{detail:{from:previous.node.id,to:current.node.id,direction}}));
     }
     chapters.forEach((chapter,index)=>{
       const next=chapters[index+1], visible=chapter.top<y+vh && (!next || next.top>y+clearance);
@@ -157,7 +137,7 @@ export function mountStorefrontSectionMotion(container,rawConfig,{scroller=null,
       if(!visible)return;
       const localTop=chapter.top-y;
       if(chapter.replayArmed && direction==='up' && localTop>=clearance-48){armChapter(chapter);chapter.replayArmed=false;}
-      if(chapter.phase==='waiting' && (chapter.actors.length || chapter.transition) && (localTop<=vh*(config.experience==='journey'?.58:.32) || atEnd))openChapter(chapter);
+      if(chapter.phase==='waiting' && chapter.actors.length && (localTop<=vh*.32 || atEnd))openChapter(chapter);
       if(['opening','presented'].includes(chapter.phase)){
         const deferred=view.performance.now()-(chapter.openedAt || 0)>500*pace;
         chapter.actors.forEach(actor=>{if(actor.state==='waiting' && chapter.top+actor.geometry.y<y+vh*.94)startActor(chapter,actor,deferred);});

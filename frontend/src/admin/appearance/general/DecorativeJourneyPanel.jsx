@@ -20,7 +20,7 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <details><summary>Segundo adorno · opcional</summary><CloudinaryImageField label="Adorno secundario" value={c.secondaryImage} onChange={value=>edit('secondaryImage',value)} transparentOnly {...uploadProps}/></details>
     </div>}
     {tab==='recorrido' && <div className="journey-editor__fields">
-      <p>Entre secciones, el contenido se abre en profundidad: primero el título, después las imágenes y al final las acciones. Los adornos mantienen su recorrido continuo.</p>
+      <p>Una onda curva atraviesa la pantalla entre secciones usando la imagen de fondo de esta tienda. Los adornos conservan su camino continuo. Ajusta la velocidad con Ritmo del recorrido y la curvatura con Intensidad.</p>
       <Range label="Tamaño de los adornos" value={c.size} min={60} max={320} step={5} suffix=" px" onChange={value=>edit('size',value)}/>
       <Range label="Largo vertical de los adornos" value={c.length ?? 100} min={50} max={250} step={5} suffix=" %" onChange={value=>edit('length',value)}/>
       <p>100 % conserva el largo original. Aumenta este valor para alargar la imagen sin cambiar su ancho.</p>

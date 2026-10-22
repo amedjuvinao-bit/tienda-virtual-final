@@ -1,5 +1,11 @@
 # Global section animation comparison
 
+## Theodore background sweep review
+
+`theodore-background-desktop.mp4` and `theodore-background-mobile.mp4` show the curved background sweep between the production Categories and Footer components. Both clips scroll down and back up, using the same production journey engine as the administration preview. The selected satin background and rose artwork are controlled fixture choices, not new platform defaults.
+
+## Earlier animation comparisons
+
 `section-opening.mp4` compares the four production presets with the same category component, catalog images, viewport, intensity and timing. Frames are rendered from `StorefrontStory` and `CategoriasSection` using their native browser animations at 25 fps, followed by an 0.8-second hold.
 
 - `stack`: Pop-up escultórico — objects unfold from their own base in 3D.

@@ -7,6 +7,7 @@ export const STORY_PRESETS = [
 ];
 export const STORY_DEFAULTS = { enabled: true, experience:'journey',journey:DECORATIVE_JOURNEY_DEFAULTS,preset: 'stack', intensity: 65, pace: 'balanced', mobileMode: 'adapted' };
 export const STORY_VISIBILITY_EVENT='storefront:chapter-visibility';
+export const STORY_CHAPTER_CHANGE_EVENT='storefront:chapter-change';
 export function normalizeStoryConfig(raw) {
   const value=raw && typeof raw==='object' && !Array.isArray(raw)?raw:{};
   const intensity=Number(value.intensity);

@@ -2,6 +2,10 @@
 .story-journey-world{position:absolute;top:0;left:0;display:block;width:100%;overflow:hidden;pointer-events:none!important}
 .storefront-sections:not([data-journey-active="true"])>.story-journey-pin{display:none}
 .story-journey-world image{pointer-events:none}
+.storefront-journey-curtain-pin{position:sticky;top:0;z-index:20;width:100%;height:0;pointer-events:none!important;user-select:none}
+.storefront-journey-curtain{position:absolute;top:0;left:0;pointer-events:none!important;background-color:var(--color-bg,Canvas);background-size:cover;background-position:center;will-change:clip-path;contain:paint}
+.storefront-journey-curtain[hidden]{display:none}
+@media(prefers-reduced-motion:reduce){.storefront-journey-curtain-pin{display:none!important}}
 .storefront-sections[data-journey-shared="true"]{background-color:var(--color-bg,Canvas);background-image:var(--journey-shared-image);background-size:cover;background-repeat:no-repeat;background-position:center top;background-attachment:fixed}
 .storefront-sections[data-journey-shared="true"] .storefront-chapter-surface{background:transparent}
 /* Only background artwork is unified. Product images, glass, layout and local

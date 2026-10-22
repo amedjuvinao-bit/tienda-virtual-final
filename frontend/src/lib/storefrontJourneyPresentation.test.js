@@ -1,22 +1,18 @@
 import {expect,it} from 'vitest';
-import {journeyActorPresentation,journeyChapterPresentation} from './storefrontJourneyPresentation';
+import {journeyCurtainFrame} from './storefrontJourneyPresentation';
 
-it('uses the real surface and distinct beats for typography, images and actions',()=>{
- const title=journeyActorPresentation({role:'title',index:0}),hero=journeyActorPresentation({role:'hero',index:0}),action=journeyActorPresentation({role:'action',index:0});
- expect(title.frames[0].clipPath).toBeDefined();expect(title.frames[0].rotate).toBeUndefined();
- expect(hero.frames[0].rotate).toContain('0 1 0');expect(action.frames[0].rotate).toContain('1 0 0');
- expect(title.delay).toBeLessThan(hero.delay);expect(hero.delay).toBeLessThan(action.delay);
- const first=journeyActorPresentation({role:'product',index:0}),next=journeyActorPresentation({role:'product',index:1});
- expect(next.delay).toBeGreaterThan(first.delay);expect(next.frames[0].rotate).not.toBe(first.frames[0].rotate);
- for(const plan of [title,hero,action]){
-  expect(plan.frames.every(frame=>frame.opacity===1 && !frame.filter)).toBe(true);
-  expect(plan.frames.at(-1).translate).toMatch(/^0 0/);
+it('sweeps the full viewport with a continuous curved leading and trailing edge',()=>{
+ const initial=journeyCurtainFrame(0,1200,800),covered=journeyCurtainFrame(.5,1200,800),cleared=journeyCurtainFrame(1,1200,800);
+ expect(initial.path).toContain('M 0 880.00');expect(covered.path).toContain('M 0 -80.00');
+ expect(cleared.path).toContain('1200.00 -80.00');expect(cleared.phase).toBe('reveal');
+ for(const width of[320,390,1440])for(let p=0;p<=1;p+=.01){
+  const frame=journeyCurtainFrame(p,width,844);
+  expect(frame.path).toContain(' C ');expect(frame.path).not.toMatch(/NaN|Infinity/);expect(frame.path).toContain(width.toFixed(2));
  }
 });
-
-it('softens the travel on adapted mobile without removing the opening',()=>{
- const desktop=journeyChapterPresentation(100),mobile=journeyChapterPresentation(100,true);
- expect(desktop.frames[0].transform).toContain('-210px');expect(mobile.frames[0].transform).toContain('-136.5px');
- expect(mobile.frames.at(-1)).toEqual(desktop.frames.at(-1));
- expect(journeyActorPresentation({role:'hero',index:0},100,true).frames[0].rotate).toContain('19.5deg');
+it('mirrors the sweep when returning and scales curvature with intensity and mobile adaptation',()=>{
+ const down=journeyCurtainFrame(.25,390,844),up=journeyCurtainFrame(.25,390,844,{direction:'up'});
+ expect(down.path).toContain('M 0 422.00');expect(up.path).toContain('M 0 422.00');expect(up.path).not.toBe(down.path);
+ expect(journeyCurtainFrame(.25,390,844,{intensity:20}).path).not.toBe(journeyCurtainFrame(.25,390,844,{intensity:100}).path);
+ expect(journeyCurtainFrame(.25,390,844,{compact:true}).path).not.toBe(down.path);
 });
