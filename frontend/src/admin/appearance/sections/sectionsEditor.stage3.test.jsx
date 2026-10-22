@@ -1,12 +1,14 @@
 import React, { useCallback, useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import SectionsPanel from './SectionsPanel';
 import api from '../../../lib/api';
 
 vi.mock('../../../context/CartContext', () => ({ useCart: () => ({ addToCart: vi.fn() }) }));
 vi.mock('../../../context/FavoritesContext', () => ({ useFavorites: () => ({ toggleFavorite: vi.fn(), isFavorite: () => false }) }));
+
+beforeEach(() => vi.stubGlobal('matchMedia', vi.fn().mockImplementation(query => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }))));
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -158,15 +160,21 @@ describe('editor de secciones, etapa 3', () => {
     'permite editar una publicación a la vez en %s sin perder el resto', (id, label) => {
       render(<Harness id={id} onSave={vi.fn()} />);
       fireEvent.click(screen.getByRole('button', { name: `Editar ${label}` }));
-      fireEvent.click(within(screen.getByRole('navigation', { name: `Contenido de ${label}` })).getByRole('button', { name: /Publicaciones/ }));
+      fireEvent.click(within(screen.getByRole('navigation', { name: `Contenido de ${label}` })).getByRole('button', { name: id === 'tiktok' ? 'Videos' : /Publicaciones/ }));
       const picker = screen.getByRole('navigation', { name: `Elegir publicación de ${label}` });
       const first = within(picker).getByRole('button', { name: 'Editar publicación 1' });
       const second = within(picker).getByRole('button', { name: 'Editar publicación 2' });
       expect(first).toHaveAttribute('aria-pressed', 'true');
       fireEvent.click(second);
       expect(second).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByText('Publicación 2')).toBeVisible();
-      expect(screen.getByText('Publicación 1')).not.toBeVisible();
+      if (id === 'tiktok') {
+        const links = screen.getAllByPlaceholderText('https://www.tiktok.com/@usuario/video/…');
+        expect(links[1]).toBeVisible();
+        expect(links[0]).not.toBeVisible();
+      } else {
+        expect(screen.getByText('Publicación 2')).toBeVisible();
+        expect(screen.getByText('Publicación 1')).not.toBeVisible();
+      }
     },
   );
 

@@ -531,17 +531,19 @@ export default function LookSection({ theme, previewProducts }) {
 
   if (lookSection.enabled === false || !products.length) return null;
 
+  const previewWarning = usingDraft ? <p role="status" className="mx-auto mb-4 max-w-5xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">{loading || loadedProductsKey !== productRefsKey ? 'Cargando productos del catálogo; mientras tanto se muestran los datos guardados.' : 'Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar.'}</p> : null;
+
   if (style.layoutPreset === "editorialGlass") {
-    return <LookEditorialGlass config={config} style={style} products={products} mainImage={mainImage}
+    return <>{previewWarning}<LookEditorialGlass config={config} style={style} products={products} mainImage={mainImage}
       mainImageAlt={mainImageAlt} selectedId={selectedId} onSelect={setSelectedId}
       onCart={(product) => addToCart(buildCartPayload(product))}
       onFavorite={(product) => toggleFavorite(buildFavoritePayload(product))}
-      isFavorite={(product) => isFavorite(buildFavoritePayload(product))} loading={loading} />;
+      isFavorite={(product) => isFavorite(buildFavoritePayload(product))} loading={loading} /></>;
   }
 
   return (
     <section style={wrapperStyle}>
-      {usingDraft ? <p role="status" className="mx-auto mb-4 max-w-5xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">{loading || loadedProductsKey !== productRefsKey ? 'Cargando productos del catálogo; mientras tanto se muestran los datos guardados.' : 'Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar.'}</p> : null}
+      {previewWarning}
       <div className="mx-auto md:hidden w-full mb-5">
         <div
           className={`w-full ${

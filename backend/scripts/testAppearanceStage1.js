@@ -40,7 +40,7 @@ async function run() {
   const identityFixture = new SiteSettings({store:{name:'Negocio de prueba',businessName:'Razón social',email:'privado@example.com'}}).toObject();
   try {
     SiteSettings.findOne = () => ({select(){return this;},async lean(){return identityFixture;}});
-    SiteSettings.findByIdAndUpdate = async () => identityFixture;
+    SiteSettings.findByIdAndUpdate = () => ({ async lean() { return identityFixture; } });
     const getAppearance = siteSettingsRouter.stack.find(layer => layer.route?.path === '/appearance' && layer.route.methods.get).route.stack.at(-1).handle;
     let response;
     await getAppearance({}, {set(){return this;},json(value){response=value;}}, error => {throw error;});

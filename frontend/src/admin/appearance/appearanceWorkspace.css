@@ -216,7 +216,7 @@
 
 @media (max-width: 980px) {
   .appearance-workspace__header { align-items: flex-start; flex-direction: column; }
-  .appearance-workspace__intro { flex: auto; }
+  .appearance-workspace__intro { flex: auto; width: 100%; }
   .appearance-navigation { width: 100%; }
   .appearance-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .appearance-workspace { padding-right: max(60px, env(safe-area-inset-right)) !important; }

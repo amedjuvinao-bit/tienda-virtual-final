@@ -1,13 +1,14 @@
 // src/components/CarouselBanner.jsx
 import "keen-slider/keen-slider.min.css"
 import { useKeenSlider } from "keen-slider/react"
-import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { useContext, useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { X } from "lucide-react"
 import { createPortal } from 'react-dom'
 import { fetchSiteSettings } from "../lib/siteSettingsApi" // ✅ MISMA RUTA QUE APPEARANCEPAGE
 import { getBannerHeightStyle } from "../lib/bannerHeight"
 import BannerTemplateView from './BannerTemplateView'
 import SliderControls from './SliderControls'
+import { StorefrontSettingsContext } from '../context/StorefrontSettingsContext'
 
 export default function CarouselBanner({ bannerOverride = null, sectionsOverride = null }) {
   const overrideRef = useRef({ banner: bannerOverride, sections: sectionsOverride })
@@ -20,9 +21,14 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   const [selectedImage, setSelectedImage] = useState(null)
 
   // ✅ settings banner
-  const [banner, setBanner] = useState(null) // theme.banner
-  const [bannerSections, setBannerSections] = useState([])
-  const [bannerLoading, setBannerLoading] = useState(true)
+  const [localBanner, setBanner] = useState(null) // theme.banner
+  const [localSections, setBannerSections] = useState([])
+  const [localLoading, setBannerLoading] = useState(true)
+  const sharedSettings = useContext(StorefrontSettingsContext)
+  const managed = sharedSettings !== undefined || Boolean(bannerOverride)
+  const banner = bannerOverride || (sharedSettings !== undefined ? sharedSettings?.theme?.banner : localBanner)
+  const bannerSections = sectionsOverride || (sharedSettings !== undefined ? sharedSettings?.theme?.sections || [] : localSections)
+  const bannerLoading = managed ? !bannerOverride && !sharedSettings : localLoading
 
   // ✅ Para dots / slide actual
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -192,6 +198,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   )
 
   useEffect(() => {
+    if (managed) return
     let mounted = true
     ;(async () => {
       if (!mounted) return
@@ -200,9 +207,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     return () => {
       mounted = false
     }
-  }, [loadBannerSettings])
+  }, [loadBannerSettings, managed])
 
   useEffect(() => {
+    if (managed) return
     const onStorage = (e) => {
       if (e?.key === "rb_site_settings_tick") {
         loadBannerSettings({ silent: true })
@@ -218,7 +226,11 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       window.removeEventListener("storage", onStorage)
       window.removeEventListener("focus", onFocus)
     }
-  }, [loadBannerSettings])
+  }, [loadBannerSettings, managed])
+
+  useEffect(() => {
+    if (sharedSettings) setSlideAnimTick(t => t + 1)
+  }, [sharedSettings])
 
   const bannerType = bannerLoading ? "loading" : String(banner?.type || "slider")
   const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId)

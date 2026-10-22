@@ -2,16 +2,33 @@ import React from 'react';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CarouselBanner from './CarouselBanner';
+import { StorefrontSettingsContext } from '../context/StorefrontSettingsContext';
+import { fetchSiteSettings } from '../lib/siteSettingsApi';
 
 vi.mock('keen-slider/react', () => ({ useKeenSlider: () => [() => {}, { current: null }] }));
 vi.mock('../lib/siteSettingsApi', () => ({ fetchSiteSettings: vi.fn().mockResolvedValue({ theme: {} }) }));
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('portada pública con diseño opcional', () => {
+  it('reutiliza la configuración de la aplicación sin consultas ni portada provisional', async () => {
+    const view = settings => <StorefrontSettingsContext.Provider value={settings}><CarouselBanner /></StorefrontSettingsContext.Provider>;
+    const { container, rerender } = render(view(null));
+    expect(container.querySelector('img')).toBeNull();
+    expect(fetchSiteSettings).not.toHaveBeenCalled();
+    rerender(view({ theme: { banner: { type: 'image', templateId: 'plain', imageUrl: '/configurada.jpg' } } }));
+    await waitFor(() => expect(container.querySelector('img')).toHaveAttribute('src', '/configurada.jpg'));
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'rb_site_settings_tick' }));
+    expect(fetchSiteSettings).not.toHaveBeenCalled();
+    rerender(view({ theme: { banner: { type: 'image', templateId: 'plain', imageUrl: '/actualizada.jpg' } } }));
+    await waitFor(() => expect(container.querySelector('img')).toHaveAttribute('src', '/actualizada.jpg'));
+  });
+
   it('aplica la misma plantilla a toda la galería y conserva las imágenes al mostrarla sola', async () => {
     const slides = [
       { image: '/uno.jpg', button: { enabled: true, kind: 'text', text: 'Viejo' } },

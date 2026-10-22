@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:appearance-closure": "vitest run src/admin/appearance src/admin/AppearancePage.initialLoad.test.jsx src/admin/AppearancePage.save.test.jsx src/admin/AppearancePage.generalUpload.test.jsx src/components src/lib/storefront src/theme",
     "dev": "vite",
     "build": "vite build",
     "audit:admin-mobile": "node scripts/auditAdminMobile.mjs",

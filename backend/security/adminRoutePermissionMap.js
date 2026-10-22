@@ -1725,6 +1725,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
    * ======================================================= */
   {
     method: 'POST',
+    path: '/api/uploads/many',
+    permission: 'media:upload',
+    description: 'Subir varios archivos o imágenes.',
+    audit: true,
+  },
+  {
+    method: 'POST',
     path: '/api/uploads',
     permission: 'media:upload',
     description: 'Subir archivo o imagen.',

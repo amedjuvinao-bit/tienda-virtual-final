@@ -148,11 +148,14 @@ export default function App() {
   const [adminLoader, setAdminLoader] = useState(getRememberedAdminLoader);
   const [siteSettingsFromServer, setSiteSettingsFromServer] = useState(null);
 
+  const settingsRequest = useRef(0);
   const reloadTheme = async () => {
+    const requestId = ++settingsRequest.current;
     let succeeded = false;
     try {
       if (!window.location.pathname.startsWith('/admin')) setLoadingPage(true);
       const data = await fetchSiteSettings();
+      if (requestId !== settingsRequest.current) return false;
       const nextLoader = normalizeAdminLoader(data?.admin?.loader);
       setAdminLoader(nextLoader);
       rememberAdminLoader(nextLoader);
@@ -171,11 +174,13 @@ export default function App() {
       adminConnectionErrorLogged.current = false;
       setAdminConnectionError(false);
     } catch (error) {
+      if (requestId !== settingsRequest.current) return false;
       if (!adminConnectionErrorLogged.current) console.error('Error cargando site settings:', error);
       adminConnectionErrorLogged.current = true;
       if (window.location.pathname.startsWith('/admin')) setAdminConnectionError(true);
     } finally {
       const finish = () => {
+        if (requestId !== settingsRequest.current) return;
         setLoadingPage(false);
         if (succeeded || !window.location.pathname.startsWith('/admin')) setThemeReady(true);
       };
@@ -218,10 +223,12 @@ export default function App() {
       if (event.key === RB_SETTINGS_TICK_KEY) reloadTheme();
     };
 
+    window.addEventListener('focus', onEvent);
     window.addEventListener('rb_site_settings_updated', onEvent);
     window.addEventListener('storage', onStorage);
 
     return () => {
+      window.removeEventListener('focus', onEvent);
       window.removeEventListener('rb_site_settings_updated', onEvent);
       window.removeEventListener('storage', onStorage);
     };
@@ -247,6 +254,7 @@ export default function App() {
                 {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
+                  <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/p/:id" element={<ProductDetail />} />
                   <Route path="/admin/login" element={<Login initialSettings={siteSettingsFromServer} loaderModel={adminLoader} />} />

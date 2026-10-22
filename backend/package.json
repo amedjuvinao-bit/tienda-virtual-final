@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "test:appearance-closure": "node scripts/testAppearanceStage1.js && node scripts/testAppearanceClosure.js",
     "start": "node index.js",
     "backup:free": "node scripts/backupAtlasFree.js",
     "backup:decrypt": "node scripts/decryptFreeBackup.js",

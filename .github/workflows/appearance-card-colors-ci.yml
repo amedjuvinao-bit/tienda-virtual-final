@@ -1,12 +1,14 @@
-name: Apariencia - persistencia de colores
+name: Apariencia - cierre técnico
 on:
   push:
     branches:
       - feature/apariencia-nivel-plus
+  pull_request:
+    branches: [main, feature/apariencia-nivel-plus]
   workflow_dispatch:
 
 jobs:
-  banner-card-colors:
+  appearance-closure:
     runs-on: ubuntu-latest
     services:
       mongo:
@@ -29,11 +31,20 @@ jobs:
         working-directory: backend
       - run: npm ci
         working-directory: frontend
+      - run: npm run test:appearance-closure
+        working-directory: backend
+      - run: npm run test:appearance-closure
+        working-directory: frontend
       - run: npm run build
         working-directory: frontend
         env:
           VITE_API_BASE_URL: http://localhost:5000
       - run: node scripts/testBannerCardColorPersistence.js
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://127.0.0.1:27017/appearance_ci
+      - run: node scripts/testAppearanceClosurePersistence.js
         working-directory: backend
         env:
           NODE_ENV: test

@@ -1,510 +1,27 @@
-import api, { adminFetch } from '../lib/api';
-// src/admin/AppearancePage.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from 'react-dom';
+import api, { adminFetch } from "../lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
 import { fetchAppearanceSettings, fetchSiteSettings, saveSiteSettings } from "../lib/siteSettingsApi";
 import { applyTheme } from "../theme/applyTheme";
-import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
+import PremiumAdminNavIcon from "./components/PremiumAdminNavIcon";
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
-import { validateHeaderMenu } from '../components/headerPresentation';
-import { normalizeGlobalConfig } from "./appearance/general/generalHelpers";
-import { normalizeStoryConfig } from '../lib/storefrontStoryConfig';
+import { validateAppearanceDraft } from "./appearance/appearanceValidation";
+import { verifyAppearanceSave } from "./appearance/verifyAppearanceSave";
 import { API_BASE_URL } from "../config/apiBaseUrl";
-
-// ✅ Banner separado
 import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
-import "./appearance/appearanceWorkspace.css";
-import useAdminPermissions from './security/useAdminPermissions';
-import AdminLoadingScreen from './loading/AdminLoadingScreen';
-import { getRememberedAdminLoader } from './loading/adminLoaderConfig';
-import {
-  LOOK_SECTION_DEFAULTS,
-  normalizeLookSection,
-} from "./appearance/sections/look/lookSectionHelpers";
+import useAdminPermissions from "./security/useAdminPermissions";
+import AdminLoadingScreen from "./loading/AdminLoadingScreen";
+import { getRememberedAdminLoader } from "./loading/adminLoaderConfig";
+import { buildThemeFromServer, buildMenusFromServer, normalizeThemeForSave, getValueAtPath, deepEqual } from "./appearance/appearanceModel";
+import './appearance/appearanceWorkspace.css';
 
 const API_BASE = API_BASE_URL;
 
-// ✅ clave para “avisar” al frontend (CarouselBanner) que recargue settings
 const RB_SETTINGS_TICK_KEY = "rb_site_settings_tick";
-
-const Input = ({ label, ...rest }) => (
-  <label className="block mb-3 min-w-0">
-    <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
-    <input
-      className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-400"
-      {...rest}
-    />
-  </label>
-);
-
-const Select = ({ label, children, ...rest }) => (
-  <label className="block mb-3 min-w-0">
-    <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
-    <select
-      className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
-      {...rest}
-    >
-      {children}
-    </select>
-  </label>
-);
-
-// 🔹 ColorInput seguro: nunca manda "" al input type="color"
-const ColorInput = ({ value, onChange }) => {
-  const isHex = (v) =>
-    typeof v === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim());
-
-  const safeColor = isHex(value) ? value : "#ffffff";
-
-  return (
-    <div className="grid grid-cols-[56px_1fr] gap-3 w-full min-w-0">
-      <input
-        type="color"
-        className="h-10 w-14 rounded border"
-        value={safeColor}
-        onChange={onChange}
-      />
-      <input
-        className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-400"
-        value={value || ""}
-        onChange={onChange}
-        placeholder="#FFFFFF"
-      />
-    </div>
-  );
-};
-
-// ✅ botón default del banner (lo usa el normalizador)
-const buildDefaultButton = () => ({
-  enabled: true,
-  kind: "image", // image | text
-  imageUrl: "/ImgBotones/VerMas2.png",
-  text: "",
-  link: "",
-  posX: 50,
-  posY: 92,
-  widthPx: 200,
-
-  // animación (solo config)
-  anim: "inherit", // inherit | none | fade | slideup | pop | glow | ...
-  animDurationMs: 600,
-  animDelayMs: 0,
-});
-
-// ==============================
-// ✅ SECCIONES BASE (Estrategia B)
-// - Siempre existen estas secciones “diseñadas”
-// - Si faltan en BD, se crean automáticamente
-// - Si existen en BD, se respetan y NO se pisan
-// - Si el usuario crea más, se permiten y quedan después
-// Nota: Para “link” profesional sin rutas, usa anclas por id: #tendencia, #look, etc.
-// (⚠️ Banner NO va aquí: el banner se configura por su pestaña aparte)
-// ==============================
-const DEFAULT_SECTION_STYLE = {
-  bgColor: "#ffffff",
-  textColor: "#111111",
-  accentColor: "#d4af37",
-  titleSizePx: 42,
-  subtitleSizePx: 16,
-  cardRadiusPx: 18,
-  imageHeightPx: 260,
-  spacingPx: 16,
-  titleWeight: 800,
-  subtitleWeight: 400,
-};
-
-const BASE_SECTIONS = [
-  { id: "tendencia", name: "En tendencia", title: "EN TENDENCIA", subtitle: "" },
-  { id: "look", name: "Looks", title: "LOOKS", subtitle: "" },
-  { id: "complementos", name: "Complementos", title: "COMPLEMENTOS", subtitle: "" },
-  { id: "categorias", name: "Categorías", title: "CATEGORÍAS", subtitle: "" },
-  { id: "instagram", name: "Instagram", title: "INSTAGRAM", subtitle: "" },
-  { id: "tiktok", name: "TikTok", title: "TIKTOK", subtitle: "" },
-  { id: "informacion", name: "Información", title: "INFORMACIÓN", subtitle: "" },
-];
-
-function buildBaseSection(base) {
-  if (base.id === "look") {
-    return normalizeLookSection({
-      ...LOOK_SECTION_DEFAULTS,
-      id: "look",
-      name: base.name,
-      label: base.name,
-      title: base.title,
-      subtitle: base.subtitle,
-      enabled: true,
-    });
-  }
-
-  return {
-    id: base.id,
-    enabled: true,
-    name: base.name,
-    title: base.title,
-    subtitle: base.subtitle,
-    titleImage: "",
-    style: { ...DEFAULT_SECTION_STYLE },
-    items: [],
-  };
-}
-
-function ensureBaseSections(inputSections) {
-  const arr = Array.isArray(inputSections) ? inputSections : [];
-  const byId = new Map(
-    arr
-      .filter((s) => s && typeof s === "object")
-      .map((s) => [String(s.id || "").trim(), s])
-      .filter(([id]) => !!id)
-  );
-
-  const result = [];
-
-  // 1) Garantiza las base en el orden correcto
-  for (const base of BASE_SECTIONS) {
-    const existing = byId.get(base.id);
-    if (existing) {
-      if (base.id === "look") {
-        result.push(
-          normalizeLookSection({
-            ...existing,
-            id: "look",
-            name:
-              typeof existing?.name === "string" && existing.name.trim()
-                ? existing.name
-                : base.name,
-            label:
-              typeof existing?.label === "string" && existing.label.trim()
-                ? existing.label
-                : base.name,
-            title: typeof existing?.title === "string" ? existing.title : base.title,
-            subtitle:
-              typeof existing?.subtitle === "string" ? existing.subtitle : base.subtitle,
-          })
-        );
-      } else {
-        result.push(existing); // respeta lo guardado en BD
-      }
-    } else {
-      result.push(buildBaseSection(base));
-    }
-  }
-
-  // 2) Agrega secciones extra (si el usuario crea nuevas) sin borrarlas
-  for (const s of arr) {
-    const id = String(s?.id || "").trim();
-    if (!id) continue;
-    const isBase = BASE_SECTIONS.some((b) => b.id === id);
-    if (!isBase) result.push(s);
-  }
-
-  return result;
-}
-
-// 🔹 Normalizador: garantiza que siempre existan colors, fonts, header, footer, banner y sections
-function buildThemeFromServer(themeRaw) {
-  const t = themeRaw || {};
-
-  const bannerRaw = t?.banner || {};
-
-  const normalizedSlides = Array.isArray(bannerRaw?.slides)
-    ? bannerRaw.slides.map((s) => ({
-        image: "",
-        link: "",
-        posX: 50,
-        posY: 50,
-        fit: "cover",
-        ...(s || {}),
-        button: {
-          ...buildDefaultButton(),
-          ...(s?.button || {}),
-        },
-      }))
-    : [];
-
-  const normalizedImagePosX = Number.isFinite(Number(bannerRaw?.imagePosX))
-    ? Number(bannerRaw.imagePosX)
-    : 50;
-
-  const normalizedImagePosY = Number.isFinite(Number(bannerRaw?.imagePosY))
-    ? Number(bannerRaw.imagePosY)
-    : 50;
-
-  const normalizedImageFit = bannerRaw?.imageFit === "contain" ? "contain" : "cover";
-
-  const bannerDefaults = {
-    type: "slider", // slider | image | video
-    slides: [],
-    imageUrl: "",
-    imageLink: "",
-    videoUrl: "",
-    videoAutoplay: true,
-    videoMuted: true,
-    videoLoop: true,
-    heightMode: "auto", // auto | fullscreen
-    heightPx: 520,
-    tabletHeightMode: "fullscreen",
-    tabletHeightPx: 1180,
-    mobileHeightMode: "fullscreen",
-    mobileHeightPx: 844,
-
-    imagePosX: 50,
-    imagePosY: 50,
-    imageFit: "cover",
-
-    imageButton: buildDefaultButton(),
-    videoButton: buildDefaultButton(),
-
-    sliderIntervalMs: 3500,
-    sliderShowProgress: true,
-    sliderShowCounter: false,
-    sliderShowControls: true,
-    sliderControlColor: "#ffffff",
-    sliderControlTheme: "minimal",
-    sliderControlPosition: "right",
-    sliderControlSize: 100,
-  };
-
-  return {
-    colors: {
-      primary: "",
-      secondary: "",
-      text: "",
-      background: "",
-      accent: "",
-      ...(t.colors || {}),
-    },
-    fonts: {
-      base: "",
-      headings: "",
-      fontSize: 16,
-      lineHeight: 1.6,
-      ...(t.fonts || {}),
-    },
-    radius: {
-      sm: 6,
-      md: 10,
-      lg: 14,
-      ...(t.radius || {}),
-    },
-    spacing: {
-      base: 8,
-      ...(t.spacing || {}),
-    },
-    logo: {
-      light: "",
-      dark: "",
-      ...(t.logo || {}),
-    },
-    favicon: t.favicon || "",
-    global: normalizeGlobalConfig(t.global),
-
-    header: {
-      bgColor: "",
-      bgOpacity: 1,
-
-      textColor: "",
-      linkColor: "",
-      metallicMenuText: false,
-      searchBgColor: "",
-      searchTextColor: "",
-      searchAccentColor: "",
-      searchBorderColor: "",
-      menuAnimation: "soft",
-
-      iconColor: "",
-      iconHoverColor: "",
-      iconAnimation: "soft",
-      iconImages: { account: "", favorites: "", cart: "" },
-      iconSizePx: 34,
-
-      fontPreset: "",
-      fontFamily: "",
-      fontSizePx: 16,
-
-      logoLight: "",
-      logoDark: "",
-      logoMode: "auto",
-      logoHeightPx: 80,
-      surfaceShape: "attached",
-      cornerRadiusPx: 16,
-      liquidGlassEnabled: false,
-      glassStrength: 75,
-
-      // ✅ NUEVO: menú móvil premium
-      mobileMenuBgColor: "#fff4f3",
-      mobileMenuTextColor: "#4e1e39",
-      mobileMenuBorderColor: "#e7c2cf",
-      mobileMenuItemBorderColor: "#d2a997",
-      mobileMenuAccentColor: "#ac7950",
-      mobileMenuMutedColor: "#815269",
-      mobileMenuTitleColor: "#1f1f1f",
-
-      mobileMenuButtonBg: "#d8b2bf",
-      mobileMenuButtonTextColor: "#7b4f5f",
-      mobileMenuSecondaryButtonBg: "#ffffff",
-      mobileMenuSecondaryButtonTextColor: "#9d6275",
-
-      mobileMenuSocialBg: "#c98ea2",
-      mobileMenuSocialIconColor: "#ffffff",
-
-      mobileMenuOverlayColor: "#54233d",
-      mobileMenuOverlayOpacity: 0.22,
-
-      mobileMenuFontFamily: "",
-      mobileMenuAnimation: "slide-left",
-      mobileMenuAnimationDurationMs: 300,
-      mobileMenuTriggerIcon: 'classic',
-      mobileMenuTriggerAnimation: 'glide',
-      mobileMenuTriggerBgOpacity: 30,
-      mobileMenuTriggerMotionDurationMs: 440,
-      mobileMenuWidthPercent: 88,
-      mobileMenuLayout: 'atelier-sheet',
-
-      ...(t.header || {}),
-      iconSet: ['gold', 'wine', 'satin', 'porcelain'].includes(t.header?.iconSet) ? t.header.iconSet : 'gold',
-      iconOverrides: {
-        ...(t.header?.iconOverrides || {}),
-        ...(t.header?.iconSet === 'custom' ? { gold: { ...(t.header?.iconImages || {}), ...(t.header?.iconOverrides?.gold || {}) } } : {}),
-      },
-    },
-
-    // ✅ SECCIONES (Estrategia B)
-    // - siempre existen las “base”
-    // - si el usuario creó nuevas, también quedan guardadas
-    sections: ensureBaseSections(t.sections),
-
-    footer: {
-      bgColor: "",
-      textColor: "",
-      ...(t.footer || {}),
-    },
-
-    banner: {
-      ...bannerDefaults,
-      ...(bannerRaw || {}),
-
-      slides: normalizedSlides,
-      imagePosX: normalizedImagePosX,
-      imagePosY: normalizedImagePosY,
-      imageFit: normalizedImageFit,
-
-      imageButton: {
-        ...buildDefaultButton(),
-        ...(bannerRaw?.imageButton || {}),
-      },
-      videoButton: {
-        ...buildDefaultButton(),
-        ...(bannerRaw?.videoButton || {}),
-      },
-
-      sliderIntervalMs: Number.isFinite(Number(bannerRaw?.sliderIntervalMs))
-        ? Number(bannerRaw.sliderIntervalMs)
-        : Number.isFinite(Number(bannerRaw?.autoplayMs))
-          ? Number(bannerRaw.autoplayMs)
-          : bannerDefaults.sliderIntervalMs,
-      sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
-      sliderShowCounter: bannerRaw?.sliderShowCounter === true,
-      sliderShowControls: bannerRaw?.sliderShowControls !== false,
-      sliderControlColor: /^#[0-9a-fA-F]{6}$/.test(bannerRaw?.sliderControlColor || '') ? bannerRaw.sliderControlColor : '#ffffff',
-      sliderControlTheme: ['minimal', 'petal', 'orbit', 'editorial'].includes(bannerRaw?.sliderControlTheme) ? bannerRaw.sliderControlTheme : 'minimal',
-      sliderControlPosition: ['right', 'left', 'bottom'].includes(bannerRaw?.sliderControlPosition) ? bannerRaw.sliderControlPosition : 'right',
-      sliderControlSize: Number.isFinite(Number(bannerRaw?.sliderControlSize)) ? Math.max(80, Math.min(140, Number(bannerRaw.sliderControlSize))) : 100,
-    },
-  };
-}
-
-// ✅ Normalizador de menús
-function buildMenusFromServer(menusRaw) {
-  const m = menusRaw || {};
-  return {
-    header: Array.isArray(m.header) ? m.header : [],
-    footer: Array.isArray(m.footer) ? m.footer : [],
-  };
-}
-
-// ✅ FIX: normaliza banner antes de guardar (evita que se “pierda” al guardar secciones)
-function normalizeThemeForSave(theme) {
-  const draft = structuredClone(theme || {});
-  if (!draft.banner) return draft;
-
-  draft.sections = ensureBaseSections(draft.sections).map((section) => {
-    const id = String(section?.id || "").trim().toLowerCase();
-    if (id === "look") return normalizeLookSection(section);
-    return section;
-  });
-
-  const b = draft.banner || {};
-  const type = String(b.type || "slider");
-
-  // ✅ FIX CLAVE (REAL): el schema de Mongo exige slides[].image (NO imageUrl)
-  if (Array.isArray(b.slides)) {
-    b.slides = b.slides.map((s) => {
-      const slide = s || {};
-      const img = slide.image || slide.imageUrl || slide.url || slide.src || "";
-      const link = slide.link || slide.href || slide.to || "";
-      const cleaned = { ...slide, image: img, link };
-
-      // opcional: limpiar alias para no mandar basura (no afecta el render)
-      delete cleaned.imageUrl;
-      delete cleaned.url;
-      delete cleaned.src;
-      delete cleaned.imageURL;
-
-      return cleaned;
-    });
-  }
-
-  // UI -> Backend (el backend suele usar autoplayMs)
-  const uiInterval = Number(b.sliderIntervalMs);
-  if (Number.isFinite(uiInterval) && uiInterval > 0) {
-    b.autoplayMs = uiInterval;
-  }
-
-  // No mandes campos solo-UI al backend (evita inconsistencias)
-  delete b.sliderIntervalMs;
-
-  // Asegura imageUrl si el tipo es imagen (por si algún panel guardó en otro nombre)
-  if (type === "image") {
-    if (!b.imageUrl || String(b.imageUrl).trim() === "") {
-      const fallback = b.image || b.url || b.imageSrc || b.imageURL || "";
-      if (fallback) b.imageUrl = fallback;
-    }
-  }
-
-  // Asegura videoUrl si el tipo es video
-  if (type === "video") {
-    if (!b.videoUrl || String(b.videoUrl).trim() === "") {
-      const fallback = b.video || b.url || b.videoSrc || b.videoURL || "";
-      if (fallback) b.videoUrl = fallback;
-    }
-  }
-
-  draft.banner = b;
-  return draft;
-}
-
-function getValueAtPath(obj, path) {
-  const keys = String(path || "").split(".");
-  let ref = obj;
-  for (const key of keys) {
-    if (ref == null) return undefined;
-    ref = ref[key];
-  }
-  return ref;
-}
-
-function deepEqual(a, b) {
-  if (Object.is(a, b)) return true;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch (_) {
-    return false;
-  }
-}
 
 export default function AppearancePage() {
   const { can } = useAdminPermissions();
@@ -530,10 +47,11 @@ export default function AppearancePage() {
   const [menus, setMenus] = useState(buildMenusFromServer(null));
   const [menusSnapshot, setMenusSnapshot] = useState(buildMenusFromServer(null));
 
+  const normalizedSnapshot = useMemo(() => serverSnapshot ? normalizeThemeForSave(serverSnapshot) : null, [serverSnapshot]);
   const changedAreas = useMemo(() => {
     if (!serverSnapshot) return [];
     const current = normalizeThemeForSave(theme);
-    const original = normalizeThemeForSave(serverSnapshot);
+    const original = normalizedSnapshot;
     const changed = new Set();
     for (const key of Object.keys(current)) {
       if (!deepEqual(current[key], original[key])) {
@@ -543,7 +61,7 @@ export default function AppearancePage() {
     if (!deepEqual(menus.header, menusSnapshot.header)) changed.add('header');
     if (!deepEqual(menus.footer, menusSnapshot.footer)) changed.add('footer');
     return [...changed];
-  }, [theme, serverSnapshot, menus, menusSnapshot]);
+  }, [theme, serverSnapshot, normalizedSnapshot, menus, menusSnapshot]);
 
   useEffect(() => {
     if (changedAreas.length && ['success', 'info'].includes(saveMessage?.type)) setSaveMessage(null);
@@ -575,7 +93,7 @@ export default function AppearancePage() {
     () => ({
       public: [
         { label: "Inicio", value: "/" },
-        { label: "Lo Nuevo", value: "/lo-nuevo" },
+        { label: "Lo Nuevo", value: "/#tendencia" },
         { label: "Carrito", value: "/carrito" },
         { label: "Favoritos", value: "/favoritos" },
 
@@ -661,17 +179,16 @@ export default function AppearancePage() {
         return prev;
       }
 
-      const draft = structuredClone(prev);
       const keys = String(path || "").split(".");
+      const draft = { ...prev };
       let ref = draft;
-
-      for (let i = 0; i < keys.length - 1; i++) {
-        if (!ref[keys[i]] || typeof ref[keys[i]] !== "object") {
-          ref[keys[i]] = {};
-        }
-        ref = ref[keys[i]];
+      let original = prev;
+      for (const key of keys.slice(0, -1)) {
+        const branch = original?.[key];
+        ref[key] = Array.isArray(branch) ? [...branch] : { ...branch };
+        ref = ref[key];
+        original = branch;
       }
-
       ref[keys.at(-1)] = nextValue;
       return draft;
     });
@@ -799,294 +316,12 @@ export default function AppearancePage() {
         return;
       }
 
-      if (changedMenus.header) {
-        const menuError = validateHeaderMenu(changedMenus.header);
-        if (menuError) { showValidation(menuError); return; }
-      }
-
-      const hexOk = (v) => !v || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
-
-      const c = theme.colors || {};
-      if (changedTheme.colors && ![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
-        showValidation("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
-        return;
-      }
-
-      const h = theme.header || {};
-      const headerColorList = [
-        h.bgColor,
-        h.textColor,
-        h.linkColor,
-        h.searchBgColor,
-        h.searchTextColor,
-        h.searchAccentColor,
-        h.searchBorderColor,
-        h.iconColor,
-        h.iconHoverColor,
-        h.mobileMenuBgColor,
-        h.mobileMenuTextColor,
-        h.mobileMenuBorderColor,
-        h.mobileMenuAccentColor,
-        h.mobileMenuMutedColor,
-        h.mobileMenuTitleColor,
-        h.mobileMenuButtonBg,
-        h.mobileMenuButtonTextColor,
-        h.mobileMenuSecondaryButtonBg,
-        h.mobileMenuSecondaryButtonTextColor,
-        h.mobileMenuSocialBg,
-        h.mobileMenuSocialIconColor,
-        h.mobileMenuOverlayColor,
-      ];
-
-      if (changedTheme.header && !headerColorList.every(hexOk)) {
-        showValidation("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
-        return;
-      }
-
-      if (changedTheme.header && !['gold', 'wine', 'satin', 'porcelain'].includes(h.iconSet)) {
-        showValidation('Selecciona un modelo válido para los íconos.');
-        return;
-      }
-      if (changedTheme.header && (!Number.isInteger(h.iconSizePx) || h.iconSizePx < 28 || h.iconSizePx > 40)) {
-        showValidation('El tamaño de los íconos debe estar entre 28 y 40 px.');
-        return;
-      }
-      if (changedTheme.header && !Object.values(h.iconOverrides || {}).every((icons) =>
-        Object.values(icons || {}).every((url) => !url || /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url))
-      )) {
-        showValidation('Carga las imágenes personalizadas en Cloudinary.');
-        return;
-      }
-
-      const op = Number(h.bgOpacity);
-      if (changedTheme.header && (Number.isNaN(op) || op < 0 || op > 1)) {
-        showValidation("La transparencia del header debe estar entre 0 y 1.");
-        return;
-      }
-
-      const mobileOverlayOpacity = Number(h.mobileMenuOverlayOpacity);
-      if (changedTheme.header && (
-        Number.isNaN(mobileOverlayOpacity) ||
-        mobileOverlayOpacity < 0 ||
-        mobileOverlayOpacity > 1
-      )) {
-        showValidation("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
-        return;
-      }
-
-      const lh = Number(h.logoHeightPx);
-      if (changedTheme.header && (Number.isNaN(lh) || lh < 30 || lh > 160)) {
-        showValidation("El tamaño del logo debe estar entre 30 y 160 px.");
-        return;
-      }
-
-      if (changedTheme.header && !['attached', 'floating'].includes(h.surfaceShape)) {
-        showValidation('Elige una forma válida para el encabezado.');
-        return;
-      }
-      if (changedTheme.header && (h.liquidGlassEnabled !== true && h.liquidGlassEnabled !== false)) {
-        showValidation('Revisa la opción de vidrio líquido.');
-        return;
-      }
-      const cornerRadius = Number(h.cornerRadiusPx);
-      const glassStrength = Number(h.glassStrength);
-      if (changedTheme.header && (!Number.isFinite(cornerRadius) || cornerRadius < 0 || cornerRadius > 48 || !Number.isFinite(glassStrength) || glassStrength < 0 || glassStrength > 100)) {
-        showValidation('El redondeo debe estar entre 0 y 48 px y la intensidad del vidrio entre 0 y 100%.');
-        return;
-      }
-
-      const mobileAnimDuration = Number(h.mobileMenuAnimationDurationMs);
-      if (changedTheme.header && (
-        Number.isNaN(mobileAnimDuration) ||
-        mobileAnimDuration < 120 ||
-        mobileAnimDuration > 1200
-      )) {
-        showValidation("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
-        return;
-      }
-
-      const mobileWidth = Number(h.mobileMenuWidthPercent);
-      if (changedTheme.header && (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100)) {
-        showValidation("El ancho del menú móvil debe estar entre 60% y 100%.");
-        return;
-      }
-
-      // ✅ Validación básica banner (tipo + altura + sliderInterval)
-      const b = theme.banner || {};
-      const bannerType = String(b.type || "slider");
-      if (changedTheme.banner && !["slider", "image", "video"].includes(bannerType)) {
-        showValidation("El tipo de banner debe ser: slider, image o video.");
-        return;
-      }
-      const hm = String(b.heightMode || "auto");
-      if (changedTheme.banner && !["auto", "fullscreen"].includes(hm)) {
-        showValidation("El modo de altura del banner debe ser automático o pantalla completa.");
-        return;
-      }
-      if (changedTheme.banner && hm === "auto") {
-        const hp = Number(b.heightPx);
-        if (Number.isNaN(hp) || hp < 240 || hp > 1200) {
-          showValidation("La altura del banner debe estar entre 240 y 1200 px.");
-          return;
-        }
-      }
-      for (const [label, modeKey, heightKey] of [
-        ["tableta", "tabletHeightMode", "tabletHeightPx"],
-        ["móvil", "mobileHeightMode", "mobileHeightPx"],
-      ]) {
-        if (!changedTheme.banner) break;
-        const mode = b[modeKey] || "fullscreen";
-        const height = Number(b[heightKey]);
-        if (!["auto", "fullscreen"].includes(mode) || (mode === "auto" && (!Number.isFinite(height) || height < 240 || height > 1200))) {
-          showValidation(`La altura de ${label} debe estar entre 240 y 1200 px o usar pantalla completa.`);
-          return;
-        }
-      }
-      if (changedTheme.banner && bannerType === "slider") {
-        const iv = Number(b.sliderIntervalMs);
-        if (Number.isFinite(iv) && (iv < 1000 || iv > 15000)) {
-          showValidation("El intervalo entre diapositivas debe estar entre 1000 y 15000 ms.");
-          return;
-        }
-        const slides = Array.isArray(b.slides) ? b.slides : [];
-        const bad = slides.find((s) => s && s.image === "");
-        if (bad) {
-          showValidation("Cada diapositiva debe tener una imagen; elimina las que estén vacías.");
-          return;
-        }
-      }
+      const validationError = validateAppearanceDraft({ theme, changedTheme, changedMenus });
+      if (validationError) { showValidation(validationError); return; }
 
       const saved = await saveSiteSettings(payload);
-      if (!Number.isSafeInteger(saved?.appearanceRevision)) {
-        throw new Error('La respuesta de guardado no incluyó la revisión de Apariencia. Recarga antes de guardar de nuevo.');
-      }
+      await verifyAppearanceSave({ saved, changedTheme, normalizedTheme, originalTheme, fetchPublicSettings: () => fetchSiteSettings() });
 
-      // Un PUT 200 no demuestra que los ajustes lleguen a la tienda pública.
-      // Lee otra vez la ruta que usa la tienda antes de confirmar el guardado.
-      const cardTextSettings = [];
-      for (const [templateId, template] of Object.entries(changedTheme.banner?.templateConfigs || {})) {
-        for (const key of ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx', 'metallicTitle']) {
-          if (template?.cardTextStyle?.[key] !== undefined) cardTextSettings.push({ templateId, index: null, key, value: template.cardTextStyle[key] });
-        }
-        (template?.cards || []).forEach((card, index) => {
-          for (const key of ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx']) {
-            if (card?.[key] !== undefined) cardTextSettings.push({ templateId, index, key, value: card[key] });
-          }
-        });
-      }
-      if (cardTextSettings.length) {
-        const detail = cardTextSettings.some(({ key }) => key === 'metallicTitle') ? 'estilos de texto'
-          : cardTextSettings.some(({ key }) => key.endsWith('SizePx')) ? 'colores o tamaños' : 'colores';
-        const matches = (settings) => cardTextSettings.every(({ templateId, index, key, value }) =>
-          String((index === null
-            ? settings?.theme?.banner?.templateConfigs?.[templateId]?.cardTextStyle?.[key]
-            : settings?.theme?.banner?.templateConfigs?.[templateId]?.cards?.[index]?.[key]) ?? '').toLowerCase()
-            === String(value ?? '').toLowerCase()
-        );
-        if (!matches(saved)) {
-          setAppearanceRevision(saved.appearanceRevision);
-          throw new Error(`El servidor omitió los ${detail} de las tarjetas en la respuesta de guardado. Tus cambios siguen en el editor y no se marcaron como guardados.`);
-        }
-        let publicSettings;
-        try {
-          publicSettings = await fetchSiteSettings();
-        } catch (error) {
-          setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('El servidor respondió al guardado, pero no se pudo comprobar la lectura pública. Tus ajustes siguen en el editor; vuelve a guardar cuando haya conexión.');
-        }
-        if (!matches(publicSettings)) {
-          setAppearanceRevision(saved.appearanceRevision);
-          throw new Error(`La tienda pública no conserva los ${detail} de las tarjetas. Tus cambios siguen en el editor y no se marcaron como guardados.`);
-        }
-      }
-
-      if (changedTheme.header && normalizedTheme.header.metallicMenuText !== originalTheme.header.metallicMenuText) {
-        const wanted = normalizedTheme.header.metallicMenuText;
-        if (saved?.theme?.header?.metallicMenuText !== wanted) {
-          setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('El servidor omitió el acabado metalizado del menú. El cambio sigue pendiente en el editor.');
-        }
-        let publicSettings;
-        try {
-          publicSettings = await fetchSiteSettings();
-        } catch {
-          setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('No se pudo comprobar el acabado del menú en la tienda pública. El cambio sigue pendiente.');
-        }
-        if (publicSettings?.theme?.header?.metallicMenuText !== wanted) {
-          setAppearanceRevision(saved.appearanceRevision);
-          throw new Error('La tienda pública no conserva el acabado metalizado del menú. El cambio sigue pendiente.');
-        }
-      }
-
-      // El backend puede seguir ejecutando un modelo antiguo y descartar campos
-      // nuevos de las tarjetas aunque el PUT responda correctamente.
-      const requestedCards = changedTheme.banner?.templateConfigs?.atelier?.cards || [];
-      const storedCards = saved?.theme?.banner?.templateConfigs?.atelier?.cards || [];
-      const positionWasLost = requestedCards.some((card, index) =>
-        ['desktop', 'tablet', 'mobile'].some((device) => {
-          const requested = card?.position?.[device];
-          if (!requested) return false;
-          const stored = storedCards[index]?.position?.[device];
-          return Number(stored?.x) !== Number(requested.x) || Number(stored?.y) !== Number(requested.y);
-        })
-      );
-      if (positionWasLost) {
-        setAppearanceRevision(saved.appearanceRevision);
-        setServerSnapshot(buildThemeFromServer(saved.theme));
-        throw new Error('El servidor no conservó la posición de las tarjetas. Reinicia el backend con la versión actualizada y vuelve a guardar; los cambios siguen aquí en el editor.');
-      }
-
-      const requestedBanner = changedTheme.banner;
-      const storedBanner = saved?.theme?.banner;
-      if (requestedBanner) {
-        const devicePositionKeys = ['posX', 'posY', 'tabletPosX', 'tabletPosY', 'mobilePosX', 'mobilePosY'];
-        const singlePositionKeys = ['imagePosX', 'imagePosY', 'imageTabletPosX', 'imageTabletPosY', 'imageMobilePosX', 'imageMobilePosY'];
-        const imageKeys = ['image', 'imageTablet', 'imageMobile'];
-        const singleImageKeys = ['imageUrl', 'imageTabletUrl', 'imageMobileUrl'];
-        const mismatches = [];
-        const checkFields = (requested, stored, keys, label) => {
-          for (const key of keys) {
-            if (requested?.[key] === undefined) continue;
-            const expected = key.toLowerCase().includes('pos') ? Number(requested[key]) : String(requested[key] || '');
-            const actual = key.toLowerCase().includes('pos') ? Number(stored?.[key]) : String(stored?.[key] || '');
-            if (!Object.is(actual, expected)) mismatches.push(label);
-          }
-        };
-        if (requestedBanner.type === 'slider') {
-          const wanted = requestedBanner.slides || [];
-          const received = storedBanner?.slides || [];
-          if (received.length !== wanted.length) mismatches.push('galería');
-          wanted.forEach((slide, index) => checkFields(slide, received[index], [...devicePositionKeys, ...imageKeys], `slide ${index + 1}`));
-        } else if (requestedBanner.type === 'image') {
-          checkFields(requestedBanner, storedBanner, [...singlePositionKeys, ...singleImageKeys], 'imagen principal');
-        }
-        for (const [templateId, template] of Object.entries(requestedBanner.templateConfigs || {})) {
-          (template?.cards || []).forEach((card, index) => {
-            const storedCard = storedBanner?.templateConfigs?.[templateId]?.cards?.[index];
-            if (card?.image && storedCard?.image !== card.image) {
-              mismatches.push(`miniatura de tarjeta ${index + 1} (${templateId})`);
-            }
-            if (card?.imageSource && storedCard?.imageSource !== card.imageSource) {
-              mismatches.push(`origen de imagen de tarjeta ${index + 1} (${templateId})`);
-            }
-          });
-        }
-        if (mismatches.length) {
-          setAppearanceRevision(saved.appearanceRevision);
-          setServerSnapshot(buildThemeFromServer(saved.theme));
-          throw new Error(`El servidor no conservó el encuadre o las imágenes de ${[...new Set(mismatches)].join(', ')}. El ajuste sigue en el editor. Sincroniza y reinicia el backend con esta versión, luego vuelve a guardar.`);
-        }
-      }
-
-      if(changedTheme.global?.sectionMotion && !deepEqual(normalizedTheme.global?.sectionMotion,originalTheme.global?.sectionMotion)) {
-        const expected=normalizeStoryConfig(changedTheme.global.sectionMotion), received=saved?.theme?.global?.sectionMotion;
-        if(!received || !deepEqual(expected,normalizeStoryConfig(received))) {
-          setAppearanceRevision(saved.appearanceRevision);
-          setServerSnapshot(buildThemeFromServer(saved.theme));
-          throw new Error('El servidor no conservó la animación global. Tus ajustes siguen en el panel; vuelve a guardar con la versión actualizada.');
-        }
-      }
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
       setAppearanceRevision(saved.appearanceRevision);
@@ -1106,6 +341,8 @@ export default function AppearancePage() {
       setSaveMessage({ type: 'success', text: 'Cambios guardados. La tienda pública ya usa esta configuración.' });
     } catch (err) {
       console.error("❌ Error guardando apariencia:", err);
+      if (Number.isSafeInteger(err.appearanceRevision)) setAppearanceRevision(err.appearanceRevision);
+      if (err.appearanceSnapshot) setServerSnapshot(buildThemeFromServer(err.appearanceSnapshot));
       if (['APPEARANCE_REVISION_CONFLICT', 'APPEARANCE_REVISION_REQUIRED'].includes(err?.response?.data?.error)) {
         setSaveConflict(true);
       } else {
