@@ -1,6 +1,6 @@
 import { journeyScene } from './decorativeJourneyScenes';
 import { journeyArtworkLayout, applyJourneyArtworkLayout } from './decorativeJourneyArtwork';
-import { cinematicOrnament, advanceCinematicCamera } from './decorativeJourneyCinema';
+import { cinematicOrnament, cinematicBeat, advanceCinematicCamera } from './decorativeJourneyCinema';
 
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
   const view=container.ownerDocument.defaultView,doc=container.ownerDocument,world=container.querySelector('[data-journey-world]');
@@ -21,6 +21,7 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   if(previousShared!==undefined)container.dataset.journeyShared=previousShared;
   if(!c.backgroundImage)container.style.setProperty('--journey-shared-image',inheritedBackground);
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')];
+  const cameras=pieces.map(()=>({position:null,velocity:0}));
   const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]');
   const ornaments=world.querySelector('[data-journey-ornaments]');
   const artworkProbes=[];
@@ -28,9 +29,9 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
   function measure(){
-    const previousWidth=width,previousHeight=height;
+    const previousWidth=width;
     width=container.offsetWidth || container.getBoundingClientRect().width;height=scroller?scroller.clientHeight:view.innerHeight;
-    if(Math.abs(width-previousWidth)>1 || Math.abs(height-previousHeight)>1)displayPhase=null;
+    if(Math.abs(width-previousWidth)>1){displayPhase=null;for(const camera of cameras){camera.position=null;camera.velocity=0;}}
     const y=scroll(),base=scroller?scroller.getBoundingClientRect().top:0;
     chapters=[...container.children].filter(node=>node.tagName==='SECTION' && node.offsetHeight>0).map(node=>{
       const saved=Number(node.dataset.storyTop);
@@ -60,20 +61,35 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
       settling=Math.abs(desired-displayPhase)>.0001 || Math.abs(cameraVelocity)>.001;
       if(!settling){displayPhase=desired;cameraVelocity=0;}
     }
-    const size=(adapted?c.mobileSize:c.size)*previewScale*scene.scale;
+    // All scene styling follows the same smoothed timeline as the scenery.
+    // It must not jump to the destination while ornaments are still arriving.
+    const last=chapters.at(-1),maxScroll=Math.max(0,last?last.top+last.height-height:0);
+    const stops=chapters.map(chapter=>Math.max(0,Math.min(maxScroll,chapter.top-height*.18)));
+    const visualIndex=Math.max(0,Math.min(chapters.length-1,Math.floor(displayPhase)));
+    const visualScroll=(stops[visualIndex]||0)+Math.max(0,displayPhase-visualIndex)*Math.max(0,(stops[visualIndex+1]??maxScroll)-(stops[visualIndex]||0));
+    const visualScene=journeyScene(visualScroll,chapters,height,width,{...c,intensity:config.intensity,compact:compact(),originTop:origin.top},reduce?.matches);
+    const size=(adapted?c.mobileSize:c.size)*previewScale*visualScene.scale;
     const count=ornamentCount;
     const depth=c.depth/100,shadowScale=previewScale*(adapted ? .6 : 1);
     if(ornaments)ornaments.style.filter=`drop-shadow(0 ${(3+depth*5)*shadowScale}px ${(3+depth*3)*shadowScale}px rgb(0 0 0 / .14))`;
-    const presence=Math.sin(scene.accent*Math.PI/2)*scene.opacity;
+    const presence=Math.sin(visualScene.accent*Math.PI/2)*visualScene.opacity;
     const opacity=c.opacity/100*presence;
     if(stem)stem.style.opacity='0';if(trace)trace.style.opacity='0';
     pieces.forEach((piece,i)=>{
       if(i>=count || !(c.image || c.secondaryImage)){piece.setAttribute('opacity','0');return;}
       const aspect=Number(piece.dataset.journeyAspect)||1;
-      const pose=cinematicOrnament(i,{phase:displayPhase,width,height,size,aspect,depth,compact:compact(),intensity:config.intensity,count});
+      const targetPhase=cinematicBeat(Math.max(0,desired-i*.06)).position,camera=cameras[i];
+      if(camera.position===null || reduce?.matches){camera.position=targetPhase;camera.velocity=0;}
+      else{
+        const next=advanceCinematicCamera(camera.position,camera.velocity,targetPhase,dt);
+        camera.position=next.position;camera.velocity=next.velocity;
+        if(Math.abs(targetPhase-camera.position)>.0001 || Math.abs(camera.velocity)>.001)settling=true;
+        else{camera.position=targetPhase;camera.velocity=0;}
+      }
+      const pose=cinematicOrnament(i,{phase:desired,cameraPhase:camera.position,width,height,size,aspect,depth,compact:compact(),intensity:config.intensity,count});
       const settings=c.sectionSettings || {};
       const sideWeight=id=>{const side=settings[id]?.placement;return side==='left'?(i%2?.15:1):side==='right'?(i%2?1:.15):1;};
-      const emphasis=sideWeight(scene.id)*(1-scene.handoff)+sideWeight(scene.nextId)*scene.handoff;
+      const emphasis=sideWeight(visualScene.id)*(1-visualScene.handoff)+sideWeight(visualScene.nextId)*visualScene.handoff;
       const {x,y,scale,angle}=pose;
       piece.dataset.journeyBent='false';
       const artwork=piece.querySelector('[data-journey-rigid]');

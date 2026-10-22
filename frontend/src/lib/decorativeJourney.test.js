@@ -28,9 +28,10 @@ function fixture(raw={},options={}){
   }
   document.body.append(root);
   const stop=mountDecorativeJourney(root,config,options);
-  const flush=()=>{for(let i=0;frame && i<140;i++){const cb=frame;frame=null;clock+=16;cb(clock);}};
+  const step=()=>{if(frame){const cb=frame;frame=null;clock+=16;cb(clock);}};
+  const flush=()=>{for(let i=0;frame && i<140;i++)step();};
   const scroll=top=>{y=top;window.dispatchEvent(new Event('scroll'));flush();};
-  return {root,reduce,mobile,stop,flush,scroll};
+  return {root,reduce,mobile,stop,flush,scroll,step,startScroll:top=>{y=top;window.dispatchEvent(new Event('scroll'));}};
 }
 it('mantiene los mismos adornos al cruzar secciones y revierte exactamente el camino al subir',()=>{
   const f=fixture(),pieces=[...f.root.querySelectorAll('[data-journey-piece]')];
@@ -137,4 +138,13 @@ it('keeps the artwork visible as text and controls pass over the background laye
  f.scroll(300);const after=[...f.root.querySelectorAll('[data-journey-piece]')].map(n=>n.getAttribute('opacity'));
  expect(after).toEqual(before);expect(f.root.querySelector('mask')).toBeNull();
  expect(f.root.querySelector('.footer-ed__logo')).toBeTruthy();f.stop();
+});
+
+it('starts the arrival immediately and does not resize to the destination before moving',()=>{
+ const f=fixture({journey:{sectionSettings:{banner:{scale:150},instagram:{scale:60}}}}),piece=f.root.querySelector('[data-journey-piece="0"]');
+ const before=piece.getAttribute('transform'),scale=value=>Number(value.match(/scale\(([^)]+)\)/)[1]);
+ f.startScroll(800);f.step();const first=piece.getAttribute('transform');
+ expect(first).not.toBe(before);expect(scale(first)/scale(before)).toBeGreaterThan(.98);expect(scale(first)/scale(before)).toBeLessThan(1.02);
+ f.flush();const arrived=piece.getAttribute('transform');expect(f.root.dataset.journeySettled).toBe('true');
+ f.flush();expect(piece.getAttribute('transform')).toBe(arrived);f.stop();
 });

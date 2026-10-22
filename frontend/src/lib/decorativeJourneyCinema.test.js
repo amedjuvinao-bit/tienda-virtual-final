@@ -68,3 +68,10 @@ it('floats into the target with continuous velocity and gradual braking',()=>{
  const reversed=advanceCinematicCamera(samples[15].position,samples[15].velocity,0,16);
  expect(Math.abs(reversed.velocity-samples[15].velocity)).toBeLessThan(1);
 });
+
+it('does not make a lateral excursion and return after arriving',()=>{
+ for(const index of [0,1]){
+  const poses=Array.from({length:51},(_,i)=>cinematicOrnament(index,{phase:3,width:1280,height:800,size:230,aspect:3,depth:1,cameraPhase:2+i/50}));
+  expect(Math.max(...poses.map(p=>p.x))-Math.min(...poses.map(p=>p.x))).toBeLessThan(.01);
+ }
+});
