@@ -149,11 +149,11 @@ export default function App() {
   const [siteSettingsFromServer, setSiteSettingsFromServer] = useState(null);
 
   const settingsRequest = useRef(0);
-  const reloadTheme = async () => {
+  const reloadTheme = async ({ silent = false } = {}) => {
     const requestId = ++settingsRequest.current;
     let succeeded = false;
     try {
-      if (!window.location.pathname.startsWith('/admin')) setLoadingPage(true);
+      if (!silent && !window.location.pathname.startsWith('/admin')) setLoadingPage(true);
       const data = await fetchSiteSettings();
       if (requestId !== settingsRequest.current) return false;
       const nextLoader = normalizeAdminLoader(data?.admin?.loader);
@@ -219,16 +219,17 @@ export default function App() {
 
   useEffect(() => {
     const onEvent = () => reloadTheme();
+    const onFocus = () => reloadTheme({ silent: true });
     const onStorage = (event) => {
       if (event.key === RB_SETTINGS_TICK_KEY) reloadTheme();
     };
 
-    window.addEventListener('focus', onEvent);
+    window.addEventListener('focus', onFocus);
     window.addEventListener('rb_site_settings_updated', onEvent);
     window.addEventListener('storage', onStorage);
 
     return () => {
-      window.removeEventListener('focus', onEvent);
+      window.removeEventListener('focus', onFocus);
       window.removeEventListener('rb_site_settings_updated', onEvent);
       window.removeEventListener('storage', onStorage);
     };
