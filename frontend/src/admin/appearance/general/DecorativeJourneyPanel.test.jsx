@@ -21,7 +21,7 @@ it('sube adornos y conserva el recorrido, el fondo y los ajustes móviles al rec
   fireEvent.click(screen.getByRole('button',{name:'Recorrido',exact:true}));
   fireEvent.change(screen.getByRole('slider',{name:'Tamaño de los adornos'}),{target:{value:'230'}});
   fireEvent.change(screen.getByRole('slider',{name:'Densidad de adornos'}),{target:{value:'26'}});
-  fireEvent.change(screen.getByRole('slider',{name:'Profundidad del camino'}),{target:{value:'90'}});
+  fireEvent.change(screen.getByRole('slider',{name:'Profundidad 3D del marco'}),{target:{value:'90'}});
   fireEvent.change(screen.getByRole('slider',{name:'Opacidad de los adornos'}),{target:{value:'75'}});
   expect(screen.queryByRole('checkbox',{name:'Mostrar línea del recorrido'})).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Fondo',exact:true}));

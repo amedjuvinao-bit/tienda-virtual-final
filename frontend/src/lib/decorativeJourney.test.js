@@ -122,6 +122,6 @@ it('loads each artwork aspect independently and releases its metadata callbacks'
   expect(tall.querySelector('[data-journey-rigid]').style.display).not.toBe('none');
   const mapped=[...f.root.querySelectorAll('[data-journey-mesh-part]')];expect(mapped.length).toBe(0);
   expect(mapped.every(part=>part.getAttribute('transform')?.startsWith('matrix('))).toBe(true);
-  const layout=tall.querySelector('image').outerHTML;f.scroll(1000);expect(tall.querySelector('image').outerHTML).toBe(layout);
+  const image=tall.querySelector('image'),dimensionsBefore=[image.getAttribute('width'),image.getAttribute('height')];f.scroll(1000);expect([image.getAttribute('width'),image.getAttribute('height')]).toEqual(dimensionsBefore);expect(image.style.transform).toContain('perspective(700px)');
   f.stop();expect(probes.every(image=>image.onload===null)).toBe(true);
 });

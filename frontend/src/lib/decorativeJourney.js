@@ -110,6 +110,12 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
       const emphasis=sideWeight(scene.id)*(1-scene.handoff)+sideWeight(scene.nextId)*scene.handoff;
       const {x,y,scale,angle}=pose;
       piece.dataset.journeyBent='false';
+      const artwork=piece.querySelector('[data-journey-rigid]');
+      if(artwork){
+        artwork.style.transformBox='fill-box';artwork.style.transformOrigin='center';
+        artwork.style.transform=`perspective(700px) rotateY(${pose.tiltY.toFixed(2)}deg) rotateX(${pose.tiltX.toFixed(2)}deg) translateZ(${pose.lift.toFixed(2)}px)`;
+        artwork.style.filter=`drop-shadow(${(pose.shadowX*previewScale).toFixed(2)}px ${(pose.shadowY*previewScale).toFixed(2)}px ${(pose.shadowBlur*previewScale).toFixed(2)}px rgb(0 0 0 / .2)) brightness(${pose.light.toFixed(3)})`;
+      }
       piece.setAttribute('transform',`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${scale.toFixed(3)})`);
       const visible=journeyOrnamentVisibility(x,y,scale*100,angle,boxes,width,height,aspect)*journeyTextVisibility(x,y,scale*45/Math.sqrt(Math.max(aspect,1/aspect)),headlines,16*previewScale);
       piece.setAttribute('opacity',String(opacity*pose.opacity*visible*emphasis));

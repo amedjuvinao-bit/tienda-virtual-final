@@ -20,10 +20,10 @@ export default function DecorativeJourneyPanel({config,onChange,theme={},uploadT
       <details><summary>Segundo adorno · opcional</summary><CloudinaryImageField label="Adorno secundario" value={c.secondaryImage} onChange={value=>edit('secondaryImage',value)} transparentOnly {...uploadProps}/></details>
     </div>}
     {tab==='recorrido' && <div className="journey-editor__fields">
-      <p>Composición cinematográfica: piezas intactas que pasan por los bordes en distintos planos de profundidad.</p>
+      <p>Composición cinematográfica: piezas intactas por los bordes, con perspectiva 3D, acercamiento e iluminación en movimiento.</p>
       <Range label="Tamaño de los adornos" value={c.size} min={60} max={320} step={5} suffix=" px" onChange={value=>edit('size',value)}/>
       <Range label="Densidad de adornos" value={c.density} min={8} max={28} onChange={value=>edit('density',value)}/>
-      <Range label="Profundidad del camino" value={c.depth} min={0} max={100} step={5} suffix=" %" onChange={value=>edit('depth',value)}/>
+      <Range label="Profundidad 3D del marco" value={c.depth} min={0} max={100} step={5} suffix=" %" onChange={value=>edit('depth',value)}/>
       <Range label="Opacidad de los adornos" value={c.opacity} min={20} max={100} step={5} suffix=" %" onChange={value=>edit('opacity',value)}/>
       <p>Los adornos recorren la tienda sin líneas de conexión visibles.</p>
     </div>}
