@@ -1,5 +1,7 @@
 import { journeyScene } from './decorativeJourneyScenes';
 import { journeyCurve, pointOnJourney, journeyOrnamentVisibility, journeyTextVisibility } from './decorativeJourneyGeometry';
+import { journeyArtworkLayout, applyJourneyArtworkLayout } from './decorativeJourneyArtwork';
+import { JOURNEY_ARTWORK_BANDS, journeyArtworkMesh } from './decorativeJourneyMesh';
 
 const occlusionSelector='.info-glass-dialog-backdrop,[role=dialog],dialog,[data-story-actor],.categories-fan__category,.look-editorial__hero,.look-editorial__card-surface,.ig-journal__main,.tk-stage__hero,.tk-stage__item,.info-glass-card,.footer-ed__social,.footer-ed__watermark,h1,h2,h3,p,a,button,input,textarea,select,article,picture,img,video,iframe';
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
@@ -7,9 +9,11 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   if(!world)return ()=>{};
   const c=config.journey,reduce=view.matchMedia?.('(prefers-reduced-motion: reduce)'),mobile=view.matchMedia?.('(max-width:767px)');
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')];
+  const meshes=pieces.map(piece=>({group:piece.querySelector('[data-journey-mesh]'),rigid:piece.querySelector('[data-journey-rigid]'),parts:[...piece.querySelectorAll('[data-journey-mesh-part]')],bent:null}));
   const masks=[...world.querySelectorAll('[data-journey-occluder]')];
   const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]'),mask=world.querySelector('[data-journey-mask]');
   const ornaments=world.querySelector('[data-journey-ornaments]');
+  const artworkProbes=[],artworkLayouts=new Map();
   let frame=0,dirty=true,disposed=false,chapters=[],candidates=[],width=0,height=0,movingUntil=0,displayPhase=null,lastPaint=0,ornamentCount=0;
   const scroll=()=>scroller?scroller.scrollTop:view.scrollY;
   const compact=()=>typeof mobileOverride==='boolean'?mobileOverride:Boolean(mobile?.matches);
@@ -39,7 +43,8 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
     const adapted=compact() && config.mobileMode==='adapted',previewScale=scroller?Math.min(1,width/(compact()?390:1440)):1;
     const size=(adapted?c.mobileSize:c.size)*previewScale,density=adapted?c.mobileDensity:c.density;
     const referenceLength=Math.min(...Array.from({length:20},(_,i)=>journeyCurve(i*.4,width,height,c.path,config.intensity,{compact:compact()}).length));
-    const spacing=size*(2.6-density/28);
+    const longest=Math.max(1,...[...artworkLayouts.values()].map(layout=>Math.sqrt(Math.max(layout.ratio,1/layout.ratio))));
+    const spacing=size*Math.max(2.6-density/28,longest*(1.8-density/35));
     // Calculate a stable count for the entire tour. Recounting every frame
     // redistributes the chain and makes ornaments jump between positions.
     ornamentCount=Math.max(1,Math.min(density,28,Math.floor(referenceLength/Math.max(1,spacing))));
@@ -103,9 +108,31 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
       const u=((i/count+displayPhase*.085)%1+1)%1,p=pointOnJourney(path,u);
       const z=Math.sin(u*Math.PI*2+displayPhase*.45);
       const scale=size/100*(.88+(i*7%9)/40)*(1+z*depth*.14);
-      const angle=p.angle+52+(i%2?-6:6);
+      const aspect=Number(piece.dataset.journeyAspect)||1,axis=Number(piece.dataset.journeyAxis)||0;
+      const angle=p.angle-axis;
       piece.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${angle.toFixed(2)}) scale(${scale.toFixed(3)})`);
-      const visible=journeyOrnamentVisibility(p.x,p.y,scale*100,angle,boxes,width,height)*journeyTextVisibility(p.x,p.y,scale*45,headlines,16*previewScale);
+      const visible=journeyOrnamentVisibility(p.x,p.y,scale*100,angle,boxes,width,height,aspect)*journeyTextVisibility(p.x,p.y,scale*45/Math.sqrt(Math.max(aspect,1/aspect)),headlines,16*previewScale);
+      const mesh=meshes[i],bent=aspect>=1.25 || aspect<=.8;
+      if(mesh.group){
+        if(mesh.bent!==bent){
+          piece.dataset.journeyBent=String(bent);mesh.group.style.display=bent?'':'none';mesh.rigid.style.display=bent?'none':'';mesh.bent=bent;
+          mesh.parts.forEach((part,index)=>part.firstElementChild.setAttribute('clip-path',`url(#${piece.dataset.journeyMeshPrefix}-${axis===90?'vertical':'horizontal'}-${index})`));
+        }
+        if(bent && visible>0){
+          if(!mesh.parts.length){
+            const fragment=doc.createDocumentFragment();
+            for(let index=0;index<JOURNEY_ARTWORK_BANDS*2;index++){
+              const part=doc.createElementNS('http://www.w3.org/2000/svg','g'),use=doc.createElementNS('http://www.w3.org/2000/svg','use');
+              part.setAttribute('data-journey-mesh-part','');use.setAttribute('href',`#${piece.dataset.journeyArtworkSource}`);
+              use.setAttribute('clip-path',`url(#${piece.dataset.journeyMeshPrefix}-${axis===90?'vertical':'horizontal'}-${index})`);
+              part.append(use);fragment.append(part);mesh.parts.push(part);
+            }
+            mesh.group.append(fragment);
+          }
+          const matrices=journeyArtworkMesh(path,u,journeyArtworkLayout(1,aspect),scale,p,angle);
+          mesh.parts.forEach((part,index)=>part.setAttribute('transform',`matrix(${matrices[index].map(value=>value.toFixed(5)).join(' ')})`));
+        }
+      }
       piece.setAttribute('opacity',String(opacity*(.94+z*depth*.06)*visible));
     });
     const writeMask=(nodes,values)=>nodes.forEach((rect,i)=>{const box=values[i];if(!box){rect.setAttribute('width','0');return;}for(const key of ['x','y','width','height'])rect.setAttribute(key,box[key].toFixed(2));rect.setAttribute('rx',box.radius);});
@@ -116,11 +143,24 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   function schedule(){if(!disposed && !frame)frame=view.requestAnimationFrame(paint);}
   function resize(){dirty=true;schedule();}
   function transition(event){if(!event.target.closest?.('[data-journey-pin]')){movingUntil=view.performance.now()+850;schedule();}}
+  // Read intrinsic dimensions once per URL, including independently sized
+  // secondary artwork. A metadata reload cannot revive a removed resource.
+  for(const piece of pieces)applyJourneyArtworkLayout(piece,journeyArtworkLayout(1,1));
+  for(const source of new Set(pieces.map(piece=>piece.querySelector('image')?.getAttribute('href')).filter(Boolean))){
+    const image=new view.Image();artworkProbes.push(image);
+    const loaded=()=>{
+      if(disposed || !image.naturalWidth || !image.naturalHeight)return;
+      const layout=journeyArtworkLayout(image.naturalWidth,image.naturalHeight);artworkLayouts.set(source,layout);
+      for(const piece of pieces)if(piece.querySelector('image')?.getAttribute('href')===source)applyJourneyArtworkLayout(piece,layout);
+      resize();
+    };
+    image.onload=loaded;image.src=source;if(image.complete)loaded();
+  }
   const resizeObserver=view.ResizeObserver?new view.ResizeObserver(resize):null;resizeObserver?.observe(container);if(scroller)resizeObserver?.observe(scroller);
   const mutation=new view.MutationObserver(records=>{if(records.some(record=>!record.target.closest?.('[data-journey-pin]')))resize();});mutation.observe(container,{childList:true,subtree:true});
   target.addEventListener('scroll',schedule,{passive:true});view.addEventListener('resize',resize);container.addEventListener('transitionrun',transition,true);container.addEventListener('load',resize,true);reduce?.addEventListener?.('change',resize);mobile?.addEventListener?.('change',resize);paint();
   return ()=>{
-    disposed=true;if(frame)view.cancelAnimationFrame(frame);resizeObserver?.disconnect();mutation.disconnect();target.removeEventListener('scroll',schedule);view.removeEventListener('resize',resize);container.removeEventListener('load',resize,true);container.removeEventListener('transitionrun',transition,true);reduce?.removeEventListener?.('change',resize);mobile?.removeEventListener?.('change',resize);
+    disposed=true;for(const image of artworkProbes)image.onload=null;if(frame)view.cancelAnimationFrame(frame);resizeObserver?.disconnect();mutation.disconnect();target.removeEventListener('scroll',schedule);view.removeEventListener('resize',resize);container.removeEventListener('load',resize,true);container.removeEventListener('transitionrun',transition,true);reduce?.removeEventListener?.('change',resize);mobile?.removeEventListener?.('change',resize);
     for(const key of ['journeyActive','journeyShared','journeyPhase','journeySection','journeyHandoff','journeySettled'])delete container.dataset[key];
   };
 }

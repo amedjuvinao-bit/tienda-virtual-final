@@ -41,7 +41,7 @@ export function pointOnJourney(path,fraction){
   const target=Math.max(0,Math.min(1,fraction))*path.length;
   let lo=0,hi=path.samples.length-1;
   while(lo<hi){const mid=(lo+hi)>>1;if(path.samples[mid].length<target)lo=mid+1;else hi=mid;}
-  const b=path.samples[lo],a=path.samples[Math.max(0,lo-1)],t=(target-a.length)/Math.max(.001,b.length-a.length);
+  const index=Math.max(1,lo),b=path.samples[index],a=path.samples[index-1],t=(target-a.length)/Math.max(.001,b.length-a.length);
   return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,angle:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI};
 }
 export function journeyPhase(scroll,tops,viewport){
@@ -66,10 +66,10 @@ export function journeyTextVisibility(x,y,radius,boxes,clearance=20){
 
 // Keep a recognisable piece of the source artwork. Tiny remnants behind a
 // photograph fade as a whole; the mask still protects every content pixel.
-export function journeyOrnamentVisibility(x,y,size,angle,boxes,width,height){
+export function journeyOrnamentVisibility(x,y,size,angle,boxes,width,height,aspect=1){
   const r=angle*Math.PI/180,cos=Math.cos(r),sin=Math.sin(r);let clear=0,onscreen=0;
   for(let row=0;row<5;row++)for(let col=0;col<5;col++){
-    const a=(col/4-.5)*size,b=(row/4-.5)*size,px=x+a*cos-b*sin,py=y+a*sin+b*cos;
+    const a=(col/4-.5)*size/Math.sqrt(aspect),b=(row/4-.5)*size*Math.sqrt(aspect),px=x+a*cos-b*sin,py=y+a*sin+b*cos;
     if(px<0 || px>width || py<0 || py>height)continue;onscreen++;
     if(!boxes.some(box=>px>=box.x && px<=box.x+box.width && py>=box.y && py<=box.y+box.height))clear++;
   }

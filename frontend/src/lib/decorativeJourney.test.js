@@ -108,3 +108,21 @@ it('muestra la línea con los recursos guardados y conserva la decisión de apag
   expect(normalizeDecorativeJourney(off).stemVisible).toBe(false);
   expect(normalizeDecorativeJourney().stemVisible).toBe(false);
 });
+it('loads each artwork aspect independently and releases its metadata callbacks',()=>{
+  const probes=[];
+  vi.spyOn(window,'Image').mockImplementation(function(){const image={complete:false,naturalWidth:0,naturalHeight:0,onload:null};probes.push(image);return image;});
+  const f=fixture({journey:{secondaryImage:'/wide-resource.webp'}});
+  expect(probes).toHaveLength(2);
+  Object.assign(probes[0],{naturalWidth:600,naturalHeight:1800});probes[0].onload();
+  Object.assign(probes[1],{naturalWidth:1800,naturalHeight:600});probes[1].onload();f.flush();
+  const tall=f.root.querySelector('[data-journey-piece="0"]'),wide=f.root.querySelector('[data-journey-piece="1"]');
+  const dimensions=node=>{const image=node.querySelector('image');return Number(image.getAttribute('height'))/Number(image.getAttribute('width'));};
+  expect(dimensions(tall)).toBeCloseTo(3);expect(dimensions(wide)).toBeCloseTo(1/3);
+  expect(tall.dataset.journeyAxis).toBe('90');expect(wide.dataset.journeyAxis).toBe('0');
+  expect(tall.dataset.journeyBent).toBe('true');expect(wide.dataset.journeyBent).toBe('true');
+  expect(tall.querySelector('[data-journey-rigid]').style.display).toBe('none');
+  const mapped=[...f.root.querySelectorAll('[data-journey-mesh-part]')];expect(mapped.length).toBeGreaterThan(0);
+  expect(mapped.every(part=>part.getAttribute('transform')?.startsWith('matrix('))).toBe(true);
+  const layout=tall.querySelector('image').outerHTML;f.scroll(1000);expect(tall.querySelector('image').outerHTML).toBe(layout);
+  f.stop();expect(probes.every(image=>image.onload===null)).toBe(true);
+});
