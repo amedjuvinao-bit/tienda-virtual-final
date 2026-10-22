@@ -1,32 +1,32 @@
 # Continuous decorative journey
 
-One store-owned transparent image follows a continuous, reversible path between the real storefront sections. The same SVG image stays mounted throughout the journey; no content or media players are duplicated. Artwork and backgrounds remain store-specific, with no built-in business motif.
+The storefront shares one continuous curved route, a chain of store-configured ornaments and a moving trace between its sections. The same ornament nodes remain mounted. Scrolling forward advances the chain and the illuminated line; scrolling back reverses both. No product content or media players are cloned.
 
-## Background composition
+## Composition and rendering
 
-The ornament uses empty background space. Photographs, product cards, complete Instagram panels (including every highlight), text, controls and the visible header are protected. A placement pass searches for a whole free pocket near the section's intended path and reduces the image to fit. Text protection follows actual text lines rather than the full block width. A hidden header does not reserve an invisible exclusion area.
+The original multi-ornament route is restored. Artwork keeps its configured size, with moderate perspective variation; it is not shrunk into isolated empty pockets. Arc-length spacing and a stable count derived from density and artwork size prevent overlapping clusters and redistribution between frames. Density changes the chain's spacing, rather than promising an exact number of visible pieces.
 
-There is one ornament, without repeated small copies. During a passage behind dense content, the whole image is concealed instead of showing cut-up fragments or placing it over photos. The configured artwork stays sharp; its shadow is separate. Movement settles with bounded interpolation and stops when scrolling stops. The SVG never intercepts input.
+Each section frames the shared curve according to its structure. The measured section order and actual heights control progress. Compositions morph during handoff, including custom left/right/lower placement. Relative size, presence and the section enable switch remain configurable. Mobile has its own artwork size and density.
 
-Each section retains its own path, measured order, actual height, position override, relative scale and enable switch. The main image continues between them, including reordered sections and short footers. Mobile has adapted compositions. Reduced motion freezes the pose, and the mobile off mode removes the effect. Observers and listeners are released on unmount.
+A base line connects the ornaments, and a brighter segment traces its progress. The trace reverses with scroll and shares the exact same curve as the chain. Configured resources automatically restore the line, including legacy settings that had it off. The administrator can explicitly turn it off using `trailLine:false`; this choice survives normalization and reloading. Empty stores still have no art or line until configured.
+
+Photographs, cards, highlights, text and controls protect their pixels with an SVG mask. Text protection follows actual text lines, not full-width heading blocks. Small remnants behind a photograph fade as whole ornaments. The images remain sharp; shadows are applied separately. The SVG never intercepts input. Scroll smoothing settles and stops without an idle animation loop. Reduced motion freezes the decorative world; mobile off removes it. Observers and listeners are released on unmount.
 
 ## Administration
 
 Apariencia → General → Animación global → Camino continuo.
 
-- **Adornos**: upload one transparent PNG/WebP. A previously saved secondary image remains a fallback if there is no primary image; replacing or clearing the displayed resource clears that fallback too.
-- **Recorrido**: path, maximum size, depth, opacity and optional path line, with the store accent color or an override.
-- **Secciones**: select a section, choose automatic/left/right/lower composition, adjust relative scale or disable that section's ornament.
-- **Fondo**: keep individual backgrounds or opt into a shared store image/color.
-- **Móvil**: maximum size in adapted mode.
+- **Adornos**: primary transparent PNG/WebP and optional secondary artwork. No fixed brand, business motif or stock image is inserted.
+- **Recorrido**: curve style, artwork size, density, depth, opacity, line enable and line color. The line uses the store accent unless overridden.
+- **Secciones**: section selection, enable switch, automatic/left/right/lower framing, relative size and presence.
+- **Fondo**: individual backgrounds or an opt-in shared store image/color.
+- **Móvil**: size and density in adapted mode.
 
-The maximum size adapts to the available background space. Old density and accompaniment values are retained in saved configuration for compatibility, but no longer generate repeated artwork or appear as inactive controls. Existing legacy entrance presets remain selectable.
-
-Settings use the existing appearance save endpoint under `theme.global.sectionMotion.journey`. The admin preview uses the production engine and current store resources. No credentials or backend setup are required.
+All settings use the existing appearance save endpoint under `theme.global.sectionMotion.journey`. Legacy entrance presets remain selectable. The admin preview uses the production engine and current store assets. No credentials or backend setup are needed.
 
 ## Verification
 
-Placement tests cover occupied photos, full social panels, resizing into free space and complete concealment during a covered passage. Engine tests cover a single persistent node, reversible scroll, mobile/reduced motion, input behavior and cleanup. Admin tests verify resource replacement and persistence. Browser review uses the actual Home components with a controlled catalog; it does not represent the user's live store configuration.
+Tests cover persistent nodes, reversible movement, trace progress, mobile density, reduced motion, input protection, cleanup and saved line visibility. Admin tests cover uploads and persistence. Browser review uses actual Home components with a controlled catalog; it is not the user's live store configuration.
 
 ## Optional demonstration resource
 

@@ -1,15 +1,30 @@
 // One continuously deforming vine, sampled without DOM measurements.
 // Every ornament keeps its identity and moves along this same curve.
 const curve=(a,b,c,d,t)=>{const s=1-t;return s*s*s*a+3*s*s*t*b+3*s*t*t*c+t*t*t*d;};
-export function journeyCurve(phase,width,height,route='flowing',intensity=65){
-  const strength=.35+intensity/100*.65, swing=Math.sin(phase*.63)*.14*strength;
-  const base=route==='edges'
+export function journeyCurve(phase,width,height,route='flowing',intensity=65,composition={}){
+  const strength=(.35+intensity/100*.65)*(composition.compact ? .4 : 1), swing=Math.sin(phase*.63)*.14*strength;
+  const base=composition.compact
+    ? route==='edges'
+      ? [[-.05,-.1],[.04,.05],[.12,.25],[.05,.5],[-.06,.85],[.2,1.04],[.52,1.04],[.95,1.04],[1.04,.55],[.95,.33],[.88,.12],[.98,-.06],[1.05,-.1]]
+      : [[-.12,.02],[.18,-.06],[.78,-.06],[.92,.055],[1.08,.20],[1.08,.55],[.98,.73],[.84,.98],[.70,1.12],[.42,1.04],[.02,.92],[-.12,.36],[-.12,.02]]
+    : route==='edges'
     ? [[-.18,-.35],[.02,-.12],[.18,.03],[.10,.32],[-.12,.65],[.01,.92],[.35,1.12],[.76,1.28],[1.18,.98],[.94,.60],[.80,.19],[1.20,.01],[1.18,-.35]]
     : [[-.18,-.35],[.20,-.34],[.94,-.20],[.69,.14],[.40,.49],[-.22,.20],[.06,.68],[.27,1.10],[1.18,1.08],[.94,.62],[.76,.23],[1.24,.16],[1.18,-.35]];
-  const points=base.map(([x,y],i)=>({
-    x:(x+swing+Math.sin(phase*.76+i*.63)*.075*strength)*width,
-    y:(y+Math.cos(phase*.53+i*.71)*.085*strength)*height,
-  }));
+  // A section's composition frames its own layout. The complete curve morphs
+  // into the next composition during handoff; ornaments never get re-seeded.
+  const frames={banner:[1,1,-.03],tendencia:[1,.92,.05],look:[1.02,.95,.02],complementos:[.97,1.02,0],categorias:[1.02,.86,.01],instagram:[1.06,.94,-.02],tiktok:[1.04,.96,.02],informacion:[.98,.90,.04],footer:[1,.80,.12]};
+  const transform=(x,y,id,placement)=>{
+    const [sx,sy,dy]=frames[id] || [1,1,0];x=.5+(x-.5)*sx;y=.5+(y-.5)*sy+dy;
+    if(placement==='left')x=-.08+x*.4;
+    if(placement==='right')x=.68+x*.4;
+    if(placement==='bottom')y=.68+y*.4;
+    return {x,y};
+  };
+  const points=base.map(([x,y],i)=>{
+    x+=swing+Math.sin(phase*.76+i*.63)*.075*strength;y+=Math.cos(phase*.53+i*.71)*.085*strength;
+    const a=transform(x,y,composition.section,composition.placement),b=transform(x,y,composition.nextSection || composition.section,composition.nextPlacement),t=composition.handoff || 0;
+    return {x:(a.x+(b.x-a.x)*t)*width,y:(a.y+(b.y-a.y)*t)*height};
+  });
   let d=`M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
   for(let i=1;i<points.length;i+=3)d+=` C ${points.slice(i,i+3).map(p=>`${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')}`;
   const samples=[],segments=(points.length-1)/3;
@@ -47,4 +62,18 @@ export function journeyTextVisibility(x,y,radius,boxes,clearance=20){
     visibility=Math.min(visibility,Math.max(0,Math.min(1,(Math.hypot(dx,dy)-radius)/clearance)));
   }
   return visibility;
+}
+
+// Keep a recognisable piece of the source artwork. Tiny remnants behind a
+// photograph fade as a whole; the mask still protects every content pixel.
+export function journeyOrnamentVisibility(x,y,size,angle,boxes,width,height){
+  const r=angle*Math.PI/180,cos=Math.cos(r),sin=Math.sin(r);let clear=0,onscreen=0;
+  for(let row=0;row<5;row++)for(let col=0;col<5;col++){
+    const a=(col/4-.5)*size,b=(row/4-.5)*size,px=x+a*cos-b*sin,py=y+a*sin+b*cos;
+    if(px<0 || px>width || py<0 || py>height)continue;onscreen++;
+    if(!boxes.some(box=>px>=box.x && px<=box.x+box.width && py>=box.y && py<=box.y+box.height))clear++;
+  }
+  if(!onscreen)return 0;
+  const value=Math.max(0,Math.min(1,(clear/onscreen-.28)/.37));
+  return value*value*(3-2*value);
 }

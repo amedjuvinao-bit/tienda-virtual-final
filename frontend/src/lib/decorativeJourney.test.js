@@ -41,9 +41,9 @@ it('oculta visualmente el adorno detrás de los controles sin duplicar contenido
   expect(f.root.querySelectorAll('video')).toHaveLength(1);expect(f.root.querySelectorAll('iframe')).toHaveLength(1);
   const click=vi.fn();f.root.querySelector('button').addEventListener('click',click);f.root.querySelector('button').click();expect(click).toHaveBeenCalledOnce();f.stop();
 });
-it('mantiene un solo adorno en móvil, congela el recorrido con movimiento reducido y permite apagarlo',()=>{
+it('adapta el camino completo en móvil, congela el recorrido con movimiento reducido y permite apagarlo',()=>{
   const f=fixture({journey:{density:24,mobileDensity:6}}),visible=()=>[...f.root.querySelectorAll('[data-journey-piece]')].filter(node=>Number(node.getAttribute('opacity'))>0);
-  expect(visible()).toHaveLength(1);f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();expect(visible()).toHaveLength(1);
+  const desktopCount=visible().length;expect(desktopCount).toBeGreaterThan(1);f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();expect(visible().length).toBeGreaterThan(1);expect(visible().length).toBeLessThan(desktopCount);
   f.reduce.matches=true;f.reduce.dispatchEvent(new Event('change'));f.flush();const pose=visible()[0].getAttribute('transform');f.scroll(1200);expect(visible()[0].getAttribute('transform')).toBe(pose);f.stop();
   const off=fixture({mobileMode:'off'});off.mobile.matches=true;off.mobile.dispatchEvent(new Event('change'));off.flush();expect(off.root.dataset.journeyActive).toBe('false');expect(off.root.dataset.journeyShared).toBe('false');off.stop();
 });
@@ -74,12 +74,12 @@ it('mantiene los recursos de cada tienda y no restaura imágenes al quitarlas',(
   const first=normalizeDecorativeJourney({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemVisible:true,stemColor:'#1286aa',unifyBackground:true});
   const second=normalizeDecorativeJourney({image:'https://cdn.example.test/second-store.png'});
   expect(first).toMatchObject({image:'/first-store.webp',backgroundImage:'/first-background.webp',stemColor:'#1286aa',unifyBackground:true});
-  expect(second).toMatchObject({image:'https://cdn.example.test/second-store.png',backgroundImage:'',stemVisible:false,unifyBackground:false});
+  expect(second).toMatchObject({image:'https://cdn.example.test/second-store.png',backgroundImage:'',stemVisible:true,unifyBackground:false});
   expect(normalizeDecorativeJourney({...first,image:'',backgroundImage:''})).toMatchObject({image:'',backgroundImage:''});
 });
 
 it('conserva los adornos nítidos a máxima profundidad y adapta la sombra en móvil',()=>{
-  const f=fixture({journey:{depth:100}}),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],art=f.root.querySelector('[data-journey-lead]');
+  const f=fixture({journey:{depth:100}}),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],art=f.root.querySelector('[data-journey-ornaments]');
   const initialScales=pieces.map(node=>node.getAttribute('transform'));
   for(const y of [0,300,1200,2300]){
     f.scroll(y);
@@ -92,14 +92,19 @@ it('conserva los adornos nítidos a máxima profundidad y adapta la sombra en m�
   expect(pieces.every(node=>!node.style.filter)).toBe(true);f.stop();
 });
 
-it('mantiene una imagen principal visible al pasar por todas las secciones',()=>{
-  const f=fixture(),lead=f.root.querySelector('[data-journey-piece="0"]'),same=lead;
-  for(const [y,id] of [[0,'banner'],[800,'instagram'],[2400,'footer']]){
-    f.scroll(y);expect(f.root.dataset.journeySection).toBe(id);
-    expect(f.root.querySelector('[data-journey-piece="0"]')).toBe(same);
-    expect(Number(lead.getAttribute('opacity'))).toBeGreaterThan(.8);
-    expect(f.root.querySelector('[data-journey-lead]')).toContainElement(lead);
-  }
-  expect(f.root.querySelectorAll('[data-journey-piece]')).toHaveLength(1);
-  expect(lead.closest('[mask]')).toBeTruthy();f.stop();
+it('recupera varios adornos y traza la misma curva al avanzar y volver',()=>{
+  const f=fixture(),pieces=[...f.root.querySelectorAll('[data-journey-piece]')],stem=f.root.querySelector('[data-journey-stem]'),trace=f.root.querySelector('[data-journey-trace]');
+  const initial=stem.getAttribute('d'),offset=trace.getAttribute('stroke-dashoffset');
+  expect(pieces).toHaveLength(28);expect(Number(stem.style.opacity)).toBeGreaterThan(.4);
+  expect(pieces.filter(p=>+p.getAttribute('opacity')>0).length).toBeGreaterThan(1);
+  f.scroll(800);expect(stem.getAttribute('d')).not.toBe(initial);expect(trace.getAttribute('stroke-dashoffset')).not.toBe(offset);
+  expect(trace.getAttribute('d')).toBe(stem.getAttribute('d'));
+  f.scroll(0);expect(stem.getAttribute('d')).toBe(initial);expect(trace.getAttribute('stroke-dashoffset')).toBe(offset);f.stop();
+});
+it('muestra la línea con los recursos guardados y conserva la decisión de apagarla',()=>{
+  const restored=normalizeDecorativeJourney({image:'/store-art.png',stemVisible:false});
+  expect(restored.stemVisible).toBe(true);
+  const off=normalizeDecorativeJourney({...restored,trailLine:false,stemVisible:false});
+  expect(normalizeDecorativeJourney(off).stemVisible).toBe(false);
+  expect(normalizeDecorativeJourney().stemVisible).toBe(false);
 });

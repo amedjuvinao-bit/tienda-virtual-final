@@ -11,4 +11,6 @@ Preset identifiers and existing saved settings remain compatible. There are no a
 
 ## Configured decoration example
 
+`continuous-journey.mp4` shows the restored multi-ornament curve and moving trace between Categories and Instagram. It is recorded from the production Home components with a controlled catalog and an explicitly selected store asset. Artwork retains its configured size and the chain has consistent spacing. The example images, colors and glass ornament are fixture choices, not defaults for other businesses.
+
 `floral-journey.mp4` is a historical preview, recorded before the section-specific choreography. It shows a continuous ornament world explicitly configured with a floral resource, using the real Home components and repository imagery. New stores start without decorative images, a connecting line or a shared background; this clip is an optional example. Categories and Information share the same mounted ornaments while the page scrolls between them. See `docs/motion/decorative-journey.md` for the controls, resource prompt and behavior.

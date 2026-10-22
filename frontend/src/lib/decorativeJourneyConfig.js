@@ -2,7 +2,7 @@ export const JOURNEY_SECTION_IDS=['banner','tendencia','look','complementos','ca
 export const DECORATIVE_JOURNEY_DEFAULTS={
   image:'',secondaryImage:'',backgroundImage:'',
   unifyBackground:false,path:'flowing',size:190,density:22,opacity:90,depth:65,
-  mobileSize:86,mobileDensity:10,stemVisible:false,stemColor:'',sectionSettings:{},
+  mobileSize:86,mobileDensity:10,stemVisible:false,trailLine:true,stemColor:'',sectionSettings:{},
 };
 const number=(value,min,max,fallback)=>Number.isFinite(Number(value))?Math.min(max,Math.max(min,Number(value))):fallback;
 export function journeyImageUrl(value,fallback=''){
@@ -25,6 +25,8 @@ export function normalizeDecorativeJourney(raw){
     size:number(c.size,60,320,d.size),density:Math.round(number(c.density,8,28,d.density)),
     opacity:number(c.opacity,20,100,d.opacity),depth:number(c.depth,0,100,d.depth),
     mobileSize:number(c.mobileSize,36,150,d.mobileSize),mobileDensity:Math.round(number(c.mobileDensity,4,14,d.mobileDensity)),
-    stemVisible:c.stemVisible===true,stemColor:/^#[\da-f]{6}$/i.test(c.stemColor)?c.stemColor:d.stemColor,
+    trailLine:c.trailLine!==false,
+    stemVisible:c.trailLine!==false && (c.stemVisible===true || Boolean(journeyImageUrl(c.image) || journeyImageUrl(c.secondaryImage))),
+    stemColor:/^#[\da-f]{6}$/i.test(c.stemColor)?c.stemColor:d.stemColor,
   };
 }
