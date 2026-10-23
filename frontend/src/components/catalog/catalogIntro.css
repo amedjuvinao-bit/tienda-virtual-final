@@ -57,3 +57,30 @@
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:min(var(--ch-padding),16px); gap:6px; }
   .cpv-glass-bags { width:calc(var(--ch-icon-size) * .35); }
 }
+/* The same optical material used by Information, sized without stretching corners. */
+.cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
+  background:var(--ch-fill); backdrop-filter:blur(var(--ch-blur)); -webkit-backdrop-filter:blur(var(--ch-blur));
+  box-shadow:0 16px 24px var(--ch-shadow),0 3px 5px var(--ch-shadow);
+}
+.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after { display:none; }
+.catalog-liquid { position:absolute; inset:0; border-radius:inherit; overflow:hidden; pointer-events:none; z-index:0; }
+.catalog-liquid__material {
+  position:absolute; inset:0; border:20px solid transparent; border-radius:inherit;
+  border-image:url('/information/glass.webp') 38 fill / 20px / 0 stretch;
+  filter:hue-rotate(var(--ch-material-hue)) saturate(var(--ch-material-saturation)); opacity:var(--ch-material-opacity);
+}
+.catalog-liquid__rim {
+  position:absolute; inset:0; border-radius:inherit; border:var(--ch-edge-width) solid var(--ch-edge);
+  box-shadow:inset 0 2px 2px var(--ch-reflection),inset 0 -2px 2px var(--ch-contrast);
+}
+.catalog-liquid__shine {
+  position:absolute; inset:0; border-radius:inherit;
+  background:radial-gradient(ellipse at var(--ch-pointer-x,28%) var(--ch-pointer-y,0%),var(--ch-reflection),transparent 60%);
+  mask-image:linear-gradient(180deg,#000,transparent 28%,transparent 70%,#000);
+}
+.catalog-liquid__shine::after {
+  content:""; position:absolute; inset:0; border-radius:inherit; opacity:.65;
+  background:linear-gradient(110deg,transparent 15%,var(--ch-reflection) 26%,transparent 34%,transparent 72%,var(--ch-reflection) 85%,transparent 91%);
+  mask-image:linear-gradient(180deg,#000,transparent 45%,#000);
+}
+.cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-hero-top,.cpv-hero-glass>.cpv-glass-bags { position:relative; z-index:1; }

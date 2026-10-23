@@ -38,6 +38,7 @@ const groups = [
     ['headerReflection', 'Intensidad de los reflejos (0 a 1)', [0, 1, .05]],
     ['headerShadowColor', 'Color de la sombra del encabezado', 'color'],
     ['headerShadow', 'Intensidad de la sombra (0 a 1)', [0, 1, .05]],
+    ['headerMaterialOpacity', 'Intensidad de la textura de Información (0 a 1)', [0, 1, .05]],
     ['headerBlur', 'Desenfoque del encabezado (px)', [0, 32, 1]],
     ['headerRadius', 'Esquinas del encabezado (px)', [0, 40, 1]],
     ['headerHeight', 'Altura mínima del encabezado (px)', [80, 240, 1]],
@@ -67,7 +68,7 @@ const topics = [
   { id:'layout', title:'Distribución', keys:['layout','maxWidth','topSpacing','gap','filterSectionBorders'] },
   { id:'background', title:'Fondo', keys:['backgroundColor','backgroundOpacity','textColor','accentColor','glassColor','glassOpacity','glassBlur','radius'] },
   { id:'header', title:'Encabezado', sections:[
-    { id:'material', title:'Cristal', keys:['headerTint','headerOpacity','headerContrastColor','headerContrast','headerBlur','headerLayers'] },
+    { id:'material', title:'Cristal', keys:['headerTint','headerOpacity','headerContrastColor','headerContrast','headerMaterialOpacity','headerBlur','headerLayers'] },
     { id:'light', title:'Bordes y luz', keys:['headerEdgeColor','headerEdgeWidth','headerReflectionColor','headerReflection','headerShadowColor','headerShadow'] },
     { id:'text', title:'Texto', keys:['titleFont','titleSize','headerTextColor','headerBadgeColor','headerBadgeTint'] },
     { id:'size', title:'Medidas', keys:['headerRadius','headerHeight','headerPadding'] },

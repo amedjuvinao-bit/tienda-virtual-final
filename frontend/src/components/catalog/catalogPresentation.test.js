@@ -29,3 +29,9 @@ it('conserva y normaliza la personalización completa del encabezado sin perder 
   expect(style['--ch-edge-width']).toBe('0px');
   expect(buildCatalogPresentation({ headerTint:'red;display:none', headerIcon:'invalid' })).toMatchObject({headerTint:'#fff6f0',headerIcon:'bags'});
 });
+
+it('permite ajustar y desactivar la textura compartida de Información', () => {
+  expect(buildCatalogPresentation({headerMaterialOpacity:0}).headerMaterialOpacity).toBe(0);
+  expect(buildCatalogPresentation({headerMaterialOpacity:900}).headerMaterialOpacity).toBe(1);
+  expect(buildCatalogPresentation({headerMaterialOpacity:'invalid'}).headerMaterialOpacity).toBe(.9);
+});

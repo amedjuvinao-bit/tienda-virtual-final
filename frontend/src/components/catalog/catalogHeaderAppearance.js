@@ -13,6 +13,7 @@ export function buildCatalogHeaderAppearance(cfg = {}) {
     headerReflection: bounded(cfg.headerReflection, 0, 1, .57),
     headerShadowColor: hex(cfg.headerShadowColor, '#633329'),
     headerShadow: bounded(cfg.headerShadow, 0, 1, .16),
+    headerMaterialOpacity: bounded(cfg.headerMaterialOpacity, 0, 1, .9),
     headerBlur: bounded(cfg.headerBlur, 0, 32, 16),
     headerRadius: bounded(cfg.headerRadius, 0, 40, 22),
     headerHeight: bounded(cfg.headerHeight, 80, 240, 116),
@@ -27,10 +28,21 @@ export function buildCatalogHeaderAppearance(cfg = {}) {
     headerIconOpacity: bounded(cfg.headerIconOpacity, 0, 1, 1),
   };
 }
+function materialTint(color) {
+  const [r,g,b] = color.slice(1).match(/../g).map(part => parseInt(part,16) / 255);
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), delta=max-min;
+  if (!delta) return {hue:0,saturation:0};
+  let hue=max===r ? ((g-b)/delta)%6 : max===g ? (b-r)/delta+2 : (r-g)/delta+4;
+  hue=(hue*60+360)%360;
+  return {hue:hue-24,saturation:1};
+}
 export function catalogHeaderAppearanceStyle(cfg) {
   const c = buildCatalogHeaderAppearance(cfg);
+  const tint = materialTint(c.headerTint);
   const mix = (color, opacity) => `color-mix(in srgb, ${color} ${opacity * 100}%, transparent)`;
   return {
+    '--ch-material-hue': `${tint.hue}deg`, '--ch-material-saturation': tint.saturation,
+    '--ch-material-opacity': c.headerMaterialOpacity,
     '--ch-tint': c.headerTint, '--ch-fill': mix(c.headerTint, c.headerOpacity),
     '--ch-contrast': mix(c.headerContrastColor, c.headerContrast),
     '--ch-edge': c.headerEdgeColor, '--ch-edge-width': `${c.headerEdgeWidth}px`,
