@@ -423,6 +423,7 @@ try {
         await page.getByLabel('Tamaño del título de catálogo (px)', { exact: true }).fill('40');
         await page.getByRole('tab', {name:'Fondo', exact:true}).click();
         await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
+        await page.getByLabel('Origen del fondo', { exact: true }).selectOption('custom');
         await page.getByLabel('Dirección de la imagen de fondo', { exact: true }).fill('/information/satin.webp');
         await page.getByRole('tab', {name:'Encabezado', exact:true}).click();
         await page.getByRole('tab', {name:'Cristal', exact:true}).click();

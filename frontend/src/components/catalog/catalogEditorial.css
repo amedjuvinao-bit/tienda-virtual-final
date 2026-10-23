@@ -104,3 +104,12 @@
 .catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices>div { min-width:0; border-radius:12px; }
 .catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices input { min-width:0; font-size:12px; }
 @container(min-width:300px) { .catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Match the continuous storefront canvas, including its fixed image position.
+   No catalog wash or moving local image is painted over the shared background. */
+.cpv-page[data-background="continuity"] {
+  background-color:var(--catalog-bg); background-image:var(--catalog-backdrop);
+  background-size:cover; background-position:center top;
+  background-repeat:no-repeat; background-attachment:fixed;
+}
+.cpv-page[data-background="continuity"]::before { display:none; }

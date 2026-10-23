@@ -20,6 +20,7 @@ export function buildCatalogPresentation(raw = {}) {
     showPhotoCount: cfg.showPhotoCount === true,
     filterSectionBorders: cfg.filterSectionBorders === true,
     layout: cfg.layout === 'grid' ? 'grid' : 'glass-grid',
+    backgroundMode: cfg.backgroundMode === 'custom' ? 'custom' : 'continuity',
     backgroundColor: color(cfg.backgroundColor, '#f8ece7'),
     backgroundImage: catalogImageUrl(cfg.backgroundImage ?? ''),
     backgroundOpacity: number(cfg.backgroundOpacity, 0, 1, .32),

@@ -14,6 +14,7 @@ import "./catalogEditorial.css";
 import "./catalogIntro.css";
 import { catalogPresentationStyle } from "./catalogPresentation";
 import useCatalogDepth from "./useCatalogDepth";
+import { catalogContinuityBackdrop } from "./catalogBackdrop";
 import CatalogSearchControls from "./CatalogSearchControls";
 import {
   Filter,
@@ -36,7 +37,7 @@ const colClasses = {
 const DEFAULT_MIN = 0;
 const DEFAULT_MAX = 10_000_000;
 
-export default function CatalogPageView({ page = null, catalogConfig = {} }) {
+export default function CatalogPageView({ page = null, catalogConfig = {}, theme }) {
   const safeConfig = useMemo(
     () => buildSafeCatalogConfig(catalogConfig),
     [catalogConfig],
@@ -52,6 +53,15 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
     return () => window.removeEventListener("resize", resize);
   }, []);
   const isMobile = viewportWidth < 768;
+  const backdrop = useMemo(() => presentation.backgroundMode === 'continuity' ? catalogContinuityBackdrop(theme, isMobile) : null, [presentation.backgroundMode, theme, isMobile]);
+  const presentationStyle = {
+    ...catalogPresentationStyle(presentation),
+    ...(backdrop ? {
+      '--catalog-bg': backdrop.color,
+      '--catalog-backdrop': backdrop.image ? `url(${JSON.stringify(backdrop.image)})` : 'none',
+    } : {}),
+  };
+
   const {
     state: query,
     setCategories: setSelectedCategories,
@@ -376,7 +386,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
 
   return (
     <>
-      <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial ? catalogPresentationStyle(presentation) : undefined}>
+      <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-background={backdrop ? "continuity" : "custom"} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial || backdrop ? presentationStyle : undefined}>
         <div className="cpv-shell">
           {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}>{commandBar}</CatalogIntro></div>}
           <div className="cpv-main-grid">

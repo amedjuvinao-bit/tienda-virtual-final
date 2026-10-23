@@ -50,3 +50,25 @@ it('hereda los colores de la escena sin introducir bordes o reflejos dorados', (
   expect(style).not.toHaveProperty('--ch-material-hue');
   expect(style['--ch-fill']).toContain('#ffffff');
 });
+
+
+it('hereda el fondo continuo actual de Inicio sin copiarlo ni sobrescribir el fondo propio guardado', async () => {
+  const { catalogContinuityBackdrop } = await import('./catalogBackdrop');
+  const config = buildCatalogPresentation({backgroundColor:'#ffffff',backgroundImage:'/catalog-local.webp'});
+  expect(config.backgroundMode).toBe('continuity');
+  const theme = {colors:{background:'#e6c8d1'},global:{sectionMotion:{journey:{backgroundImage:'/home-first.webp'}}}};
+  expect(catalogContinuityBackdrop(theme)).toEqual({color:'#e6c8d1',image:'/home-first.webp'});
+  expect(catalogContinuityBackdrop({...theme,global:{sectionMotion:{journey:{backgroundImage:'/home-updated.webp'}}}}).image).toBe('/home-updated.webp');
+  expect(config.backgroundImage).toBe('/catalog-local.webp');
+  expect(buildCatalogPresentation({...config,backgroundMode:'custom'}).backgroundMode).toBe('custom');
+  expect(catalogContinuityBackdrop(null)).toBeNull();
+});
+
+it('reutiliza el fondo de las secciones y el fondo móvil de Inicio cuando el continuo no tiene una imagen propia', async () => {
+  const { catalogContinuityBackdrop } = await import('./catalogBackdrop');
+  const theme={sections:[{id:'tendencia',config:{products:[{productId:'p1'}],presentation:{mode:'floatingGlass',backdropMode:'custom',backgroundImage:'https://res.cloudinary.com/store/image/upload/desktop.webp',mobileBackgroundMode:'custom',mobileBackgroundImage:'https://res.cloudinary.com/store/image/upload/mobile.webp'}}}]};
+  expect(catalogContinuityBackdrop(theme).image).toContain('/desktop.webp');
+  expect(catalogContinuityBackdrop(theme,true).image).toContain('/mobile.webp');
+  const look={sections:[{id:'look',config:{editorialBackgroundImage:'/shared-look.webp'}}]};
+  expect(catalogContinuityBackdrop(look).image).toBe('/shared-look.webp');
+});

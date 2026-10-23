@@ -17,6 +17,7 @@ it('sube un fondo sin sobrescribir ajustes editados durante la subida y permite 
   const user = userEvent.setup();
   render(<Editor/>);
   await user.click(screen.getByRole('tab', {name:'Fondo', exact:true}));
+  await user.selectOptions(screen.getByLabelText('Origen del fondo'), 'custom');
   await user.upload(screen.getByLabelText('Subir imagen de fondo'), new File(['image'], 'fondo.webp', { type: 'image/webp' }));
   expect(await screen.findByText('Subiendo imagen…')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', {name:'Encabezado', exact:true}));
@@ -69,4 +70,19 @@ it('recupera la paleta de cristal en un paso sin modificar las medidas del usuar
   await user.click(screen.getByRole('button',{name:'Aplicar paleta de cristal',exact:true}));
   expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#fff6f0',headerBadgeColor:'#984d62',headerHeight:164,glassPaletteVersion:2});
   expect(screen.getByText('Paleta aplicada a la vista previa. Guarda los cambios para conservarla.')).toHaveAttribute('role','status');
+});
+
+
+it('usa Inicio por defecto y conserva la imagen propia al cambiar de origen del fondo', async () => {
+  const user=userEvent.setup();
+  render(<Editor/>);
+  await user.click(screen.getByRole('tab',{name:'Fondo',exact:true}));
+  expect(screen.getByLabelText('Origen del fondo')).toHaveValue('continuity');
+  expect(screen.getByLabelText('Dirección de la imagen de fondo')).not.toBeVisible();
+  await user.selectOptions(screen.getByLabelText('Origen del fondo'),'custom');
+  fireEvent.change(screen.getByLabelText('Dirección de la imagen de fondo'),{target:{value:'/saved-background.webp'}});
+  await user.selectOptions(screen.getByLabelText('Origen del fondo'),'continuity');
+  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({backgroundMode:'continuity',backgroundImage:'/saved-background.webp'});
+  await user.selectOptions(screen.getByLabelText('Origen del fondo'),'custom');
+  expect(screen.getByLabelText('Dirección de la imagen de fondo')).toHaveValue('/saved-background.webp');
 });

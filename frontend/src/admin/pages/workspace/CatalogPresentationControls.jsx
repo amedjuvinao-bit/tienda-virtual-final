@@ -19,6 +19,7 @@ const groups = [
     ['gap', 'Separación entre productos (px)', [8, 48, 1]],
   ]},
   { title: 'Fondo y cristal', fields: [
+    ['backgroundMode', 'Origen del fondo', [['continuity', 'Fondo continuo de Inicio'], ['custom', 'Fondo propio del catálogo']]],
     ['backgroundColor', 'Color de fondo de la escena', 'color'],
     ['backgroundOpacity', 'Intensidad de la imagen de fondo (0 a 1)', [0, 1, .05]],
     ['textColor', 'Color de títulos y controles', 'color'],
@@ -69,7 +70,7 @@ const groups = [
 const fields = new Map(groups.flatMap(group => group.fields).map(field => [field[0], field]));
 const topics = [
   { id:'layout', title:'Distribución', keys:['layout','maxWidth','topSpacing','gap','filterSectionBorders'] },
-  { id:'background', title:'Fondo', keys:['backgroundColor','backgroundOpacity','textColor','accentColor','glassColor','glassOpacity','glassBlur','radius'] },
+  { id:'background', title:'Fondo', keys:['backgroundMode','backgroundColor','backgroundOpacity','textColor','accentColor','glassColor','glassOpacity','glassBlur','radius'] },
   { id:'header', title:'Encabezado', sections:[
     { id:'material', title:'Cristal', keys:['headerTint','headerOpacity','headerMaterialDepthColor','headerMaterialDepth','headerContrastColor','headerContrast','headerMaterialOpacity','headerBlur','headerLayers'] },
     { id:'light', title:'Bordes y luz', keys:['headerEdgeColor','headerEdgeWidth','headerReflectionColor','headerReflection','headerShadowColor','headerShadow'] },
@@ -131,7 +132,7 @@ export default function CatalogPresentationControls({ value, onChange }) {
     {topics.map(group => <div key={group.id} role="tabpanel" id={`${id}-panel-${group.id}`} aria-labelledby={`${id}-tab-${group.id}`} hidden={topic !== group.id}>
       {group.sections && <TopicTabs items={group.sections} selected={headerSection} onSelect={setHeaderSection} id={`${id}-header`} label="Ajustes del encabezado"/>}
       {(group.sections || [group]).map(section => <div key={section.id} role={group.sections ? 'tabpanel' : undefined} id={`${id}-header-panel-${section.id}`} aria-labelledby={group.sections ? `${id}-header-tab-${section.id}` : undefined} hidden={!!group.sections && headerSection !== section.id}>
-      <div className="grid gap-3 md:grid-cols-2">{section.keys.map(key => fields.get(key)).map(([key, label, type]) => <label key={key} className={`block min-w-0 text-sm text-gray-700 ${type === 'boolean' ? 'flex items-center justify-between gap-3 rounded-xl border p-3' : ''}`}>
+      <div className="grid gap-3 md:grid-cols-2">{section.keys.filter(key => value.backgroundMode === 'custom' || !['backgroundColor','backgroundOpacity'].includes(key)).map(key => fields.get(key)).map(([key, label, type]) => <label key={key} className={`block min-w-0 text-sm text-gray-700 ${type === 'boolean' ? 'flex items-center justify-between gap-3 rounded-xl border p-3' : ''}`}>
         <span id={`${id}-${key}`} className="mb-1 block">{label}</span>
         {type === 'boolean' ? <input aria-labelledby={`${id}-${key}`} type="checkbox" checked={value[key]} onChange={event => patch(key, event.target.checked)} className="h-4 w-4 accent-pink-600"/> :
           Array.isArray(type) && Array.isArray(type[0]) ? <select aria-labelledby={`${id}-${key}`} className={fieldClass} value={value[key]} onChange={event => patch(key, event.target.value)}>{type.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select> :
@@ -140,7 +141,8 @@ export default function CatalogPresentationControls({ value, onChange }) {
       </label>)}</div>
     </div>)}
     </div>)}
-    <fieldset hidden={topic !== 'background'} className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
+    {topic === 'background' && value.backgroundMode !== 'custom' && <p className="text-sm text-gray-600">El catálogo utiliza el fondo continuo de Inicio y se actualiza cuando cambias ese fondo en Apariencia.</p>}
+    <fieldset hidden={topic !== 'background' || value.backgroundMode !== 'custom'} className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
       <label className="block text-sm text-gray-700">Dirección de la imagen de fondo<input className={fieldClass} value={value.backgroundImage} onChange={event => patch('backgroundImage', event.target.value)} placeholder="https://… o /imagen.webp"/></label>
       <label className="block text-sm text-gray-700">Subir imagen de fondo<input className={`${fieldClass} mt-1`} type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={uploading} onChange={upload}/></label>
       <button type="button" className="rounded-xl border px-3 py-2 text-sm" disabled={uploading || !value.backgroundImage} onClick={() => patch('backgroundImage', '')}>Quitar imagen de fondo</button>

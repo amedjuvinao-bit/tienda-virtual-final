@@ -9,6 +9,8 @@ import { CartContext } from "../../../context/CartContext";
 import { FavoritesContext } from "../../../context/FavoritesContext";
 import { API_BASE_URL } from "../../../config/apiBaseUrl";
 import "../../../index.css";
+import { fetchSiteSettings } from "../../../lib/siteSettingsApi";
+import { StorefrontSettingsContext } from "../../../context/StorefrontSettingsContext";
 const noop = () => {};
 const cart = {
   cart: [],
@@ -145,6 +147,12 @@ class PreviewBoundary extends React.Component {
 }
 function Preview() {
   const [draft, setDraft] = useState(null);
+  const [settings, setSettings] = useState(null);
+  useEffect(() => {
+    let active = true;
+    fetchSiteSettings().then(data => { if (active) setSettings(data); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     const receive = (event) => {
       if (
@@ -189,6 +197,7 @@ function Preview() {
       </p>
     );
   return (
+    <StorefrontSettingsContext.Provider value={settings}>
     <PreviewBoundary>
       <MemoryRouter>
         <CartContext.Provider value={cart}>
@@ -210,6 +219,7 @@ function Preview() {
                 <CatalogPageView
                   page={draft}
                   catalogConfig={draft.catalogConfig}
+                  theme={settings?.theme}
                 />
               ) : (
                 <DetailPreview draft={draft} />
@@ -220,6 +230,7 @@ function Preview() {
         </CartContext.Provider>
       </MemoryRouter>
     </PreviewBoundary>
+    </StorefrontSettingsContext.Provider>
   );
 }
 createRoot(document.getElementById("root")).render(<Preview />);
