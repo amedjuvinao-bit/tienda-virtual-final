@@ -1,5 +1,5 @@
 // src/components/catalog/CatalogPageView.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
 import CatalogEditorialCard from "./CatalogEditorialCard";
@@ -17,6 +17,7 @@ import { catalogPresentationStyle } from "./catalogPresentation";
 import useCatalogDepth from "./useCatalogDepth";
 import { catalogContinuityBackdrop } from "./catalogBackdrop";
 import CatalogSearchControls from "./CatalogSearchControls";
+import CatalogGlassTexture, { catalogGlassTextureStyle } from "./CatalogGlassTexture";
 import {
   Filter,
   ChevronLeft,
@@ -44,6 +45,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
     [catalogConfig],
   );
   const presentation = safeConfig.presentation;
+  const glassTextureId = `catalog-glass-${useId().replace(/:/g, '')}`;
   const depthRef = useCatalogDepth(presentation);
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window === "undefined" ? 1280 : window.innerWidth,
@@ -57,6 +59,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
   const backdrop = useMemo(() => presentation.backgroundMode === 'continuity' ? catalogContinuityBackdrop(theme, isMobile) : null, [presentation.backgroundMode, theme, isMobile]);
   const presentationStyle = {
     ...catalogPresentationStyle(presentation),
+    ...catalogGlassTextureStyle(glassTextureId),
     ...(backdrop ? {
       '--catalog-bg': backdrop.color,
       '--catalog-backdrop': backdrop.image ? `url(${JSON.stringify(backdrop.image)})` : 'none',
@@ -388,6 +391,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
   return (
     <>
       <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-background={backdrop ? "continuity" : "custom"} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial || backdrop ? presentationStyle : undefined}>
+        {editorial && <CatalogGlassTexture id={glassTextureId} presentation={presentation} theme={theme}/>}
         <div className="cpv-shell">
           {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}>{commandBar}</CatalogIntro></div>}
           <div className="cpv-main-grid">
