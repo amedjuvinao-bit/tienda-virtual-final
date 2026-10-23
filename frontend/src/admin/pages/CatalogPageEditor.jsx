@@ -1,3 +1,4 @@
+import { applyCatalogEditorialPreset, restoreCatalogVisualBackup } from "../../components/catalog/catalogEditorialPreset";
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/CatalogPageEditor.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -645,6 +646,13 @@ export default function CatalogPageEditor() {
         ...patch,
       },
     }));
+  };
+
+  const updateCatalogPresentation = (patch) => {
+    setForm(prev => {
+      const catalogConfig = { ...prev.catalogConfig, presentation: { ...prev.catalogConfig.presentation, ...patch } };
+      return { ...prev, catalogConfig: patch.layout === 'editorial' && catalogConfig.presentation.styleVersion < 2 ? buildSafeCatalogConfig(catalogConfig) : catalogConfig };
+    });
   };
 
   const updateFilterUiConfig = (patch) => {
@@ -1340,7 +1348,11 @@ export default function CatalogPageEditor() {
                   }
                 />
               </div>
-              <CatalogPresentationControls value={form.catalogConfig.presentation} onChange={patch => setForm(prev => ({ ...prev, catalogConfig: { ...prev.catalogConfig, presentation: { ...prev.catalogConfig.presentation, ...patch } } }))}/>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button type="button" className="rounded-xl border border-pink-200 bg-pink-50 px-4 py-2 text-sm text-pink-800" onClick={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}>Aplicar acabado de la propuesta</button>
+                {form.catalogConfig.visualBackup && <button type="button" className="rounded-xl border px-4 py-2 text-sm" onClick={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}>Recuperar personalización anterior</button>}
+              </div>
+              <CatalogPresentationControls value={form.catalogConfig.presentation} onChange={updateCatalogPresentation}/>
             </SectionCard>
           )}
 

@@ -12,6 +12,9 @@ export function catalogImageUrl(value) {
 export function buildCatalogPresentation(raw = {}) {
   const cfg = raw && typeof raw === 'object' ? raw : {};
   return {
+    styleVersion: number(cfg.styleVersion, 0, 2, 0),
+    showPhotoCount: cfg.showPhotoCount === true,
+    filterSectionBorders: cfg.filterSectionBorders === true,
     layout: cfg.layout === 'grid' ? 'grid' : 'editorial',
     backgroundColor: color(cfg.backgroundColor, '#f8ece7'),
     backgroundImage: catalogImageUrl(cfg.backgroundImage ?? '/instagram/editorial-satin.webp'),
@@ -40,7 +43,7 @@ export function buildCatalogPresentation(raw = {}) {
   };
 }
 export function catalogPresentationStyle(config) {
-  const font = { inherit: 'var(--font-headings, inherit)', serif: 'Georgia, serif', sans: 'var(--font-base, system-ui, sans-serif)' };
+  const font = { inherit: 'var(--font-headings, inherit)', serif: '"Catalog Editorial", Georgia, serif', sans: 'var(--font-base, system-ui, sans-serif)' };
   return {
     '--catalog-bg': config.backgroundColor,
     '--catalog-backdrop': config.backgroundImage ? `url(${JSON.stringify(config.backgroundImage)})` : 'none',

@@ -361,6 +361,7 @@ export default function FilterSidebar({
   return (
     <div
       data-presentation={catalogConfig?.presentation?.layout}
+      data-section-borders={catalogConfig?.presentation?.filterSectionBorders}
       className={`catalog-filters space-y-4 sm:space-y-5 ${ui.stickyHeader ? "md:sticky md:top-24" : ""}`}
       style={{
         '--catalog-filter-bg': ui.panelBg,
@@ -766,7 +767,7 @@ export default function FilterSidebar({
             />
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="catalog-filter-prices mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div
               className="rounded-[18px] border px-3 py-2.5 focus-within:ring-2"
               style={{
@@ -788,6 +789,7 @@ export default function FilterSidebar({
                   inputMode="numeric"
                   min={MIN_PRICE}
                   max={MAX_PRICE}
+                  aria-label="Precio mínimo"
                   value={safeRange[0]}
                   onChange={(e) => handleMin(e.target.value)}
                   className="w-full bg-transparent outline-none text-[13px] sm:text-[14px]"
@@ -817,6 +819,7 @@ export default function FilterSidebar({
                   inputMode="numeric"
                   min={MIN_PRICE}
                   max={MAX_PRICE}
+                  aria-label="Precio máximo"
                   value={safeRange[1]}
                   onChange={(e) => handleMax(e.target.value)}
                   className="w-full bg-transparent outline-none text-[13px] sm:text-[14px]"

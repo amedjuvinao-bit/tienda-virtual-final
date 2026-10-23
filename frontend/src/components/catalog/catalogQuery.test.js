@@ -95,7 +95,7 @@ describe("contrato del catálogo público", () => {
     ).toEqual(["uno", "dos"]);
   });
   it("conserva y normaliza los controles compartidos entre panel, tarjeta y vista pública", () => {
-    const config = buildSafeCatalogConfig({
+    const config = buildSafeCatalogConfig({ presentation: { styleVersion: 2 },
       showSearch: false,
       showSort: false,
       defaultSort: "price",

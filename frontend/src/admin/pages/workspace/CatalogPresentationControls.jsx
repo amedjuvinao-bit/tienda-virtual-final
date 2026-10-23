@@ -7,6 +7,8 @@ const fieldClass = 'w-full min-w-0 rounded-xl border border-gray-300 bg-white px
 const groups = [
   { title: 'Composición', fields: [
     ['layout', 'Composición del catálogo', [['editorial', 'Editorial con profundidad'], ['grid', 'Cuadrícula clásica']]],
+    ['showPhotoCount', 'Mostrar cantidad de fotos', 'boolean'],
+    ['filterSectionBorders', 'Separar filtros en paneles con borde', 'boolean'],
     ['featuredEnabled', 'Destacar el primer resultado', 'boolean'],
     ['featuredShape', 'Forma del protagonista', [['arch', 'Arco'], ['rounded', 'Esquinas de la tarjeta'], ['square', 'Rectangular']]],
     ['featuredFit', 'Encuadre del protagonista', [['cover', 'Cubrir el espacio'], ['contain', 'Mostrar imagen completa']]],

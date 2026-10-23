@@ -1,3 +1,4 @@
+import { prepareCatalogEditorialConfig } from "./catalogEditorialPreset";
 import { buildCatalogPresentation } from "./catalogPresentation";
 function clampInt(value, min, max, fallback) {
   const n = Number.parseInt(value, 10);
@@ -245,11 +246,12 @@ function buildSafeColumnControlsUiConfig(raw) {
 }
 
 function buildSafeCatalogConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
+  const cfg = prepareCatalogEditorialConfig(raw && typeof raw === "object" ? raw : {});
   const presentation = buildCatalogPresentation(cfg.presentation);
 
   return {
     presentation,
+    visualBackup: cfg.visualBackup || null,
     title: typeof cfg.title === "string" ? cfg.title : "",
     subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : "",
     description: typeof cfg.description === "string" ? cfg.description : "",

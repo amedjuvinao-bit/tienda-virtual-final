@@ -189,6 +189,7 @@ describe("catálogo conectado", () => {
     const { container } = mount({
       showFilters: false,
       defaultColsDesktop: 2,
+      presentation: { styleVersion: 2 },
       cardUiConfig: { showBorder: false, showShadow: false },
     });
     await screen.findByText("Libro especial");
@@ -198,11 +199,9 @@ describe("catálogo conectado", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /favorito/i }));
     expect(toggleFavorite).toHaveBeenCalledWith(selected);
-    expect(container.querySelector(".group.border")).toHaveStyle({
-      borderWidth: "0px",
-      boxShadow: "none",
-    });
-    expect(screen.getByText("$35.000")).toBeInTheDocument();
+    expect(container.querySelector('.catalog-ecard').style.getPropertyValue('--ecard-border-width')).toBe('0px');
+    expect(container.querySelector('.catalog-ecard').style.getPropertyValue('--ecard-shadow')).toBe('none');
+    expect(screen.getByText(/35.000/)).toBeInTheDocument();
   });
   it("bloquea agregar productos agotados y conserva navegación al detalle", async () => {
     fetch.mockResolvedValue(

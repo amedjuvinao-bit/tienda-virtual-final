@@ -1,8 +1,9 @@
 // src/components/catalog/CatalogPageView.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
+import CatalogEditorialCard from "./CatalogEditorialCard";
+import CatalogIntro from "./CatalogIntro";
 import { clampInt, buildSafeCatalogConfig } from "./catalogConfig";
 import useCatalogQuery from "./useCatalogQuery";
 import useCatalogProducts from "./useCatalogProducts";
@@ -17,7 +18,6 @@ import {
   ChevronLeft,
   X,
   SlidersHorizontal,
-  Sparkles,
 } from "lucide-react";
 
 // columnas -> clases tailwind
@@ -114,14 +114,6 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
   const effectiveCols = cols;
   const renderedCols = effectiveCols;
 
-  const title = safeConfig.title || page?.name || "Catálogo";
-  const subtitle = safeConfig.subtitle || "";
-  const description = safeConfig.description || "";
-  const titleImage = String(safeConfig.titleImage || "").trim();
-  const titleImageAlt = String(
-    safeConfig.titleImageAlt || title || "Catálogo",
-  ).trim();
-
   const editorial = presentation.layout === "editorial";
   // Feature only the first result in its original server order. Never inject an unrelated product.
   const hasFeatured = editorial && presentation.featuredEnabled && renderedCols >= 3 && viewportWidth >= 1100 && filteredProducts.length >= 5;
@@ -203,6 +195,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
     <>
       <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-motion={presentation.motion} data-feature-shape={presentation.featuredShape} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial ? catalogPresentationStyle(presentation) : undefined}>
         <div className="cpv-shell">
+          {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}/></div>}
           <div className="cpv-main-grid">
             {safeConfig.showFilters && !isMobile && (
               <aside
@@ -243,47 +236,9 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
             )}
 
             <main className="cpv-content">
-              {safeConfig.showBreadcrumb && (
-                <nav className="cpv-breadcrumb">
-                  <Link to="/">Inicio</Link>
-                  <span>›</span>
-                  <span className="cpv-bc-current">{title}</span>
-                </nav>
-              )}
+              {!editorial && <CatalogIntro config={safeConfig} page={page}/>}
 
-              <section className="cpv-hero">
-                <div className="cpv-hero-top">
-                  {safeConfig.showHeroBadge && safeConfig.heroBadge && (
-                    <div className="cpv-hero-badge">
-                      <Sparkles size={14} />
-                      {safeConfig.heroBadge}
-                    </div>
-                  )}
-
-                  <div className="cpv-title-wrap">
-                    {safeConfig.titleMode === "image" && titleImage ? (
-                      <img
-                        src={titleImage}
-                        alt={titleImageAlt}
-                        className="cpv-title-image"
-                        draggable="false"
-                      />
-                    ) : (
-                      <>
-                        <h1 className="cpv-title">{title}</h1>
-                        {subtitle ? (
-                          <p className="cpv-subtitle">{subtitle}</p>
-                        ) : null}
-                      </>
-                    )}
-
-                    {description ? (
-                      <p className="cpv-description">{description}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
-
+              <div className="cpv-commandbar">
               <CatalogSearchControls
                 config={safeConfig}
                 query={query}
@@ -320,6 +275,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
               {safeConfig.showToolbar && (
                 <div className="cpv-toolbar">
                   <div className="cpv-toolbar-left">
+                    {editorial && safeConfig.showFilters && safeConfig.showFilterFab && <button type="button" className="cpv-inline-filter" aria-label="Mostrar/ocultar filtros" onClick={() => isMobile ? setMobileDrawerOpen(true) : setSidebarVisible(value => !value)}><Filter size={15}/><span>Filtros</span></button>}
                     {safeConfig.showResultCount && (
                       <span
                         className="cpv-result-pill"
@@ -432,6 +388,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
                 </div>
               )}
 
+              </div>
               <div
                 className={`cpv-grid ${colClasses[renderedCols] || colClasses[4]}`}
                 style={gridStyle}
@@ -471,11 +428,8 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
                         animationDelay: `${Math.min(idx * 45, 420)}ms`,
                       }}
                     >
-                      <ProductCard
-                        product={product}
-                        cols={renderedCols}
-                        cardUiConfig={safeConfig.cardUiConfig}
-                      />
+                      {editorial ? <CatalogEditorialCard product={product} config={safeConfig} featured={hasFeatured && idx === 0}/> : <ProductCard product={product} cols={renderedCols} cardUiConfig={safeConfig.cardUiConfig}/>}
+
                     </div>
                   ))
                 )}
@@ -515,7 +469,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
             </main>
           </div>
 
-          {safeConfig.showFilters && safeConfig.showFilterFab && (
+          {(!editorial || !safeConfig.showToolbar) && safeConfig.showFilters && safeConfig.showFilterFab && (
             <button
               className="cpv-fab"
               onClick={() =>

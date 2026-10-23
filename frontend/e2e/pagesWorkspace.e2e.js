@@ -86,6 +86,7 @@ const products = Array.from({ length: 8 }, (_, i) => ({
   slug: "producto-" + (i + 1),
   price: 80000,
   image: "/categorias/collection-older.webp",
+  images: ["/categorias/collection-older.webp", "/categorias/collection-atlas.webp"],
   categories: ["Destacados"],
   stock: i === 1 ? 0 : 10,
   inventoryTracked: true,
@@ -100,7 +101,7 @@ const products = Array.from({ length: 8 }, (_, i) => ({
     },
   ],
 }));
-const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import PublicCatalog from'/src/components/catalog/CatalogPageView.jsx';import{CartContext}from'/src/context/CartContext.jsx';import{FavoritesContext}from'/src/context/FavoritesContext.jsx';function PublicAudit({editorial=false}){return <CartContext.Provider value={{cart:[],totalItems:0,subtotal:0,addToCart:p=>window.__catalogCart=p}}><FavoritesContext.Provider value={{favorites:[],isFavorite:()=>false,toggleFavorite:p=>window.__catalogFavorite=p}}><PublicCatalog catalogConfig={{limit:editorial?8:2,sourceMode:'categories',allowedCategoriesText:'Destacados',showHeroBadge:false,initialMaxPrice:300000}}/></FavoritesContext.Provider></CartContext.Provider>}import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/catalog-audit' element={<PublicAudit/>}/><Route path='/catalog-editorial-audit' element={<PublicAudit editorial/>}/><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
+const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import PublicCatalog from'/src/components/catalog/CatalogPageView.jsx';import{CartContext}from'/src/context/CartContext.jsx';import{FavoritesContext}from'/src/context/FavoritesContext.jsx';function PublicAudit({editorial=false}){return <CartContext.Provider value={{cart:[],totalItems:0,subtotal:0,addToCart:p=>window.__catalogCart=p}}><FavoritesContext.Provider value={{favorites:[],isFavorite:()=>false,toggleFavorite:p=>window.__catalogFavorite=p}}><PublicCatalog catalogConfig={{limit:editorial?8:2,sourceMode:'categories',allowedCategoriesText:'Destacados',showHeroBadge:false,initialMaxPrice:300000,presentation:{styleVersion:1,showPhotoCount:true},cardUiConfig:{titleColor:'#0066ff',priceColor:'#ff00ff',cardPaddingPx:12,cardBorderWidthPx:6,cardRadiusPx:40},filterUiConfig:{panelBorderColor:'#0066ff',sectionHeaderBg:'#d6ffe6'}}}/></FavoritesContext.Provider></CartContext.Provider>}import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/catalog-audit' element={<PublicAudit/>}/><Route path='/catalog-editorial-audit' element={<PublicAudit editorial/>}/><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
 const server = await createServer({
   root,
   cacheDir: "/tmp/pages-ui-vite-cache",
@@ -612,6 +613,13 @@ try {
     const featuredCount = await page.locator('.cpv-product-item--featured').count();
     if (featuredCount !== (width >= 1100 ? 1 : 0)) throw Error('Incorrect responsive featured layout at ' + width);
     if (!(await page.locator('.cpv-title').evaluate(node => getComputedStyle(node).fontFamily)).includes('Georgia')) throw Error('Editorial typography not applied');
+    const refined = await page.locator('.catalog-ecard').first().evaluate(node => ({ border:getComputedStyle(node).borderTopWidth, padding:getComputedStyle(node).paddingTop, title:node.style.getPropertyValue('--ecard-title') }));
+    if (refined.border !== '1px' || refined.padding !== '0px' || refined.title !== '#562633') throw Error('Legacy styles still contaminate the editorial design');
+    const collision = await page.locator('.catalog-ecard__footer').evaluateAll(nodes => nodes.some(node => {
+      const info=node.querySelector('.catalog-ecard__info').getBoundingClientRect(), actions=node.querySelector('.catalog-ecard__actions').getBoundingClientRect();
+      return Math.min(info.right,actions.right)-Math.max(info.left,actions.left)>1 && Math.min(info.bottom,actions.bottom)-Math.max(info.top,actions.top)>1;
+    }));
+    if (collision) throw Error('Editorial controls collide with product details');
     const geometry = await page.locator('.cpv-product-item').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
     for (let i = 0; i < geometry.length; i++) for (let j = i + 1; j < geometry.length; j++) {
       const a = geometry[i], b = geometry[j];
