@@ -4,6 +4,7 @@ import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
 import CatalogEditorialCard from "./CatalogEditorialCard";
 import CatalogIntro from "./CatalogIntro";
+import CatalogViewIcon from "./CatalogViewIcon";
 import { clampInt, buildSafeCatalogConfig } from "./catalogConfig";
 import useCatalogQuery from "./useCatalogQuery";
 import useCatalogProducts from "./useCatalogProducts";
@@ -190,6 +191,20 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
     1,
   );
 
+  const navigateViews = (event) => {
+    const buttons = [...event.currentTarget.querySelectorAll('button')];
+    const current = buttons.indexOf(document.activeElement);
+    let next;
+    if (event.key === 'ArrowRight') next = (current + 1) % buttons.length;
+    if (event.key === 'ArrowLeft') next = (current - 1 + buttons.length) % buttons.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = buttons.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    setCols(Number(buttons[next].dataset.columns));
+    buttons[next].focus();
+  };
+
   const hasCommandBar = safeConfig.showSearch || safeConfig.showSort || safeConfig.showToolbar || activeFilters.length > 0 || query.q;
   const commandBar = hasCommandBar ? (
     <div className="cpv-commandbar">
@@ -248,7 +263,17 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
             )}
           </div>
 
-          <div className="cpv-col-controls">
+          <div className={`cpv-col-controls${editorial ? ' cpv-view-dock' : ''}`} role="group" aria-label="Vista de productos" onKeyDown={editorial ? navigateViews : undefined} style={editorial ? {
+            '--catalog-view-index': effectiveCols - 1,
+            '--catalog-view-extra': effectiveCols > 1 ? '8px' : '0px',
+            '--catalog-view-bg': normalButtonBgColor,
+            '--catalog-view-edge': normalButtonBorderColor,
+            '--catalog-view-edge-width': `${columnButtonBorderWidthPx}px`,
+            '--catalog-view-active-bg': activeButtonBgColor,
+            '--catalog-view-active-edge': activeButtonBorderColor,
+            '--catalog-view-radius': `${columnButtonRadiusPx}px`,
+          } : undefined}>
+            {editorial && <span className="cpv-view-indicator" aria-hidden="true"/>}
             {[1, 2, 3, 4, 5, 6].map((n) => {
               if (isMobile && n > maxMobileCols) return null;
               if (!isMobile && n > maxDesktopCols) return null;
@@ -283,18 +308,20 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
                     onMouseEnter={() => setHoveredColButton(n)}
                     onMouseLeave={() => setHoveredColButton(null)}
                     aria-pressed={isActive}
+                    data-columns={n}
+                    tabIndex={editorial ? (isActive ? 0 : -1) : undefined}
                     aria-label={
                       n === 1 ? "Vista lista" : `${n} columnas`
                     }
                     style={{
                       '--catalog-control-bg': currentButtonBg,
                       background: editorial ? undefined : currentButtonBg,
-                      borderColor: currentButtonBorder,
+                      borderColor: editorial ? "transparent" : currentButtonBorder,
                       borderWidth: `${columnButtonBorderWidthPx}px`,
                       borderRadius: `${columnButtonRadiusPx}px`,
                     }}
                   >
-                    <div
+                    {editorial ? <CatalogViewIcon columns={n} color={currentIconColor}/> : <div
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -332,7 +359,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
                               }}
                             />
                           ))}
-                    </div>
+                    </div>}
 
                     <span className="cpv-tooltip">
                       {n === 1 ? "Lista" : `${n} columnas`}
