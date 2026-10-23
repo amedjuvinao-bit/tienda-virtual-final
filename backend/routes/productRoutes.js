@@ -445,6 +445,8 @@ async function serializePublicProductWithAvailability(product) {
   };
 }
 
+const { attachPublicCatalogAvailability } = require('../services/publicCatalogAvailabilityService');
+
 // GET /api/products (catálogo público: siempre activos y visibles)
 router.get('/', async (req, res) => {
   try {
@@ -452,7 +454,8 @@ router.get('/', async (req, res) => {
       ProductModel: Product,
       populate: PUBLIC_TAXONOMY_POPULATE,
     });
-    return res.json({ ok: true, ...result });
+    const products = await attachPublicCatalogAvailability(result.products);
+    return res.json({ ok: true, ...result, products });
   } catch (error) {
     if (error instanceof ProductListQueryError) {
       return res.status(error.status).json({
@@ -498,11 +501,12 @@ router.get('/catalog-categories', async (_req, res) => {
   }
 });
 
-router.get('/meta', async (_req, res) => {
+router.get('/meta', async (req, res) => {
   try {
-    const facets = await listPublicProductFacets({ ProductModel: Product });
+    const facets = await listPublicProductFacets({ ProductModel: Product, query: req.query });
     return res.json({ ok: true, ...facets });
   } catch (error) {
+    if (error instanceof ProductListQueryError) return res.status(error.status).json({ ok: false, error: error.code, message: error.message });
     console.error(
       'Error al obtener filtros de productos:',
       error?.code || error?.name || 'PRODUCT_META_FAILED'

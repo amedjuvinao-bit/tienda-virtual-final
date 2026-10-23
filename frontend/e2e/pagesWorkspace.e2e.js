@@ -87,9 +87,20 @@ const products = Array.from({ length: 8 }, (_, i) => ({
   price: 80000,
   image: "/categorias/collection-older.webp",
   categories: ["Destacados"],
-  stock: 10,
+  stock: i === 1 ? 0 : 10,
+  inventoryTracked: true,
+  availableStock: i === 1 ? 0 : 10,
+  colors: ["rojo"],
+  variants: [
+    {
+      variantKey: "unica",
+      availableStock: i === 1 ? 0 : 10,
+      price: 80000,
+      active: true,
+    },
+  ],
 }));
-const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
+const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import PublicCatalog from'/src/components/catalog/CatalogPageView.jsx';import{CartContext}from'/src/context/CartContext.jsx';import{FavoritesContext}from'/src/context/FavoritesContext.jsx';function PublicAudit(){return <CartContext.Provider value={{cart:[],totalItems:0,subtotal:0,addToCart:p=>window.__catalogCart=p}}><FavoritesContext.Provider value={{favorites:[],isFavorite:()=>false,toggleFavorite:p=>window.__catalogFavorite=p}}><PublicCatalog catalogConfig={{limit:2,sourceMode:'categories',allowedCategoriesText:'Destacados',showHeroBadge:false,initialMaxPrice:300000}}/></FavoritesContext.Provider></CartContext.Provider>}import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/catalog-audit' element={<PublicAudit/>}/><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
 const server = await createServer({
   root,
   cacheDir: "/tmp/pages-ui-vite-cache",
@@ -113,7 +124,11 @@ const server = await createServer({
       },
       configureServer(s) {
         s.middlewares.use(async (req, res, next) => {
-          if (!req.url.split("?")[0].startsWith("/admin/")) return next();
+          if (
+            !req.url.split("?")[0].startsWith("/admin/") &&
+            !req.url.startsWith("/catalog-audit")
+          )
+            return next();
           res.setHeader("Content-Type", "text/html");
           res.end(
             await s.transformIndexHtml(
@@ -219,17 +234,45 @@ try {
       data = pages.find((p) => p._id === u.pathname.split("/").at(-1)) || {};
     else if (u.pathname.startsWith("/api/site-settings")) data = settings;
     else if (u.pathname === "/api/products/meta")
-      data = { categories: ["Destacados"], minPrice: 10000, maxPrice: 150000 };
+      data = {
+        categories: ["Destacados"],
+        colors: ["rojo"],
+        minPrice: 10000,
+        maxPrice: 150000,
+      };
     else if (u.pathname === "/api/products/admin/reviews")
       data = { reviews: [] };
     else if (/^\/api\/products\/p\d+$/.test(u.pathname))
       data = products.find((p) => p._id === u.pathname.split("/").at(-1));
-    else if (u.pathname.startsWith("/api/products"))
+    else if (u.pathname.startsWith("/api/products")) {
+      const q = (u.searchParams.get("q") || "").toLowerCase();
+      let rows = products.filter(
+        (p) => !q || p.title.toLowerCase().includes(q),
+      );
+      const keys = u.searchParams.getAll("productKeys");
+      if (keys.length)
+        rows = rows.filter(
+          (p) => keys.includes(p._id) || keys.includes(p.slug),
+        );
+      if (u.searchParams.get("sort") === "-title") rows = [...rows].reverse();
+      const pageNumber = Number(u.searchParams.get("page") || 1),
+        limit = Number(u.searchParams.get("limit") || 24);
+      const total = rows.length,
+        totalPages = Math.ceil(total / limit);
       data = {
-        products,
-        pagination: { page: 1, totalPages: 1, total: products.length },
+        products: rows.slice((pageNumber - 1) * limit, pageNumber * limit),
+        pagination: {
+          page: pageNumber,
+          limit,
+          totalProducts: total,
+          totalPages,
+          hasPreviousPage: pageNumber > 1,
+          hasNextPage: pageNumber < totalPages,
+          from: total ? (pageNumber - 1) * limit + 1 : 0,
+          to: Math.min(total, pageNumber * limit),
+        },
       };
-    else data = { items: [], posts: [] };
+    } else data = { items: [], posts: [] };
     return route.fulfill({
       status: 200,
       headers,
@@ -439,6 +482,108 @@ try {
     .waitFor();
   if (writes.filter((w) => w.method === "POST").length !== 1)
     throw Error("Unexpected writes " + JSON.stringify(writes));
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 880, height: 1000 },
+    { width: 390, height: 844 },
+    { width: 320, height: 740 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("http://127.0.0.1:5205/catalog-audit?utm_source=qa");
+    await page
+      .getByRole("heading", { name: "Producto 1", exact: true })
+      .waitFor();
+    if ((await page.locator(".cpv-product-item").count()) !== 2)
+      throw Error("Public catalog did not paginate");
+    if (
+      !(await page
+        .getByRole("button", { name: "Agotado", exact: true })
+        .isDisabled())
+    )
+      throw Error("Unavailable product can be purchased");
+    await page
+      .getByRole("button", { name: "Favorito", exact: true })
+      .first()
+      .click();
+    await page
+      .getByRole("button", { name: "Agregar al carrito", exact: true })
+      .click();
+    const intent = await page.evaluate(() => ({
+      cart: window.__catalogCart,
+      favorite: window.__catalogFavorite,
+    }));
+    if (intent.cart?.variantKey !== "unica" || intent.favorite?._id !== "p0")
+      throw Error("Commercial catalog actions disconnected");
+    await page.getByRole("button", { name: "Siguiente", exact: true }).click();
+    await page.getByText("Página 2 de 4", { exact: true }).waitFor();
+    await page
+      .getByRole("textbox", { name: "Buscar productos" })
+      .fill("Producto 8");
+    await page
+      .getByRole("textbox", { name: "Buscar productos" })
+      .press("Enter");
+    await page
+      .getByRole("heading", { name: "Producto 8", exact: true })
+      .waitFor();
+    if (new URL(page.url()).searchParams.has("page"))
+      throw Error("Search did not reset page");
+    await page.goBack();
+    await page.getByText("Página 2 de 4", { exact: true }).waitFor();
+    await page.reload();
+    await page.getByText("Página 2 de 4", { exact: true }).waitFor();
+    if (new URL(page.url()).searchParams.get("utm_source") !== "qa")
+      throw Error("Catalog removed attribution");
+    await page.getByLabel("Ordenar productos").selectOption("price");
+    await page.getByText("Página 1 de 4", { exact: true }).waitFor();
+    if (viewport.width < 768) {
+      await page
+        .getByRole("button", { name: "Mostrar/ocultar filtros" })
+        .click();
+      await page
+        .getByRole("dialog", { name: "Filtros", exact: true })
+        .waitFor();
+      await page.getByRole("button", { name: "rojo", exact: true }).click();
+      await page.keyboard.press("Escape");
+      if (
+        await page.getByRole("dialog", { name: "Filtros", exact: true }).count()
+      )
+        throw Error("Filter drawer did not close");
+    } else
+      await page.getByRole("button", { name: "rojo", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "Producto 1", exact: true })
+      .waitFor();
+    if (new URL(page.url()).searchParams.get("colors") !== "rojo")
+      throw Error("Filter changed the color identity");
+    if (
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth + 1,
+      )
+    )
+      throw Error("Public catalog overflows");
+    await page
+      .locator(".cpv-product-item img")
+      .evaluateAll((images) =>
+        Promise.all(images.map((image) => image.decode().catch(() => {}))),
+      );
+    await page.screenshot({
+      path: artifactDirectory + "/catalog-plus-" + viewport.width + ".png",
+      fullPage: true,
+      animations: "disabled",
+    });
+    console.log(
+      JSON.stringify({
+        publicCatalog: true,
+        width: viewport.width,
+        pagination: true,
+        history: true,
+        inventory: true,
+        variantCart: true,
+        favorites: true,
+        colors: true,
+      }),
+    );
+  }
   if (errors.length) throw Error("Browser errors " + JSON.stringify(errors));
   console.log(
     JSON.stringify({

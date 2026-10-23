@@ -216,6 +216,7 @@
     "test:qa-catalog-50": "node scripts/testQa50CatalogFixtureFactory.js",
     "test:product-code-index-migration": "node scripts/testProductCommercialCodeIndexMigration.js",
     "test:product-code-indexes-physical": "node scripts/testProductCommercialCodeIndexesPhysical.js",
+    "test:catalog-plus": "node scripts/testCatalogPlus.js",
     "test:product-pagination": "node scripts/testProductPaginationIntegrity.js",
     "product-code-indexes:migrate": "node scripts/migrateProductCommercialCodeIndexes.js",
     "test:products-catalog-operations": "node scripts/testProductsCatalogOperations.js",

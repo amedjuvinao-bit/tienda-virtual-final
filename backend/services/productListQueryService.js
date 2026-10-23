@@ -346,8 +346,10 @@ function normalizeFacetValues(values = []) {
     .slice(0, 500);
 }
 
-async function listPublicProductFacets({ ProductModel = Product } = {}) {
-  const filter = buildPublicProductFilter();
+async function listPublicProductFacets({ ProductModel = Product, query = {} } = {}) {
+  // Facets describe this catalog's source, before the customer's filters.
+  const options = parsePublicProductListQuery({ categoryScope: query.categoryScope, productKeys: query.productKeys });
+  const filter = buildPublicProductListFilter(options);
   const [category, categories, colors, variantColors] = await Promise.all([
     ProductModel.distinct('category', filter),
     ProductModel.distinct('categories', filter),

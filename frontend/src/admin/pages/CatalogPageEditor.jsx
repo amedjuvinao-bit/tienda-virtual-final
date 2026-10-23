@@ -6,6 +6,7 @@ import PageLoadState from "./workspace/PageLoadState";
 import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
 import SectionCard from "./workspace/EditorSection";
 import usePageDraft from "./workspace/usePageDraft";
+import { buildSafeCatalogConfig, buildSafeCardUiConfig, buildSafeFilterUiConfig, buildSafeColumnControlsUiConfig } from '../../components/catalog/catalogConfig';
 import { API_BASE_URL } from "../../config/apiBaseUrl";
 
 const API_BASE = API_BASE_URL;
@@ -124,6 +125,7 @@ const ColorInput = ({ label, value, onChange }) => {
       <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
         <input
           type="color"
+          aria-label={`Elegir ${label.toLowerCase()}`}
           value={safeValue}
           onChange={(e) => onChange({ target: { value: e.target.value } })}
           className="h-10 w-12 cursor-pointer rounded border border-gray-200 bg-white"
@@ -131,6 +133,7 @@ const ColorInput = ({ label, value, onChange }) => {
 
         <input
           type="text"
+          aria-label={label}
           value={value || ""}
           onChange={(e) => onChange({ target: { value: e.target.value } })}
           className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none"
@@ -202,281 +205,6 @@ function dedupeCaseInsensitive(list) {
 
 function listToCsv(list) {
   return dedupeCaseInsensitive(list).join(", ");
-}
-
-function buildSafeFilterUiConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    panelBg: typeof cfg.panelBg === "string" ? cfg.panelBg : "#ffffff",
-    panelBorderColor:
-      typeof cfg.panelBorderColor === "string" ? cfg.panelBorderColor : "#ead7aa",
-    panelTitleColor:
-      typeof cfg.panelTitleColor === "string" ? cfg.panelTitleColor : "#111827",
-    panelSubtitleColor:
-      typeof cfg.panelSubtitleColor === "string" ? cfg.panelSubtitleColor : "#6b7280",
-    sectionHeaderBg:
-      typeof cfg.sectionHeaderBg === "string" ? cfg.sectionHeaderBg : "#fff8fb",
-    sectionHeaderTextColor:
-      typeof cfg.sectionHeaderTextColor === "string"
-        ? cfg.sectionHeaderTextColor
-        : "#1f2937",
-    accentColor:
-      typeof cfg.accentColor === "string" ? cfg.accentColor : "#ec4899",
-    accentColor2:
-      typeof cfg.accentColor2 === "string" ? cfg.accentColor2 : "#d4af37",
-    chipBg: typeof cfg.chipBg === "string" ? cfg.chipBg : "#ffffff",
-    chipTextColor:
-      typeof cfg.chipTextColor === "string" ? cfg.chipTextColor : "#374151",
-    radiusPx: clampInt(cfg.radiusPx, 8, 40, 22),
-    sectionRadiusPx: clampInt(cfg.sectionRadiusPx, 6, 32, 18),
-    borderWidthPx: clampInt(cfg.borderWidthPx, 1, 4, 1),
-    shadowStyle:
-      cfg.shadowStyle === "none" ||
-      cfg.shadowStyle === "soft" ||
-      cfg.shadowStyle === "medium" ||
-      cfg.shadowStyle === "strong"
-        ? cfg.shadowStyle
-        : "soft",
-    sectionGapPx: clampInt(cfg.sectionGapPx, 8, 40, 20),
-    colorDotSizePx: clampInt(cfg.colorDotSizePx, 16, 40, 26),
-    titleSizePx: clampInt(cfg.titleSizePx, 16, 32, 22),
-    sectionTitleSizePx: clampInt(cfg.sectionTitleSizePx, 13, 24, 17),
-    contentTextSizePx: clampInt(cfg.contentTextSizePx, 11, 20, 14),
-    animation:
-      cfg.animation === "none" ||
-      cfg.animation === "soft" ||
-      cfg.animation === "fade" ||
-      cfg.animation === "slide"
-        ? cfg.animation
-        : "soft",
-    showSectionIcons: cfg.showSectionIcons !== false,
-    showCounters: cfg.showCounters !== false,
-    showSelectedSummary: cfg.showSelectedSummary !== false,
-    categoriesSearchEnabled: cfg.categoriesSearchEnabled !== false,
-    stickyHeader: cfg.stickyHeader === true,
-  };
-}
-
-function buildSafeCardUiConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    cardBg: typeof cfg.cardBg === "string" ? cfg.cardBg : "#ffffff",
-    cardBorderColor:
-      typeof cfg.cardBorderColor === "string" ? cfg.cardBorderColor : "#ecdcb6",
-    cardBorderWidthPx: clampInt(cfg.cardBorderWidthPx, 0, 6, 1),
-    cardRadiusPx: clampInt(cfg.cardRadiusPx, 8, 40, 28),
-    cardPaddingPx: clampInt(cfg.cardPaddingPx, 0, 40, 12),
-    cardShadowStyle:
-      cfg.cardShadowStyle === "none" ||
-      cfg.cardShadowStyle === "soft" ||
-      cfg.cardShadowStyle === "medium" ||
-      cfg.cardShadowStyle === "strong"
-        ? cfg.cardShadowStyle
-        : "soft",
-
-    imageBg: typeof cfg.imageBg === "string" ? cfg.imageBg : "#faf8f3",
-    imageRadiusPx: clampInt(cfg.imageRadiusPx, 0, 40, 24),
-    imageFit:
-      cfg.imageFit === "cover" || cfg.imageFit === "contain" ? cfg.imageFit : "cover",
-
-    titleColor: typeof cfg.titleColor === "string" ? cfg.titleColor : "#2f3440",
-    priceColor: typeof cfg.priceColor === "string" ? cfg.priceColor : "#e54497",
-    oldPriceColor:
-      typeof cfg.oldPriceColor === "string" ? cfg.oldPriceColor : "#9ca3af",
-    metaColor: typeof cfg.metaColor === "string" ? cfg.metaColor : "#6b7280",
-
-    buttonBg: typeof cfg.buttonBg === "string" ? cfg.buttonBg : "#ffffff",
-    favoriteButtonBg:
-      typeof cfg.favoriteButtonBg === "string" ? cfg.favoriteButtonBg : "#ffffff",
-    cartButtonBg:
-      typeof cfg.cartButtonBg === "string" ? cfg.cartButtonBg : "#ffffff",
-
-    favoriteButtonOpacity: clampNumber(cfg.favoriteButtonOpacity, 0, 1, 1),
-    cartButtonOpacity: clampNumber(cfg.cartButtonOpacity, 0, 1, 1),
-
-    buttonTextColor:
-      typeof cfg.buttonTextColor === "string" ? cfg.buttonTextColor : "#ffffff",
-    actionButtonBorderColor:
-      typeof cfg.actionButtonBorderColor === "string"
-        ? cfg.actionButtonBorderColor
-        : "#ffffff",
-    actionButtonBorderWidthPx: clampInt(cfg.actionButtonBorderWidthPx, 0, 4, 1),
-
-    cartIconColor:
-      typeof cfg.cartIconColor === "string" ? cfg.cartIconColor : "#D4AF37",
-
-    favoriteIconColor:
-      typeof cfg.favoriteIconColor === "string" ? cfg.favoriteIconColor : "#d946ef",
-    favoriteActiveColor:
-      typeof cfg.favoriteActiveColor === "string"
-        ? cfg.favoriteActiveColor
-        : "#D4AF37",
-
-    favoriteIconName:
-      cfg.favoriteIconName === "heart" ||
-      cfg.favoriteIconName === "sparkles" ||
-      cfg.favoriteIconName === "star"
-        ? cfg.favoriteIconName
-        : "star",
-
-    cartIconName:
-      cfg.cartIconName === "shopping-bag" ||
-      cfg.cartIconName === "bag-heart" ||
-      cfg.cartIconName === "shopping-cart"
-        ? cfg.cartIconName
-        : "shopping-cart",
-
-    titleFontFamily:
-      cfg.titleFontFamily === "jost" ||
-      cfg.titleFontFamily === "cormorant" ||
-      cfg.titleFontFamily === "playfair" ||
-      cfg.titleFontFamily === "inter" ||
-      cfg.titleFontFamily === "inherit"
-        ? cfg.titleFontFamily
-        : "inherit",
-
-    priceFontFamily:
-      cfg.priceFontFamily === "jost" ||
-      cfg.priceFontFamily === "cormorant" ||
-      cfg.priceFontFamily === "playfair" ||
-      cfg.priceFontFamily === "inter" ||
-      cfg.priceFontFamily === "inherit"
-        ? cfg.priceFontFamily
-        : "inherit",
-
-    metaFontFamily:
-      cfg.metaFontFamily === "jost" ||
-      cfg.metaFontFamily === "cormorant" ||
-      cfg.metaFontFamily === "playfair" ||
-      cfg.metaFontFamily === "inter" ||
-      cfg.metaFontFamily === "inherit"
-        ? cfg.metaFontFamily
-        : "inherit",
-
-    showBorder: cfg.showBorder !== false,
-    showShadow: cfg.showShadow !== false,
-    showImageBg: cfg.showImageBg !== false,
-  };
-}
-
-function buildSafeColumnControlsUiConfig(raw) {
-   const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    buttonBgColor:
-      typeof cfg.buttonBgColor === "string" ? cfg.buttonBgColor : "#ffffff",
-    buttonBorderColor:
-      typeof cfg.buttonBorderColor === "string" ? cfg.buttonBorderColor : "#e8e7eb",
-    buttonIconColor:
-      typeof cfg.buttonIconColor === "string" ? cfg.buttonIconColor : "#D4AF37",
-
-    hoverButtonBgColor:
-      typeof cfg.hoverButtonBgColor === "string"
-        ? cfg.hoverButtonBgColor
-        : "#ffffff",
-    hoverButtonBorderColor:
-      typeof cfg.hoverButtonBorderColor === "string"
-        ? cfg.hoverButtonBorderColor
-        : "#D4AF37",
-    hoverButtonIconColor:
-      typeof cfg.hoverButtonIconColor === "string"
-        ? cfg.hoverButtonIconColor
-        : "#D4AF37",
-
-    activeButtonBgColor:
-      typeof cfg.activeButtonBgColor === "string"
-        ? cfg.activeButtonBgColor
-        : "#fff5fa",
-    activeButtonBorderColor:
-      typeof cfg.activeButtonBorderColor === "string"
-        ? cfg.activeButtonBorderColor
-        : "#ec4899",
-    activeButtonIconColor:
-      typeof cfg.activeButtonIconColor === "string"
-        ? cfg.activeButtonIconColor
-        : "#ec4899",
-
-    buttonRadiusPx: clampInt(cfg.buttonRadiusPx, 8, 24, 12),
-    buttonBorderWidthPx: clampInt(cfg.buttonBorderWidthPx, 1, 4, 1),
-  };
-}
-
-function buildSafeCatalogConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    title: typeof cfg.title === "string" ? cfg.title : "",
-    subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : "",
-    description: typeof cfg.description === "string" ? cfg.description : "",
-    titleMode:
-      cfg.titleMode === "image" || cfg.titleMode === "text" ? cfg.titleMode : "text",
-    titleImage: typeof cfg.titleImage === "string" ? cfg.titleImage : "",
-    titleImageAlt: typeof cfg.titleImageAlt === "string" ? cfg.titleImageAlt : "",
-    showBreadcrumb: cfg.showBreadcrumb !== false,
-    showFilters: cfg.showFilters !== false,
-    showToolbar: cfg.showToolbar !== false,
-    showFilterFab: cfg.showFilterFab !== false,
-    showResultCount: cfg.showResultCount !== false,
-    columnsDesktop: clampInt(cfg.columnsDesktop, 1, 6, 4),
-    columnsTablet: clampInt(cfg.columnsTablet, 1, 4, 3),
-    columnsMobile: clampInt(cfg.columnsMobile, 1, 2, 2),
-    defaultColsDesktop: clampInt(
-      cfg.defaultColsDesktop ?? cfg.columnsDesktop,
-      1,
-      6,
-      clampInt(cfg.columnsDesktop, 1, 6, 4)
-    ),
-    defaultColsMobile: clampInt(
-      cfg.defaultColsMobile ?? cfg.columnsMobile,
-      1,
-      2,
-      clampInt(cfg.columnsMobile, 1, 2, 2)
-    ),
-    limit: clampInt(cfg.limit, 0, 200, 0),
-
-    sourceMode:
-      cfg.sourceMode === "categories" || cfg.sourceMode === "manual"
-        ? cfg.sourceMode
-        : "all",
-
-    allowedCategoriesText:
-      typeof cfg.allowedCategoriesText === "string"
-        ? normalizeCsvText(cfg.allowedCategoriesText)
-        : "",
-
-    manualProductIdsText:
-      typeof cfg.manualProductIdsText === "string"
-        ? normalizeCsvText(cfg.manualProductIdsText)
-        : "",
-
-    onlyActive: cfg.onlyActive !== false,
-
-    initialCategoriesText:
-      typeof cfg.initialCategoriesText === "string"
-        ? normalizeCsvText(cfg.initialCategoriesText)
-        : "",
-    initialColorsText:
-      typeof cfg.initialColorsText === "string"
-        ? normalizeCsvText(cfg.initialColorsText)
-        : "",
-    initialMinPrice: clampNumber(cfg.initialMinPrice, 0, 10000000, 0),
-    initialMaxPrice: clampNumber(cfg.initialMaxPrice, 0, 10000000, 10000000),
-    emptyTitle:
-      typeof cfg.emptyTitle === "string" && cfg.emptyTitle.trim()
-        ? cfg.emptyTitle
-        : "No se encontraron productos",
-    emptyText:
-      typeof cfg.emptyText === "string" && cfg.emptyText.trim()
-        ? cfg.emptyText
-        : "Intenta cambiar los filtros para ver más resultados.",
-    filterUiConfig: buildSafeFilterUiConfig(cfg.filterUiConfig),
-    cardUiConfig: buildSafeCardUiConfig(cfg.cardUiConfig),
-    columnControlsUiConfig: buildSafeColumnControlsUiConfig(
-      cfg.columnControlsUiConfig
-    ),
-  };
 }
 
 function MiniTabButton({ active, onClick, children }) {
@@ -601,7 +329,7 @@ function ManualProductsPicker({
         const title = String(product?.title || product?.name || "").toLowerCase();
         const slug = String(product?.slug || "").toLowerCase();
         const id = String(product?._id || "").toLowerCase();
-        return title.includes(q) || slug.includes(q) || id.includes(q);
+        return [title, slug, id, product.sku, product.barcode, ...(product.variants || []).flatMap(v => [v.sku, v.barcode])].some(value => String(value || '').toLowerCase().includes(q));
       })
       .slice(0, 20);
   }, [allProducts, query]);
@@ -620,6 +348,7 @@ function ManualProductsPicker({
       <Input
         label="Buscar productos"
         value={query}
+        maxLength={160}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Busca por nombre o referencia"
       />
@@ -735,6 +464,8 @@ export default function CatalogPageEditor() {
   const [allProducts, setAllProducts] = useState([]);
   const [availableProductCategories, setAvailableProductCategories] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productsError, setProductsError] = useState('');
+  const selectedKeysRef = useRef([]), productRequests = useRef(0);
 
   const [titleImageFile, setTitleImageFile] = useState(null);
   const [titleImagePreview, setTitleImagePreview] = useState("");
@@ -782,6 +513,8 @@ export default function CatalogPageEditor() {
     () => parseCsvArray(form?.catalogConfig?.manualProductIdsText || ""),
     [form?.catalogConfig?.manualProductIdsText]
   );
+
+  selectedKeysRef.current = selectedManualKeys;
 
   const fetchPage = async () => {
     const sequence = ++loadSequence.current;
@@ -835,14 +568,16 @@ export default function CatalogPageEditor() {
   };
 
   const fetchProducts = useCallback(async (query = '', productKeys = []) => {
+    productRequests.current++;
     try {
       setLoadingProducts(true);
+      setProductsError('');
       const params = new URLSearchParams({
         page: '1',
         limit: query ? '20' : '40',
         sort: 'title',
       });
-      if (query) params.set('q', query);
+      if (query) params.set('q', query.trim().slice(0, 160));
       productKeys.forEach((value) => params.append('productKeys', value));
       const [productsResponse, metaResponse] = await Promise.all([
         adminFetch(`${API_BASE}/api/products?${params.toString()}`),
@@ -855,13 +590,16 @@ export default function CatalogPageEditor() {
       const incoming = Array.isArray(data?.products) ? data.products : [];
       setAllProducts((current) => {
         const byId = new Map(
-          [...current, ...incoming].map((product) => [
+          [...incoming, ...current].map((product) => [
             String(product?._id || product?.slug || ''),
             product,
           ])
         );
         byId.delete('');
-        return [...byId.values()];
+        const values = [...byId.values()];
+        const selected = values.filter(p => selectedKeysRef.current.includes(String(p._id)) || selectedKeysRef.current.includes(p.slug));
+        const bounded = new Map([...selected, ...values.slice(0, 100)].map(p => [String(p._id || p.slug), p]));
+        return [...bounded.values()];
       });
       if (metaResponse?.ok) {
         const meta = await metaResponse.json();
@@ -871,8 +609,10 @@ export default function CatalogPageEditor() {
       }
     } catch (error) {
       console.error("Error cargando productos del editor catálogo:", error);
+      setProductsError('No pudimos cargar los productos disponibles. Revisa tu conexión y vuelve a intentarlo.');
     } finally {
-      setLoadingProducts(false);
+      productRequests.current--;
+      setLoadingProducts(productRequests.current > 0);
     }
   }, []);
 
@@ -1085,6 +825,14 @@ export default function CatalogPageEditor() {
       setSaving(true);
 
       const safeCatalogConfig = buildSafeCatalogConfig(form.catalogConfig);
+      const allowed = parseCsvArray(safeCatalogConfig.allowedCategoriesText);
+      const manual = parseCsvArray(safeCatalogConfig.manualProductIdsText);
+      if (safeCatalogConfig.sourceMode === 'categories' && (!allowed.length || allowed.length > 30)) {
+        draft.notify('Selecciona entre 1 y 30 categorías para este catálogo.'); return;
+      }
+      if (safeCatalogConfig.sourceMode === 'manual' && (!manual.length || manual.length > 100)) {
+        draft.notify('Selecciona entre 1 y 100 productos para este catálogo.'); return;
+      }
 
       if (safeCatalogConfig.initialMinPrice > safeCatalogConfig.initialMaxPrice) {
         draft.notify("El precio mínimo inicial no puede ser mayor que el precio máximo inicial.");
@@ -1284,6 +1032,8 @@ export default function CatalogPageEditor() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
+            <Toggle label="Mostrar distintivo del catálogo" checked={form.catalogConfig.showHeroBadge} onChange={value => updateCatalogConfig({ showHeroBadge: value })}/>
+            <Input label="Texto del distintivo" value={form.catalogConfig.heroBadge} onChange={e => updateCatalogConfig({ heroBadge: e.target.value })}/>
             <Input
               label="Título del catálogo"
               value={form.catalogConfig.title}
@@ -1386,6 +1136,7 @@ export default function CatalogPageEditor() {
 
       {activeTab === "products" && (
         <div className="space-y-4">
+          {productsError && <p role="alert" className="text-sm">{productsError} <button type="button" onClick={() => fetchProducts()}>Reintentar productos</button></p>}
           <div className="rounded-2xl border border-gray-200 bg-white p-3">
             <div className="flex flex-wrap gap-2">
               {PRODUCT_SUBTABS.map((tab) => (
@@ -1417,11 +1168,7 @@ export default function CatalogPageEditor() {
                 <option value="manual">Selección manual</option>
               </Select>
 
-              <Toggle
-                label="Mostrar solo productos activos"
-                checked={form.catalogConfig.onlyActive}
-                onChange={(value) => updateCatalogConfig({ onlyActive: value })}
-              />
+              <p className="text-sm text-gray-500">La tienda muestra únicamente productos activos, visibles y sin archivar.</p>
             </SectionCard>
           )}
 
@@ -1552,7 +1299,7 @@ export default function CatalogPageEditor() {
             >
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <Toggle
-                  label="Mostrar breadcrumb"
+                  label="Mostrar ruta de navegación"
                   checked={form.catalogConfig.showBreadcrumb}
                   onChange={(value) =>
                     updateCatalogConfig({ showBreadcrumb: value })
@@ -1565,8 +1312,13 @@ export default function CatalogPageEditor() {
                   onChange={(value) => updateCatalogConfig({ showFilters: value })}
                 />
 
+                <Toggle label="Mostrar búsqueda de productos" checked={form.catalogConfig.showSearch} onChange={value => updateCatalogConfig({ showSearch: value })}/>
+                <Toggle label="Mostrar orden de productos" checked={form.catalogConfig.showSort} onChange={value => updateCatalogConfig({ showSort: value })}/>
+                <Select label="Orden inicial" value={form.catalogConfig.defaultSort} onChange={e => updateCatalogConfig({ defaultSort: e.target.value })}>
+                  <option value="-createdAt">Más recientes</option><option value="createdAt">Más antiguos</option><option value="title">Nombre: A a Z</option><option value="-title">Nombre: Z a A</option><option value="price">Menor precio</option><option value="-price">Mayor precio</option>
+                </Select>
                 <Toggle
-                  label="Mostrar toolbar"
+                  label="Mostrar barra de resultados"
                   checked={form.catalogConfig.showToolbar}
                   onChange={(value) => updateCatalogConfig({ showToolbar: value })}
                 />
@@ -2333,14 +2085,14 @@ export default function CatalogPageEditor() {
             </div>
 
             <Input
-              label="Límite inicial de productos (0 = sin límite)"
+              label="Productos por página (0 usa 24)"
               type="number"
               min="0"
-              max="200"
+              max="100"
               value={form.catalogConfig.limit}
               onChange={(e) =>
                 updateCatalogConfig({
-                  limit: clampInt(e.target.value, 0, 200, 0),
+                  limit: clampInt(e.target.value, 0, 100, 0),
                 })
               }
             />

@@ -70,7 +70,7 @@
     "test:admin-security-stage5": "vitest run src/admin/security/AdminSecurityAlertsStage5.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx",
-    "test:pages-module": "vitest run src/lib/api.adminFetch.test.js src/admin/pages src/admin/components/adminNavigationIdentity.test.js src/pages/ProductDetail.test.jsx src/components/ProductCard.quickAdd.test.js",
+    "test:pages-module": "vitest run src/components/catalog src/lib/api.adminFetch.test.js src/admin/pages src/admin/components/adminNavigationIdentity.test.js src/pages/ProductDetail.test.jsx src/components/ProductCard.quickAdd.test.js",
     "test:e2e:pages-module": "node e2e/pagesWorkspace.e2e.js"
   },
   "dependencies": {

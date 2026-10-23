@@ -1,5 +1,5 @@
 // src/components/FilterSidebar.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useId } from "react";
 import { Range } from "react-range";
 import {
   ChevronDown,
@@ -9,8 +9,8 @@ import {
   Palette,
   BadgeDollarSign,
 } from "lucide-react";
-import api from "../lib/api";
-import { normalizeFilterCategories } from "./filterSidebarMeta";
+import useCatalogFacets from "./catalog/useCatalogFacets";
+import { prettyColor, normalizeToCss } from "./catalog/catalogColors";
 
 // ===== Precio =====
 const MIN_PRICE = 0;
@@ -18,144 +18,18 @@ const MAX_PRICE = 10_000_000;
 const STEP_PRICE = 10_000;
 const formatMoney = (n) => Number(n || 0).toLocaleString("es-CO");
 
-// ===== Sugerencias (fallback) =====
-const SUGGESTED_CATEGORIES = [
-  "Vestidos cortos",
-  "Vestidos largos",
-  "Conjuntos",
-  "Pantalones",
-  "Jeans",
-  "Shorts",
-  "Faldas",
-  "Blusas",
-  "Pijamas",
-  "Abrigos",
-  "Accesorios",
-];
-
-const COLORS_FALLBACK = [
-  "#6fd2c5",
-  "#ffe991",
-  "#a9d4ed",
-  "#fae1b8",
-  "#ffffff",
-  "#cfa8e0",
-  "#eacbcb",
-  "#ff7bac",
-  "#fbb2d3",
-  "#ff8c94",
-];
-
-// ===== Util colores =====
-const COLOR_LABELS = {
-  "#d4af37": "Dorado",
-  "#6fd2c5": "Aqua pastel",
-  "#ffe991": "Amarillo pastel",
-  "#a9d4ed": "Azul pastel",
-  "#fae1b8": "Durazno",
-  "#ffffff": "Blanco",
-  "#cfa8e0": "Lila",
-  "#eacbcb": "Rosa claro",
-  "#ff7bac": "Rosa",
-  "#fbb2d3": "Rosa suave",
-  "#ff8c94": "Coral",
-  "#000000": "Negro",
-  "#ff69b4": "Rosa",
-  "#ff1493": "Fucsia",
-  "#0000ff": "Azul",
-  "#00ff00": "Verde",
-  "#ff0000": "Rojo",
-};
-
-const NAME_ALIASES = {
-  negro: "#000000",
-  blanco: "#ffffff",
-  rojo: "#ff0000",
-  verde: "#00ff00",
-  azul: "#0000ff",
-  fucsia: "#ff1493",
-  rosa: "#ff69b4",
-  "rosa palo": "#f4a2b7",
-  celeste: "#87ceeb",
-  dorado: "#d4af37",
-  morado: "#800080",
-  lila: "#cfa8e0",
-  coral: "#ff8c94",
-};
-
-const prettyColor = (c) => COLOR_LABELS[String(c || "").toLowerCase()] || c;
-
-const isValidCssColor = (c) => {
-  if (!c) return false;
-  const s = new Option().style;
-  s.color = "";
-  s.color = c;
-  return s.color !== "";
-};
-
-const normalizeToCss = (c) => {
-  if (!c) return "";
-  if (typeof c === "object") {
-    const raw = c?.hex || c?.value || c?.name || "";
-    return normalizeToCss(raw);
-  }
-  const raw = String(c).trim();
-  if (isValidCssColor(raw)) return raw;
-  const alias = NAME_ALIASES[raw.toLowerCase()];
-  return alias && isValidCssColor(alias) ? alias : "";
-};
-
-const buildPalette = (arr) => {
-  const out = [];
+const buildPalette = (values) => {
   const seen = new Set();
-  for (const c of arr) {
-    const n = normalizeToCss(c);
-    if (!n) continue;
-    const key = n.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(n);
-  }
-  return out;
-};
-
-// Extrae colores de productos
-const extractColorsFromProducts = (list) => {
-  const collected = [];
-  for (const p of Array.isArray(list) ? list : []) {
-    const arr = Array.isArray(p?.colors) ? p.colors : [];
-    for (const c of arr) collected.push(c);
-  }
-  return buildPalette(collected);
-};
-
-// Extrae categorías (cuenta ocurrencias)
-const extractCategoriesFromProducts = (list) => {
-  const counts = new Map();
-  for (const p of Array.isArray(list) ? list : []) {
-    const arr =
-      Array.isArray(p?.categories) && p.categories.length
-        ? p.categories
-        : p?.category
-          ? [p.category]
-          : [];
-    for (const raw of arr) {
-      const name = String(raw || "").trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      counts.set(key, { name, count: (counts.get(key)?.count || 0) + 1 });
-    }
-  }
-
-  if (counts.size === 0) {
-    for (const s of SUGGESTED_CATEGORIES) {
-      counts.set(s.toLowerCase(), { name: s, count: 0 });
-    }
-  }
-
-  return Array.from(counts.values()).sort(
-    (a, b) => b.count - a.count || a.name.localeCompare(b.name)
-  );
+  return values.flatMap((color) => {
+    const value = String(
+      typeof color === "object"
+        ? color?.value || color?.hex || color?.name || ""
+        : color || "",
+    ).trim();
+    if (!value || seen.has(value.toLowerCase())) return [];
+    seen.add(value.toLowerCase());
+    return [{ value, css: normalizeToCss(value), label: prettyColor(value) }];
+  });
 };
 
 function clampNumber(value, min, max, fallback) {
@@ -202,7 +76,8 @@ function buildSafeUiConfig(raw) {
         ? cfg.panelTitleColor
         : "#111827",
     panelSubtitleColor:
-      typeof cfg.panelSubtitleColor === "string" && cfg.panelSubtitleColor.trim()
+      typeof cfg.panelSubtitleColor === "string" &&
+      cfg.panelSubtitleColor.trim()
         ? cfg.panelSubtitleColor
         : "#6b7280",
     sectionHeaderBg:
@@ -304,7 +179,7 @@ function FilterSection({
         style={{
           background: `linear-gradient(135deg, ${hexToRgba(
             ui.sectionHeaderBg,
-            0.95
+            0.95,
           )} 0%, rgba(255,255,255,0.96) 100%)`,
           color: ui.sectionHeaderTextColor,
         }}
@@ -319,7 +194,7 @@ function FilterSection({
                 height: isMobile ? "38px" : "38px",
                 background: `linear-gradient(135deg, ${hexToRgba(
                   ui.accentColor2,
-                  0.18
+                  0.18,
                 )}, ${hexToRgba(ui.accentColor, 0.16)})`,
                 color: ui.accentColor,
                 boxShadow: `inset 0 1px 0 rgba(255,255,255,0.8)`,
@@ -359,7 +234,7 @@ function FilterSection({
       {isOpen && (
         <div
           className={`px-3 pb-3 pt-3 sm:px-4 sm:pb-4 ${getSectionAnimationClass(
-            ui.animation
+            ui.animation,
           )}`}
           style={{
             fontSize: `${isMobile ? Math.max(ui.contentTextSizePx - 1, 12) : ui.contentTextSizePx}px`,
@@ -380,6 +255,7 @@ export default function FilterSidebar({
   priceRange = [MIN_PRICE, MAX_PRICE],
   onPriceChange = () => {},
   filterUiConfig = {},
+  catalogConfig,
 }) {
   const ui = useMemo(() => buildSafeUiConfig(filterUiConfig), [filterUiConfig]);
 
@@ -387,12 +263,17 @@ export default function FilterSidebar({
   const [openColors, setOpenColors] = useState(true);
   const [openPrice, setOpenPrice] = useState(true);
 
-  const [availableColors, setAvailableColors] = useState([]);
-  const [availableCategories, setAvailableCategories] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const {
+    colors: availableColors,
+    categories: availableCategories,
+    loading,
+    error: metaError,
+    retry: fetchMeta,
+  } = useCatalogFacets(catalogConfig);
+  const categoryPrefix = useId();
   const [categorySearch, setCategorySearch] = useState("");
   const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 768 : false
+    typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
 
   useEffect(() => {
@@ -400,29 +281,6 @@ export default function FilterSidebar({
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const fetchMeta = async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get(`/api/products/meta`, {
-        params: { _: Date.now() },
-      });
-      setAvailableColors(
-        Array.isArray(data?.colors) ? data.colors : []
-      );
-      setAvailableCategories(
-        normalizeFilterCategories(data?.categories)
-      );
-    } catch (error) {
-      console.error("Error cargando metadatos del filtro:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMeta();
   }, []);
 
   const refreshOnOpen = (setter, current) => {
@@ -433,7 +291,7 @@ export default function FilterSidebar({
 
   const paletteToUse = buildPalette([
     ...(availableColors || []),
-    ...COLORS_FALLBACK,
+    ...selectedColors,
   ]);
 
   const toggleCategory = (name) => {
@@ -448,7 +306,7 @@ export default function FilterSidebar({
   };
 
   const toggleColor = (c) => {
-    const normalized = normalizeToCss(c);
+    const normalized = String(c || "").trim();
     if (!normalized) return;
     const key = normalized.toLowerCase();
     const exists = selectedColors.some((s) => s.toLowerCase() === key);
@@ -483,10 +341,14 @@ export default function FilterSidebar({
     ]);
 
   const filteredCategories = useMemo(() => {
-    const query = String(categorySearch || "").trim().toLowerCase();
+    const query = String(categorySearch || "")
+      .trim()
+      .toLowerCase();
     if (!query) return availableCategories;
     return availableCategories.filter(({ name }) =>
-      String(name || "").toLowerCase().includes(query)
+      String(name || "")
+        .toLowerCase()
+        .includes(query),
     );
   }, [availableCategories, categorySearch]);
 
@@ -503,6 +365,14 @@ export default function FilterSidebar({
         gap: `${isMobile ? Math.max(ui.sectionGapPx - 6, 12) : ui.sectionGapPx}px`,
       }}
     >
+      {metaError && (
+        <p role="alert" className="text-sm">
+          {metaError}{" "}
+          <button type="button" onClick={fetchMeta}>
+            Reintentar filtros
+          </button>
+        </p>
+      )}
       <div
         className={`overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
         style={{
@@ -510,7 +380,7 @@ export default function FilterSidebar({
           border: `${ui.borderWidthPx}px solid ${hexToRgba(ui.panelBorderColor, 0.95)}`,
           background: `linear-gradient(145deg, rgba(255,255,255,0.97) 0%, ${hexToRgba(
             ui.accentColor2,
-            0.10
+            0.1,
           )} 40%, ${hexToRgba(ui.accentColor, 0.08)} 100%)`,
           boxShadow:
             "0 16px 34px rgba(180,150,60,0.08), 0 6px 18px rgba(236,72,153,0.05)",
@@ -550,7 +420,7 @@ export default function FilterSidebar({
                   fontSize: `${isMobile ? 12 : Math.max(ui.contentTextSizePx - 1, 11)}px`,
                 }}
               >
-                Ajusta categorías, colores y precio para descubrir tu estilo.
+                Ajusta categorías, colores y precio para encontrar productos.
               </p>
             </div>
           </div>
@@ -562,7 +432,7 @@ export default function FilterSidebar({
                 style={{
                   background: `linear-gradient(135deg, ${hexToRgba(
                     ui.accentColor,
-                    0.12
+                    0.12,
                   )}, ${hexToRgba(ui.accentColor2, 0.14)})`,
                   color: ui.accentColor,
                   border: `1px solid ${hexToRgba(ui.accentColor, 0.12)}`,
@@ -595,7 +465,11 @@ export default function FilterSidebar({
         isOpen={openCats}
         onToggle={() => refreshOnOpen(setOpenCats, openCats)}
         ui={ui}
-        badge={ui.showCounters ? `${availableCategories.length} disponibles` : null}
+        badge={
+          ui.showCounters
+            ? `${availableCategories.length} ${availableCategories.length === 1 ? "disponible" : "disponibles"}`
+            : null
+        }
         isMobile={isMobile}
       >
         {ui.categoriesSearchEnabled && (
@@ -644,9 +518,9 @@ export default function FilterSidebar({
           <ul className="max-h-60 sm:max-h-72 space-y-2 overflow-auto pr-1">
             {filteredCategories.map(({ name, count }) => {
               const checked = selectedCategories.some(
-                (c) => c.toLowerCase() === name.toLowerCase()
+                (c) => c.toLowerCase() === name.toLowerCase(),
               );
-              const safeId = `cat-${name
+              const safeId = `${categoryPrefix}-cat-${name
                 .replace(/\s+/g, "-")
                 .replace(/[^a-zA-Z0-9_-]/g, "")
                 .toLowerCase()}`;
@@ -663,8 +537,8 @@ export default function FilterSidebar({
                       background: checked
                         ? `linear-gradient(135deg, ${hexToRgba(
                             ui.accentColor,
-                            0.09
-                          )} 0%, ${hexToRgba(ui.accentColor2, 0.10)} 100%)`
+                            0.09,
+                          )} 0%, ${hexToRgba(ui.accentColor2, 0.1)} 100%)`
                         : "rgba(255,255,255,0.9)",
                       color: ui.chipTextColor,
                       boxShadow: checked
@@ -685,7 +559,9 @@ export default function FilterSidebar({
                       </span>
                     </div>
 
-                    {ui.showCounters && typeof count === "number" ? (
+                    {ui.showCounters &&
+                    typeof count === "number" &&
+                    count > 0 ? (
                       <span
                         className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
                         style={{
@@ -712,7 +588,11 @@ export default function FilterSidebar({
         isOpen={openColors}
         onToggle={() => refreshOnOpen(setOpenColors, openColors)}
         ui={ui}
-        badge={ui.showCounters ? `${paletteToUse.length} tonos disponibles` : null}
+        badge={
+          ui.showCounters
+            ? `${paletteToUse.length} ${paletteToUse.length === 1 ? "tono disponible" : "tonos disponibles"}`
+            : null
+        }
         isMobile={isMobile}
       >
         {loading ? (
@@ -730,16 +610,16 @@ export default function FilterSidebar({
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-6">
-            {paletteToUse.map((c, i) => {
+            {paletteToUse.map(({ value: c, css, label }, i) => {
               const isSelected = selectedColors.some(
-                (s) => s.toLowerCase() === String(c).toLowerCase()
+                (s) => s.toLowerCase() === String(c).toLowerCase(),
               );
 
               return (
                 <button
                   key={`${c}-${i}`}
                   type="button"
-                  title={prettyColor(c)}
+                  title={label}
                   onClick={() => toggleColor(c)}
                   className={`relative mx-auto rounded-full border transition-all duration-200 ${
                     isSelected
@@ -749,7 +629,7 @@ export default function FilterSidebar({
                   style={{
                     width: `${dotSize}px`,
                     height: `${dotSize}px`,
-                    backgroundColor: c,
+                    backgroundColor: css || "#f1edf3",
                     borderColor: isSelected ? ui.accentColor : "#d1d5db",
                     boxShadow: isSelected
                       ? `0 0 0 5px ${hexToRgba(ui.accentColor, 0.16)}`
@@ -757,8 +637,13 @@ export default function FilterSidebar({
                         ? "inset 0 0 0 1px #d1d5db"
                         : "0 6px 14px rgba(0,0,0,0.04)",
                   }}
-                  aria-label={prettyColor(c)}
-                />
+                  aria-label={label}
+                  aria-pressed={isSelected}
+                >
+                  {!css && (
+                    <span style={{ fontSize: 9 }}>{label.slice(0, 2)}</span>
+                  )}
+                </button>
               );
             })}
           </div>
@@ -792,7 +677,11 @@ export default function FilterSidebar({
                 const rightPct = 100 - (safeRange[1] / MAX_PRICE) * 100;
 
                 return (
-                  <div key={key} {...rest} className="relative h-14 select-none">
+                  <div
+                    key={key}
+                    {...rest}
+                    className="relative h-14 select-none"
+                  >
                     <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-gray-200" />
                     <div
                       className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full"
