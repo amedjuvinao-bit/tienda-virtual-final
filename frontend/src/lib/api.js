@@ -37,7 +37,9 @@ export async function adminFetch(input, init) {
     !url.includes('/api/site-settings') && !url.includes('/api/admin/auth/');
   if (track) changeAdminRouteRequestCount(pathname, 1);
   try {
-    return await fetch(input, init);
+    // The API may use another origin (for example localhost:5000).
+    // Admin access uses an HttpOnly cookie, including for writes and uploads.
+    return await fetch(input, { credentials: 'include', ...init });
   } finally {
     if (track) changeAdminRouteRequestCount(pathname, -1);
   }

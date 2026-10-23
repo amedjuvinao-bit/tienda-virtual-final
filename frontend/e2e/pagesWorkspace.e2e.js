@@ -93,6 +93,12 @@ const fixture = `import React from'react';import{createRoot}from'react-dom/clien
 const server = await createServer({
   root,
   cacheDir: "/tmp/pages-ui-vite-cache",
+  // Same site, separate origin: match the frontend/API ports used in development.
+  define: {
+    "import.meta.env.VITE_API_BASE_URL": JSON.stringify(
+      "http://127.0.0.1:5206",
+    ),
+  },
   plugins: [
     {
       name: "pages-ui-audit",
@@ -134,6 +140,15 @@ try {
     headless: true,
   });
   page = await browser.newPage();
+  await page.context().addCookies([
+    {
+      name: "admin_access",
+      value: "pages-session-fixture",
+      url: "http://127.0.0.1:5206",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
   const errors = [];
   page.on("pageerror", (e) => {
     errors.push(e.message);
@@ -150,6 +165,23 @@ try {
         u.pathname.startsWith("/api/pages") &&
         ["POST", "PUT"].includes(method)
       ) {
+        if (
+          !(await route.request().allHeaders()).cookie?.includes(
+            "admin_access=pages-session-fixture",
+          )
+        ) {
+          return route.fulfill({
+            status: 401,
+            contentType: "application/json",
+            headers: {
+              "access-control-allow-origin": "http://127.0.0.1:5205",
+              "access-control-allow-credentials": "true",
+            },
+            body: JSON.stringify({
+              message: "Token de administrador ausente.",
+            }),
+          });
+        }
         writes.push({
           method,
           url: u.pathname,
