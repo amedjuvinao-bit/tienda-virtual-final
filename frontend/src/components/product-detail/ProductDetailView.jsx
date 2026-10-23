@@ -752,6 +752,7 @@ const PD_STYLES = `
 export default function ProductDetailView({
   product,
   config,
+  withChrome = true,
   isFavorite,
   onToggleFavorite,
   onAddToCart,
@@ -1302,7 +1303,7 @@ export default function ProductDetailView({
     <>
       <style>{PD_STYLES}</style>
 
-      <Header />
+      {withChrome && <Header />}
 
       <main
         className="pd-page min-h-screen"
@@ -2532,8 +2533,8 @@ export default function ProductDetailView({
         </div>
       </main>
 
-      <FooterSection />
-      <WhatsAppButton />
+      {withChrome && <FooterSection />}
+      {withChrome && <WhatsAppButton />}
     </>
   );
 }

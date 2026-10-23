@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { MoreHorizontal, Search, X } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { preloadAdminRoute } from '../adminRoutePreload';
+import { isAdminNavigationActive } from './adminNavigationIdentity';
 
 function normalizeSearch(value = '') {
   return String(value)
@@ -13,7 +14,7 @@ function normalizeSearch(value = '') {
 }
 
 function isCurrentPath(pathname, target) {
-  return pathname === target || pathname.startsWith(`${target}/`);
+  return isAdminNavigationActive(pathname, target);
 }
 
 export default function AdminMobileNavigation({ primaryLinks = [], groups = [] }) {

@@ -2,21 +2,25 @@ import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/CatalogPageEditor.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import PageLoadState from "./workspace/PageLoadState";
+import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
+import SectionCard from "./workspace/EditorSection";
+import usePageDraft from "./workspace/usePageDraft";
 import { API_BASE_URL } from "../../config/apiBaseUrl";
 
 const API_BASE = API_BASE_URL;
 
 const EDITOR_TABS = [
-  { id: "general", label: "General" },
-  { id: "header", label: "Encabezado" },
-  { id: "products", label: "Productos" },
-  { id: "visual", label: "Visual" },
-  { id: "grid", label: "Grilla y filtros" },
-  { id: "empty", label: "Estado vacío" },
+  { id: "header", label: "Título y presentación", group: "content" },
+  { id: "products", label: "Productos", group: "content" },
+  { id: "visual", label: "Diseño del catálogo", group: "design" },
+  { id: "grid", label: "Distribución y filtros", group: "options" },
+  { id: "empty", label: "Sin resultados", group: "options" },
+  { id: "general", label: "Datos de la página", group: "settings" },
 ];
 
 const PRODUCT_SUBTABS = [
-  { id: "universe", label: "Universo" },
+  { id: "universe", label: "Origen de productos" },
   { id: "categories", label: "Categorías" },
   { id: "manual", label: "Selección manual" },
 ];
@@ -24,7 +28,7 @@ const PRODUCT_SUBTABS = [
 const VISUAL_SUBTABS = [
   { id: "layout", label: "Estructura" },
   { id: "filter-style", label: "Estilo del filtro" },
-  { id: "card-style", label: "Estilo de cards" },
+  { id: "card-style", label: "Tarjetas de producto" },
 ];
 
 const SHADOW_OPTIONS = [
@@ -37,13 +41,13 @@ const SHADOW_OPTIONS = [
 const FILTER_ANIMATION_OPTIONS = [
   { value: "none", label: "Sin animación" },
   { value: "soft", label: "Suave" },
-  { value: "fade", label: "Fade" },
+  { value: "fade", label: "Desvanecimiento" },
   { value: "slide", label: "Deslizamiento" },
 ];
 
 const CARD_IMAGE_FIT_OPTIONS = [
-  { value: "cover", label: "Cover" },
-  { value: "contain", label: "Contain" },
+  { value: "cover", label: "Cubrir el espacio" },
+  { value: "contain", label: "Mostrar imagen completa" },
 ];
 
 const FAVORITE_ICON_OPTIONS = [
@@ -137,12 +141,6 @@ const ColorInput = ({ label, value, onChange }) => {
   );
 };
 
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
 
 function slugify(value) {
   return String(value || "")
@@ -481,23 +479,6 @@ function buildSafeCatalogConfig(raw) {
   };
 }
 
-function TabButton({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-2xl border px-4 py-2.5 text-sm font-medium transition",
-        active
-          ? "border-pink-500 bg-pink-600 text-white shadow-sm"
-          : "border-pink-100 bg-white text-pink-700 hover:border-pink-200 hover:bg-pink-50",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
-}
-
 function MiniTabButton({ active, onClick, children }) {
   return (
     <button
@@ -512,20 +493,6 @@ function MiniTabButton({ active, onClick, children }) {
     >
       {children}
     </button>
-  );
-}
-
-function SectionCard({ title, text, children, className = "" }) {
-  return (
-    <section
-      className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 md:p-5 ${className}`}
-    >
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {text ? <p className="mt-1 text-sm text-gray-500">{text}</p> : null}
-      </div>
-      {children}
-    </section>
   );
 }
 
@@ -654,7 +621,7 @@ function ManualProductsPicker({
         label="Buscar productos"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Busca por nombre, slug o id"
+        placeholder="Busca por nombre o referencia"
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
@@ -684,7 +651,7 @@ function ManualProductsPicker({
                       ID: {productId || "—"}
                     </div>
                     <div className="mt-1 break-all text-xs text-gray-500">
-                      Slug: {product?.slug || "—"}
+                      Dirección: {product?.slug || "—"}
                     </div>
 
                     <button
@@ -728,7 +695,7 @@ function ManualProductsPicker({
                     ID: {product?._id || "—"}
                   </div>
                   <div className="mt-1 break-all text-xs text-gray-500">
-                    Slug: {product?.slug || "—"}
+                    Dirección: {product?.slug || "—"}
                   </div>
 
                   <button
@@ -755,10 +722,13 @@ export default function CatalogPageEditor() {
 
   const [page, setPage] = useState(null);
   const [form, setForm] = useState(null);
+  const draft = usePageDraft(form);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const loadSequence = useRef(0);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("products");
   const [productsSubtab, setProductsSubtab] = useState("universe");
   const [visualSubtab, setVisualSubtab] = useState("layout");
 
@@ -814,12 +784,15 @@ export default function CatalogPageEditor() {
   );
 
   const fetchPage = async () => {
+    const sequence = ++loadSequence.current;
     try {
       setLoading(true);
       setNotFound(false);
+      setLoadError("");
 
       const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
+      if (sequence !== loadSequence.current) return;
       if (res.status === 404) {
         setPage(null);
         setForm(null);
@@ -832,10 +805,11 @@ export default function CatalogPageEditor() {
       }
 
       const data = await res.json();
+      if (sequence !== loadSequence.current) return;
       const safeCatalogConfig = buildSafeCatalogConfig(data?.catalogConfig);
 
       setPage(data);
-      setForm({
+      const loadedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "catalog",
@@ -843,16 +817,20 @@ export default function CatalogPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         catalogConfig: safeCatalogConfig,
-      });
+      };
+      setForm(loadedForm);
+      draft.initialize(loadedForm);
       setTitleImagePreview(String(safeCatalogConfig?.titleImage || ""));
       setTitleImageFile(null);
     } catch (error) {
+      if (sequence !== loadSequence.current) return;
+      setLoadError(error.message || "Error de conexión");
       console.error("Error cargando página catálogo:", error);
       setPage(null);
       setForm(null);
       setNotFound(true);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
@@ -969,18 +947,7 @@ export default function CatalogPageEditor() {
     }));
   };
 
-  const handleNameChange = (value) => {
-    setForm((prev) => {
-      const currentSlug = String(prev?.slug || "").trim();
-      const autoSlug = slugify(value);
-
-      return {
-        ...prev,
-        name: value,
-        slug: currentSlug ? currentSlug : autoSlug,
-      };
-    });
-  };
+  const handleNameChange = (value) => setForm(previous => ({ ...previous, name: value }));
 
   const toggleCsvCategoryField = (fieldName, category) => {
     const current = parseCsvArray(form?.catalogConfig?.[fieldName] || "");
@@ -1060,7 +1027,7 @@ export default function CatalogPageEditor() {
 
   const handleUploadTitleImage = async () => {
     if (!titleImageFile) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -1089,10 +1056,10 @@ export default function CatalogPageEditor() {
         titleImageInputRef.current.value = "";
       }
 
-      alert("Imagen subida correctamente ✅");
+      draft.inform("Imagen subida correctamente ✅");
     } catch (error) {
       console.error("Error subiendo imagen de título:", error);
-      alert(error.message || "No se pudo subir la imagen a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir la imagen a Cloudinary.");
     } finally {
       setUploadingTitleImage(false);
     }
@@ -1105,12 +1072,12 @@ export default function CatalogPageEditor() {
     const slug = slugify(form.slug || form.name);
 
     if (!name) {
-      alert("El nombre de la página es obligatorio.");
+      draft.notify("El nombre de la página es obligatorio.");
       return;
     }
 
     if (!slug) {
-      alert("El slug de la página es obligatorio.");
+      draft.notify("Escribe una dirección válida para la página.");
       return;
     }
 
@@ -1120,7 +1087,7 @@ export default function CatalogPageEditor() {
       const safeCatalogConfig = buildSafeCatalogConfig(form.catalogConfig);
 
       if (safeCatalogConfig.initialMinPrice > safeCatalogConfig.initialMaxPrice) {
-        alert("El precio mínimo inicial no puede ser mayor que el precio máximo inicial.");
+        draft.notify("El precio mínimo inicial no puede ser mayor que el precio máximo inicial.");
         return;
       }
 
@@ -1149,8 +1116,12 @@ export default function CatalogPageEditor() {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
 
+      if (JSON.stringify(buildSafeCatalogConfig(data?.catalogConfig)) !== JSON.stringify(payload.catalogConfig)) {
+        throw new Error("El servidor no conservó todos los ajustes. Tus cambios siguen en el editor; vuelve a intentarlo.");
+      }
+
       setPage(data);
-      setForm({
+      const savedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "catalog",
@@ -1158,32 +1129,21 @@ export default function CatalogPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         catalogConfig: buildSafeCatalogConfig(data?.catalogConfig),
-      });
+      };
+      setForm(savedForm);
+      draft.markSaved(savedForm);
 
-      alert("Página catálogo guardada correctamente ✅");
     } catch (error) {
       console.error("Error guardando página catálogo:", error);
-      alert(error.message || "No se pudo guardar la página catálogo.");
+      draft.notify(error.message || "No se pudo guardar la página catálogo.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleOpenPreview = () => {
-    if (!previewUrl) {
-      alert("La página todavía no tiene un slug válido para vista previa.");
-      return;
-    }
 
-    window.open(previewUrl, "_blank", "noopener,noreferrer");
-  };
-
-  if (loading) {
-    return <div className="p-6 text-gray-500">Cargando página catálogo...</div>;
-  }
-
-  if (notFound || !page || !form) {
-    return <div className="p-6 text-red-500">Página catálogo no encontrada</div>;
+  if (loading || notFound || !page || !form) {
+    return <PageLoadState loading={loading} error={loadError} onRetry={fetchPage} onBack={() => navigate("/admin/paginas")}/>;
   }
 
   if (String(page?.pageType || "custom").toLowerCase() !== "catalog") {
@@ -1203,66 +1163,19 @@ export default function CatalogPageEditor() {
   }
 
   return (
-    <div className="min-w-0 space-y-6 p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/paginas")}
-            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
-          >
-            ← Volver
-          </button>
-
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Editor de página catálogo
-            </h1>
-            <p className="text-sm text-gray-500">
-              Configura una página tipo catálogo, separada del editor por bloques.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleOpenPreview}
-            className="inline-flex items-center gap-2 rounded-xl border border-pink-300 bg-pink-50 px-4 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100"
-          >
-            Vista previa
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-60"
-          >
-            {saving ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
-      </div>
-
-      <InfoCard
-        title="Control del catálogo"
-        text="Aquí el usuario ya puede controlar estructura, filtros, columnas, comportamiento inicial, contenido vacío, universo base, imagen de título, estilo visual del filtro y ahora también la base editable del estilo de las cards del catálogo."
-      />
-
-      <div className="rounded-3xl border border-pink-100 bg-gradient-to-br from-white to-pink-50/60 p-3 md:p-4">
-        <div className="flex flex-wrap gap-2">
-          {EDITOR_TABS.map((tab) => (
-            <TabButton
-              key={tab.id}
-              active={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </TabButton>
-          ))}
-        </div>
-      </div>
-
+    <PageEditorWorkspace
+      form={form}
+      tabs={EDITOR_TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onBack={() => draft.leave(() => navigate("/admin/paginas"))}
+      onSave={handleSave}
+      saving={saving}
+      uploading={uploadingTitleImage}
+      draft={draft}
+      pageTypeLabel="Catálogo"
+    >
+      <fieldset disabled={saving} className="pages-editor-fields">
       {activeTab === "general" && (
         <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
           <SectionCard
@@ -1278,7 +1191,7 @@ export default function CatalogPageEditor() {
             />
 
             <Input
-              label="Slug / ruta"
+              label="Dirección de la página"
               value={form.slug}
               onChange={(e) => updateRoot({ slug: slugify(e.target.value) })}
               placeholder="Ej: lo-nuevo"
@@ -1291,13 +1204,13 @@ export default function CatalogPageEditor() {
             />
 
             <Toggle
-              label="Usar header"
+              label="Mostrar encabezado"
               checked={form.useHeader}
               onChange={(value) => updateRoot({ useHeader: value })}
             />
 
             <Toggle
-              label="Usar footer"
+              label="Mostrar pie de página"
               checked={form.useFooter}
               onChange={(value) => updateRoot({ useFooter: value })}
             />
@@ -1335,11 +1248,11 @@ export default function CatalogPageEditor() {
 
               <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Header / Footer
+                  Encabezado y pie de página
                 </div>
                 <div className="mt-2 text-sm text-gray-800">
-                  {form.useHeader ? "Header activo" : "Sin header"} ·{" "}
-                  {form.useFooter ? "Footer activo" : "Sin footer"}
+                  {form.useHeader ? "Encabezado activo" : "Sin encabezado"} ·{" "}
+                  {form.useFooter ? "Pie de página activo" : "Sin pie de página"}
                 </div>
               </div>
             </div>
@@ -1396,14 +1309,14 @@ export default function CatalogPageEditor() {
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <Input
-                label="URL de imagen de título"
+                label="Enlace de la imagen del título"
                 value={form.catalogConfig.titleImage}
                 onChange={(e) => updateCatalogConfig({ titleImage: e.target.value })}
                 placeholder="https://... o /ruta/imagen.png"
               />
 
               <Input
-                label="Alt de la imagen de título"
+                label="Descripción de la imagen"
                 value={form.catalogConfig.titleImageAlt}
                 onChange={(e) =>
                   updateCatalogConfig({ titleImageAlt: e.target.value })
@@ -1425,7 +1338,7 @@ export default function CatalogPageEditor() {
                   onClick={handlePickTitleImage}
                   className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
                 >
-                  Escoger imagen
+                  Elegir imagen
                 </button>
 
                 <button
@@ -1434,7 +1347,7 @@ export default function CatalogPageEditor() {
                   disabled={uploadingTitleImage || !titleImageFile}
                   className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-50"
                 >
-                  {uploadingTitleImage ? "Subiendo..." : "Subir a Cloudinary"}
+                  {uploadingTitleImage ? "Subiendo..." : "Cargar imagen"}
                 </button>
               </div>
 
@@ -1489,7 +1402,7 @@ export default function CatalogPageEditor() {
 
           {productsSubtab === "universe" && (
             <SectionCard
-              title="Universo base del catálogo"
+              title="Productos de este catálogo"
               text="Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."
             >
               <Select
@@ -1516,7 +1429,7 @@ export default function CatalogPageEditor() {
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <SectionCard
                 title="Categorías permitidas"
-                text="El usuario selecciona las categorías reales ya existentes en productos."
+                text="Elige entre las categorías de tu catálogo."
               >
                 {loadingProducts ? (
                   <div className="text-sm text-gray-500">Cargando categorías...</div>
@@ -1524,7 +1437,7 @@ export default function CatalogPageEditor() {
                   <>
                     <CategoryPicker
                       label="Selecciona categorías permitidas"
-                      helper="Esto reemplaza el texto manual. Sigue guardando en allowedCategoriesText sin romper tu estructura."
+                      helper="Elige las categorías cuyos productos se mostrarán en esta página."
                       options={allCategoryOptions}
                       selected={selectedAllowedCategories}
                       onToggle={(category) =>
@@ -1557,7 +1470,7 @@ export default function CatalogPageEditor() {
                   <>
                     <CategoryPicker
                       label="Selecciona categorías iniciales"
-                      helper="También sigue guardando el CSV original en initialCategoriesText."
+                      helper="Estas categorías estarán seleccionadas al abrir el catálogo."
                       options={allCategoryOptions}
                       selected={selectedInitialCategories}
                       onToggle={(category) =>
@@ -1585,7 +1498,7 @@ export default function CatalogPageEditor() {
           {productsSubtab === "manual" && (
             <SectionCard
               title="Selección manual de productos"
-              text="Busca productos y agrégalos visualmente. Se sigue guardando manualProductIdsText."
+              text="Busca los productos que quieres mostrar y añádelos a tu selección."
             >
               {loadingProducts ? (
                 <div className="text-sm text-gray-500">Cargando productos...</div>
@@ -1600,7 +1513,7 @@ export default function CatalogPageEditor() {
                   />
 
                   <Textarea
-                    label="IDs o slugs manuales (avanzado)"
+                    label="Referencias de productos (avanzado)"
                     value={form.catalogConfig.manualProductIdsText}
                     onChange={(e) =>
                       updateCatalogConfig({
@@ -1680,7 +1593,7 @@ export default function CatalogPageEditor() {
           {visualSubtab === "filter-style" && (
             <SectionCard
               title="Estilo profesional del filtro"
-              text="Todo lo que ves en el filtro lateral ahora queda manipulable por el usuario desde el panel."
+              text="Personaliza los colores, los espacios y los botones del filtro."
             >
               <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
                 <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -1970,7 +1883,7 @@ export default function CatalogPageEditor() {
                     />
 
                     <Toggle
-                      label="Cabecera sticky en desktop"
+                      label="Encabezado fijo en escritorio"
                       checked={form.catalogConfig.filterUiConfig.stickyHeader}
                       onChange={(value) =>
                         updateFilterUiConfig({ stickyHeader: value })
@@ -1985,7 +1898,7 @@ export default function CatalogPageEditor() {
           {visualSubtab === "card-style" && (
             <SectionCard
               title="Estilo editable de cards"
-              text="Aquí dejamos solo controles seguros para personalizar botones, íconos, tipografías y bordes sin perder la estructura base bonita de la card."
+              text="Ajusta los botones, iconos, textos y bordes de las tarjetas."
             >
               <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
                 <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -2642,6 +2555,7 @@ export default function CatalogPageEditor() {
           />
         </SectionCard>
       )}
-    </div>
+      </fieldset>
+    </PageEditorWorkspace>
   );
 }
