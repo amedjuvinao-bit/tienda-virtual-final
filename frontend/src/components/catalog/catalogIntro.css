@@ -58,17 +58,12 @@
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:min(var(--ch-padding),16px); gap:6px; }
   .cpv-glass-bags { width:calc(var(--ch-icon-size) * .35); }
 }
-/* The horizontal surface keeps its native proportions; the shared original
-   bevel is drawn independently so neither texture nor corner highlights stretch. */
+/* Keep the face smooth; optical artwork is confined to the frame. */
 .catalog-liquid { position:absolute; inset:0; border-radius:inherit; overflow:hidden; pointer-events:none; z-index:0; }
 .catalog-liquid__filters { position:absolute; pointer-events:none; }
 .catalog-liquid__material {
   position:absolute; inset:0; border-radius:inherit; overflow:hidden;
   opacity:var(--ch-material-opacity);
-}
-.catalog-liquid__surface {
-  position:absolute; inset:-12%;
-  background:url('/catalog/glass-horizontal-clear-v2.webp') center / cover no-repeat;
 }
 .catalog-liquid__bevel {
   position:absolute; inset:-2px; border:18px solid transparent; border-radius:inherit;

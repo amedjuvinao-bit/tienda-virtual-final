@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef } from 'react';
 import CatalogGlassMaterialFilter from './CatalogGlassMaterialFilter';
 
-// Horizontal optical surface with a separate shared bevel; no texture stretching.
+// Clear interior. The artwork is restricted to the bevel around the perimeter.
 export default function CatalogLiquidGlass({ presentation }) {
   const layer = useRef(null);
   const id = `catalog-material-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -23,12 +23,10 @@ export default function CatalogLiquidGlass({ presentation }) {
   return <div ref={layer} className="catalog-liquid" aria-hidden="true">
     <svg className="catalog-liquid__filters" width="0" height="0" focusable="false">
       <defs>
-        <CatalogGlassMaterialFilter id={`${id}-surface`} color={presentation.headerTint} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} depthColor={presentation.headerMaterialDepthColor} depth={presentation.headerMaterialDepth}/>
         <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} depthColor={presentation.headerMaterialDepthColor} depth={Math.min(1, presentation.headerMaterialDepth * 1.6)} shadeScale={.6}/>
       </defs>
     </svg>
     <div className="catalog-liquid__material">
-      <div className="catalog-liquid__surface" style={{ filter: `url(#${id}-surface)` }}/>
       <div className="catalog-liquid__bevel" style={{ filter: `url(#${id}-bevel)` }}/>
     </div>
     <div className="catalog-liquid__rim"/>
