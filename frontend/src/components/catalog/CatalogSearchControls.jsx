@@ -49,7 +49,7 @@ export default function CatalogSearchControls({
       )}
       {config.showSort && (
         <label>
-          Ordenar por
+          <span className="cpv-sort-label">Ordenar por</span>
           <select
             aria-label="Ordenar productos"
             value={query.sort}

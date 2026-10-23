@@ -190,11 +190,168 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
     1,
   );
 
+  const hasCommandBar = safeConfig.showSearch || safeConfig.showSort || safeConfig.showToolbar || activeFilters.length > 0 || query.q;
+  const commandBar = hasCommandBar ? (
+    <div className="cpv-commandbar">
+      <CatalogSearchControls
+        config={safeConfig}
+        query={query}
+        onSearch={setSearch}
+        onSort={setSort}
+      />
+      {(activeFilters.length > 0 || query.q) && (
+        <div className="cpv-active-filters">
+          {activeFilters.map((filter, index) => (
+            <button
+              key={`${filter.type}-${filter.label}-${index}`}
+              className="cpv-filter-chip"
+              onClick={() => removeFilter(filter)}
+            >
+              <span>{filter.label}</span>
+              <X size={12} />
+            </button>
+          ))}
+
+          <button
+            className="cpv-filter-chip cpv-filter-chip--clear"
+            style={editorial ? undefined : {
+              background: "#f9fafb",
+              borderColor: "#e5e7eb",
+              color: "#6b7280",
+            }}
+            onClick={clear}
+          >
+            Limpiar todo
+          </button>
+        </div>
+      )}
+
+      {safeConfig.showToolbar && (
+        <div className="cpv-toolbar">
+          <div className="cpv-toolbar-left">
+            {editorial && safeConfig.showFilters && safeConfig.showFilterFab && <button type="button" className="cpv-inline-filter" aria-label="Mostrar/ocultar filtros" aria-expanded={isMobile ? mobileDrawerOpen : sidebarVisible} onClick={() => isMobile ? setMobileDrawerOpen(true) : setSidebarVisible(value => !value)}><Filter size={15}/><span>Filtros</span></button>}
+            {safeConfig.showResultCount && (
+              <span
+                className="cpv-result-pill"
+                role="status"
+                aria-live="polite"
+              >
+                <strong>
+                  {productsLoading
+                    ? "…"
+                    : productPagination.totalProducts}
+                </strong>
+                {productPagination.totalProducts === 1
+                  ? " producto"
+                  : " productos"}
+              </span>
+            )}
+          </div>
+
+          <div className="cpv-col-controls">
+            {[1, 2, 3, 4, 5, 6].map((n) => {
+              if (isMobile && n > maxMobileCols) return null;
+              if (!isMobile && n > maxDesktopCols) return null;
+
+              const isActive = effectiveCols === n;
+              const isHovered = hoveredColButton === n;
+
+              const currentButtonBg = isActive
+                ? activeButtonBgColor
+                : isHovered
+                  ? hoverButtonBgColor
+                  : normalButtonBgColor;
+
+              const currentButtonBorder = isActive
+                ? activeButtonBorderColor
+                : isHovered
+                  ? hoverButtonBorderColor
+                  : normalButtonBorderColor;
+
+              const currentIconColor = isActive
+                ? activeButtonIconColor
+                : isHovered
+                  ? hoverButtonIconColor
+                  : normalButtonIconColor;
+
+              return (
+                <div key={n} style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    className={`cpv-col-btn ${isActive ? "active" : ""}`}
+                    onClick={() => setCols(n)}
+                    onMouseEnter={() => setHoveredColButton(n)}
+                    onMouseLeave={() => setHoveredColButton(null)}
+                    aria-pressed={isActive}
+                    aria-label={
+                      n === 1 ? "Vista lista" : `${n} columnas`
+                    }
+                    style={{
+                      '--catalog-control-bg': currentButtonBg,
+                      background: editorial ? undefined : currentButtonBg,
+                      borderColor: currentButtonBorder,
+                      borderWidth: `${columnButtonBorderWidthPx}px`,
+                      borderRadius: `${columnButtonRadiusPx}px`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: n === 1 ? 0 : "3px",
+                        flexDirection: n === 1 ? "column" : "row",
+                        width: "100%",
+                        height: "100%",
+                        padding: "6px",
+                      }}
+                    >
+                      {n === 1
+                        ? [...Array(3)].map((_, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                display: "block",
+                                width: "20px",
+                                height: "2px",
+                                background: currentIconColor,
+                                borderRadius: "2px",
+                                margin: "1.5px 0",
+                              }}
+                            />
+                          ))
+                        : Array.from({ length: n }).map((_, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                display: "block",
+                                width: "2px",
+                                height: "16px",
+                                background: currentIconColor,
+                                borderRadius: "2px",
+                              }}
+                            />
+                          ))}
+                    </div>
+
+                    <span className="cpv-tooltip">
+                      {n === 1 ? "Lista" : `${n} columnas`}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <>
       <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial ? catalogPresentationStyle(presentation) : undefined}>
         <div className="cpv-shell">
-          {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}/></div>}
+          {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}>{commandBar}</CatalogIntro></div>}
           <div className="cpv-main-grid">
             {safeConfig.showFilters && !isMobile && (
               <aside
@@ -237,157 +394,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
             <main className="cpv-content">
               {!editorial && <CatalogIntro config={safeConfig} page={page}/>}
 
-              <div className="cpv-commandbar">
-              <CatalogSearchControls
-                config={safeConfig}
-                query={query}
-                onSearch={setSearch}
-                onSort={setSort}
-              />
-              {(activeFilters.length > 0 || query.q) && (
-                <div className="cpv-active-filters">
-                  {activeFilters.map((filter, index) => (
-                    <button
-                      key={`${filter.type}-${filter.label}-${index}`}
-                      className="cpv-filter-chip"
-                      onClick={() => removeFilter(filter)}
-                    >
-                      {filter.label}
-                      <X size={12} />
-                    </button>
-                  ))}
-
-                  <button
-                    className="cpv-filter-chip"
-                    style={{
-                      background: "#f9fafb",
-                      borderColor: "#e5e7eb",
-                      color: "#6b7280",
-                    }}
-                    onClick={clear}
-                  >
-                    Limpiar todo
-                  </button>
-                </div>
-              )}
-
-              {safeConfig.showToolbar && (
-                <div className="cpv-toolbar">
-                  <div className="cpv-toolbar-left">
-                    {editorial && safeConfig.showFilters && safeConfig.showFilterFab && <button type="button" className="cpv-inline-filter" aria-label="Mostrar/ocultar filtros" onClick={() => isMobile ? setMobileDrawerOpen(true) : setSidebarVisible(value => !value)}><Filter size={15}/><span>Filtros</span></button>}
-                    {safeConfig.showResultCount && (
-                      <span
-                        className="cpv-result-pill"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        <strong>
-                          {productsLoading
-                            ? "…"
-                            : productPagination.totalProducts}
-                        </strong>
-                        {productPagination.totalProducts === 1
-                          ? " producto"
-                          : " productos"}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="cpv-col-controls">
-                    {[1, 2, 3, 4, 5, 6].map((n) => {
-                      if (isMobile && n > maxMobileCols) return null;
-                      if (!isMobile && n > maxDesktopCols) return null;
-
-                      const isActive = effectiveCols === n;
-                      const isHovered = hoveredColButton === n;
-
-                      const currentButtonBg = isActive
-                        ? activeButtonBgColor
-                        : isHovered
-                          ? hoverButtonBgColor
-                          : normalButtonBgColor;
-
-                      const currentButtonBorder = isActive
-                        ? activeButtonBorderColor
-                        : isHovered
-                          ? hoverButtonBorderColor
-                          : normalButtonBorderColor;
-
-                      const currentIconColor = isActive
-                        ? activeButtonIconColor
-                        : isHovered
-                          ? hoverButtonIconColor
-                          : normalButtonIconColor;
-
-                      return (
-                        <div key={n} style={{ position: "relative" }}>
-                          <button
-                            className={`cpv-col-btn ${isActive ? "active" : ""}`}
-                            onClick={() => setCols(n)}
-                            onMouseEnter={() => setHoveredColButton(n)}
-                            onMouseLeave={() => setHoveredColButton(null)}
-                            aria-label={
-                              n === 1 ? "Vista lista" : `${n} columnas`
-                            }
-                            style={{
-                              background: currentButtonBg,
-                              borderColor: currentButtonBorder,
-                              borderWidth: `${columnButtonBorderWidthPx}px`,
-                              borderRadius: `${columnButtonRadiusPx}px`,
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: n === 1 ? 0 : "3px",
-                                flexDirection: n === 1 ? "column" : "row",
-                                width: "100%",
-                                height: "100%",
-                                padding: "6px",
-                              }}
-                            >
-                              {n === 1
-                                ? [...Array(3)].map((_, i) => (
-                                    <span
-                                      key={i}
-                                      style={{
-                                        display: "block",
-                                        width: "20px",
-                                        height: "2px",
-                                        background: currentIconColor,
-                                        borderRadius: "2px",
-                                        margin: "1.5px 0",
-                                      }}
-                                    />
-                                  ))
-                                : Array.from({ length: n }).map((_, i) => (
-                                    <span
-                                      key={i}
-                                      style={{
-                                        display: "block",
-                                        width: "2px",
-                                        height: "16px",
-                                        background: currentIconColor,
-                                        borderRadius: "2px",
-                                      }}
-                                    />
-                                  ))}
-                            </div>
-
-                            <span className="cpv-tooltip">
-                              {n === 1 ? "Lista" : `${n} columnas`}
-                            </span>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              </div>
+              {!editorial && commandBar}
               <div
                 className={`cpv-grid ${colClasses[renderedCols] || colClasses[4]}`}
                 style={gridStyle}

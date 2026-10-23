@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react';
 import CatalogLiquidGlass from './CatalogLiquidGlass';
 import CatalogGlassBags from './CatalogGlassBags';
 
-export default function CatalogIntro({ config: safeConfig, page }) {
+export default function CatalogIntro({ config: safeConfig, page, children }) {
   const glass = safeConfig.presentation?.layout === 'glass-grid';
   const title = safeConfig.title || page?.name || 'Catálogo';
   const subtitle = safeConfig.subtitle, description = safeConfig.description;
@@ -51,6 +51,7 @@ export default function CatalogIntro({ config: safeConfig, page }) {
                   </div>
                 </div>
                 {glass && safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
+                {glass && children}
               </section>
 
   </>;
