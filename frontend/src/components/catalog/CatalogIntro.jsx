@@ -9,50 +9,51 @@ export default function CatalogIntro({ config: safeConfig, page, children }) {
   const title = safeConfig.title || page?.name || 'Catálogo';
   const subtitle = safeConfig.subtitle, description = safeConfig.description;
   const titleImage = safeConfig.titleImage.trim(), titleImageAlt = safeConfig.titleImageAlt.trim() || title;
+  const heading = (<>
+    {safeConfig.showHeroBadge && safeConfig.heroBadge && (
+      <div className="cpv-hero-badge">
+        {!glass && <Sparkles size={14} />}
+        {safeConfig.heroBadge}
+      </div>
+    )}
+
+    <div className="cpv-title-wrap">
+      {safeConfig.titleMode === "image" && titleImage ? (
+        <img
+          src={titleImage}
+          alt={titleImageAlt}
+          className="cpv-title-image"
+          draggable="false"
+        />
+      ) : (
+        <>
+          <h1 className="cpv-title">{title}</h1>
+          {subtitle ? (
+            <p className="cpv-subtitle">{subtitle}</p>
+          ) : null}
+        </>
+      )}
+
+      {description ? (
+        <p className="cpv-description">{description}</p>
+      ) : null}
+    </div>
+  </>);
   return <>
-              {safeConfig.showBreadcrumb && (
-                <nav className="cpv-breadcrumb" aria-label="Ruta de navegación">
-                  <Link to="/">Inicio</Link>
-                  <span>›</span>
-                  <span className="cpv-bc-current">{title}</span>
-                </nav>
-              )}
+    {safeConfig.showBreadcrumb && (
+      <nav className="cpv-breadcrumb" aria-label="Ruta de navegación">
+        <Link to="/">Inicio</Link>
+        <span>›</span>
+        <span className="cpv-bc-current">{title}</span>
+      </nav>
+    )}
 
-              <section className={`cpv-hero${glass ? ' cpv-hero-glass' : ''}`}>
-                {glass && <CatalogLiquidGlass presentation={safeConfig.presentation} />}
-                <div className="cpv-hero-top">
-                  {safeConfig.showHeroBadge && safeConfig.heroBadge && (
-                    <div className="cpv-hero-badge">
-                      {!glass && <Sparkles size={14} />}
-                      {safeConfig.heroBadge}
-                    </div>
-                  )}
-
-                  <div className="cpv-title-wrap">
-                    {safeConfig.titleMode === "image" && titleImage ? (
-                      <img
-                        src={titleImage}
-                        alt={titleImageAlt}
-                        className="cpv-title-image"
-                        draggable="false"
-                      />
-                    ) : (
-                      <>
-                        <h1 className="cpv-title">{title}</h1>
-                        {subtitle ? (
-                          <p className="cpv-subtitle">{subtitle}</p>
-                        ) : null}
-                      </>
-                    )}
-
-                    {description ? (
-                      <p className="cpv-description">{description}</p>
-                    ) : null}
-                  </div>
-                </div>
-                {glass && safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
-                {glass && children}
-              </section>
-
+    {/* The glass frame must not inherit the classic header's opaque surface. */}
+    <section className={glass ? 'cpv-hero-glass' : 'cpv-hero'}>
+      {glass && <CatalogLiquidGlass presentation={safeConfig.presentation} />}
+      {glass ? heading : <div className="cpv-hero-top">{heading}</div>}
+      {glass && safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
+      {glass && children}
+    </section>
   </>;
 }
