@@ -252,6 +252,7 @@ function buildSafeCatalogConfig(raw) {
   return {
     presentation,
     visualBackup: cfg.visualBackup || null,
+    glassPaletteBackup: cfg.glassPaletteBackup || null,
     title: typeof cfg.title === "string" ? cfg.title : "",
     subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : "",
     description: typeof cfg.description === "string" ? cfg.description : "",

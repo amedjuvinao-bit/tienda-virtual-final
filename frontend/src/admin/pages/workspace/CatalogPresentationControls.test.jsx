@@ -58,3 +58,15 @@ it('muestra un tema a la vez y permite navegar las pestañas con el teclado sin 
   await user.keyboard('{Home}');
   expect(screen.getByLabelText('Color del cristal del encabezado')).toHaveValue('#123456');
 });
+
+it('recupera la paleta de cristal en un paso sin modificar las medidas del usuario', async () => {
+  const user=userEvent.setup();
+  render(<Editor/>);
+  await user.click(screen.getByRole('tab',{name:'Encabezado',exact:true}));
+  fireEvent.change(screen.getByLabelText('Color del cristal del encabezado'),{target:{value:'#f8b4d9'}});
+  await user.click(screen.getByRole('tab',{name:'Medidas',exact:true}));
+  fireEvent.change(screen.getByLabelText('Altura mínima del encabezado (px)'),{target:{value:'164'}});
+  await user.click(screen.getByRole('button',{name:'Aplicar paleta de cristal',exact:true}));
+  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#ffffff',headerBadgeColor:'#713a42',headerHeight:164,glassPaletteVersion:1});
+  expect(screen.getByText('Paleta aplicada a la vista previa. Guarda los cambios para conservarla.')).toHaveAttribute('role','status');
+});

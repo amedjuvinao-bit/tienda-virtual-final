@@ -1,6 +1,7 @@
 import React, { useId, useState } from 'react';
 import { adminFetch } from '../../../lib/api';
 import { API_BASE_URL } from '../../../config/apiBaseUrl';
+import { CATALOG_GLASS_PALETTE } from '../../../components/catalog/catalogGlassPalette';
 import { catalogImageUrl } from '../../../components/catalog/catalogPresentation';
 
 const fieldClass = 'w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800';
@@ -96,7 +97,8 @@ export default function CatalogPresentationControls({ value, onChange }) {
   const [headerSection, setHeaderSection] = useState('material');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
-  const patch = (key, next) => onChange({ [key]: next });
+  const [paletteApplied, setPaletteApplied] = useState(false);
+  const patch = (key, next) => { setPaletteApplied(false); onChange({ [key]: next }); };
   async function upload(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -118,6 +120,11 @@ export default function CatalogPresentationControls({ value, onChange }) {
   }
   return <div className="catalog-presentation-controls mt-6 space-y-4 border-t border-gray-200 pt-5">
     <p className="text-sm text-gray-600">Elige un tema. Los cambios se muestran en la vista previa y se publican al guardar.</p>
+    {value.layout === 'glass-grid' && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pink-100 bg-pink-50/50 p-3">
+      <div><p className="text-sm font-semibold text-gray-800">Cristal luminoso</p><p className="text-xs text-gray-600">Color cálido, luz suave y textos con contraste. Puedes ajustar cada valor después.</p></div>
+      <button type="button" className="shrink-0 rounded-xl border border-pink-200 bg-white px-3 py-2 text-sm text-pink-900 transition hover:bg-pink-50 hover:shadow-sm active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-700 motion-reduce:transition-none" onClick={() => { onChange({ ...CATALOG_GLASS_PALETTE }); setPaletteApplied(true); }}>Aplicar paleta de cristal</button>
+      {paletteApplied && <p className="w-full text-xs text-gray-600" role="status">Paleta aplicada a la vista previa. Guarda los cambios para conservarla.</p>}
+    </div>}
     <TopicTabs items={topics} selected={topic} onSelect={setTopic} id={id} label="Temas de diseño del catálogo"/>
     {topics.map(group => <div key={group.id} role="tabpanel" id={`${id}-panel-${group.id}`} aria-labelledby={`${id}-tab-${group.id}`} hidden={topic !== group.id}>
       {group.sections && <TopicTabs items={group.sections} selected={headerSection} onSelect={setHeaderSection} id={`${id}-header`} label="Ajustes del encabezado"/>}

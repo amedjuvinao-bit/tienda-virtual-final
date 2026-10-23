@@ -1,3 +1,4 @@
+import { applyCatalogGlassPalette, CATALOG_GLASS_PALETTE_VERSION } from './catalogGlassPalette';
 import { buildCatalogPresentation } from './catalogPresentation';
 
 export const EDITORIAL_STYLE_VERSION = 3;
@@ -41,10 +42,11 @@ export function applyCatalogEditorialPreset(raw = {}) {
 export function prepareCatalogEditorialConfig(raw) {
   const presentation = buildCatalogPresentation(raw.presentation);
   if (presentation.layout !== 'glass-grid') return raw;
-  let current = raw;
+  // Calibrate before older migrations derive their card and filter colors.
+  let current = presentation.glassPaletteVersion < CATALOG_GLASS_PALETTE_VERSION ? applyCatalogGlassPalette(raw) : raw;
   if (presentation.styleVersion < EDITORIAL_STYLE_VERSION) {
     const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
-    current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(raw) : raw;
+    current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(current) : current;
     current = { ...current, presentation: { ...presentation, ...current.presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage }, cardUiConfig: { ...current.cardUiConfig, imageFit: 'contain' } };
   }
   // Adopt the approved typographic heading once; keep the uploaded artwork available
@@ -56,5 +58,5 @@ export function prepareCatalogEditorialConfig(raw) {
 }
 export function restoreCatalogVisualBackup(config) {
   if (!config.visualBackup) return config;
-  return { ...config, ...config.visualBackup, presentation: { ...config.presentation, ...config.visualBackup.presentation, styleVersion: EDITORIAL_STYLE_VERSION } };
+  return { ...config, ...config.visualBackup, presentation: { ...config.presentation, ...config.visualBackup.presentation, styleVersion: EDITORIAL_STYLE_VERSION, glassPaletteVersion: CATALOG_GLASS_PALETTE_VERSION } };
 }

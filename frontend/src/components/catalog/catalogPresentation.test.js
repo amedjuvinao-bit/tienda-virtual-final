@@ -20,7 +20,7 @@ describe('presentación editorial compartida', () => {
 });
 
 it('conserva y normaliza la personalización completa del encabezado sin perder valores cero', () => {
-  const config = buildSafeCatalogConfig({ presentation:{ headerVersion:1, styleVersion:3, headerTint:'#123456', headerOpacity:0, headerReflection:0, headerContrast:0, headerShadow:0, headerLayers:false, headerIcon:'none', headerIconColor:'#abcdef', headerEdgeWidth:0, headerRadius:0, headerHeight:999 } });
+  const config = buildSafeCatalogConfig({ presentation:{ glassPaletteVersion:1, headerVersion:1, styleVersion:3, headerTint:'#123456', headerOpacity:0, headerReflection:0, headerContrast:0, headerShadow:0, headerLayers:false, headerIcon:'none', headerIconColor:'#abcdef', headerEdgeWidth:0, headerRadius:0, headerHeight:999 } });
   expect(config.presentation).toMatchObject({ headerTint:'#123456', headerOpacity:0, headerReflection:0, headerContrast:0, headerShadow:0, headerLayers:false, headerIcon:'none', headerIconColor:'#abcdef', headerEdgeWidth:0, headerRadius:0, headerHeight:240 });
   expect(buildSafeCatalogConfig(config)).toEqual(config);
   const style = catalogPresentationStyle(config.presentation);
