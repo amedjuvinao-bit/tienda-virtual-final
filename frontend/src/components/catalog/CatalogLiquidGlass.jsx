@@ -29,7 +29,6 @@ export default function CatalogLiquidGlass({ presentation }) {
     <div className="catalog-liquid__material">
       <div className="catalog-liquid__bevel" style={{ filter: `url(#${id}-bevel)` }}/>
     </div>
-    <div className="catalog-liquid__rim"/>
     <div className="catalog-liquid__shine"/>
   </div>;
 }
