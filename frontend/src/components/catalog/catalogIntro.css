@@ -9,7 +9,9 @@
   min-height:var(--ch-height); margin:0 0 6px 4px;
   border:var(--ch-edge-width) solid var(--ch-reflection);
   border-radius:var(--ch-radius);
-  background:transparent;
+  /* A clear face over a white scene still looks like a white panel. Use the
+     saved color behind the glass across the face, without a white overlay. */
+  background:var(--ch-contrast);
   box-shadow:inset 0 2px 2px var(--ch-reflection),inset 2px 0 3px var(--ch-reflection),
     inset -2px -2px 2px var(--ch-contrast),inset 0 -1px 1px var(--ch-detail),0 17px 25px -16px var(--ch-shadow);
   backdrop-filter:blur(var(--ch-blur)); -webkit-backdrop-filter:blur(var(--ch-blur));
