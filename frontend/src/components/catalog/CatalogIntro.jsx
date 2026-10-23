@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
-import CatalogLiquidGlass from './CatalogLiquidGlass';
 import CatalogGlassBags from './CatalogGlassBags';
 
 export default function CatalogIntro({ config: safeConfig, page, children }) {
@@ -19,7 +18,6 @@ export default function CatalogIntro({ config: safeConfig, page, children }) {
               )}
 
               <section className={`cpv-hero${glass ? ' cpv-hero-glass' : ''}`}>
-                {glass && <CatalogLiquidGlass presentation={safeConfig.presentation} />}
                 <div className="cpv-hero-top">
                   {safeConfig.showHeroBadge && safeConfig.heroBadge && (
                     <div className="cpv-hero-badge">
