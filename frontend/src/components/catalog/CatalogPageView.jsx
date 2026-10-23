@@ -11,6 +11,7 @@ import useCatalogProducts from "./useCatalogProducts";
 import CatalogFilterDrawer from "./CatalogFilterDrawer";
 import "./catalogPage.css";
 import "./catalogEditorial.css";
+import "./catalogFooterGlass.css";
 import "./catalogIntro.css";
 import { catalogPresentationStyle } from "./catalogPresentation";
 import useCatalogDepth from "./useCatalogDepth";

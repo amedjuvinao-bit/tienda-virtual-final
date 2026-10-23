@@ -1,0 +1,77 @@
+/* One continuous scene behind a separate, sculpted footer pane.
+   Material colors and strength come from the existing footer editor. */
+.cpv-page[data-background="continuity"] > .cpv-footer:has(.footer-ed) {
+  padding:18px clamp(12px,2vw,28px) 24px;
+}
+.cpv-page[data-background="continuity"] > .cpv-footer .footer-ed {
+  --fg-light:var(--fe-edge);
+  --fg-shade:color-mix(in srgb,var(--fe-tint) 72%,var(--fe-ink));
+  border:1px solid color-mix(in srgb,var(--fg-light) 85%,transparent);
+  border-radius:calc(var(--fe-radius) + 8px);
+  background:
+    linear-gradient(125deg,color-mix(in srgb,var(--fg-light) 14%,transparent),transparent 38%,color-mix(in srgb,var(--fe-tint) 12%,transparent)),
+    color-mix(in srgb,var(--fe-tint) calc(var(--fe-glass-alpha) * 45%),transparent) !important;
+  backdrop-filter:blur(calc(var(--fe-blur) * .7)) saturate(1.18);
+  -webkit-backdrop-filter:blur(calc(var(--fe-blur) * .7)) saturate(1.18);
+  box-shadow:
+    inset 0 2px 2px color-mix(in srgb,var(--fg-light) 95%,transparent),
+    inset 2px 0 3px color-mix(in srgb,var(--fg-light) 65%,transparent),
+    inset -2px -3px 4px color-mix(in srgb,var(--fg-shade) 42%,transparent),
+    0 2px 2px color-mix(in srgb,var(--fg-light) 65%,transparent),
+    0 calc(var(--fe-depth) * .8) calc(var(--fe-depth) * 2) calc(var(--fe-depth) * -.5) color-mix(in srgb,var(--fg-shade) 38%,transparent);
+}
+/* Both highlights are hollow: the center never receives a white overlay. */
+.cpv-footer .footer-ed::before,
+.cpv-footer .footer-ed::after {
+  content:"";display:block;position:absolute;inset:0;z-index:-1;
+  border-radius:inherit;padding:7px;pointer-events:none;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+.cpv-footer .footer-ed::before {
+  background:linear-gradient(135deg,var(--fg-light),color-mix(in srgb,var(--fe-tint) 70%,transparent) 16%,var(--fg-light) 31%,transparent 46%,var(--fg-shade) 64%,var(--fg-light) 83%,var(--fe-tint));
+  opacity:var(--fe-art-alpha);
+}
+.cpv-footer .footer-ed::after {
+  inset:8px;padding:1px;border-radius:calc(var(--fe-radius) - 1px);
+  background:linear-gradient(145deg,var(--fg-light),transparent 38%,var(--fg-shade) 67%,var(--fg-light));
+  opacity:calc(var(--fe-art-alpha) * .8);
+}
+.cpv-footer .footer-ed__glass {
+  isolation:isolate;
+  border:1px solid color-mix(in srgb,var(--fe-edge) 80%,transparent);
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--fe-edge) 18%,transparent),transparent 45%,color-mix(in srgb,var(--fe-edge) 9%,transparent)),
+    color-mix(in srgb,var(--fe-tint) calc(var(--fe-glass-alpha) * 100%),transparent);
+  backdrop-filter:blur(var(--fe-blur)) saturate(1.28);
+  -webkit-backdrop-filter:blur(var(--fe-blur)) saturate(1.28);
+  box-shadow:inset 0 2px 2px var(--fe-edge),inset 2px 0 3px color-mix(in srgb,var(--fe-edge) 70%,transparent),inset -2px -3px 4px color-mix(in srgb,var(--fg-shade) 60%,transparent),0 2px 2px color-mix(in srgb,var(--fe-edge) 60%,transparent),0 10px 20px -10px color-mix(in srgb,var(--fg-shade) 65%,transparent);
+}
+.cpv-footer .footer-ed__glass::before {
+  inset:0;padding:6px;z-index:0;border:0;border-radius:inherit;box-shadow:none;
+  background:linear-gradient(135deg,var(--fe-edge),var(--fe-tint) 18%,var(--fe-edge) 30%,transparent 43%,var(--fg-shade) 63%,var(--fe-edge) 84%,var(--fe-tint));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;opacity:var(--fe-art-alpha);
+}
+.cpv-footer .footer-ed__glass::after {
+  inset:8px;z-index:0;border:1px solid color-mix(in srgb,var(--fe-edge) 70%,transparent);
+  border-radius:calc(var(--fe-radius) - 8px);
+  box-shadow:0 -1px 2px color-mix(in srgb,var(--fg-shade) 40%,transparent),inset 0 -1px 2px var(--fe-edge);
+}
+.cpv-footer .footer-ed__material { display:none; }
+.cpv-footer .footer-ed__email {
+  background:linear-gradient(150deg,color-mix(in srgb,var(--fe-tint) 16%,transparent),color-mix(in srgb,var(--fe-edge) 12%,transparent));
+  border-color:color-mix(in srgb,var(--fe-edge) 85%,transparent);
+  box-shadow:inset 0 2px 4px color-mix(in srgb,var(--fg-shade) 40%,transparent),inset 0 -2px 2px var(--fe-edge),0 1px 1px var(--fe-edge);
+}
+@media(max-width:767px) {
+  .cpv-page[data-background="continuity"] > .cpv-footer:has(.footer-ed) { padding:12px 10px 16px; }
+  .cpv-page[data-background="continuity"] > .cpv-footer .footer-ed { border-radius:var(--fe-radius); }
+  .cpv-footer .footer-ed::before { padding:5px; }
+  .cpv-footer .footer-ed::after { inset:6px;border-radius:calc(var(--fe-radius) - 6px); }
+  .cpv-footer .footer-ed__glass::after { border-radius:calc(min(var(--fe-radius),22px) - 8px); }
+}
