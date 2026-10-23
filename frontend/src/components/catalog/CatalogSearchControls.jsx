@@ -50,7 +50,7 @@ export default function CatalogSearchControls({
       {config.showSort && (
         <label>
           <span className="cpv-sort-label">Ordenar por</span>
-          <span className="cpv-sort-surface"><select
+          <select
             aria-label="Ordenar productos"
             value={query.sort}
             onChange={(e) => onSort(e.target.value)}
@@ -60,7 +60,7 @@ export default function CatalogSearchControls({
                 {label}
               </option>
             ))}
-          </select></span>
+          </select>
         </label>
       )}
     </div>

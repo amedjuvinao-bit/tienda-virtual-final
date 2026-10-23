@@ -244,11 +244,10 @@ it('presenta todos los resultados en una cuadrícula sin destacar ninguno y perm
   expect(items).toHaveLength(6);
   expect(items.map(item => item.querySelector('h3').textContent)).toEqual(Array.from({ length: 6 }, (_, i) => `Artículo ${i}`));
   expect(items.every(item => item.className === 'cpv-product-item')).toBe(true);
-  expect(items.every(item => item.querySelector('.catalog-ecard').dataset.rim === 'optical')).toBe(true);
-  expect(rendered.container.querySelectorAll('.catalog-glass-defs filter')).toHaveLength(6);
+  expect(rendered.container.querySelectorAll('.look-glass-rim')).toHaveLength(6);
   expect(rendered.container.querySelector('.cpv-page')).toHaveAttribute('data-motion', 'none');
   rendered.unmount();
   mount({ showFilters: false, presentation: { rimStyle: 'none' } });
   await screen.findByText('Artículo 0');
-  expect([...document.querySelectorAll('.catalog-ecard')].every(card => card.dataset.rim === 'none')).toBe(true);
+  expect(document.querySelector('.look-glass-rim')).toBeNull();
 });

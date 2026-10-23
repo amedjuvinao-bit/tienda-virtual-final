@@ -6,6 +6,7 @@ import { useFavorites } from '../../context/FavoritesContext';
 import { buildCatalogCartIntent } from '../ProductCard';
 import { normalizeToCss } from './catalogColors';
 import './catalogEditorialCard.css';
+import LookGlassRim from '../LookGlassRim';
 
 const fonts = { cormorant: '"Catalog Editorial", Georgia, serif', playfair: '"Catalog Editorial", Georgia, serif', jost: 'Jost, system-ui, sans-serif', inter: 'Inter, system-ui, sans-serif' };
 const shadows = { none: 'none', soft: '0 8px 24px #5626330c', medium: '0 12px 28px #5626331c', strong: '0 18px 40px #5626332c' };
@@ -46,6 +47,8 @@ export default function CatalogEditorialCard({ product, config }) {
   };
   const favorite = <button type="button" className="catalog-ecard__favorite" aria-label="Favorito" aria-pressed={selected} onClick={() => toggleFavorite(product)} style={{ color: selected ? card.favoriteActiveColor : card.favoriteIconColor }}><Favorite size={17} strokeWidth={1.5} fill={selected && card.favoriteIconName !== 'sparkles' ? 'currentColor' : 'none'}/></button>;
   return <article className="catalog-ecard" data-rim={card.showBorder ? presentation.rimStyle : 'none'} style={style}>
+    {card.showBorder && presentation.rimStyle === 'optical' && <LookGlassRim variant="card" radius={card.cardRadiusPx}/>}
+
     <div className="catalog-ecard__photo">
       <Link className="catalog-ecard__photo-link" to={destination} aria-label={`Ver ${product.title}`}>
         <img src={cover} alt={product.title || ''} loading="lazy" decoding="async" onError={() => { if (!failedImage) setFailedImage(true); }}/>
