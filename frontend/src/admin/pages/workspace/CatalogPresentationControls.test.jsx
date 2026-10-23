@@ -40,8 +40,8 @@ it('permite cambiar los colores, materiales y adorno del encabezado desde el pan
   fireEvent.click(screen.getByRole('tab', {name:'Bolsas', exact:true}));
   fireEvent.change(screen.getByLabelText('Adorno del encabezado'), {target:{value:'none'}});
   fireEvent.click(screen.getByRole('tab', {name:'Cristal', exact:true}));
-  fireEvent.change(screen.getByLabelText('Desenfoque del encabezado (px)'), {target:{value:'0'}});
-  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#123456',headerReflection:0,headerIcon:'none',headerBlur:0});
+  fireEvent.click(screen.getByLabelText('Mostrar segunda capa de cristal'));
+  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#123456',headerReflection:0,headerIcon:'none',headerLayers:false});
 });
 
 it('muestra un tema a la vez y permite navegar las pestañas con el teclado sin perder cambios', async () => {
