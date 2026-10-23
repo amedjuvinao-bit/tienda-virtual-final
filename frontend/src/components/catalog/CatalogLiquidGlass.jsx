@@ -24,7 +24,7 @@ export default function CatalogLiquidGlass({ presentation }) {
     <svg className="catalog-liquid__filters" width="0" height="0" focusable="false">
       <defs>
         <CatalogGlassMaterialFilter id={`${id}-surface`} color={presentation.headerTint} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection}/>
-        <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} density={2.2}/>
+        <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} density={1.1} contourColor={presentation.headerTextColor} contourOpacity={.24}/>
       </defs>
     </svg>
     <div className="catalog-liquid__material">
