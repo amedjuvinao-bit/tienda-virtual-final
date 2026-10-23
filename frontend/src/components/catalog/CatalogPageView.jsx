@@ -10,6 +10,7 @@ import useCatalogProducts from "./useCatalogProducts";
 import CatalogFilterDrawer from "./CatalogFilterDrawer";
 import "./catalogPage.css";
 import "./catalogEditorial.css";
+import "./catalogIntro.css";
 import { catalogPresentationStyle } from "./catalogPresentation";
 import useCatalogDepth from "./useCatalogDepth";
 import CatalogSearchControls from "./CatalogSearchControls";

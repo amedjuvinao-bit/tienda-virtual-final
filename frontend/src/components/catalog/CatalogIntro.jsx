@@ -1,25 +1,27 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
+import CatalogGlassBags from './CatalogGlassBags';
 
 export default function CatalogIntro({ config: safeConfig, page }) {
+  const glass = safeConfig.presentation?.layout === 'glass-grid';
   const title = safeConfig.title || page?.name || 'Catálogo';
   const subtitle = safeConfig.subtitle, description = safeConfig.description;
   const titleImage = safeConfig.titleImage.trim(), titleImageAlt = safeConfig.titleImageAlt.trim() || title;
   return <>
               {safeConfig.showBreadcrumb && (
-                <nav className="cpv-breadcrumb">
+                <nav className="cpv-breadcrumb" aria-label="Ruta de navegación">
                   <Link to="/">Inicio</Link>
                   <span>›</span>
                   <span className="cpv-bc-current">{title}</span>
                 </nav>
               )}
 
-              <section className="cpv-hero">
+              <section className={`cpv-hero${glass ? ' cpv-hero-glass' : ''}`}>
                 <div className="cpv-hero-top">
                   {safeConfig.showHeroBadge && safeConfig.heroBadge && (
                     <div className="cpv-hero-badge">
-                      <Sparkles size={14} />
+                      {!glass && <Sparkles size={14} />}
                       {safeConfig.heroBadge}
                     </div>
                   )}
@@ -46,6 +48,7 @@ export default function CatalogIntro({ config: safeConfig, page }) {
                     ) : null}
                   </div>
                 </div>
+                {glass && <CatalogGlassBags />}
               </section>
 
   </>;
