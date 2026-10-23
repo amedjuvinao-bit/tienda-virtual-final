@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import LookEditorialGlass from "./LookEditorialGlass";
 import {
   LOOK_MAX_PRODUCTS,
   LOOK_SECTION_DEFAULTS,
@@ -107,7 +108,7 @@ function mapProductFromApi(product, ref) {
   };
 }
 
-export default function LookSection({ theme }) {
+export default function LookSection({ theme, previewProducts }) {
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
   const mobileSliderRef = useRef(null);
@@ -128,8 +129,10 @@ export default function LookSection({ theme }) {
   const config = lookSection.config;
   const style = lookSection.style;
 
-  const [products, setProducts] = useState([]);
-  const [selectedId, setSelectedId] = useState(config.selectedProductId || "");
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [loadedProductsKey, setLoadedProductsKey] = useState('');
+  const hasCustomHero = config.heroMode === "custom" && !!config.heroImage;
+  const [selectedId, setSelectedId] = useState(hasCustomHero ? "" : config.selectedProductId || "");
   const [loading, setLoading] = useState(false);
 
   const [zoomActive, setZoomActive] = useState(false);
@@ -177,58 +180,94 @@ export default function LookSection({ theme }) {
     return Math.min(12, Math.max(0, n));
   }, [style?.mobileSliderControlSeparatorWidthPx]);
 
+  const productRefsKey = JSON.stringify(
+    Array.isArray(config?.products) ? config.products.slice(0, LOOK_MAX_PRODUCTS) : []
+  );
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadProducts() {
-      const refs = Array.isArray(config?.products) ? config.products.slice(0, LOOK_MAX_PRODUCTS) : [];
+      const refs = JSON.parse(productRefsKey);
+      const productIds = [...new Set(refs.map((ref) => String(ref?.productId || "").trim()).filter(Boolean))];
 
-      if (!refs.length) {
-        setProducts([]);
+      if (lookSection.enabled === false || !productIds.length) {
+        setCatalogProducts([]);
+        setLoadedProductsKey(productRefsKey);
+        setLoading(false);
         return;
       }
 
       setLoading(true);
-
       try {
-        const results = await Promise.all(
-          refs.map(async (ref) => {
-            const productId = String(ref?.productId || "").trim();
-            if (!productId) return null;
+        const params = new URLSearchParams({
+          productKeys: productIds.join(","),
+          limit: String(productIds.length),
+        });
+        const res = await fetch(`${API_BASE}/api/products?${params.toString()}`);
+        if (!res.ok) throw new Error(`El catálogo respondió ${res.status}`);
 
-            try {
-              const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(productId)}`);
-              if (!res.ok) return null;
-              const data = await res.json();
-              const payload = data?.product || data?.data || data;
-              return mapProductFromApi(payload, ref);
-            } catch {
-              return null;
-            }
-          })
+        const data = await res.json();
+        const byId = new Map(
+          (Array.isArray(data?.products) ? data.products : []).map((product) => [
+            String(product?._id || product?.id || ""),
+            product,
+          ])
         );
-
         if (cancelled) return;
 
-        const clean = results.filter(Boolean).slice(0, LOOK_MAX_PRODUCTS);
-        setProducts(clean);
+        setCatalogProducts(
+          refs.map((ref) => mapProductFromApi(
+            byId.get(String(ref?.productId || "").trim()),
+            ref
+          )).filter(Boolean)
+        );
+        setLoadedProductsKey(productRefsKey);
+      } catch {
+        if (!cancelled) {
+          setCatalogProducts([]);
+          setLoadedProductsKey(productRefsKey);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     loadProducts();
-
     return () => {
       cancelled = true;
     };
-  }, [config?.products]);
+  }, [productRefsKey, lookSection.enabled]);
+
+  // Saved product details are used only by the admin preview. The storefront
+  // still relies on the live catalog and never receives previewProducts.
+  const draftProducts = useMemo(() => Array.isArray(previewProducts)
+    ? previewProducts.map((ref) => ({
+      id: String(ref?.productId || ''),
+      image: ref?.mainImage || '/placeholder.png',
+      subtitle: ref?.title || ref?.name || 'Producto seleccionado',
+      price: Number(ref?.price) || 0,
+      colors: Array.isArray(ref?.colors) ? ref.colors.map(normalizeColorHex).filter(Boolean) : [],
+    })).filter((product) => product.id)
+    : [], [previewProducts]);
+  const currentCatalogProducts = loadedProductsKey === productRefsKey ? catalogProducts : [];
+  const catalogById = new Map(currentCatalogProducts.map((product) => [product.id, product]));
+  const products = draftProducts.length
+    ? draftProducts.map((product) => catalogById.get(product.id) || product)
+    : currentCatalogProducts;
+  const usingDraft = draftProducts.some((product) => !catalogById.has(product.id));
+
+  useEffect(() => {
+    setSelectedId(hasCustomHero ? "" : config.selectedProductId || "");
+  }, [hasCustomHero, config.heroImage, config.selectedProductId]);
 
   useEffect(() => {
     if (!products.length) {
       setSelectedId("");
       return;
     }
+
+    if (hasCustomHero && !selectedId) return;
 
     const exists = products.some((p) => String(p.id) === String(selectedId));
     if (exists) return;
@@ -238,8 +277,8 @@ export default function LookSection({ theme }) {
         products.find((p) => String(p.id) === String(config.selectedProductId))) ||
       products[0];
 
-    setSelectedId(preferred?.id || "");
-  }, [products, selectedId, config?.selectedProductId]);
+    setSelectedId(hasCustomHero ? "" : preferred?.id || "");
+  }, [products, selectedId, config?.selectedProductId, hasCustomHero]);
 
   useEffect(() => {
     setZoomActive(false);
@@ -250,6 +289,8 @@ export default function LookSection({ theme }) {
   const selected = useMemo(() => {
     return products.find((p) => String(p.id) === String(selectedId)) || products[0] || null;
   }, [products, selectedId]);
+  const mainImage = hasCustomHero && !selectedId ? config.heroImage : selected?.image;
+  const mainImageAlt = hasCustomHero && !selectedId ? (config.titleText || "Imagen principal de la sección") : selected?.subtitle;
 
   const titleStyle = useMemo(() => buildTextStyleFrom(style, "title"), [style]);
   const descStyle = useMemo(() => buildTextStyleFrom(style, "desc"), [style]);
@@ -315,6 +356,41 @@ export default function LookSection({ theme }) {
     });
   }
 
+  function renderHeroCard(isMobile = false) {
+    if (!hasCustomHero) return null;
+
+    return (
+      <button
+        key="look-custom-hero"
+        data-story-actor="detail"
+        type="button"
+        aria-label="Mostrar imagen principal"
+        aria-pressed={!selectedId}
+        onClick={() => setSelectedId("")}
+        className={`group block self-start shrink-0 text-center transition-transform duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${isMobile ? "w-[calc(50%-6px)] snap-start" : "w-full"}`}
+        style={isMobile ? undefined : { maxWidth: thumbCardMaxWidthPx }}
+        onMouseEnter={(event) => {
+          event.currentTarget.style.transform = `scale(${style.thumbHoverScale}) rotate(${style.thumbHoverRotateDeg}deg)`;
+        }}
+        onMouseLeave={(event) => {
+          event.currentTarget.style.transform = "scale(1) rotate(0deg)";
+        }}
+      >
+        <span
+          className="block w-full overflow-hidden"
+          style={{
+            height: isMobile ? Math.max(150, Math.round(thumbHeightPx * 0.9)) : thumbHeightPx,
+            borderRadius: style.thumbRadiusPx,
+            boxShadow: style.thumbShadow ? "0 10px 24px rgba(0,0,0,0.12)" : "none",
+          }}
+        >
+          <img src={config.heroImage} alt="Portada de la sección" className="h-full w-full object-cover" draggable={false} />
+        </span>
+        <span className="mt-2 block leading-tight" style={thumbTitleStyle}>Imagen principal</span>
+      </button>
+    );
+  }
+
   function renderProductCard(prod, isMobile = false) {
     const favoritePayload = buildFavoritePayload(prod);
     const cartPayload = buildCartPayload(prod);
@@ -323,6 +399,7 @@ export default function LookSection({ theme }) {
     return (
       <div
         key={prod.id}
+        data-story-actor="product"
         className={isMobile ? "w-[calc(50%-6px)] shrink-0 snap-start" : "w-full"}
         style={isMobile ? undefined : { maxWidth: thumbCardMaxWidthPx }}
       >
@@ -452,8 +529,21 @@ export default function LookSection({ theme }) {
     );
   }
 
+  if (lookSection.enabled === false || !products.length) return null;
+
+  const previewWarning = usingDraft ? <p role="status" className="mx-auto mb-4 max-w-5xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">{loading || loadedProductsKey !== productRefsKey ? 'Cargando productos del catálogo; mientras tanto se muestran los datos guardados.' : 'Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar.'}</p> : null;
+
+  if (style.layoutPreset === "editorialGlass") {
+    return <>{previewWarning}<LookEditorialGlass config={config} style={style} products={products} mainImage={mainImage}
+      mainImageAlt={mainImageAlt} selectedId={selectedId} onSelect={setSelectedId}
+      onCart={(product) => addToCart(buildCartPayload(product))}
+      onFavorite={(product) => toggleFavorite(buildFavoritePayload(product))}
+      isFavorite={(product) => isFavorite(buildFavoritePayload(product))} loading={loading} /></>;
+  }
+
   return (
     <section style={wrapperStyle}>
+      {previewWarning}
       <div className="mx-auto md:hidden w-full mb-5">
         <div
           className={`w-full ${
@@ -490,10 +580,10 @@ export default function LookSection({ theme }) {
         className="mx-auto grid grid-cols-1 md:grid-cols-[2fr_1fr] items-start"
         style={contentStyle}
       >
-        <div className="relative">
+        <div className="relative" data-story-actor="hero">
           <div
             className={`${getAspectClass(style.mainImageAspect)} relative w-full overflow-hidden group ${
-              selected ? "cursor-none" : ""
+              mainImage ? "cursor-none" : ""
             }`}
             style={{
               borderRadius: style.mainImageRadiusPx,
@@ -503,7 +593,7 @@ export default function LookSection({ theme }) {
               boxShadow: style.mainImageShadow ? "0 20px 40px rgba(0,0,0,0.12)" : "none",
             }}
             onMouseEnter={() => {
-              if (selected) setZoomActive(true);
+              if (mainImage) setZoomActive(true);
             }}
             onMouseMove={handleMainImageMouseMove}
             onMouseLeave={() => {
@@ -512,11 +602,11 @@ export default function LookSection({ theme }) {
               setLensPosition({ x: 50, y: 50 });
             }}
           >
-            {selected ? (
+            {mainImage ? (
               <>
                 <img
-                  src={selected.image}
-                  alt={selected.subtitle}
+                  src={mainImage}
+                  alt={mainImageAlt}
                   className="w-full h-full object-cover select-none transition-transform duration-150 ease-out"
                   draggable={false}
                   style={{
@@ -620,16 +710,17 @@ export default function LookSection({ theme }) {
           <div className="w-full md:hidden">
             <div
               ref={mobileSliderRef}
-              className="look-mobile-slider flex overflow-x-auto snap-x snap-mandatory"
+              className="look-mobile-slider flex items-start overflow-x-auto snap-x snap-mandatory"
               style={{
                 gap: safeMobileSliderGapPx,
                 paddingBottom: 4,
               }}
             >
+              {renderHeroCard(true)}
               {products.map((prod) => renderProductCard(prod, true))}
             </div>
 
-            {products.length > 2 ? (
+            {products.length + Number(hasCustomHero) > 2 ? (
               <div
                 className="flex items-center justify-center"
                 style={{ marginTop: safeMobileSliderControlMarginTopPx }}
@@ -687,13 +778,14 @@ export default function LookSection({ theme }) {
           </div>
 
           <div
-            className="look-thumb-grid hidden md:grid w-full"
+            className="look-thumb-grid hidden md:grid w-full items-start"
             style={{
               gap: style.thumbGapPx,
               gridTemplateColumns: `repeat(${style.thumbGridColsMobile}, minmax(0, 1fr))`,
               justifyItems: "center",
             }}
           >
+            {renderHeroCard(false)}
             {products.map((prod) => renderProductCard(prod, false))}
           </div>
         </div>

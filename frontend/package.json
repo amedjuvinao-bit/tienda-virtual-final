@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:appearance-closure": "vitest run src/admin/appearance src/admin/AppearancePage.initialLoad.test.jsx src/admin/AppearancePage.save.test.jsx src/admin/AppearancePage.generalUpload.test.jsx src/components src/lib/storefront src/theme",
     "dev": "vite",
     "build": "vite build",
     "audit:admin-mobile": "node scripts/auditAdminMobile.mjs",
@@ -51,6 +52,7 @@
     "test:orders-manual-order-form": "vitest run src/admin/orders/components/ManualOrderModal.test.jsx",
     "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:configuration-level-plus-stage0": "vitest run src/admin/configuracion/ConfigurationStage0.test.js",
+    "test:appearance-stage1": "vitest run src/admin/AppearancePage.initialLoad.test.jsx src/admin/AppearancePage.save.test.jsx",
     "test:admin-audit-logs-level-plus": "vitest run src/admin/configuracion/sections/LogsSection.test.jsx",
     "test:admin-users-stage1": "vitest run src/admin/users/AdminUsersStage1.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
     "test:admin-users-stage2": "vitest run src/admin/users/AdminUsersStage1.test.jsx src/admin/users/AdminUsersStage2.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",

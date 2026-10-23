@@ -1,10 +1,15 @@
 // src/components/TrendingSection.jsx
-import { Star, ShoppingCart } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Star, Heart, ShoppingCart } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import { normalizeTrendingPresentation, trendingPresentationVars } from "./trendingPresentation";
+import boutiqueBackdrop from "../assets/trending-vitrine-boutique.webp";
+import runwayBackdrop from "../assets/trending-runway-mobile.webp";
+import TrendingMobileRunway from "./TrendingMobileRunway";
+import "./trendingFloatingGlass.css";
 
 function moneyCOP(value) {
   const n = Number(value);
@@ -73,56 +78,9 @@ function uniqueStrings(arr) {
   return out;
 }
 
-export default function TrendingSection({ theme }) {
+export default function TrendingSection({ theme, previewProducts }) {
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
-
-  const fallbackProducts = [
-    {
-      id: 1,
-      image1: "/Tendencia1a.jpg",
-      image2: "/Tendencia1b.jpg",
-      name: "Vestido Rosado Elegante",
-      price: 129000,
-      finalPrice: 103200,
-      hasDiscount: true,
-      discountPercent: 20,
-      features: ["Talla S/M/L", "Tela lino", "Edición limitada"],
-    },
-    {
-      id: 2,
-      image1: "/Tendencia2b.jpg",
-      image2: "/Tendencia2a.jpg",
-      name: "Bolso Floral Chic",
-      price: 95000,
-      finalPrice: 95000,
-      hasDiscount: false,
-      discountPercent: 0,
-      features: ["Cuero sintético", "Color rosa pastel", "Correa ajustable"],
-    },
-    {
-      id: 3,
-      image1: "/Tendencia3a.jpg",
-      image2: "/Tendencia3b.jpg",
-      name: "Vestido Largo Vintage",
-      price: 165000,
-      finalPrice: 132000,
-      hasDiscount: true,
-      discountPercent: 20,
-      features: ["Encaje", "Colores tierra", "Talla única"],
-    },
-    {
-      id: 4,
-      image1: "/Tendencia4b.jpg",
-      image2: "/Tendencia4a.jpg",
-      name: "Perfume Rosa Gardenia",
-      price: 72000,
-      finalPrice: 72000,
-      hasDiscount: false,
-      discountPercent: 0,
-      features: ["50 ml", "Aroma floral", "Duración 12h+"],
-    },
-  ];
 
   const tendenciaSection = useMemo(() => {
     const list = Array.isArray(theme?.sections) ? theme.sections : [];
@@ -132,6 +90,35 @@ export default function TrendingSection({ theme }) {
   const config = useMemo(() => {
     return tendenciaSection?.config && typeof tendenciaSection.config === "object" ? tendenciaSection.config : null;
   }, [tendenciaSection]);
+  const presentation = normalizeTrendingPresentation(config?.presentation);
+  const floatingGlass = presentation.mode === "floatingGlass";
+  const viewportRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(() => Boolean(window.matchMedia?.("(max-width: 767px)")?.matches));
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 767px)");
+    if (!media) return undefined;
+    const update = () => setIsMobile(viewportRef.current?.clientWidth > 0
+      ? viewportRef.current.clientWidth < 768 : media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+  const mobileRunway = floatingGlass && isMobile;
+  const floatingTextStyle = (existing, color, fontSize) => floatingGlass ? { ...existing, color, ...(fontSize ? { fontSize } : {}) } : existing;
+  const mobileSolidBackground = mobileRunway && presentation.mobileBackgroundMode === "color";
+  const mobileCustomBackground = mobileRunway && presentation.mobileBackgroundMode === "custom" && presentation.mobileBackgroundImage;
+  const sceneImage = mobileSolidBackground ? "" : mobileCustomBackground || (presentation.backdropMode === "custom" ? presentation.backgroundImage
+    : presentation.backdropMode === "boutique" ? (mobileRunway ? runwayBackdrop : boutiqueBackdrop) : "");
+  const floatingSectionStyle = floatingGlass ? {
+    ...trendingPresentationVars(presentation),
+    ...(mobileSolidBackground ? { "--trending-background": presentation.mobileBackgroundColor } : {}),
+    "--trending-scene-image": sceneImage ? `url("${sceneImage}")` : "none",
+    ...(sceneImage ? {
+      backgroundImage: `radial-gradient(ellipse at 9% 30%, rgba(var(--trending-glow-rgb), calc(var(--trending-glow-strength) * .22)), transparent 42%), linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,.12)), url("${sceneImage}")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    } : {}),
+  } : undefined;
 
   const sectionStyle = useMemo(() => {
     const st = tendenciaSection?.style && typeof tendenciaSection.style === "object" ? tendenciaSection.style : {};
@@ -199,11 +186,11 @@ export default function TrendingSection({ theme }) {
 
     return {
       favorite: {
-        enabled: typeof fav.enabled === "boolean" ? fav.enabled : true,
+        enabled: typeof raw.favoritesEnabled === "boolean" ? raw.favoritesEnabled : typeof fav.enabled === "boolean" ? fav.enabled : true,
         link: typeof fav.link === "string" && fav.link.trim() ? fav.link.trim() : "/favoritos",
       },
       cart: {
-        enabled: typeof cart.enabled === "boolean" ? cart.enabled : true,
+        enabled: typeof raw.cartEnabled === "boolean" ? raw.cartEnabled : typeof cart.enabled === "boolean" ? cart.enabled : true,
         link: typeof cart.link === "string" && cart.link.trim() ? cart.link.trim() : "/carrito",
       },
     };
@@ -255,8 +242,9 @@ export default function TrendingSection({ theme }) {
     return Math.max(0, Math.min(24, n));
   }, [config]);
 
+  const productRefsKey = JSON.stringify(Array.isArray(config?.products) ? config.products : []);
   const refs = useMemo(() => {
-    const arr = Array.isArray(config?.products) ? config.products : [];
+    const arr = JSON.parse(productRefsKey);
 
     return arr
       .map((r) => {
@@ -289,80 +277,38 @@ export default function TrendingSection({ theme }) {
       })
       .filter((r) => r.productId)
       .slice(0, maxItems);
-  }, [config, maxItems]);
+  }, [productRefsKey, maxItems]);
 
-  const shouldUseConfig = !!config && tendenciaSection?.enabled !== false && refs.length > 0;
+  const shouldUseConfig = tendenciaSection?.enabled !== false && refs.length > 0 && maxItems > 0;
 
-  const [remoteProducts, setRemoteProducts] = useState([]);
-  const [remoteLoading, setRemoteLoading] = useState(false);
-  const [remoteError, setRemoteError] = useState(null);
+  const [remoteResult, setRemoteResult] = useState({ key: "", products: [], status: "loading" });
+  const requestKey = `${productRefsKey}:${maxItems}`;
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       if (!shouldUseConfig) {
-        setRemoteProducts([]);
-        setRemoteLoading(false);
-        setRemoteError(null);
+        setRemoteResult({ key: requestKey, products: [], status: "ready" });
         return;
       }
 
-      setRemoteLoading(true);
-      setRemoteError(null);
+      setRemoteResult({ key: requestKey, products: [], status: "loading" });
 
       try {
         const uniqueIds = Array.from(new Set(refs.map((r) => r.productId)));
 
-        const results = await Promise.all(
-          uniqueIds.map(async (id) => {
-            const url = `${API_BASE}/api/products/${encodeURIComponent(id)}`;
-
-            try {
-              const res = await fetch(url);
-
-              if (!res.ok) {
-                let bodyText = "";
-                try {
-                  bodyText = await res.text();
-                } catch {
-                  bodyText = "";
-                }
-                return { __error: true, id, url, status: res.status, body: bodyText };
-              }
-
-              const data = await res.json();
-              return { __error: false, id, url, data };
-            } catch (err) {
-              return {
-                __error: true,
-                id,
-                url,
-                status: 0,
-                body: err?.message || "Fetch failed",
-              };
-            }
-          })
-        );
-
-        if (cancelled) return;
-
-        const errors = results.filter((r) => r && r.__error);
-        const oks = results.filter((r) => r && !r.__error).map((r) => r.data);
-
-        if (oks.length === 0) {
-          setRemoteProducts([]);
-          setRemoteLoading(false);
-
-          const first = errors[0];
-          setRemoteError({
-            message: "No se pudo cargar ningún producto desde /api/products/:id",
-            firstFail: first || null,
-            totalFails: errors.length,
-            totalIds: uniqueIds.length,
-          });
-          return;
+        const params = new URLSearchParams({
+          productKeys: uniqueIds.join(","),
+          limit: String(Math.max(1, uniqueIds.length)),
+        });
+        const url = `${API_BASE}/api/products?${params.toString()}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`El catálogo respondió ${res.status} al consultar los productos seleccionados.`);
         }
+        const payload = await res.json();
+        const oks = Array.isArray(payload?.products) ? payload.products : [];
 
         const byId = new Map();
         for (const p of oks) {
@@ -425,26 +371,12 @@ export default function TrendingSection({ theme }) {
           })
           .filter(Boolean);
 
-        setRemoteProducts(normalized);
-        setRemoteLoading(false);
-
-        const missing = refs.filter((r) => !byId.has(String(r.productId))).map((r) => r.productId);
-        if (missing.length > 0) {
-          setRemoteError({
-            message:
-              "Algunos IDs no devolvieron producto (revisa si existen en MongoDB o si el endpoint retorna otro formato).",
-            missingIds: missing.slice(0, 10),
-            totalMissing: missing.length,
-          });
-        }
+        if (cancelled) return;
+        setRemoteResult({ key: requestKey, products: normalized, status: "ready" });
       } catch (err) {
         if (cancelled) return;
-        setRemoteProducts([]);
-        setRemoteLoading(false);
-        setRemoteError({
-          message: "Error general cargando productos de tendencia.",
-          details: err?.message || String(err),
-        });
+        setRemoteResult({ key: requestKey, products: [], status: "error" });
+        console.warn("No se pudieron cargar los productos de Tendencia:", err);
       }
     }
 
@@ -452,14 +384,31 @@ export default function TrendingSection({ theme }) {
     return () => {
       cancelled = true;
     };
-  }, [refs, shouldUseConfig]);
+  }, [refs, shouldUseConfig, requestKey]);
 
-  const mustUseRemoteOnly = shouldUseConfig;
-
-  const productsToRender = useMemo(() => {
-    if (!mustUseRemoteOnly) return fallbackProducts;
-    return remoteProducts;
-  }, [mustUseRemoteOnly, remoteProducts]);
+  const catalogProducts = shouldUseConfig && remoteResult.key === requestKey
+    ? remoteResult.products.slice(0, maxItems)
+    : [];
+  // The editor can still show the saved draft when a product has disappeared
+  // from the catalog. The public storefront never receives previewProducts.
+  const draftProducts = Array.isArray(previewProducts) ? previewProducts.slice(0, maxItems) : [];
+  const catalogById = new Map(catalogProducts.map((product) => [product.id, product]));
+  const usingDraft = shouldUseConfig && draftProducts.some((product) => !catalogById.has(product.id));
+  const productsToRender = shouldUseConfig && draftProducts.length
+    ? draftProducts.map((product) => catalogById.get(product.id) || product)
+    : catalogProducts;
+  const hasProducts = productsToRender.length > 0;
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element || !floatingGlass) return undefined;
+    // clientWidth is unscaled, so the admin's mobile canvas works inside a desktop window too.
+    const measure = () => { if (element.clientWidth > 0) setIsMobile(element.clientWidth < 768); };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasProducts, floatingGlass]);
 
   function buildCartPayload(product) {
     return {
@@ -484,79 +433,43 @@ export default function TrendingSection({ theme }) {
     };
   }
 
-  if (mustUseRemoteOnly && remoteError && (!remoteProducts || remoteProducts.length === 0)) {
-    return (
-      <section id="tendencia" className="pb-24 pt-5 relative overflow-hidden">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-5">
-            <div className="flex items-center justify-center">
-              <img
-                src={titleImage}
-                alt="En tendencia"
-                className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none"
-              />
-            </div>
-          </div>
+  if (!productsToRender.length) return null;
 
-          <div className="border border-red-300 bg-red-50 rounded-xl p-4 text-sm text-red-800">
-            <div className="font-extrabold mb-2">Error cargando productos de “En Tendencia”</div>
-            <div className="mb-2">{remoteError.message}</div>
-
-            {remoteError.firstFail ? (
-              <div className="text-xs whitespace-pre-wrap bg-white/70 border border-red-200 rounded-lg p-3">
-                <div>
-                  <b>URL:</b> {remoteError.firstFail.url}
-                </div>
-                <div>
-                  <b>Status:</b> {remoteError.firstFail.status}
-                </div>
-                {remoteError.firstFail.body ? (
-                  <div className="mt-2">
-                    <b>Body:</b>
-                    <div className="mt-1">{remoteError.firstFail.body.slice(0, 300)}</div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="mt-3 text-xs text-red-700">
-              <b>API_BASE usado:</b> {API_BASE}
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (mobileRunway) return <section ref={viewportRef} className="relative overflow-hidden trending-section--floating-glass trending-section--mobile-runway"
+    style={floatingSectionStyle}>
+    <div className="trending-section__content">
+      {usingDraft && <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">
+        {remoteResult.key !== requestKey || remoteResult.status === "loading"
+          ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados."
+          : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}
+      </p>}
+      <TrendingMobileRunway key={productsToRender.map((product) => product.id).join("|")} products={productsToRender}
+        title={config?.title} titleImage={titleImage} presentation={presentation} fields={sectionStyle}
+        favoriteEnabled={actions.favorite.enabled} isFavorite={(product) => isFavorite(buildFavoritePayload(product))}
+        onFavorite={(product) => toggleFavorite(buildFavoritePayload(product))} />
+    </div>
+  </section>;
 
   return (
-    <section id="tendencia" className="pb-24 pt-5 relative overflow-hidden">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="text-center mb-5">
-          <div className="flex items-center justify-center">
-            <img
-              src={titleImage}
-              alt="En tendencia"
-              className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none"
-            />
+    <section ref={viewportRef} className={`pb-24 pt-5 relative overflow-hidden ${floatingGlass ? "trending-section--floating-glass" : ""}`} style={floatingSectionStyle}>
+      <div className={floatingGlass ? "trending-section__content max-w-6xl mx-auto px-4" : "max-w-6xl mx-auto px-4"}>
+        {usingDraft ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900" role="status">{remoteResult.key !== requestKey || remoteResult.status === "loading" ? "Cargando productos del catálogo; mientras tanto se muestran los datos guardados." : "Algunos productos no están disponibles en el catálogo. Se muestran sus datos guardados; comprueba los vínculos antes de publicar."}</p> : null}
+        <div className={floatingGlass ? "text-center mb-3" : "text-center mb-5"}>
+          <div className={`flex items-center justify-center trending-section__heading ${presentation.ornamentEnabled ? "" : "trending-section__heading--plain"}`}>
+            {floatingGlass && presentation.titleMode === "text" ? (
+              <h2 className="trending-section__title" style={{ "--trending-title-ink": presentation.titleColor, color: presentation.titleColor, fontSize: `clamp(18px, 5vw, ${presentation.titleSizePx}px)`, fontFamily: presentation.titleFontFamily }}>
+                {String(config?.title || "EN TENDENCIA")}
+              </h2>
+            ) : (
+              <img src={titleImage} alt="En tendencia" className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none" />
+            )}
           </div>
         </div>
 
-        {mustUseRemoteOnly && remoteError && remoteProducts.length > 0 ? (
-          <div className="mb-3 border border-amber-200 bg-amber-50 rounded-xl p-3 text-xs text-amber-900">
-            <div className="font-extrabold">Aviso</div>
-            <div>{remoteError.message}</div>
-            {remoteError.missingIds ? (
-              <div className="mt-1">
-                <b>IDs faltantes (muestra):</b> {remoteError.missingIds.join(", ")}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: sectionStyle.spacingPx }}>
+        <div className={`grid grid-cols-2 md:grid-cols-4 ${floatingGlass ? "trending-section__stage" : ""}`} style={{ gap: sectionStyle.spacingPx }}>
           {productsToRender.map((product, index) => {
             const radius = sectionStyle.cardRadiusPx;
-            const imgH = sectionStyle.imageHeightPx;
+            const imgH = floatingGlass ? presentation.imageHeightPx : sectionStyle.imageHeightPx;
 
             const mobileImgHeight = Math.max(145, Math.round(imgH * 0.66));
             const tabletImgHeight = Math.max(165, Math.round(imgH * 0.78));
@@ -574,6 +487,7 @@ export default function TrendingSection({ theme }) {
 
             const showDescription =
               sectionStyle.showDescription &&
+              (!floatingGlass || presentation.showDescription) &&
               !featuresList.length &&
               typeof product.description === "string" &&
               product.description.trim();
@@ -614,57 +528,41 @@ export default function TrendingSection({ theme }) {
             const favoritePayload = buildFavoritePayload(product);
             const cartPayload = buildCartPayload(product);
             const favoriteActive = isFavorite(favoritePayload);
+            const cardActions = (
+              <div className={`trending-card__actions ${floatingGlass ? "" : "absolute top-2 right-2 z-30 flex flex-col gap-1.5 md:gap-2"}`}>
+                {actions.favorite.enabled ? (
+                  <button type="button" title={favoriteActive ? "Quitar de favoritos" : "Agregar a favoritos"}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(favoritePayload); }}
+                    className={`trending-card__action ${floatingGlass ? "" : "w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"}`}>
+                    {floatingGlass ? <Heart className={`w-4 h-4 ${favoriteActive ? "fill-current" : ""}`} /> : <Star className={`w-3.5 h-3.5 md:w-4 md:h-4 transition ${favoriteActive ? "text-yellow-500 fill-yellow-500" : "text-pink-600"}`} />}
+                  </button>
+                ) : null}
+                {actions.cart.enabled ? (
+                  <button type="button" title="Agregar al carrito"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToCart(cartPayload); }}
+                    className={`trending-card__action ${floatingGlass ? "" : "w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"}`}>
+                    <ShoppingCart className={`w-3.5 h-3.5 md:w-4 md:h-4 ${floatingGlass ? "" : "text-pink-600"}`} />
+                  </button>
+                ) : null}
+              </div>
+            );
 
             return (
-              <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block">
+              <Link key={product.id ?? index} to={`/producto/${product.id}`} className="block" data-story-actor="product" title={floatingGlass ? product.name : undefined}>
                 <div
-                  className="relative group bg-white border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col"
-                  style={{ borderRadius: radius, overflow: "hidden" }}
+                  className={floatingGlass ? "relative group trending-card--floating-glass" : "relative group bg-white border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col"}
+                  style={floatingGlass ? undefined : { borderRadius: radius, overflow: "hidden" }}
                 >
-                  {product.hasDiscount ? (
+                  {product.hasDiscount && !floatingGlass ? (
                     <div className="absolute top-2 left-2 z-30 bg-pink-100 text-pink-700 text-[9px] md:text-[11px] font-extrabold px-2 py-[3px] md:py-1 rounded-full border border-pink-200">
                       -{product.discountPercent}%
                     </div>
                   ) : null}
 
-                  <div className="absolute top-2 right-2 z-30 flex flex-col gap-1.5 md:gap-2">
-                    {actions.favorite.enabled ? (
-                      <button
-                        type="button"
-                        title={favoriteActive ? "Quitar de favoritos" : "Agregar a favoritos"}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleFavorite(favoritePayload);
-                        }}
-                        className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"
-                      >
-                        <Star
-                          className={`w-3.5 h-3.5 md:w-4 md:h-4 transition ${
-                            favoriteActive ? "text-yellow-500 fill-yellow-500" : "text-pink-600"
-                          }`}
-                        />
-                      </button>
-                    ) : null}
-
-                    {actions.cart.enabled ? (
-                      <button
-                        type="button"
-                        title="Agregar al carrito"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          addToCart(cartPayload);
-                        }}
-                        className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center hover:scale-105 transition"
-                      >
-                        <ShoppingCart className="w-3.5 h-3.5 md:w-4 md:h-4 text-pink-600" />
-                      </button>
-                    ) : null}
-                  </div>
+                  {!floatingGlass ? cardActions : null}
 
                   <div
-                    className="relative md:h-[var(--img-h-desktop)] sm:h-[var(--img-h-tablet)] h-[var(--img-h-mobile)]"
+                    className="trending-card__photo relative md:h-[var(--img-h-desktop)] sm:h-[var(--img-h-tablet)] h-[var(--img-h-mobile)]"
                     style={{
                       "--img-h-mobile": `${mobileImgHeight}px`,
                       "--img-h-tablet": `${tabletImgHeight}px`,
@@ -685,49 +583,50 @@ export default function TrendingSection({ theme }) {
                     />
                   </div>
 
-                  <div className="px-2.5 md:px-3 pt-2 md:pt-2.5 pb-2 relative overflow-hidden flex-1 min-h-[108px] sm:min-h-[126px] md:min-h-[180px]">
-                    {watermarkImage ? (
+                  <div className={floatingGlass ? "trending-card__dock" : "px-2.5 md:px-3 pt-2 md:pt-2.5 pb-2 relative overflow-hidden flex-1 min-h-[108px] sm:min-h-[126px] md:min-h-[180px]"}>
+                    {floatingGlass ? cardActions : null}
+                    {watermarkImage && (!floatingGlass || presentation.showWatermark) ? (
                       <img
                         src={watermarkImage}
                         alt=""
                         className="absolute pointer-events-none select-none"
                         style={{
-                          width: watermark.sizePx,
+                          width: floatingGlass ? Math.min(watermark.sizePx, 70) : watermark.sizePx,
                           height: "auto",
-                          opacity: watermark.opacity,
+                          opacity: floatingGlass ? Math.min(watermark.opacity, .1) : watermark.opacity,
                           zIndex: 0,
-                          ...watermarkStyle,
+                          ...(floatingGlass ? { right: 8, bottom: 8 } : watermarkStyle),
                         }}
                         draggable={false}
                       />
                     ) : null}
 
-                    <div className="relative z-10">
+                    <div className="relative z-10 trending-card__details" style={floatingGlass ? { "--trending-card-title-size": `${presentation.productTitleSizePx}px`, "--trending-card-price-size": `${presentation.priceSizePx}px`, "--trending-card-meta-size": `${presentation.metaSizePx}px` } : undefined}>
                       <h3
                         className="text-[10px] md:text-sm font-extrabold text-gray-900 leading-snug line-clamp-1"
-                        style={sectionStyle.titleStyle}
+                        style={floatingTextStyle(sectionStyle.titleStyle, presentation.cardTitleColor, presentation.productTitleSizePx)}
                       >
                         {product.name}
                       </h3>
 
-                      <div className="mt-1 flex items-end justify-between gap-1.5 md:gap-2">
-                        <div className="flex items-end gap-1.5 md:gap-2 min-w-0">
+                      <div className={floatingGlass ? "trending-card__pricing" : "mt-1 flex items-end justify-between gap-1.5 md:gap-2"}>
+                        <div className={floatingGlass ? "trending-card__price-line" : "flex items-end gap-1.5 md:gap-2 min-w-0"}>
                           {product.hasDiscount ? (
                             <>
-                              <span className="text-[9px] md:text-[12px] text-gray-400 line-through font-bold">
+                              <span className="text-[9px] md:text-[12px] text-gray-400 line-through font-bold" style={floatingGlass ? { color: presentation.cardMutedColor, fontSize: presentation.oldPriceSizePx } : undefined}>
                                 {moneyCOP(product.price)}
                               </span>
                               <span
-                                className="text-[12px] md:text-base text-pink-700 font-extrabold tracking-tight"
-                                style={sectionStyle.priceStyle}
+                                className="trending-card__price text-[12px] md:text-base text-pink-700 font-extrabold tracking-tight"
+                                style={floatingTextStyle(sectionStyle.priceStyle, presentation.cardPriceColor, presentation.priceSizePx)}
                               >
                                 {moneyCOP(product.finalPrice)}
                               </span>
                             </>
                           ) : (
                             <span
-                              className="text-[12px] md:text-base text-gray-900 font-extrabold tracking-tight"
-                              style={sectionStyle.priceStyle}
+                              className="trending-card__price text-[12px] md:text-base text-gray-900 font-extrabold tracking-tight"
+                              style={floatingTextStyle(sectionStyle.priceStyle, presentation.cardPriceColor, presentation.priceSizePx)}
                             >
                               {moneyCOP(product.price)}
                             </span>
@@ -735,19 +634,19 @@ export default function TrendingSection({ theme }) {
                         </div>
 
                         {product.hasDiscount ? (
-                          <span className="text-[8px] md:text-[11px] font-extrabold text-pink-700 bg-pink-50 border border-pink-100 px-1.5 md:px-2 py-[2px] rounded-full whitespace-nowrap">
+                          <span className="trending-card__discount text-[8px] md:text-[11px] font-extrabold text-pink-700 bg-pink-50 border border-pink-100 px-1.5 md:px-2 py-[2px] rounded-full whitespace-nowrap">
                             Ahorra {product.discountPercent}%
                           </span>
                         ) : null}
                       </div>
 
                       {showMetaBlock ? (
-                        <div className="mt-1.5 md:mt-2 rounded-xl bg-transparent px-0 py-0 border-0 shadow-none">
+                        <div className={floatingGlass ? "trending-card__metadata rounded-xl bg-transparent px-0 py-0 border-0 shadow-none" : "mt-1.5 md:mt-2 rounded-xl bg-transparent px-0 py-0 border-0 shadow-none"}>
                           {sectionStyle.showSizes && sizesArrAll.length ? (
-                            <div className="flex items-start gap-1.5 md:gap-2">
+                            <div className={`flex items-start gap-1.5 md:gap-2 ${floatingGlass ? "trending-card__meta-row" : ""}`}>
                               <div
-                                className="shrink-0 text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
-                                style={sectionStyle.metaStyle}
+                                className="trending-card__meta-label shrink-0 text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
+                                style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                               >
                                 TALLAS
                               </div>
@@ -756,8 +655,8 @@ export default function TrendingSection({ theme }) {
                                 {sizesToShow.map((sz) => (
                                   <span
                                     key={sz}
-                                    className="px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-800 border border-[#ead1db] bg-transparent rounded-lg"
-                                    style={sectionStyle.metaStyle}
+                                    className="trending-card__size px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-800 border border-[#ead1db] bg-transparent rounded-lg"
+                                    style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                     title={`Talla ${sz}`}
                                   >
                                     {sz}
@@ -766,8 +665,8 @@ export default function TrendingSection({ theme }) {
 
                                 {extraSizes > 0 ? (
                                   <span
-                                    className="px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-500 border border-[#ead1db] bg-transparent rounded-lg"
-                                    style={sectionStyle.metaStyle}
+                                    className={`px-1.5 md:px-2 py-[2px] md:py-[3px] text-[9px] md:text-[11px] font-extrabold text-gray-500 border border-[#ead1db] bg-transparent rounded-lg ${floatingGlass ? "trending-card__size" : ""}`}
+                                    style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                     title={`${extraSizes} tallas más`}
                                   >
                                     +{extraSizes}
@@ -779,10 +678,10 @@ export default function TrendingSection({ theme }) {
 
                           {sectionStyle.showColors && colorsHex.length ? (
                             <div className={sectionStyle.showSizes && sizesArrAll.length ? "mt-1" : ""}>
-                              <div className="flex items-center justify-between gap-1.5 md:gap-2">
+                              <div className={`flex items-center justify-between gap-1.5 md:gap-2 ${floatingGlass ? "trending-card__meta-row" : ""}`}>
                                 <div
-                                  className="text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
-                                  style={sectionStyle.metaStyle}
+                                  className="trending-card__meta-label text-[9px] md:text-[11px] font-extrabold tracking-wide text-gray-700"
+                                  style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                 >
                                   COLORES
                                 </div>
@@ -799,7 +698,7 @@ export default function TrendingSection({ theme }) {
                                   {colorsHex.length > colorsToShow.length ? (
                                     <span
                                       className="text-[9px] md:text-[11px] font-extrabold text-gray-500 ml-1"
-                                      style={sectionStyle.metaStyle}
+                                      style={floatingTextStyle(sectionStyle.metaStyle, presentation.cardMetaColor, presentation.metaSizePx)}
                                       title={`${colorsHex.length - colorsToShow.length} colores más`}
                                     >
                                       +{colorsHex.length - colorsToShow.length}
@@ -812,12 +711,12 @@ export default function TrendingSection({ theme }) {
                         </div>
                       ) : null}
 
-                      {sectionStyle.showFeatures && featuresList.length ? (
+                      {sectionStyle.showFeatures && (!floatingGlass || presentation.showDescription) && featuresList.length ? (
                         <ul className="mt-1.5 text-[9px] md:text-[11px] text-gray-600 space-y-0.5">
                           {featuresList.map((f, i) => (
                             <li key={i} className="flex gap-1.5 md:gap-2 leading-snug line-clamp-1">
                               <span className="text-pink-600 font-extrabold">•</span>
-                              <span className="font-semibold" style={sectionStyle.descStyle}>
+                              <span className="font-semibold" style={floatingTextStyle(sectionStyle.descStyle, presentation.cardDescColor, presentation.descSizePx)}>
                                 {f}
                               </span>
                             </li>
@@ -828,7 +727,7 @@ export default function TrendingSection({ theme }) {
                       {showDescription ? (
                         <p
                           className="mt-1.5 text-[9px] md:text-[11px] text-gray-600 leading-snug line-clamp-1"
-                          style={sectionStyle.descStyle}
+                          style={floatingTextStyle(sectionStyle.descStyle, presentation.cardDescColor, presentation.descSizePx)}
                         >
                           {product.description}
                         </p>
@@ -841,9 +740,6 @@ export default function TrendingSection({ theme }) {
           })}
         </div>
 
-        {mustUseRemoteOnly && remoteLoading ? (
-          <div className="mt-4 text-center text-xs text-gray-500">Cargando productos…</div>
-        ) : null}
       </div>
     </section>
   );

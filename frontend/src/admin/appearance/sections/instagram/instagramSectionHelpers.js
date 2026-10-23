@@ -63,7 +63,7 @@ export const INSTAGRAM_SECTION_DEFAULTS = {
     titleFontSizePx: 28,
     titleFontWeight: 700,
 
-    profileLink: "https://instagram.com",
+    profileLink: "",
     profileUser: "",
 
     userTextColor: "#111111",
@@ -254,7 +254,7 @@ export function normalizeInstagramSection(section) {
       ),
 
       profileLink:
-        typeof cfg.profileLink === "string" && cfg.profileLink.trim()
+        typeof cfg.profileLink === "string"
           ? cfg.profileLink
           : base.config.profileLink,
 
@@ -553,6 +553,7 @@ export function normalizeInstagramSection(section) {
 
       posts: Array.isArray(cfg.posts)
         ? cfg.posts.map((p, i) => ({
+            ...p,
             id: p?.id || `post_${i + 1}`,
             image: p?.image || "",
             link: p?.link || "",

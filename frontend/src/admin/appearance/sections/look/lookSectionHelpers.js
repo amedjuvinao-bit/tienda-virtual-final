@@ -4,6 +4,17 @@ export const LOOK_SECTION_ID = "look";
 
 export const LOOK_MAX_PRODUCTS = 6;
 
+const EDITORIAL_CARD_TEXT_DEFAULTS = {
+  titleColor: "#5d3446",
+  priceColor: "#c54a69",
+  titleFontFamily: '"Cormorant Garamond", Georgia, serif',
+  priceFontFamily: '"Manrope", system-ui, sans-serif',
+  titleWeight: 600,
+  priceWeight: 600,
+  titleSizePx: 12,
+  priceSizePx: 13,
+};
+
 export const LOOK_SECTION_DEFAULTS = {
   id: LOOK_SECTION_ID,
   type: "look",
@@ -18,6 +29,11 @@ export const LOOK_SECTION_DEFAULTS = {
       "¡Descubre nuestros looks pensados para bautizos, celebraciones y recuerdos eternos!",
     maxItems: 6,
     selectedProductId: "",
+    heroMode: "product",
+    heroImage: "",
+    editorialEyebrow: "LOOKS",
+    editorialHeadline: "Momentos que visten su historia",
+    editorialBackgroundImage: "",
     products: [],
     actions: {
       favorite: {
@@ -39,6 +55,26 @@ export const LOOK_SECTION_DEFAULTS = {
 
     desktopLeftRatio: 2,
     desktopRightRatio: 1,
+    layoutPreset: "editorialGlass",
+    editorialCardTextVersion: 0,
+    editorialBackgroundColor: "#f2d6d0",
+    editorialGlassColor: "#fce6e3",
+    editorialGlassOpacity: 54,
+    editorialGlassBlurPx: 18,
+    editorialDepth: 74,
+    editorialAccentColor: "#ba735f",
+    editorialTextColor: "#53242f",
+    editorialOverlapPercent: 7,
+    editorialRailPositionPercent: 100,
+    editorialHeroFit: "natural",
+    editorialHeroAspect: "1/1",
+    editorialContentWidthPx: 1600,
+    editorialHeadlineSizePx: 62,
+    editorialDescriptionSizePx: 20,
+    editorialTitleWeight: 400,
+    editorialVisibleCards: 3,
+    editorialCardGapPx: 12,
+    editorialHeroTransition: "dissolve",
 
     titleAlign: "center",
     titleImageWidthPx: 520,
@@ -235,6 +271,17 @@ export function normalizeLookSectionConfig(input = {}) {
     titleImage: asString(input?.titleImage, base.titleImage).trim() || base.titleImage,
     titleText: asString(input?.titleText, base.titleText),
     description: asString(input?.description, base.description),
+    heroMode: input?.heroMode === "custom" ? "custom" : "product",
+    editorialEyebrow: asString(input?.editorialEyebrow, base.editorialEyebrow).slice(0, 80),
+    editorialHeadline: asString(input?.editorialHeadline, asString(input?.titleText).trim() || base.editorialHeadline).slice(0, 160),
+    editorialBackgroundImage: (() => {
+      const url = asString(input?.editorialBackgroundImage, "").trim();
+      return /^https:\/\/res\.cloudinary\.com\/[a-z0-9_/-]+\/image\/upload\/[a-z0-9_.,/%?=&~-]+$/i.test(url) || /^\/(?!\/)[a-z0-9_.,/%~-]+$/i.test(url) ? url : "";
+    })(),
+    heroImage: (() => {
+      const url = asString(input?.heroImage, "").trim();
+      return /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url) || /^\/(?!\/)[^\s]*$/.test(url) ? url : "";
+    })(),
     maxItems: clampNumber(input?.maxItems, 1, LOOK_MAX_PRODUCTS, base.maxItems),
     selectedProductId,
     products,
@@ -267,6 +314,28 @@ export function normalizeLookSectionStyle(input = {}) {
 
     desktopLeftRatio: clampNumber(input?.desktopLeftRatio, 1, 4, base.desktopLeftRatio),
     desktopRightRatio: clampNumber(input?.desktopRightRatio, 1, 4, base.desktopRightRatio),
+    layoutPreset: input?.layoutPreset === "classic" ? "classic" : "editorialGlass",
+    editorialCardTextVersion: [1, 2, 3].includes(input?.editorialCardTextVersion) ? input.editorialCardTextVersion : 0,
+    editorialBackgroundColor: asString(input?.editorialBackgroundColor, base.editorialBackgroundColor),
+    editorialGlassColor: asString(input?.editorialGlassColor, base.editorialGlassColor),
+    editorialGlassOpacity: clampNumber(input?.editorialGlassOpacity, 0, 90, base.editorialGlassOpacity),
+    editorialGlassBlurPx: clampNumber(input?.editorialGlassBlurPx, 0, 40, base.editorialGlassBlurPx),
+    editorialDepth: clampNumber(input?.editorialDepth, 0, 100, base.editorialDepth),
+    editorialAccentColor: asString(input?.editorialAccentColor, base.editorialAccentColor),
+    editorialTextColor: asString(input?.editorialTextColor, base.editorialTextColor),
+    editorialOverlapPercent: clampNumber(input?.editorialOverlapPercent, 0, 22, base.editorialOverlapPercent),
+    editorialRailPositionPercent: clampNumber(input?.editorialRailPositionPercent, 0, 150, base.editorialRailPositionPercent),
+    editorialHeroFit: input?.editorialHeroFit === "crop" ? "crop" : "natural",
+    editorialHeroAspect: ["1/1", "3/4", "4/5", "16/9"].includes(input?.editorialHeroAspect)
+      ? input.editorialHeroAspect : base.editorialHeroAspect,
+    editorialContentWidthPx: clampNumber(input?.editorialContentWidthPx, 1000, 1800, base.editorialContentWidthPx),
+    editorialHeadlineSizePx: clampNumber(input?.editorialHeadlineSizePx, 30, 90, base.editorialHeadlineSizePx),
+    editorialDescriptionSizePx: clampNumber(input?.editorialDescriptionSizePx, 12, 30, base.editorialDescriptionSizePx),
+    editorialTitleWeight: clampNumber(input?.editorialTitleWeight, 300, 800, base.editorialTitleWeight),
+    editorialVisibleCards: clampNumber(input?.editorialVisibleCards, 2, 3, base.editorialVisibleCards),
+    editorialCardGapPx: clampNumber(input?.editorialCardGapPx, 4, 30, base.editorialCardGapPx),
+    editorialHeroTransition: ["dissolve", "float", "reveal", "focus"].includes(input?.editorialHeroTransition)
+      ? input.editorialHeroTransition : base.editorialHeroTransition,
 
     titleAlign: ["left", "center", "right"].includes(input?.titleAlign)
       ? input.titleAlign
@@ -383,6 +452,42 @@ export function normalizeLookSectionStyle(input = {}) {
       base.mobileSliderControlSeparatorWidthPx
     ),
   };
+
+  const previousEditorialPreset = normalized.editorialCardTextVersion === 2
+    && String(input?.thumbTitleColor).toLowerCase() === "#5d3446"
+    && String(input?.thumbPriceColor).toLowerCase() === "#a45f68"
+    && Number(input?.thumbTitleSizePx) === 17
+    && Number(input?.thumbPriceSizePx) === 13
+    && Number(input?.thumbTitleWeight) === 600
+    && Number(input?.thumbPriceWeight) === 500
+    && input?.thumbTitleFontFamily === EDITORIAL_CARD_TEXT_DEFAULTS.titleFontFamily
+    && input?.thumbPriceFontFamily === EDITORIAL_CARD_TEXT_DEFAULTS.priceFontFamily;
+  if (normalized.layoutPreset === "editorialGlass"
+    && (normalized.editorialCardTextVersion < 2 || previousEditorialPreset)) {
+    // Los colores y fuentes iniciales del editor antiguo no pertenecían a la vitrina editorial.
+    // Una vez migrados, el usuario puede escoger cualquiera de ellos de forma explícita.
+    const inherited = (key, legacy) => !input?.[key]
+      || String(input[key]).trim().toLowerCase() === legacy;
+    const darkNames = ["#000", "#000000", "#111", "#111111", "#111827", "#1f2937", "#374151", "#633847"];
+    const loudPrices = ["#f00", "#ff0000", "#e11d48", "#a34e66", "#a45f68"];
+    if (!input?.thumbTitleColor || darkNames.includes(String(input.thumbTitleColor).trim().toLowerCase())) {
+      normalized.thumbTitleColor = EDITORIAL_CARD_TEXT_DEFAULTS.titleColor;
+    }
+    if (!input?.thumbPriceColor || loudPrices.includes(String(input.thumbPriceColor).trim().toLowerCase())) {
+      normalized.thumbPriceColor = EDITORIAL_CARD_TEXT_DEFAULTS.priceColor;
+    }
+    if (inherited("thumbTitleFontFamily", "") || inherited("thumbTitleFontFamily", "georgia, 'times new roman', serif")) {
+      normalized.thumbTitleFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.titleFontFamily;
+    }
+    if (inherited("thumbPriceFontFamily", "") || inherited("thumbPriceFontFamily", "georgia, 'times new roman', serif")) {
+      normalized.thumbPriceFontFamily = EDITORIAL_CARD_TEXT_DEFAULTS.priceFontFamily;
+    }
+    if (input?.thumbTitleWeight == null || [400, 500].includes(Number(input.thumbTitleWeight))) normalized.thumbTitleWeight = EDITORIAL_CARD_TEXT_DEFAULTS.titleWeight;
+    if (input?.thumbPriceWeight == null || Number(input.thumbPriceWeight) === 500) normalized.thumbPriceWeight = EDITORIAL_CARD_TEXT_DEFAULTS.priceWeight;
+    if (input?.thumbTitleSizePx == null || [14, 17].includes(Number(input.thumbTitleSizePx))) normalized.thumbTitleSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.titleSizePx;
+    if (input?.thumbPriceSizePx == null || Number(input.thumbPriceSizePx) === 14) normalized.thumbPriceSizePx = EDITORIAL_CARD_TEXT_DEFAULTS.priceSizePx;
+  }
+  if (normalized.layoutPreset === "editorialGlass") normalized.editorialCardTextVersion = 3;
 
   return normalized;
 }

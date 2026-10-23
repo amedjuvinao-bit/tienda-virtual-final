@@ -64,6 +64,7 @@ describe('Cierre financiero mensual', () => {
         canExport
       />
     );
+    fireEvent.change(screen.getByLabelText('MES'), { target: { value: '2026-09' } });
 
     expect(await screen.findByText('Listo para certificar')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Revisar: Controles financieros' }));
@@ -86,6 +87,7 @@ describe('Cierre financiero mensual', () => {
         onDataChanged={onDataChanged}
       />
     );
+    fireEvent.change(screen.getByLabelText('MES'), { target: { value: '2026-09' } });
 
     await screen.findByText('Listo para certificar');
     fireEvent.click(screen.getByRole('button', { name: 'Certificar: Huella e informe' }));

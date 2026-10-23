@@ -47,6 +47,11 @@ export const INFO_ICON_OPTIONS = [
   { value: "truck", label: "Camión" },
   { value: "headset", label: "Atención" },
   { value: "store", label: "Tienda" },
+  { value: "shield", label: "Confianza" },
+  { value: "package", label: "Paquete" },
+  { value: "heart", label: "Favorito" },
+  { value: "location", label: "Ubicación" },
+  { value: "clock", label: "Horario" },
 ];
 
 // 🎨 Fuentes
@@ -90,7 +95,7 @@ export const INFO_SECTION_DEFAULTS = {
     entranceAnimation: "none",
 
     // TÍTULO
-    titleText: "¡Te acompañamos en cada etapa de su historia!",
+    titleText: "Te acompañamos\nen cada detalle",
     titleColor: "#ffffff",
     titleFontSize: 32,
     titleFontFamily: "",
@@ -106,7 +111,7 @@ export const INFO_SECTION_DEFAULTS = {
         iconColor: "#ffffff",
         iconBgColor: "rgba(255,255,255,0.30)",
         iconSize: 32,
-        text: "¡La magia de cada look! Directo a tu puerta, envíos a toda Colombia para acompañar cada etapa de tu princesa.",
+        text: "Recibe tu pedido donde estés.",
         textColor: "#ffffff",
         textFontSize: 18,
         textFontFamily: "",
@@ -119,7 +124,7 @@ export const INFO_SECTION_DEFAULTS = {
         iconColor: "#ffffff",
         iconBgColor: "rgba(255,255,255,0.30)",
         iconSize: 32,
-        text: "Te asesoramos con cariño en cada detalle. Escríbenos y hagamos magia juntas.",
+        text: "Te ayudamos a elegir lo que necesitas.",
         textColor: "#ffffff",
         textFontSize: 18,
         textFontFamily: "",
@@ -132,7 +137,7 @@ export const INFO_SECTION_DEFAULTS = {
         iconColor: "#ffffff",
         iconBgColor: "rgba(255,255,255,0.30)",
         iconSize: 32,
-        text: "¡Conoce en persona cada detalle encantador de nuestros looks!",
+        text: "Encuentra tu punto de atención más cercano.",
         textColor: "#ffffff",
         textFontSize: 18,
         textFontFamily: "",

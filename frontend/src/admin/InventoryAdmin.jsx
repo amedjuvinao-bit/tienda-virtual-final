@@ -795,7 +795,7 @@ export default function InventoryAdmin() {
           <div className="inventory-filter-bar">
             <div className="inventory-search-field">
               <Search size={17} />
-              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por producto, SKU, talla o color" style={styles.input} />
+              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por producto, SKU, tamaño o color" style={styles.input} />
             </div>
             <select value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)} style={styles.input} aria-label="Filtrar por sede">
               <option value="all">Todas las sedes</option>

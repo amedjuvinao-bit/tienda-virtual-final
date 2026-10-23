@@ -1,8 +1,12 @@
+import TiktokStageUI from './TiktokStageUI';
 // src/admin/appearance/sections/tiktok/TiktokSectionUI.jsx
 
 import React, { useMemo, useState } from "react";
 import { Music2 } from "lucide-react";
 import { Field, Input, Toggle } from "../ui/UiComponents";
+import SectionEditorSteps from "../ui/SectionEditorSteps";
+import SectionEditorPostPicker from "../ui/SectionEditorPostPicker";
+import SectionColorPicker from "../ui/SectionColorPicker";
 import {
   normalizeTiktokSection,
   TIKTOK_SECTION_ID,
@@ -24,30 +28,6 @@ const FONT_OPTIONS = [
   { label: "Cormorant Garamond", value: '"Cormorant Garamond", Georgia, serif' },
   { label: "Lora", value: '"Lora", Georgia, serif' },
   { label: "DM Serif Display", value: '"DM Serif Display", Georgia, serif' },
-];
-
-const COLOR_PRESETS = [
-  "#111111",
-  "#ffffff",
-  "#f72585",
-  "#b5179e",
-  "#7209b7",
-  "#560bad",
-  "#480ca8",
-  "#3a0ca3",
-  "#4361ee",
-  "#4895ef",
-  "#4cc9f0",
-  "#ff4d6d",
-  "#ff758f",
-  "#ff8fa3",
-  "#c9184a",
-  "#a4133c",
-  "#d4a373",
-  "#e9c46a",
-  "#2a9d8f",
-  "#84a59d",
-  "#D4AF37",
 ];
 
 function clampNumber(value, min, max) {
@@ -88,29 +68,6 @@ function updateTiktokInsideSections(sections, nextTiktokSection) {
   }
 
   return next;
-}
-
-function ColorPresets({ value, onChange }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {COLOR_PRESETS.map((color) => {
-        const active = value === color;
-        return (
-          <button
-            key={color}
-            type="button"
-            onClick={() => onChange(color)}
-            title={color}
-            className={[
-              "h-7 w-7 rounded-full border-2 transition",
-              active ? "border-neutral-900 scale-110" : "border-white hover:scale-105",
-            ].join(" ")}
-            style={{ backgroundColor: color }}
-          />
-        );
-      })}
-    </div>
-  );
 }
 
 function isSafeRasterImage(file) {
@@ -322,12 +279,16 @@ function getBigLogoPreviewStyle(config) {
   }
 }
 
-export default function TiktokSectionUI({
+function LegacyTiktokSectionUI({
   theme,
   setPath,
   uploadToCloudinary,
   uploading = false,
 }) {
+  const [step, setStep] = useState("content");
+  const [contentGroup, setContentGroup] = useState('profile');
+  const [designGroup, setDesignGroup] = useState(0);
+  const [activePostIndex, setActivePostIndex] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [logoPreviewError, setLogoPreviewError] = useState(false);
   const [previewHoveredId, setPreviewHoveredId] = useState(null);
@@ -389,11 +350,14 @@ export default function TiktokSectionUI({
       },
     ];
     updateConfig("posts", nextPosts);
+    setActivePostIndex(nextPosts.length - 1);
+    setContentGroup('posts');
   }
 
   function removePost(index) {
     const nextPosts = posts.filter((_, i) => i !== index);
     updateConfig("posts", nextPosts);
+    setActivePostIndex((current) => Math.min(current > index ? current - 1 : current, nextPosts.length - 1));
   }
 
   async function handleUploadConfigImage(key, file) {
@@ -588,13 +552,11 @@ export default function TiktokSectionUI({
   const bigLogoPreviewStyle = getBigLogoPreviewStyle(config);
 
   return (
-    <div className="space-y-8">
+    <div className="section-social-editor space-y-4" data-step={step}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-neutral-900">Configuración de TikTok</div>
-          <div className="text-xs text-neutral-500">
-            Esta sección se guarda dentro de <code>theme.sections</code>
-          </div>
+          <div className="text-xs text-neutral-500">Edita el perfil, las publicaciones y su apariencia.</div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -616,9 +578,22 @@ export default function TiktokSectionUI({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <SectionEditorSteps value={step} onChange={setStep} sectionName="TikTok" items={[
+        { value: "content", label: "Contenido", hint: "Añade el perfil, el título y los videos o imágenes." },
+        { value: "design", label: "Diseño", hint: "Ajusta logo, tarjetas, marca de agua y efectos." },
+      ]} />
+
+      <nav className="section-editor-substeps" aria-label={step === 'content' ? 'Contenido de TikTok' : 'Diseño de TikTok'}>
+        {step === 'content'
+          ? [['profile', 'Perfil'], ['title', 'Título'], ['posts', `Publicaciones (${posts.length})`]].map(([id, name]) =>
+            <button key={id} type="button" aria-pressed={contentGroup === id} onClick={() => setContentGroup(id)}>{name}</button>)
+          : ['Logo y perfil', 'Fondo', 'Galería', 'Logo al pasar', 'Efectos'].map((name, index) =>
+            <button key={name} type="button" aria-pressed={designGroup === index} onClick={() => setDesignGroup(index)}>{name}</button>)}
+      </nav>
+
+      <div className="section-social-editor__grid grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content" hidden={contentGroup !== 'profile'}>
             <div className="text-sm font-semibold text-neutral-900">Perfil</div>
 
             <Field label="Link del perfil de TikTok">
@@ -638,17 +613,11 @@ export default function TiktokSectionUI({
             </Field>
 
             <Field label="Color del texto del usuario">
-              <div className="space-y-3">
-                <Input
-                  value={config.userTextColor || "#111111"}
-                  onChange={(e) => updateConfig("userTextColor", e.target.value)}
-                  placeholder="#111111"
-                />
-                <ColorPresets
-                  value={config.userTextColor || "#111111"}
-                  onChange={(value) => updateConfig("userTextColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del texto del usuario"
+                value={config.userTextColor || "#111111"}
+                onChange={(value) => updateConfig("userTextColor", value)}
+              />
             </Field>
 
             <Field label="Fuente del usuario">
@@ -688,7 +657,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content" hidden={contentGroup !== 'title'}>
             <div className="text-sm font-semibold text-neutral-900">Título</div>
 
             <Field label="Imagen del título">
@@ -699,7 +668,7 @@ export default function TiktokSectionUI({
                   onChange={(e) => updateConfig("titleImage", e.target.value)}
                 />
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen de título"}
                   <input
                     type="file"
@@ -731,17 +700,11 @@ export default function TiktokSectionUI({
             </Field>
 
             <Field label="Color del texto del título">
-              <div className="space-y-3">
-                <Input
-                  value={config.titleTextColor || "#111111"}
-                  onChange={(e) => updateConfig("titleTextColor", e.target.value)}
-                  placeholder="#111111"
-                />
-                <ColorPresets
-                  value={config.titleTextColor || "#111111"}
-                  onChange={(value) => updateConfig("titleTextColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del texto del título"
+                value={config.titleTextColor || "#111111"}
+                onChange={(value) => updateConfig("titleTextColor", value)}
+              />
             </Field>
 
             <Field label="Fuente del título">
@@ -781,7 +744,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 0}>
             <div className="text-sm font-semibold text-neutral-900">Logo principal</div>
 
             <Field label="Imagen del logo">
@@ -815,7 +778,7 @@ export default function TiktokSectionUI({
                   </div>
                 ) : null}
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir logo"}
                   <input
                     type="file"
@@ -899,7 +862,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 1}>
             <div className="text-sm font-semibold text-neutral-900">Marca de agua de fondo</div>
 
             <Field label="Mostrar marca de agua">
@@ -917,7 +880,7 @@ export default function TiktokSectionUI({
                   onChange={(e) => updateConfig("watermarkImage", e.target.value)}
                 />
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen de marca de agua"}
                   <input
                     type="file"
@@ -1032,7 +995,7 @@ export default function TiktokSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 2}>
             <div className="text-sm font-semibold text-neutral-900">Grid y apariencia</div>
 
             <Field label="Modo de galería">
@@ -1086,17 +1049,11 @@ export default function TiktokSectionUI({
             </Field>
 
             <Field label="Color del marco de las fotos">
-              <div className="space-y-3">
-                <Input
-                  value={config.cardBorderColor || "#D4AF37"}
-                  onChange={(e) => updateConfig("cardBorderColor", e.target.value)}
-                  placeholder="#D4AF37"
-                />
-                <ColorPresets
-                  value={config.cardBorderColor || "#D4AF37"}
-                  onChange={(value) => updateConfig("cardBorderColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del marco de las fotos"
+                value={config.cardBorderColor || "#D4AF37"}
+                onChange={(value) => updateConfig("cardBorderColor", value)}
+              />
             </Field>
 
             <Field label="Grosor del marco (px)">
@@ -1150,7 +1107,7 @@ export default function TiktokSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 3}>
             <div className="text-sm font-semibold text-neutral-900">Logo hover marca de agua</div>
 
             <Field label="Mostrar logo al pasar mouse">
@@ -1220,7 +1177,7 @@ export default function TiktokSectionUI({
                   onChange={(e) => updateConfig("hoverLogoImage", e.target.value)}
                 />
 
-                <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen hover"}
                   <input
                     type="file"
@@ -1236,17 +1193,11 @@ export default function TiktokSectionUI({
             </Field>
 
             <Field label="Color del logo hover">
-              <div className="space-y-3">
-                <Input
-                  value={config.hoverLogoColor || "#ffffff"}
-                  onChange={(e) => updateConfig("hoverLogoColor", e.target.value)}
-                  placeholder="#ffffff"
-                />
-                <ColorPresets
-                  value={config.hoverLogoColor || "#ffffff"}
-                  onChange={(value) => updateConfig("hoverLogoColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color del logo al pasar el cursor"
+                value={config.hoverLogoColor || "#ffffff"}
+                onChange={(value) => updateConfig("hoverLogoColor", value)}
+              />
             </Field>
 
             <Field label="Opacidad del logo hover">
@@ -1271,7 +1222,7 @@ export default function TiktokSectionUI({
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="design" hidden={designGroup !== 4}>
             <div className="text-sm font-semibold text-neutral-900">Overlay, hover y animación</div>
 
             <Field label="Activar overlay">
@@ -1282,17 +1233,11 @@ export default function TiktokSectionUI({
             </Field>
 
             <Field label="Color del overlay">
-              <div className="space-y-3">
-                <Input
-                  value={config.overlayColor || "#000000"}
-                  onChange={(e) => updateConfig("overlayColor", e.target.value)}
-                  placeholder="#000000"
-                />
-                <ColorPresets
-                  value={config.overlayColor || "#000000"}
-                  onChange={(value) => updateConfig("overlayColor", value)}
-                />
-              </div>
+              <SectionColorPicker
+                label="Color de la superposición"
+                value={config.overlayColor || "#000000"}
+                onChange={(value) => updateConfig("overlayColor", value)}
+              />
             </Field>
 
             <Field label="Opacidad del overlay">
@@ -1354,27 +1299,29 @@ export default function TiktokSectionUI({
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="content" hidden={contentGroup !== 'posts'}>
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-neutral-900">Posts de TikTok</div>
+              <div className="text-sm font-semibold text-neutral-900">Publicaciones de TikTok</div>
               <button
                 type="button"
                 onClick={addPost}
-                className="px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium hover:bg-neutral-800 transition"
+                className="px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium section-editor-accent-hover transition"
               >
-                Agregar post
+                Agregar publicación
               </button>
             </div>
 
+            <SectionEditorPostPicker posts={posts} activeIndex={Math.max(0, Math.min(activePostIndex, posts.length - 1))} onSelect={setActivePostIndex} label="TikTok" />
             <div className="space-y-4">
               {posts.map((post, index) => (
                 <div
                   key={post.id}
                   className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 space-y-4"
+                  hidden={index !== Math.max(0, Math.min(activePostIndex, posts.length - 1))}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs font-semibold text-neutral-800">
-                      Post {index + 1}
+                      Publicación {index + 1}
                     </div>
 
                     <button
@@ -1386,7 +1333,7 @@ export default function TiktokSectionUI({
                     </button>
                   </div>
 
-                  <Field label="Imagen principal del post">
+                  <Field label="Imagen principal de la publicación">
                     <div className="space-y-3">
                       <Input
                         value={post.image || ""}
@@ -1394,7 +1341,7 @@ export default function TiktokSectionUI({
                         onChange={(e) => updatePost(index, "image", e.target.value)}
                       />
 
-                      <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                      <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                         {uploading ? "Subiendo..." : "Subir imagen principal"}
                         <input
                           type="file"
@@ -1409,7 +1356,7 @@ export default function TiktokSectionUI({
                     </div>
                   </Field>
 
-                  <Field label="Miniatura / thumbnail">
+                  <Field label="Miniatura de la publicación">
                     <div className="space-y-3">
                       <Input
                         value={post.thumb || ""}
@@ -1417,7 +1364,7 @@ export default function TiktokSectionUI({
                         onChange={(e) => updatePost(index, "thumb", e.target.value)}
                       />
 
-                      <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                      <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                         {uploading ? "Subiendo..." : "Subir thumbnail"}
                         <input
                           type="file"
@@ -1432,7 +1379,7 @@ export default function TiktokSectionUI({
                     </div>
                   </Field>
 
-                  <Field label="Link del post">
+                  <Field label="Enlace de la publicación">
                     <Input
                       value={post.link || ""}
                       placeholder="https://www.tiktok.com/@usuario/video/123"
@@ -1440,7 +1387,7 @@ export default function TiktokSectionUI({
                     />
                   </Field>
 
-                  <Field label="Video hover (subido desde tu equipo)">
+                  <Field label="Video al pasar el cursor (subido desde tu equipo)">
                     <div className="space-y-3">
                       <Input
                         value={post.videoUrl || ""}
@@ -1449,7 +1396,7 @@ export default function TiktokSectionUI({
                       />
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer hover:bg-neutral-800 transition">
+                        <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                           {uploading ? "Subiendo..." : "Subir video hover"}
                           <input
                             type="file"
@@ -1479,7 +1426,7 @@ export default function TiktokSectionUI({
                     </div>
                   </Field>
 
-                  <Field label="Mostrar post">
+                  <Field label="Mostrar publicación">
                     <Toggle
                       checked={post.enabled !== false}
                       onChange={(v) => updatePost(index, "enabled", !!v)}
@@ -1490,7 +1437,7 @@ export default function TiktokSectionUI({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-4" data-editor-step="preview">
             <div className="text-sm font-semibold text-neutral-900">Vista previa</div>
 
             <div
@@ -1698,4 +1645,9 @@ export default function TiktokSectionUI({
       </div>    
     </div>
   );
+}
+
+export default function TiktokSectionUI(props) {
+  const config = props.theme?.sections?.find(s => s.id === 'tiktok' || s.type === 'tiktok')?.config;
+  return config?.stageLayout === 'legacy' ? <LegacyTiktokSectionUI {...props}/> : <TiktokStageUI {...props}/>;
 }

@@ -13,7 +13,7 @@ const STATUS_META = {
 };
 
 export const RETURN_REASONS = [
-  ['wrong_size', 'Talla incorrecta'],
+  ['wrong_size', 'Tamaño incorrecto'],
   ['wrong_item', 'Producto equivocado'],
   ['damaged', 'Llegó averiado'],
   ['defective', 'Defecto de fabricación'],

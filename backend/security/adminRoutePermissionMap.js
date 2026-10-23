@@ -16,6 +16,20 @@ const {
 const { requiredUserWritePermissions } = require('./adminUserWritePolicy');
 
 const ADMIN_ROUTE_PERMISSION_RULES = [
+  { method: 'GET', path: '/api/admin/tiktok-settings/feed', permission: 'appearance:view', description: 'Consultar publicaciones desde Apariencia.' },
+  { method: 'POST', path: '/api/admin/tiktok-settings/refresh-feed', permission: 'appearance:view', description: 'Actualizar publicaciones desde Apariencia.' },
+  { method: 'GET', path: '/api/tiktok/admin/feed', permission: 'appearance:view', description: 'Consultar publicaciones para la selección de Apariencia.' },
+  { method: 'POST', path: '/api/tiktok/admin/refresh', permission: 'appearance:view', description: 'Actualizar publicaciones para la selección de Apariencia.' },
+  ...['GET', 'PUT'].map(method => ({ method, path: '/api/admin/tiktok-settings', permission: 'settings:tiktok', audit: method !== 'GET', danger: method !== 'GET', description: 'Administrar la conexión privada de TikTok.' })),
+  ...['authorize', 'sync', 'disconnect'].map(action => ({ method: 'POST', path: `/api/admin/tiktok-settings/${action}`, permission: 'settings:tiktok', audit: true, danger: true, description: 'Gestionar la cuenta conectada de TikTok.' })),
+  ...['qr', 'qr/cancel', 'qr/check'].map(action => ({ method: 'POST', path: `/api/admin/tiktok-settings/${action}`, permission: 'settings:tiktok', audit: action !== 'qr/check', danger: action !== 'qr/check', description: 'Autorizar la cuenta de TikTok por QR.' })),
+  { method: 'GET', path: '/api/admin/instagram-settings/feed', permission: 'appearance:view', description: 'Consultar publicaciones desde Apariencia.' },
+  { method: 'POST', path: '/api/admin/instagram-settings/refresh-feed', permission: 'appearance:view', description: 'Actualizar publicaciones desde Apariencia.' },
+  { method: 'GET', path: '/api/instagram/admin/feed', permission: 'appearance:view', description: 'Consultar publicaciones para la selección de Apariencia.' },
+  { method: 'POST', path: '/api/instagram/admin/refresh', permission: 'appearance:view', description: 'Actualizar publicaciones para la selección de Apariencia.' },
+  ...['GET', 'PUT'].map(method => ({ method, path: '/api/admin/instagram-settings', permission: 'settings:instagram', audit: method !== 'GET', danger: method !== 'GET', description: 'Administrar la conexión privada de Instagram.' })),
+  ...['authorize', 'connect-token', 'sync', 'disconnect'].map(action => ({ method: 'POST', path: `/api/admin/instagram-settings/${action}`, permission: 'settings:instagram', audit: true, danger: true, description: 'Gestionar la cuenta conectada de Instagram.' })),
+
   /* =========================================================
    * DASHBOARD / REPORTES
    * ======================================================= */
@@ -1279,6 +1293,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/site-settings/appearance',
+    permission: 'appearance:view',
+    description: 'Consultar Apariencia con revisión para el editor.',
+  },
+  {
+    method: 'GET',
     path: '/api/admin/store-settings',
     permission: 'settings:store',
     description: 'Consultar los datos operativos del módulo Tienda.',
@@ -1703,6 +1723,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   /* =========================================================
    * MEDIA / UPLOADS
    * ======================================================= */
+  {
+    method: 'POST',
+    path: '/api/uploads/many',
+    permission: 'media:upload',
+    description: 'Subir varios archivos o imágenes.',
+    audit: true,
+  },
   {
     method: 'POST',
     path: '/api/uploads',

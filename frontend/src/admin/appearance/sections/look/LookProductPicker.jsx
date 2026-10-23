@@ -105,7 +105,7 @@ export default function LookProductPicker({
   onChange,
   onPick,
   maxItems = LOOK_MAX_PRODUCTS,
-  title = "Productos de la sección LOOK",
+  title = "Productos de la sección",
 }) {
   const selectedList = Array.isArray(value) ? value : [];
   const [query, setQuery] = useState("");

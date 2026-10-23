@@ -1,0 +1,18 @@
+.search-results-page { min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg,#fff1f6 0%,#fffafd 330px,#fff9fb 100%); }
+.search-results-main { width: min(100% - 36px, 1240px); margin: 0 auto; padding: 136px 0 100px; flex: 1; }
+.search-results-intro { text-align: center; color: #783d58; }
+.search-results-intro > a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.search-results-eyebrow { margin: 36px 0 10px; letter-spacing: .2em; font-size: 11px; font-weight: 700; color: #ad7087; }
+.search-results-intro h1 { font: 500 clamp(32px, 5vw, 54px)/1.15 Georgia, serif; color: #572b42; }
+.search-results-caption { margin: 12px 0 0; color: #896477; }
+.search-results-form { display: flex; gap: 10px; max-width: 660px; margin: 32px auto 42px; padding: 7px; border: 1px solid #e8c5d3; border-radius: 16px; background: #fff; box-shadow: 0 9px 27px rgba(112, 42, 73, .08); }
+.search-results-form:focus-within { outline: 2px solid #bd7d96; outline-offset: 2px; }
+.search-results-form input { flex: 1; min-width: 0; padding: 9px 14px; border: 0; outline: 0; background: transparent; color: #572b42; }
+.search-results-form button,.search-results-pages button,.search-results-message button { border: 0; border-radius: 11px; background: #803754; color: #fff; padding: 11px 22px; font-weight: 600; }
+.search-results-form button:disabled,.search-results-pages button:disabled { opacity: .45; cursor: not-allowed; }
+.search-results-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 26px 18px; }
+.search-results-message { padding: 55px 20px; text-align: center; color: #795166; background: rgba(255,255,255,.68); border: 1px solid #f0d6e0; border-radius: 20px; }
+.search-results-message button { margin-left: 12px; }
+.search-results-pages { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 40px; color: #70435b; }
+@media(max-width: 900px) { .search-results-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width: 520px) { .search-results-main { padding-top: 112px; } .search-results-grid { gap: 16px 10px; } .search-results-pages { gap: 8px; font-size: 13px; } .search-results-pages button { padding: 10px 12px; } }

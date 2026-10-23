@@ -1,0 +1,24 @@
+.story-journey-pin{position:sticky;top:0;z-index:0;width:100%;height:0;pointer-events:none!important;user-select:none}
+.story-journey-world{position:absolute;top:0;left:0;display:block;width:100%;overflow:hidden;pointer-events:none!important}
+.storefront-sections:not([data-journey-active="true"])>.story-journey-pin{display:none}
+.story-journey-world image{pointer-events:none}
+.storefront-journey-curtain-pin{position:sticky;top:0;z-index:20;width:100%;height:0;pointer-events:none!important;user-select:none}
+.storefront-journey-curtain{position:absolute;top:0;left:0;pointer-events:none!important;background-color:var(--color-bg,Canvas);background-size:cover;background-position:center;will-change:clip-path;contain:paint}
+.storefront-journey-curtain[hidden]{display:none}
+@media(prefers-reduced-motion:reduce){.storefront-journey-curtain-pin{display:none!important}}
+.storefront-sections[data-journey-shared="true"]{background-color:var(--color-bg,Canvas);background-image:var(--journey-shared-image);background-size:cover;background-repeat:no-repeat;background-position:center top;background-attachment:fixed}
+.storefront-sections[data-journey-shared="true"] .storefront-chapter-surface{background:transparent}
+/* Only background artwork is unified. Product images, glass, layout and local
+   component interactions continue to be rendered by their own components. */
+.storefront-sections[data-journey-shared="true"] :is(.trending-section--floating-glass,.look-editorial,.complementos-look-section,.categories-fan,.ig-journal,.tk-stage,.info-glass,.footer-ed,.story-preview__content){background:none!important}
+.storefront-sections[data-journey-shared="true"] .categories-fan__background,
+.storefront-sections[data-journey-shared="true"] :is(.ig-journal,.tk-stage,.footer-ed,.trending-section--floating-glass)::before,
+.storefront-sections[data-journey-shared="true"] :is(.ig-journal,.footer-ed,.trending-section--floating-glass)::after{display:none!important}
+@media(prefers-reduced-motion:reduce){.story-journey-world *{transition:none!important;animation:none!important}}
+
+/* The route is geometry for the artwork, never a visible connecting cord. */
+[data-journey-stem],[data-journey-trace]{display:none}
+
+/* A genuine background layer avoids flickering masks as content scrolls past. */
+.storefront-sections[data-journey-active="true"]{position:relative;isolation:isolate}
+.storefront-sections[data-journey-active="true"]>section{position:relative;z-index:1}

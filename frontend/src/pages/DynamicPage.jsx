@@ -305,7 +305,7 @@ export default function DynamicPage({ theme }) {
 
     switch (type) {
       case "banner":
-        return <CarouselBanner />;
+        return <CarouselBanner bannerOverride={config} sectionsOverride={theme?.sections} />;
 
       case "tendencia":
         return <TrendingSection theme={blockTheme} />;

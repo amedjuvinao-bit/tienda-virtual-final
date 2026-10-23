@@ -9,6 +9,8 @@ const { env } = require('../config/env');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 
+const { mediaUploadOptions } = require('../lib/uploads/mediaUploadPolicy');
+
 const router = express.Router();
 const ADMIN_PANEL_BACKGROUND_PROFILE = 'admin-panel-background';
 const ADMIN_PANEL_BACKGROUND_MAX_BYTES = 8 * 1024 * 1024;
@@ -73,7 +75,9 @@ const storage = new CloudinaryMulterStorage({
   },
 });
 
-const upload = multer({ storage });
+const uploadOptions = mediaUploadOptions(storage, multer);
+const upload = multer(uploadOptions);
+const uploadSingle = multer({ ...uploadOptions, limits: { ...uploadOptions.limits, files: 1 } });
 const uploadAdminPanelBackground = multer({
   storage,
   limits: { fileSize: ADMIN_PANEL_BACKGROUND_MAX_BYTES, files: 1 },
@@ -99,7 +103,9 @@ function requireCloudinary(req, res, next) {
 }
 
 function requireAdminPanelBackgroundAccess(req, res, next) {
-  if (!isAdminPanelBackgroundRequest(req)) return next();
+  if (!isAdminPanelBackgroundRequest(req)) {
+    return requireAdmin(req, res, () => requirePermission('media:upload')(req, res, next));
+  }
 
   return requireAdmin(req, res, () =>
     requirePermission('settings:panel')(req, res, next)
@@ -113,9 +119,11 @@ function runMulter(mw) {
         console.error('Multer/Cloudinary error:', err);
         const msg =
           err?.code === 'LIMIT_FILE_SIZE'
-            ? 'La imagen supera el máximo permitido de 8 MB.'
+            ? (isAdminPanelBackgroundRequest(req) ? 'La imagen supera el máximo permitido de 8 MB.' : 'El archivo supera el máximo permitido de 50 MB.')
+            : ['LIMIT_FILE_COUNT', 'LIMIT_PART_COUNT', 'LIMIT_FIELD_COUNT'].includes(err?.code)
+              ? 'La carga supera el número máximo permitido de archivos o campos.'
             : err?.code === 'LIMIT_UNEXPECTED_FILE'
-              ? 'Solo se permiten imágenes JPG, PNG o WebP.'
+              ? 'El tipo o el campo del archivo no está permitido.'
               : err?.message || 'Fallo al subir archivo';
         return res.status(400).json({ ok: false, error: msg });
       }
@@ -146,12 +154,12 @@ router.post('/', requireAdminPanelBackgroundAccess, requireCloudinary, (req, res
 
   const middleware = isAdminPanelBackgroundRequest(req)
     ? uploadAdminPanelBackground.single('image')
-    : upload.any();
+    : uploadSingle.any();
 
   return runMulter(middleware)(req, res);
 });
 
-router.post('/many', requireCloudinary, (req, res) => {
+router.post('/many', requireAdmin, requirePermission('media:upload'), requireCloudinary, (req, res) => {
   res.locals.nextHandler = () => {
     try {
       const files = req.files || [];

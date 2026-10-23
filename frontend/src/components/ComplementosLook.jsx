@@ -1,303 +1,87 @@
-// src/components/ComplementosLook.jsx
-import React, { useMemo, useState } from "react";
-import {
-  ArrowRight,
-  ChevronRight,
-  ChevronsRight,
-  MoveRight,
-  Sparkles,
-} from "lucide-react";
-import {
-  COMPLEMENTOS_SECTION_DEFAULTS,
-  normalizeComplementosSection,
-} from "../admin/appearance/sections/complementos/complementosSectionHelpers";
+import React, { useMemo } from 'react';
+import { ArrowRight, ChevronRight, ChevronsRight, MoveRight, Sparkles, Flower2 } from 'lucide-react';
+import { COMPLEMENTOS_SECTION_DEFAULTS, normalizeComplementosSection, safeComplementosHref, resolveComplementosBackdrop } from '../admin/appearance/sections/complementos/complementosSectionHelpers';
+import './complementosLook.css';
 
-function buildButtonAnimationClass(animation) {
-  if (animation === "pulse") return "animate-pulse";
-  if (animation === "soft-float") return "animate-[floatY_3.2s_ease-in-out_infinite]";
-  return "";
-}
-
-function renderArrow(styleName) {
-  switch (styleName) {
-    case "none":
-      return null;
-
-    case "chevron-right":
-      return <ChevronRight className="w-4 h-4 shrink-0" />;
-
-    case "double-chevron":
-      return <ChevronsRight className="w-4 h-4 shrink-0" />;
-
-    case "long-arrow":
-      return <MoveRight className="w-4 h-4 shrink-0" />;
-
-    case "spark-arrow":
-      return (
-        <span className="inline-flex items-center gap-1">
-          <Sparkles className="w-3.5 h-3.5 shrink-0" />
-          <ArrowRight className="w-4 h-4 shrink-0" />
-        </span>
-      );
-
-    case "minimal-line":
-      return <span className="text-[1em] leading-none">⟶</span>;
-
-    case "arrow-right":
-    default:
-      return <ArrowRight className="w-4 h-4 shrink-0" />;
-  }
+function Arrow({ variant }) {
+  const props = { size: 20, 'aria-hidden': true };
+  if (variant === 'none') return null;
+  if (variant === 'chevron-right') return <ChevronRight {...props} />;
+  if (variant === 'double-chevron') return <ChevronsRight {...props} />;
+  if (variant === 'long-arrow' || variant === 'minimal-line') return <MoveRight {...props} />;
+  if (variant === 'spark-arrow') return <><Sparkles size={16} aria-hidden="true" /><ArrowRight {...props} /></>;
+  return <ArrowRight {...props} />;
 }
 
 export default function ComplementosLook({ theme, imageSrc }) {
-  const [isHoveringButton, setIsHoveringButton] = useState(false);
-
-  const complementosSection = useMemo(() => {
-    const list = Array.isArray(theme?.sections) ? theme.sections : [];
-
-    const found = list.find((s) => {
-      const id = typeof s?.id === "string" ? s.id.trim().toLowerCase() : "";
-      const type = typeof s?.type === "string" ? s.type.trim().toLowerCase() : "";
-      return id === "complementos" || type === "complementos";
-    });
-
-    if (found) return normalizeComplementosSection(found);
-
-    return normalizeComplementosSection({
+  const section = useMemo(() => {
+    const entries = Array.isArray(theme?.sections) ? theme.sections : [];
+    const found = entries.find((s) => [s?.id, s?.type].some((value) => typeof value === 'string' && value.trim().toLowerCase() === 'complementos'));
+    return normalizeComplementosSection(found || {
       ...COMPLEMENTOS_SECTION_DEFAULTS,
-      config: {
-        ...COMPLEMENTOS_SECTION_DEFAULTS.config,
-        imageSrc:
-          typeof imageSrc === "string" && imageSrc.trim()
-            ? imageSrc.trim()
-            : COMPLEMENTOS_SECTION_DEFAULTS.config.imageSrc,
-      },
+      config: { ...COMPLEMENTOS_SECTION_DEFAULTS.config, ...(imageSrc ? { imageSrc } : {}) },
     });
   }, [theme, imageSrc]);
-
-  const config = complementosSection.config;
-  const style = complementosSection.style;
-
-  if (complementosSection.enabled === false) return null;
-
-  const buttonAnimationClass = buildButtonAnimationClass(style.buttonAnimation);
-
-  const sectionVars = {
-    "--comp-section-margin-top": `${style.sectionMarginTopPx}px`,
-    "--comp-section-padding-x": `${style.sectionPaddingXPx}px`,
-    "--comp-content-max-width": `${style.contentMaxWidthPx}px`,
-    "--comp-image-width": `${style.imageWidthPercent}%`,
-    "--comp-image-height": `${style.imageHeightPx}px`,
-    "--comp-image-radius": `${style.imageRadiusPx}px`,
-    "--comp-image-border-width": `${style.imageBorderPx}px`,
-    "--comp-image-border-color": style.imageBorderColor,
-    "--comp-ring-width": `${style.ringWidthPx}px`,
-    "--comp-ring-color": style.ringColor,
-    "--comp-btn-left": `${style.buttonPosXPercent}%`,
-    "--comp-btn-top": `${style.buttonPosYPercent}%`,
-    "--comp-btn-bg": isHoveringButton ? style.buttonHoverBg : style.buttonBg,
-    "--comp-btn-color": isHoveringButton
-      ? style.buttonHoverTextColor
-      : style.buttonTextColor,
-    "--comp-btn-radius": `${style.buttonRadiusPx}px`,
-    "--comp-btn-font-size": `${style.buttonFontSizePx}px`,
-    "--comp-btn-font-weight": style.buttonFontWeight,
-    "--comp-btn-px": `${style.buttonPx}px`,
-    "--comp-btn-py": `${style.buttonPy}px`,
-    "--comp-btn-gap": `${style.buttonGapPx}px`,
-    "--comp-btn-shadow":
-      isHoveringButton && style.buttonHoverShadow
-        ? "0 14px 30px rgba(0,0,0,0.20)"
-        : style.buttonShadow
-        ? "0 10px 24px rgba(0,0,0,0.16)"
-        : "none",
-    "--comp-btn-transform": isHoveringButton
-      ? `translate(-50%, -50%) scale(${style.buttonHoverScale})`
-      : "translate(-50%, -50%) scale(1)",
+  const { config: c, style: s } = section;
+  if (!section.enabled) return null;
+  const backdrop = resolveComplementosBackdrop(theme, section);
+  const vars = {
+    "--comp-scene-color": backdrop.color,
+    "--comp-scene-image": backdrop.image ? `url(${JSON.stringify(backdrop.image)})` : "none",
+    "--comp-scene-wash": `${backdrop.wash}%`,
+    "--comp-bottom": `${s.sectionPaddingBottomPx}px`,
+    '--comp-margin': `${s.sectionMarginTopPx}px`, '--comp-padding': `${s.sectionPaddingXPx}px`,
+    '--comp-max': `${s.contentMaxWidthPx}px`, '--comp-width': `${s.imageWidthPercent}%`,
+    '--comp-height': `${s.imageHeightPx}px`, '--comp-radius': `${s.imageRadiusPx}px`,
+    '--comp-bg': s.bannerBg, '--comp-image-fit': s.imageObjectFit,
+    '--comp-position': `${s.imagePositionX}% ${s.imagePositionY}%`,
+    '--comp-image-border': `${s.imageBorderPx}px solid ${s.imageBorderColor}`,
+    '--comp-ring': `${s.ringWidthPx}px solid ${s.ringColor}`,
+    '--comp-shadow': s.imageShadow ? '0 18px 40px #6e254820' : 'none',
+    '--comp-title': s.titleColor, '--comp-subtitle': s.subtitleColor,
+    '--comp-font': s.titleFontFamily, '--comp-title-size': `${s.titleFontSizePx}px`,
+    '--comp-title-weight': s.titleWeight, '--comp-subtitle-size': `${s.subtitleFontSizePx}px`,
+    '--comp-tracking': `${s.subtitleLetterSpacingPx}px`, '--comp-content-width': `${s.contentWidthPercent}%`,
+    '--comp-content-padding': `${s.contentPaddingPx}px`, '--comp-gap': `${s.contentGapPx}px`,
+    '--comp-align': s.contentAlign, '--comp-frame-inset': `${s.frameInsetPx}px`,
+    '--comp-frame-color': s.frameColor, '--comp-frame-width': `${s.frameWidthPx}px`,
+    '--comp-frame-opacity': s.frameOpacity / 100, '--comp-panel-tint': `${s.panelTintPercent}%`,
+    '--comp-panel-blur': `${s.panelBlurPx}px`, '--comp-overlay': s.overlayColor,
+    '--comp-overlay-opacity': s.overlayOpacity / 100,
+    '--comp-button-bg': s.buttonBg, '--comp-button-color': s.buttonTextColor,
+    '--comp-button-hover-bg': s.buttonHoverBg, '--comp-button-hover-color': s.buttonHoverTextColor,
+    '--comp-button-tint': `${s.buttonTintPercent}%`, '--comp-button-hover-tint': `${Math.min(100, s.buttonTintPercent + 6)}%`,
+    '--comp-button-blur': `${s.buttonBlurPx}px`, '--comp-button-border': `${s.buttonBorderPx}px solid ${s.buttonBorderColor}`,
+    '--comp-button-radius': `${s.buttonRadiusPx}px`, '--comp-button-size': `${s.buttonFontSizePx}px`,
+    '--comp-button-weight': s.buttonFontWeight, '--comp-button-px': `${s.buttonPx}px`,
+    '--comp-button-py': `${s.buttonPy}px`, '--comp-button-gap': `${s.buttonGapPx}px`,
+    '--comp-button-scale': s.buttonHoverScale,
+    '--comp-button-shadow': s.buttonShadow ? '0 6px 18px #752b3d25' : 'none',
+    '--comp-button-hover-shadow': s.buttonHoverShadow ? '0 10px 24px #752b3d35' : 'none',
+    '--comp-mobile-height': `${s.mobileHeightPx}px`, '--comp-mobile-title-size': `${s.mobileTitleFontSizePx}px`,
+    '--comp-mobile-subtitle-size': `${s.mobileSubtitleFontSizePx}px`,
+    '--comp-mobile-button-size': `${s.mobileButtonFontSizePx}px`,
+    '--comp-mobile-content-padding': `${s.mobileContentPaddingPx}px`,
+    '--comp-mobile-padding': `${s.mobileSectionPaddingXPx}px`, '--comp-mobile-radius': `${s.mobileImageRadiusPx}px`,
+    '--comp-mobile-position': `${s.mobileImagePositionX}% ${s.mobileImagePositionY}%`,
+    '--comp-mobile-fit': s.mobileImageObjectFit,
   };
-
-  const imageStyle = {
-    width: "var(--comp-image-width)",
-    maxWidth: "100%",
-    height: "var(--comp-image-height)",
-    objectFit: style.imageObjectFit,
-    borderRadius: "var(--comp-image-radius)",
-    borderWidth: "var(--comp-image-border-width)",
-    borderStyle: "solid",
-    borderColor: "var(--comp-image-border-color)",
-    boxShadow: style.imageShadow ? "0 25px 50px rgba(0,0,0,0.18)" : "none",
-    outline: `var(--comp-ring-width) solid var(--comp-ring-color)`,
-    outlineOffset: "0px",
-  };
-
-  const buttonStyle = {
-    left: "var(--comp-btn-left)",
-    top: "var(--comp-btn-top)",
-    background: "var(--comp-btn-bg)",
-    color: "var(--comp-btn-color)",
-    borderRadius: "var(--comp-btn-radius)",
-    boxShadow: "var(--comp-btn-shadow)",
-    fontSize: "var(--comp-btn-font-size)",
-    fontWeight: "var(--comp-btn-font-weight)",
-    paddingLeft: "var(--comp-btn-px)",
-    paddingRight: "var(--comp-btn-px)",
-    paddingTop: "var(--comp-btn-py)",
-    paddingBottom: "var(--comp-btn-py)",
-    gap: "var(--comp-btn-gap)",
-    backdropFilter: "blur(4px)",
-    transform: "var(--comp-btn-transform)",
-    transition:
-      "transform 220ms ease, background 220ms ease, color 220ms ease, box-shadow 220ms ease",
-  };
-
-  return (
-    <section
-      className="complementos-look-section relative w-full"
-      style={sectionVars}
-    >
-      <style>{`
-        @keyframes floatY {
-          0% { transform: translate(-50%, -50%) translateY(0px); }
-          50% { transform: translate(-50%, -50%) translateY(-6px); }
-          100% { transform: translate(-50%, -50%) translateY(0px); }
-        }
-
-        .complementos-look-section {
-          margin-top: var(--comp-section-margin-top);
-          padding-left: var(--comp-section-padding-x);
-          padding-right: var(--comp-section-padding-x);
-        }
-
-        .complementos-look-container {
-          width: 100%;
-          max-width: var(--comp-content-max-width);
-        }
-
-        .complementos-look-image {
-          display: block;
-        }
-
-        .complementos-look-button {
-          white-space: nowrap;
-        }
-
-        @media (max-width: 1024px) {
-          .complementos-look-section {
-            padding-left: 18px !important;
-            padding-right: 18px !important;
-          }
-
-          .complementos-look-image {
-            width: 100% !important;
-            height: auto !important;
-            max-height: 520px;
-          }
-
-          .complementos-look-button {
-            font-size: clamp(12px, 1.65vw, 16px) !important;
-            padding: clamp(8px, 1.1vw, 11px) clamp(14px, 2vw, 20px) !important;
-            gap: clamp(6px, 0.8vw, 10px) !important;
-          }
-
-          .complementos-look-button svg {
-            width: clamp(14px, 1.35vw, 17px) !important;
-            height: clamp(14px, 1.35vw, 17px) !important;
-          }
-        }
-
-        @media (max-width: 767px) {
-          .complementos-look-section {
-            padding-left: 12px !important;
-            padding-right: 12px !important;
-          }
-
-          .complementos-look-container {
-            max-width: 100% !important;
-          }
-
-          .complementos-look-image {
-            width: 100% !important;
-            height: auto !important;
-            max-height: none !important;
-            object-fit: contain !important;
-          }
-
-          .complementos-look-button {
-            left: 50% !important;
-            top: auto !important;
-            bottom: clamp(8px, 2.5vw, 14px) !important;
-            transform: translateX(-50%) !important;
-            font-size: clamp(10px, 2.7vw, 14px) !important;
-            padding: clamp(6px, 1.8vw, 10px) clamp(10px, 3.4vw, 16px) !important;
-            gap: clamp(4px, 1.4vw, 8px) !important;
-            max-width: calc(100% - 20px);
-            line-height: 1;
-            border-radius: clamp(12px, 4vw, 22px) !important;
-          }
-
-          .complementos-look-button svg {
-            width: clamp(11px, 2.3vw, 15px) !important;
-            height: clamp(11px, 2.3vw, 15px) !important;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .complementos-look-button {
-            bottom: clamp(6px, 2.2vw, 12px) !important;
-            font-size: clamp(9px, 2.5vw, 12px) !important;
-            padding: clamp(5px, 1.6vw, 8px) clamp(9px, 3vw, 14px) !important;
-            gap: clamp(4px, 1vw, 6px) !important;
-            max-width: calc(100% - 16px);
-          }
-
-          .complementos-look-button svg {
-            width: clamp(10px, 2vw, 13px) !important;
-            height: clamp(10px, 2vw, 13px) !important;
-          }
-        }
-
-        @media (max-width: 360px) {
-          .complementos-look-button {
-            font-size: 9px !important;
-            padding: 5px 10px !important;
-            gap: 4px !important;
-          }
-
-          .complementos-look-button svg {
-            width: 10px !important;
-            height: 10px !important;
-          }
-        }
-      `}</style>
-
-      <div className="complementos-look-container mx-auto w-full">
-        <div className="relative w-full">
-          <img
-            src={config.imageSrc}
-            alt={config.imageAlt}
-            className="complementos-look-image"
-            style={imageStyle}
-          />
-
-          {config.buttonEnabled ? (
-            <a
-              href={config.linkHref}
-              className={[
-                "complementos-look-button absolute -translate-x-1/2 -translate-y-1/2",
-                "inline-flex items-center uppercase",
-                "duration-300 ease-in-out",
-                buttonAnimationClass,
-              ].join(" ")}
-              style={buttonStyle}
-              onMouseEnter={() => setIsHoveringButton(true)}
-              onMouseLeave={() => setIsHoveringButton(false)}
-            >
-              <span>{config.buttonText}</span>
-              {renderArrow(style.buttonArrowStyle)}
-            </a>
-          ) : null}
+  return <section className="complementos-look-section" style={vars} aria-label="Complementos">
+    <div className="complementos-look-container">
+      <div className={`complementos-banner complementos-banner--${s.layout}`} data-content-position={s.contentPosition} data-mobile-position={s.mobileContentPosition}>
+        <img className="complementos-look-image complementos-image--desktop" src={c.imageSrc} alt={c.imageAlt} loading="lazy" decoding="async" />
+        <img className="complementos-look-image complementos-image--mobile" src={c.mobileImageSrc || c.imageSrc} alt={`${c.imageAlt} (móvil)`} loading="lazy" decoding="async" />
+        <div className="complementos-banner__overlay" aria-hidden="true" />
+        {s.frameEnabled && <div className="complementos-banner__frame" aria-hidden="true" />}
+        <div className="complementos-banner__content">
+          {c.titleEnabled && c.title && <h2 className="complementos-banner__title">{c.title}</h2>}
+          {c.dividerEnabled && <div className="complementos-banner__divider" aria-hidden="true"><span /><Flower2 size={20} strokeWidth={1} /><span /></div>}
+          {c.subtitleEnabled && c.subtitle && <p className="complementos-banner__subtitle">{c.subtitle}</p>}
+          {c.buttonEnabled && <a className={`complementos-look-button complementos-button--${s.buttonAnimation}`} href={safeComplementosHref(c.linkHref)}>
+            <span>{c.buttonText}</span><Arrow variant={s.buttonArrowStyle} />
+          </a>}
         </div>
       </div>
-    </section>
-  );
+    </div>
+  </section>;
 }

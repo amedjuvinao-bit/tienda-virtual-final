@@ -233,6 +233,8 @@ const ADMIN_PERMISSION_MODULES = [
       permission('settings:billing', 'Editar datos fiscales generales', 'Permite modificar datos fiscales generales de la empresa.', { audit: true, sensitive: true }),
       permission('settings:payments', 'Editar datos generales de pagos', 'Permite modificar ajustes generales de pagos.', { audit: true, sensitive: true, danger: true }),
       permission('settings:shipping', 'Editar configuración de envíos', 'Permite modificar reglas o parámetros de envío.', { audit: true, sensitive: true }),
+      permission('settings:instagram', 'Conectar Instagram', 'Permite administrar las credenciales privadas y sincronizar la cuenta de Instagram.', { audit: true, sensitive: true, danger: true }),
+      permission('settings:tiktok', 'Conectar TikTok', 'Permite administrar las credenciales privadas y sincronizar la cuenta de TikTok.', { audit: true, sensitive: true, danger: true }),
       permission('settings:mail', 'Editar configuración de correo', 'Permite modificar configuración SMTP y remitentes.', { audit: true, sensitive: true, danger: true }),
       permission('settings:mail_test', 'Enviar prueba de correo', 'Permite enviar correos de prueba desde configuración.', { audit: true, sensitive: true }),
       permission('settings:login', 'Editar login admin', 'Permite modificar configuración o apariencia del login administrativo.', { audit: true, sensitive: true }),

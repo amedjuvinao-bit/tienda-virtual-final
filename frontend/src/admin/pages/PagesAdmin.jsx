@@ -58,7 +58,7 @@ const PageTypeSelector = ({ value, onChange }) => (
             Página personalizada
           </div>
           <div className="text-xs leading-5 text-gray-500">
-            Usa el editor actual por bloques: banner, tendencia, look, categorías,
+            Usa el editor actual por bloques: portada, tendencias, selección de productos, categorías,
             complementos, Instagram, TikTok e información.
           </div>
         </div>
@@ -117,7 +117,7 @@ const EmptyState = () => (
     <div className="text-base font-semibold text-gray-800">Aún no hay páginas creadas</div>
     <p className="mt-2 text-sm text-gray-500">
       Crea tu primera página dinámica para luego agregarle bloques como banner,
-      tendencia, look, categorías, Instagram, TikTok e información.
+      tendencias, selección de productos, categorías, Instagram, TikTok e información.
     </p>
   </div>
 );
@@ -510,14 +510,14 @@ export default function PagesAdmin() {
                 label="Nombre de la página"
                 value={form.name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Ej: Bautizos"
+                placeholder="Ej: Novedades"
               />
 
               <Input
                 label="Slug / ruta"
                 value={form.slug}
                 onChange={(e) => updateForm({ slug: slugify(e.target.value) })}
-                placeholder="Ej: bautizos"
+                placeholder="Ej: novedades"
               />
 
               <PageTypeSelector

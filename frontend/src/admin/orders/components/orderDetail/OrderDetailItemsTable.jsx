@@ -99,7 +99,7 @@ export default function OrderDetailItemsTable({ order }) {
       <SectionTitle
         icon={OrderDetailIcons.ShoppingBag}
         title="Productos de la orden"
-        subtitle="Detalle de prendas, cantidades, variantes y subtotales"
+        subtitle="Detalle de productos, cantidades, variantes y subtotales"
         action={
           <SoftBadge variant="neutral">
             {items.length} producto(s)

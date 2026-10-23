@@ -1,0 +1,18 @@
+/* The original section artwork is the stage. No added covers or blank panels. */
+.storefront-sections{position:relative;display:block;min-width:0;overflow:clip;isolation:isolate;background:var(--color-bg,Canvas)}
+.storefront-section-shell:empty{display:none}
+.storefront-sections>section{margin:0;min-width:0}
+.storefront-chapter-surface{position:relative;display:flow-root;min-width:0;height:100%;background:inherit}
+[data-story-weave="true"]{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+[data-story-weave="true"]>:not([data-story-fragments]){opacity:0!important}
+.storefront-image-weave{position:absolute;z-index:4;pointer-events:none;overflow:visible;background:none;border:0}
+.storefront-image-weave__stripe{position:absolute;top:0;bottom:0;display:block;overflow:hidden;background:none;transform-origin:50% 50%;pointer-events:none}
+.storefront-image-weave__stripe>*{pointer-events:none!important}
+@media(prefers-reduced-motion:no-preference){
+ .storefront-sections[data-story-preset]>section{position:sticky;top:var(--story-pin-top,0px);z-index:var(--story-layer,1)}
+ .storefront-sections[data-story-preset="stack"]>section[data-story-performing="true"]>.storefront-chapter-surface{perspective:1500px}
+ .storefront-sections[data-story-preset="stack"] [data-story-acting="true"]{backface-visibility:hidden;will-change:rotate}
+ .storefront-sections[data-story-preset="cinema"] [data-story-acting="true"]{will-change:clip-path}
+ .storefront-sections[data-story-preset="cascade"] [data-story-acting="true"]{will-change:filter,scale}
+}
+@media(prefers-reduced-motion:reduce){.storefront-sections>section{position:relative!important;top:auto!important}.storefront-image-weave{display:none!important}.storefront-chapter-surface{perspective:none!important}}

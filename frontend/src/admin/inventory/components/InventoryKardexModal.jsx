@@ -367,7 +367,7 @@ export default function InventoryKardexModal({ open, onClose, stockRow }) {
 
     if (!params.productId || !params.branchId || !params.size || !params.color) {
       setError(
-        'No se pudo consultar el Kardex porque faltan datos del producto, sede, talla o color.'
+        'No se pudo consultar el Kardex porque faltan datos del producto, sede, tamaño o color.'
       );
       setKardex(null);
       return;
@@ -627,7 +627,7 @@ export default function InventoryKardexModal({ open, onClose, stockRow }) {
 
                   {!loading && movements.length === 0 && (
                     <div className="py-10 text-center" style={styles.cardMuted}>
-                      No hay movimientos para este producto, sede, talla y color.
+                      No hay movimientos para este producto, sede, tamaño y color.
                     </div>
                   )}
 
@@ -786,7 +786,7 @@ export default function InventoryKardexModal({ open, onClose, stockRow }) {
           <footer className="shrink-0 px-5 py-4 md:px-8" style={styles.footer}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-sm" style={styles.muted}>
-                Kardex filtrado por producto, sede, talla y color seleccionado.
+                Kardex filtrado por producto, sede, tamaño y color seleccionado.
               </p>
 
               <button

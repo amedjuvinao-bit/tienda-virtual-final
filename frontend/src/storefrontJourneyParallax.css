@@ -1,0 +1,6 @@
+@media(prefers-reduced-motion:no-preference){
+ .storefront-sections[data-journey-parallax="true"]>section[data-story-chapter]{position:sticky;top:var(--story-pin-top,0px);z-index:var(--story-layer,1)}
+ .storefront-sections[data-journey-parallax="true"]>section>.storefront-chapter-surface{isolation:isolate}
+ .storefront-sections[data-journey-parallax="true"] :is(.look-editorial,.categories-fan,.ig-journal,.tk-stage,.info-glass,.footer-ed,.complementos-look-section,.story-preview__content){overflow:visible}
+ .storefront-sections[data-journey-parallax="true"] [data-journey-layer-moving="true"]{will-change:translate}
+}

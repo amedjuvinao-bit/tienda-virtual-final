@@ -3,6 +3,8 @@ const express = require("express");
 const router = express.Router();
 
 const SiteSettings = require("../models/SiteSettings");
+const { validateAppearanceInput } = require("../services/appearanceValidation");
+const { loadSettingsDocument } = require("../services/siteSettingsDocumentService");
 const requireAdmin = require("../middleware/requireAdmin");
 const requirePermission = require("../middleware/requirePermission");
 const {
@@ -14,6 +16,11 @@ const {
   getUnsupportedSiteSettingsKeys,
   resolveSiteSettingsWritePermissions,
 } = require("../security/siteSettingsWritePermissions");
+const {
+  isAppearanceWrite,
+  appearanceVersionFilter,
+  updateAppearanceWithRevision,
+} = require('../services/appearanceSettingsRevisionService');
 
 /**
  * 🔎 Ping de diagnóstico
@@ -22,219 +29,6 @@ const {
 router.get("/ping", (_req, res) => {
   res.json({ ok: true, where: "siteSettings router" });
 });
-
-// Defaults (incluye header.logoHeightPx y menus.social)
-function buildDefaultSettings() {
-  return {
-    store: {
-      name: "",
-      businessName: "",
-      email: "",
-      phone: "",
-      whatsapp: "",
-      supportEmail: "",
-      website: "",
-      address: "",
-      city: "",
-      cityCode: "",
-      department: "",
-      departmentCode: "",
-      country: "CO",
-      timezone: "America/Bogota",
-      locale: "es-CO",
-      customerServiceHours: "",
-      weeklySchedule: null,
-    },
-
-    theme: {
-      colors: {
-        primary: "#111827",
-        secondary: "#4b5563",
-        text: "#111827",
-        background: "#ffffff",
-        accent: "#ef4444",
-      },
-      fonts: { base: "Inter", headings: "Poppins", fontSize: 16, lineHeight: 1.6 },
-      radius: { sm: 6, md: 10, lg: 14 },
-      spacing: { base: 8 },
-      logo: { light: "", dark: "" },
-      favicon: "",
-      header: {
-        bgColor: "",
-        bgOpacity: 1,
-        textColor: "",
-        linkColor: "",
-        menuAnimation: "soft",
-        iconColor: "",
-        iconHoverColor: "",
-        iconAnimation: "soft",
-        fontPreset: "",
-        fontFamily: "",
-        fontSizePx: 16,
-        logoLight: "",
-        logoDark: "",
-        logoHeightPx: 80,
-      },
-
-      home: {
-        title: "",
-        subtitle: "",
-        bgImage: "",
-        textColor: "",
-      },
-
-      footer: {
-        bgColor: "",
-        textColor: "",
-      },
-
-      banner: {
-        type: "slider",
-        slides: [],
-        imageUrl: "",
-        imageLink: "",
-        imagePosX: 50,
-        imagePosY: 50,
-        imageFit: "cover",
-        videoUrl: "",
-        videoAutoplay: true,
-        videoMuted: true,
-        videoLoop: true,
-        heightMode: "auto",
-        heightPx: 520,
-        imageButton: {
-          enabled: true,
-          kind: "image",
-          imageUrl: "",
-          text: "",
-          link: "",
-          posX: 50,
-          posY: 85,
-          widthPx: 180,
-        },
-        videoButton: {
-          enabled: true,
-          kind: "image",
-          imageUrl: "",
-          text: "",
-          link: "",
-          posX: 50,
-          posY: 85,
-          widthPx: 180,
-        },
-      },
-
-      sections: [],
-    },
-
-    admin: {
-      theme: {},
-      layout: "default",
-      sidebar: "expanded",
-      loader: { model: "halo" },
-      background: {
-        enabled: false,
-        image: "",
-      },
-    },
-
-    loginAdmin: {
-      theme: "liquidGlass",
-      layout: "centeredCard",
-      background: {
-        mode: "theme",
-        color: "#16324a",
-        image: "",
-        imageOpacity: 0.35,
-        overlay: 0.35,
-        glassTransparency: 0.35,
-      },
-      backgrounds: {},
-    },
-
-    billing: {
-      fiscalInfo: {
-        businessName: "",
-        nit: "",
-        dv: "",
-        taxRegime: "",
-        taxResponsibility: "",
-        taxLevelCode: "",
-        responsibilityCode: "",
-        legalRepresentative: "",
-        billingEmail: "",
-        address: "",
-        city: "",
-        cityCode: "",
-        municipalityCode: "",
-        department: "",
-        departmentCode: "",
-        country: "CO",
-      },
-      dianResolution: {
-        resolutionNumber: "",
-        prefix: "",
-        rangeFrom: 1,
-        rangeTo: 1,
-        currentNumber: 1,
-        resolutionDate: "",
-        expirationDate: "",
-        documentType: "",
-        technicalKey: "",
-        environment: "2",
-      },
-      dian: {
-        enabled: false,
-        mode: "internal",
-        environment: "2",
-        providerType: "",
-        softwareId: "",
-        softwarePin: "",
-        softwareSecurityCode: "",
-        testSetId: "",
-        providerNit: "",
-        providerDv: "",
-        certificateFileName: "",
-        certificatePath: "",
-        certificatePassword: "",
-        certificateUploadedAt: null,
-        wsdlUrl: "",
-        productionWsdlUrl: "",
-        habilitationWsdlUrl: "",
-        lastTestStatus: "",
-        lastTestMessage: "",
-        lastTestAt: null,
-        lastSyncStatus: "",
-        lastSyncMessage: "",
-        lastSyncAt: null,
-      },
-      legalTexts: {
-        invoiceLegalText: "",
-        internalReceiptNote: "",
-      },
-      taxes: {
-        iva: {
-          enabled: true,
-          percent: 19,
-          code: "01",
-          name: "IVA",
-        },
-      },
-    },
-
-    menus: { header: [], footer: [], social: [] },
-    updatedBy: "system",
-  };
-}
-
-// Helper: asegura que exista un documento singleton (y devuelve {_id})
-async function ensureSingletonId() {
-  const existing = await SiteSettings.findOne().select("_id").lean();
-  if (existing?._id) return existing._id;
-
-  const created = await SiteSettings.create(buildDefaultSettings());
-  return created._id;
-}
 
 /**
  * Convierte un objeto en un mapa plano para $set:
@@ -331,167 +125,10 @@ function validateAdminLoader(admin) {
   return null;
 }
 
-/**
- * ✅ autocorrige documentos viejos para que tengan theme.sections
- */
-async function ensureThemeSectionsExists() {
-  const doc = await SiteSettings.findOne().select("_id theme.sections").lean();
-  if (!doc?._id) return;
-
-  const hasSections = Array.isArray(doc?.theme?.sections);
-  if (hasSections) return;
-
-  await SiteSettings.findByIdAndUpdate(
-    doc._id,
-    { $set: { "theme.sections": [] } },
-    { strict: false }
-  );
-}
-
-/**
- * ✅ autocorrige documentos viejos para que tengan admin y loginAdmin
- */
-async function ensureAdminAppearanceExists() {
-  const doc = await SiteSettings.findOne().select("_id admin loginAdmin").lean();
-  if (!doc?._id) return;
-
-  const $set = {};
-
-  if (!doc.admin) {
-    $set.admin = {
-      theme: {},
-      layout: "default",
-      sidebar: "expanded",
-      background: {
-        enabled: false,
-        image: "",
-      },
-    };
-  }
-
-  if (!doc.loginAdmin) {
-    $set.loginAdmin = {
-      theme: "liquidGlass",
-      layout: "centeredCard",
-      background: {
-        mode: "theme",
-        color: "#16324a",
-        image: "",
-        imageOpacity: 0.35,
-        overlay: 0.35,
-        glassTransparency: 0.35,
-      },
-      backgrounds: {},
-    };
-  }
-
-  if (Object.keys($set).length === 0) return;
-
-  await SiteSettings.findByIdAndUpdate(doc._id, { $set }, { strict: false });
-}
-
-/**
- * ✅ autocorrige documentos viejos para que tengan billing completo
- */
-async function ensureBillingExists() {
-  const doc = await SiteSettings.findOne().select("_id billing").lean();
-  if (!doc?._id) return;
-
-  const defaults = buildDefaultSettings().billing;
-  const $set = {};
-
-  if (!doc.billing || typeof doc.billing !== "object") {
-    $set.billing = defaults;
-  } else {
-    if (!doc.billing.fiscalInfo || typeof doc.billing.fiscalInfo !== "object") {
-      $set["billing.fiscalInfo"] = defaults.fiscalInfo;
-    } else {
-      for (const [key, value] of Object.entries(defaults.fiscalInfo)) {
-        if (typeof doc.billing.fiscalInfo[key] === "undefined") {
-          $set[`billing.fiscalInfo.${key}`] = value;
-        }
-      }
-    }
-
-    if (!doc.billing.dianResolution || typeof doc.billing.dianResolution !== "object") {
-      $set["billing.dianResolution"] = defaults.dianResolution;
-    } else {
-      for (const [key, value] of Object.entries(defaults.dianResolution)) {
-        if (typeof doc.billing.dianResolution[key] === "undefined") {
-          $set[`billing.dianResolution.${key}`] = value;
-        }
-      }
-    }
-
-    if (!doc.billing.dian || typeof doc.billing.dian !== "object") {
-      $set["billing.dian"] = defaults.dian;
-    } else {
-      for (const [key, value] of Object.entries(defaults.dian)) {
-        if (typeof doc.billing.dian[key] === "undefined") {
-          $set[`billing.dian.${key}`] = value;
-        }
-      }
-    }
-
-    if (!doc.billing.legalTexts || typeof doc.billing.legalTexts !== "object") {
-      $set["billing.legalTexts"] = defaults.legalTexts;
-    }
-
-    if (!doc.billing.taxes || typeof doc.billing.taxes !== "object") {
-      $set["billing.taxes"] = defaults.taxes;
-    } else if (!doc.billing.taxes.iva || typeof doc.billing.taxes.iva !== "object") {
-      $set["billing.taxes.iva"] = defaults.taxes.iva;
-    } else {
-      for (const [key, value] of Object.entries(defaults.taxes.iva)) {
-        if (typeof doc.billing.taxes.iva[key] === "undefined") {
-          $set[`billing.taxes.iva.${key}`] = value;
-        }
-      }
-    }
-  }
-
-  if (Object.keys($set).length === 0) return;
-
-  await SiteSettings.findByIdAndUpdate(doc._id, { $set }, { strict: false });
-}
-
-/**
- * ✅ autocorrige documentos viejos para que tengan store
- */
-async function ensureStoreExists() {
-  const doc = await SiteSettings.findOne().select("_id store").lean();
-  if (!doc?._id) return;
-
-  if (doc.store && typeof doc.store === "object") return;
-
-  await SiteSettings.findByIdAndUpdate(
-    doc._id,
-    { $set: { store: buildDefaultSettings().store } },
-    { strict: false }
-  );
-}
-
-/**
- * GET /api/site-settings
- * Devuelve el documento (crea uno por defecto si no existe)
- * ✅ Autocorrige theme.sections si el documento es viejo
- */
-async function loadSettingsDocument() {
-  await ensureSingletonId();
-  await ensureThemeSectionsExists();
-  await ensureAdminAppearanceExists();
-  await ensureBillingExists();
-  await ensureStoreExists();
-
-  return SiteSettings.findOne().lean();
-}
-
 function requireSensitiveSettingsPermissions(req, res, next) {
-  const requiredPermissions = resolveSiteSettingsWritePermissions(req.body);
-
-  if (!requiredPermissions.length) return next();
-
-  return requirePermission(requiredPermissions)(req, res, next);
+  const permissions = resolveSiteSettingsWritePermissions(req.body);
+  if (!permissions.length) return next();
+  return requirePermission(permissions)(req, res, next);
 }
 
 router.get(
@@ -507,6 +144,22 @@ router.get(
     }
   }
 );
+
+router.get('/appearance', requireAdmin, requirePermission('appearance:view'), async (_req, res, next) => {
+  try {
+    const doc = await loadSettingsDocument();
+    const safe = buildAdminSiteSettings(doc);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.json({
+      theme: safe.theme,
+      menus: safe.menus,
+      store: { name: safe.store?.name || "", businessName: safe.store?.businessName || "" },
+      appearanceRevision: Number(safe.appearanceRevision || 0),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/", async (_req, res, next) => {
   try {
@@ -528,7 +181,7 @@ router.get("/", async (_req, res, next) => {
  */
 router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, res, next) => {
   try {
-    const { theme, menus, admin, billing } = req.body || {};
+    const { theme, menus, admin, billing, appearanceRevision } = req.body || {};
     const unsupportedKeys = getUnsupportedSiteSettingsKeys(req.body);
 
     if (unsupportedKeys.length) {
@@ -540,12 +193,21 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       });
     }
 
-    if (!resolveSiteSettingsWritePermissions(req.body).length) {
+    const requiredPermissions = resolveSiteSettingsWritePermissions(req.body);
+    if (!requiredPermissions.length) {
       return res.status(400).json({
         ok: false,
         error: "EMPTY_SETTINGS_UPDATE",
         message: "Debes enviar al menos una sección de configuración válida.",
       });
+    }
+
+    const appearanceWrite = isAppearanceWrite(requiredPermissions);
+    if (!appearanceWrite && appearanceRevision !== undefined) {
+      return res.status(400).json({ ok: false, error: 'UNEXPECTED_APPEARANCE_REVISION', message: 'Esta revisión solo corresponde a Apariencia.' });
+    }
+    if (appearanceWrite && (!Number.isSafeInteger(appearanceRevision) || appearanceRevision < 0)) {
+      return res.status(409).json({ ok: false, error: 'APPEARANCE_REVISION_REQUIRED', message: 'Recarga Apariencia antes de guardar.' });
     }
 
     if (Object.prototype.hasOwnProperty.call(req.body || {}, "store")) {
@@ -589,8 +251,53 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (isInvalidSettingsSection(theme)) {
       return res.status(400).json({ error: "theme debe ser un objeto" });
     }
+    if (theme && Object.prototype.hasOwnProperty.call(theme, 'sections') && !Array.isArray(theme.sections)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_SECTIONS', message: 'Las secciones deben ser una lista.' });
+    }
+    if (theme?.header?.iconSet === 'custom') {
+      const iconImages = theme.header.iconImages;
+      const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
+      if (!['account', 'favorites', 'cart'].every((kind) => validCloudinaryImage(iconImages?.[kind]))) {
+        return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_IMAGES', message: 'Carga los tres iconos en Cloudinary antes de guardar.' });
+      }
+    }
+    if (theme?.header && ['searchBgColor', 'searchTextColor', 'searchAccentColor', 'searchBorderColor'].some((key) => {
+      const value = theme.header[key];
+      return value !== undefined && value !== '' && (typeof value !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value));
+    })) {
+      return res.status(400).json({ ok: false, error: 'INVALID_HEADER_SEARCH_COLORS', message: 'Los colores del buscador deben ser hexadecimales válidos.' });
+    }
+    if (theme?.header?.iconOverrides !== undefined) {
+      const overrides = theme.header.iconOverrides;
+      const validCloudinaryImage = (url) => typeof url === 'string' && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(url);
+      const validKinds = ['account', 'search', 'favorites', 'cart'];
+      const validSets = ['gold', 'wine', 'satin', 'porcelain'];
+      const valid = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+        && Object.entries(overrides).every(([set, images]) => validSets.includes(set)
+          && images && typeof images === 'object' && !Array.isArray(images)
+          && Object.entries(images).every(([kind, url]) => validKinds.includes(kind) && (url === '' || validCloudinaryImage(url))));
+      if (!valid) return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_OVERRIDES', message: 'Los iconos personalizados deben ser imágenes de Cloudinary.' });
+    }
+    if (theme?.header?.mobileMenuFeatureImage !== undefined &&
+      theme.header.mobileMenuFeatureImage !== '' &&
+      (typeof theme.header.mobileMenuFeatureImage !== 'string' ||
+        !/^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\//i.test(theme.header.mobileMenuFeatureImage))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_MOBILE_MENU_FEATURE_IMAGE', message: 'La imagen destacada del menú móvil debe estar en Cloudinary.' });
+    }
+    if (theme?.header?.iconSizePx !== undefined && (!Number.isInteger(theme.header.iconSizePx) || theme.header.iconSizePx < 28 || theme.header.iconSizePx > 40)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_HEADER_ICON_SIZE', message: 'El tamaño de los iconos debe estar entre 28 y 40 px.' });
+    }
     if (isInvalidSettingsSection(menus)) {
       return res.status(400).json({ error: "menus debe ser un objeto" });
+    }
+    if (menus && ['header', 'footer', 'social'].some((key) =>
+      Object.prototype.hasOwnProperty.call(menus, key) && !Array.isArray(menus[key])
+    )) {
+      return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_MENUS', message: 'Los menús deben ser listas.' });
+    }
+    if (menus?.header?.some((item) => item?.iconColor !== undefined && item.iconColor !== '' &&
+      (typeof item.iconColor !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(item.iconColor)))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_MOBILE_MENU_ICON_COLOR', message: 'El color de cada ícono debe ser hexadecimal.' });
     }
     if (isInvalidSettingsSection(admin)) {
       return res.status(400).json({ error: "admin debe ser un objeto" });
@@ -610,17 +317,17 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (isInvalidSettingsSection(billing)) {
       return res.status(400).json({ error: "billing debe ser un objeto" });
     }
+    if (appearanceWrite) {
+      const error = validateAppearanceInput({ theme, menus });
+      if (error) return res.status(400).json({ ok: false, error: 'INVALID_APPEARANCE_SETTINGS', message: error });
+    }
+
     const updatedBy =
       req.adminUsername ||
       req.adminUserId ||
       "admin";
 
-    const id = await ensureSingletonId();
-
-    await ensureThemeSectionsExists();
-    await ensureAdminAppearanceExists();
-    await ensureBillingExists();
-    await ensureStoreExists();
+    const { _id: id } = await loadSettingsDocument();
 
     const $set = { updatedBy };
 
@@ -646,17 +353,61 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
 
     const protectedSet = stripProtectedWriteFields($set);
 
-    const updated = await SiteSettings.findByIdAndUpdate(
-      id,
-      { $set: protectedSet },
-      {
-        new: true,
-        strict: false,
-        runValidators: false,
+    // Store card text overrides with the same atomic revision update as the rest of
+    // Appearance. Mongoose can cast an entire cards array using an older
+    // compiled nested schema and silently omit recently added card fields.
+    const hasCardTextOverrides = Object.values(theme?.banner?.templateConfigs || {}).some(
+      (template) => (template?.cardTextStyle && Object.keys(template.cardTextStyle).length > 0)
+        || (Array.isArray(template?.cards) && template.cards.some((card) =>
+          card && ['titleColor', 'labelColor', 'titleSizePx', 'labelSizePx'].some((key) => Object.hasOwn(card, key))))
+    );
+    if (hasCardTextOverrides) {
+      for (const template of Object.values(theme.banner.templateConfigs)) {
+        for (const card of [template?.cardTextStyle, ...(template?.cards || [])]) {
+          for (const key of ['titleColor', 'labelColor']) {
+            if (card?.[key] !== undefined && card[key] !== '' && !/^#[0-9a-f]{6}$/i.test(card[key])) {
+              return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_COLOR', message: 'El color de texto de una tarjeta no es válido.' });
+            }
+          }
+          for (const [key, min, max] of [['titleSizePx', 10, 24], ['labelSizePx', 8, 18]]) {
+            const value = card?.[key];
+            if (value !== undefined && value !== null && (!Number.isInteger(value) || value < min || value > max)) {
+              return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_TEXT_SIZE', message: 'El tamaño de texto de una tarjeta no es válido.' });
+            }
+          }
+        }
+        if (template?.cardTextStyle?.metallicTitle !== undefined && typeof template.cardTextStyle.metallicTitle !== 'boolean') {
+          return res.status(400).json({ ok: false, error: 'INVALID_BANNER_CARD_METALLIC_TITLE', message: 'El efecto metalizado debe estar activado o desactivado.' });
+        }
       }
-    ).lean();
+    }
 
-    res.json(buildAdminSiteSettings(updated));
+    const updated = appearanceWrite
+      ? hasCardTextOverrides
+        ? await SiteSettings.collection.findOneAndUpdate(
+          appearanceVersionFilter(id, appearanceRevision),
+          { $set: protectedSet, $inc: { appearanceRevision: 1 } },
+          { returnDocument: 'after' }
+        )
+        : await updateAppearanceWithRevision({ id, revision: appearanceRevision, changes: protectedSet })
+      : await SiteSettings.findByIdAndUpdate(
+        id,
+        { $set: protectedSet },
+        { new: true, strict: false, runValidators: false }
+      ).lean();
+
+    if (!updated) {
+      return res.status(409).json({
+        ok: false,
+        error: 'APPEARANCE_REVISION_CONFLICT',
+        message: 'La Apariencia guardada cambió. Recarga los datos y revisa tus cambios antes de guardar.',
+      });
+    }
+
+    const safe = buildAdminSiteSettings(updated);
+    res.json(appearanceWrite && !admin && !billing
+      ? { theme: safe.theme, menus: safe.menus, appearanceRevision: safe.appearanceRevision }
+      : safe);
   } catch (err) {
     next(err);
   }

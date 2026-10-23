@@ -30,6 +30,7 @@ const {
 
 const adminAccessGate = require('./middleware/adminAccessGate');
 const backupMaintenance = require('./services/backupMaintenanceService');
+const { listenHttpServer, startupErrorMessage } = require('./lib/listenHttpServer');
 
 const app = express();
 app.disable('x-powered-by');
@@ -115,6 +116,7 @@ requireCritical('./services/electronicInvoiceRecoveryBootstrapService');
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
+const newsletterRoutes = requireCritical('./routes/newsletter');
 const couponRoutes = tryRequire('./routes/coupons');
 const orderEmailRoutes = requireCritical('./routes/orderEmailRoutes');
 const orderCustomerNotificationRoutes = requireCritical(
@@ -154,6 +156,8 @@ const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
+const mountInstagramRoutes = require('./routes/mountInstagramRoutes');
+const mountTiktokRoutes = require('./routes/mountTiktokRoutes');
 const adminLoginSettingsRoutes = tryRequire('./routes/adminLoginSettings');
 const adminAuditLogsRoutes = tryRequire('./routes/adminAuditLogs');
 const adminStoreSettingsRoutes = tryRequire('./routes/adminStoreSettings');
@@ -169,6 +173,7 @@ const digitalDeliveryRoutes = tryRequire('./routes/digitalDeliveries');
 if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
 if (digitalDeliveryRoutes) {
   app.use('/api/digital-deliveries', digitalDeliveryRoutes);
@@ -208,6 +213,9 @@ if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
+mountInstagramRoutes(app);
+mountTiktokRoutes(app);
+console.log('Instagram: rutas de conexión y publicaciones registradas.');
 if (adminLoginSettingsRoutes) {
   app.use('/api/admin/login-settings', adminLoginSettingsRoutes);
 }
@@ -240,6 +248,7 @@ let billingRecoveryRunning = false;
 let shippingWebhookRecoveryTimer = null;
 let shippingWebhookRecoveryRunning = false;
 let orderPostCommitOutboxWorker = null;
+let httpServer = null;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -416,8 +425,10 @@ mongoose
   .connect(env.mongoUri, {
     autoIndex: mongooseIndexPolicy.autoIndex && !backupMaintenance.isActive(),
   })
-  .then(() => {
+  .then(async () => {
     console.log('MongoDB conectado');
+    httpServer = await listenHttpServer(app, PORT);
+    console.log(`Servidor corriendo en http://localhost:${PORT} | PID ${process.pid}`);
     backupMaintenance.setWorkersIdle(() =>
       !inventoryReservationExpirationRunning && !billingRecoveryRunning &&
       !shippingWebhookRecoveryRunning && !orderPostCommitOutboxWorker?.metrics().running
@@ -426,8 +437,14 @@ mongoose
     startBillingInvoiceRecoveryJob();
     startShippingWebhookRecoveryJob();
     startOrderPostCommitOutboxWorker();
-    app.listen(PORT, () => {
-      console.log(`Servidor corriendo en http://localhost:${PORT}`);
-    });
   })
-  .catch((err) => console.error('Error MongoDB:', err));
+  .catch(async err => {
+    console.error(startupErrorMessage(err, PORT));
+    clearInterval(inventoryReservationExpirationTimer);
+    clearInterval(billingRecoveryTimer);
+    clearInterval(shippingWebhookRecoveryTimer);
+    orderPostCommitOutboxWorker?.stop();
+    if (httpServer) await new Promise(resolve => httpServer.close(resolve));
+    await mongoose.disconnect().catch(() => {});
+    process.exitCode = 1;
+  });

@@ -1,12 +1,18 @@
 // src/components/CarouselBanner.jsx
 import "keen-slider/keen-slider.min.css"
 import { useKeenSlider } from "keen-slider/react"
-import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { useContext, useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { X } from "lucide-react"
+import { createPortal } from 'react-dom'
 import { fetchSiteSettings } from "../lib/siteSettingsApi" // ✅ MISMA RUTA QUE APPEARANCEPAGE
+import { getBannerHeightStyle } from "../lib/bannerHeight"
+import BannerTemplateView from './BannerTemplateView'
+import SliderControls from './SliderControls'
+import { StorefrontSettingsContext } from '../context/StorefrontSettingsContext'
 
-export default function CarouselBanner() {
-  const [loaded, setLoaded] = useState(false)
+export default function CarouselBanner({ bannerOverride = null, sectionsOverride = null }) {
+  const overrideRef = useRef({ banner: bannerOverride, sections: sectionsOverride })
+  overrideRef.current = { banner: bannerOverride, sections: sectionsOverride }
   const intervalRef = useRef(null)
   const rafRef = useRef(null)
   const startTsRef = useRef(0)
@@ -15,8 +21,14 @@ export default function CarouselBanner() {
   const [selectedImage, setSelectedImage] = useState(null)
 
   // ✅ settings banner
-  const [banner, setBanner] = useState(null) // theme.banner
-  const [bannerLoading, setBannerLoading] = useState(true)
+  const [localBanner, setBanner] = useState(null) // theme.banner
+  const [localSections, setBannerSections] = useState([])
+  const [localLoading, setBannerLoading] = useState(true)
+  const sharedSettings = useContext(StorefrontSettingsContext)
+  const managed = sharedSettings !== undefined || Boolean(bannerOverride)
+  const banner = bannerOverride || (sharedSettings !== undefined ? sharedSettings?.theme?.banner : localBanner)
+  const bannerSections = sectionsOverride || (sharedSettings !== undefined ? sharedSettings?.theme?.sections || [] : localSections)
+  const bannerLoading = managed ? !bannerOverride && !sharedSettings : localLoading
 
   // ✅ Para dots / slide actual
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -67,14 +79,9 @@ export default function CarouselBanner() {
       if (!opts?.silent) setBannerLoading(true)
       const settings = await fetchSiteSettings()
       const b = settings?.theme?.banner || null
-      setBanner(b)
+      setBanner(overrideRef.current.banner || b)
+      setBannerSections(overrideRef.current.sections || settings?.theme?.sections || [])
 
-      console.log("RB BANNER LOADED", {
-        type: b?.type || "slider",
-        slidesLen: Array.isArray(b?.slides) ? b.slides.length : 0,
-        heightMode: b?.heightMode || "auto",
-        firstSlideKeys: b?.slides?.[0] ? Object.keys(b.slides[0]) : [],
-      })
 
       setSlideAnimTick((t) => t + 1)
     } catch (e) {
@@ -83,6 +90,11 @@ export default function CarouselBanner() {
       setBannerLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (bannerOverride) setBanner(bannerOverride)
+    if (sectionsOverride) setBannerSections(sectionsOverride)
+  }, [bannerOverride, sectionsOverride])
 
   useEffect(() => {
     return () => {
@@ -186,6 +198,7 @@ export default function CarouselBanner() {
   )
 
   useEffect(() => {
+    if (managed) return
     let mounted = true
     ;(async () => {
       if (!mounted) return
@@ -194,9 +207,10 @@ export default function CarouselBanner() {
     return () => {
       mounted = false
     }
-  }, [loadBannerSettings])
+  }, [loadBannerSettings, managed])
 
   useEffect(() => {
+    if (managed) return
     const onStorage = (e) => {
       if (e?.key === "rb_site_settings_tick") {
         loadBannerSettings({ silent: true })
@@ -207,22 +221,20 @@ export default function CarouselBanner() {
     window.addEventListener("storage", onStorage)
     window.addEventListener("focus", onFocus)
 
-    const poll = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        loadBannerSettings({ silent: true })
-      }
-    }, 6000)
 
     return () => {
       window.removeEventListener("storage", onStorage)
       window.removeEventListener("focus", onFocus)
-      clearInterval(poll)
     }
-  }, [loadBannerSettings])
+  }, [loadBannerSettings, managed])
+
+  useEffect(() => {
+    if (sharedSettings) setSlideAnimTick(t => t + 1)
+  }, [sharedSettings])
 
   const bannerType = bannerLoading ? "loading" : String(banner?.type || "slider")
-  const heightMode = banner?.heightMode || "auto"
-
+  const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId)
+  const plainMedia = banner?.templateId === 'plain'
   const isMobile = viewportWidth < 640
   const isTablet = viewportWidth >= 640 && viewportWidth < 1024
   const isDesktop = viewportWidth >= 1024
@@ -238,21 +250,7 @@ export default function CarouselBanner() {
     ? Math.max(1200, Math.min(20000, autoplayMsRaw))
     : 3500
 
-  const heightPxRaw = Number(banner?.heightPx)
-  const heightPx = Number.isFinite(heightPxRaw) ? heightPxRaw : 520
-  const clampedHeightPx = Math.max(240, Math.min(1200, heightPx))
-
-  // ✅ en móvil y tablet el banner cubre toda la pantalla
-  const responsiveHeightPx = useMemo(() => {
-    if (isMobile) return Math.max(520, Math.min(860, clampedHeightPx))
-    if (isTablet) return Math.max(560, Math.min(920, clampedHeightPx))
-    return clampedHeightPx
-  }, [isMobile, isTablet, clampedHeightPx])
-
-  const responsiveFullscreenHeight = useMemo(() => {
-    if (isMobile || isTablet) return "100dvh"
-    return "100vh"
-  }, [isMobile, isTablet])
+  const heightDevice = isMobile ? "mobile" : isTablet ? "tablet" : "desktop"
 
   // ✅ SIN fondo / SIN espacio artificial debajo del header
   const heroWrapStyle = useMemo(() => ({}), [])
@@ -262,12 +260,7 @@ export default function CarouselBanner() {
 
   const heroContainerClass = "w-full relative"
 
-  const heroContainerStyle =
-    heightMode === "fullscreen"
-      ? { height: responsiveFullscreenHeight }
-      : isMobile || isTablet
-      ? { height: "100dvh" }
-      : { height: `${responsiveHeightPx}px` }
+  const heroContainerStyle = getBannerHeightStyle(banner, heightDevice)
 
   const heroFullscreenClass = ""
 
@@ -313,6 +306,14 @@ export default function CarouselBanner() {
     if (/^(https?:)?\/\//i.test(u) || u.startsWith("data:")) return u
     if (u.startsWith("/")) return u
     return `/${u}`
+  }
+
+  const selectDeviceImage = (item, device) => device === "mobile" ? item?.imageMobile || item?.imageTablet || item?.image : device === "tablet" ? item?.imageTablet || item?.image : item?.image
+  const selectSingleImage = (item, device) => device === "mobile" ? item?.imageMobileUrl || item?.imageTabletUrl || item?.imageUrl : device === "tablet" ? item?.imageTabletUrl || item?.imageUrl : item?.imageUrl
+
+  const positionForDevice = (item, device, single = false) => {
+    const prefix = device === "mobile" ? (single ? "imageMobilePos" : "mobilePos") : device === "tablet" ? (single ? "imageTabletPos" : "tabletPos") : (single ? "imagePos" : "pos")
+    return `${clamp0_100(item?.[prefix + "X"], 50)}% ${clamp0_100(item?.[prefix + "Y"], 50)}%`
   }
 
   const defaultButton = useMemo(
@@ -635,17 +636,23 @@ export default function CarouselBanner() {
         const img = resolveSlideImage(s)
         return {
           image: img,
+          imageTablet: resolveSlideImage({ image: s?.imageTablet }),
+          imageMobile: resolveSlideImage({ image: s?.imageMobile }),
           link: String(s?.link || s?.href || "").trim(),
           fit: normalizeFit(s?.fit),
           posX: clamp0_100(s?.posX, 50),
           posY: clamp0_100(s?.posY, 50),
+          tabletPosX: clamp0_100(s?.tabletPosX, 50),
+          tabletPosY: clamp0_100(s?.tabletPosY, 50),
+          mobilePosX: clamp0_100(s?.mobilePosX, 50),
+          mobilePosY: clamp0_100(s?.mobilePosY, 50),
           button: s?.button || null,
           buttons: Array.isArray(s?.buttons) ? s.buttons : null,
         }
       })
       .filter((s) => !!s.image)
 
-    if (normalized.length > 0) return normalized.map((s) => ({ ...s, text: "" }))
+    if (normalized.length > 0 || useTemplate || plainMedia) return normalized.map((s) => ({ ...s, text: "" }))
 
     return fallbackSlides.map((s) => ({
       image: s.image,
@@ -657,7 +664,8 @@ export default function CarouselBanner() {
       buttons: null,
       text: s.text || "",
     }))
-  }, [bannerType, banner?.slides, fallbackSlides])
+  }, [bannerType, banner?.slides, fallbackSlides, useTemplate, plainMedia])
+  const trackSliderProgress = banner?.sliderShowControls !== false && banner?.sliderShowCounter === true && banner?.sliderShowProgress !== false && slides.length > 1
 
   const sliderMountKey = useMemo(() => {
     if (bannerType !== "slider") return "noslider"
@@ -684,19 +692,9 @@ export default function CarouselBanner() {
           defaultAnimation: { duration: 700 },
 
           created(s) {
-            setLoaded(true)
             setShowButtons(true)
             setSlideAnimTick((t) => t + 1)
 
-            const totalSlides = s?.track?.details?.slides?.length ?? null
-            const rel = s?.track?.details?.rel ?? 0
-            console.log("RB SLIDER CREATED", {
-              totalSlides,
-              rel,
-              abs: s?.track?.details?.abs ?? 0,
-              bannerLoading,
-              slidesLenReact: slidesLenRef.current,
-            })
           },
 
           slideChanged(s) {
@@ -710,18 +708,6 @@ export default function CarouselBanner() {
             startTsRef.current = performance.now()
             setProgress(0)
 
-            const totalSlides = s?.track?.details?.slides?.length ?? null
-            const abs = s?.track?.details?.abs ?? null
-
-            console.log("RB SLIDER CHANGE", {
-              rel: relSafe,
-              relRaw,
-              abs,
-              totalSlides,
-              bannerLoading,
-              bannerType,
-              slideImage: slides[relSafe]?.image,
-            })
           },
 
           animationEnded() {
@@ -762,22 +748,27 @@ export default function CarouselBanner() {
       rafRef.current = requestAnimationFrame(tick)
     }
 
-    rafRef.current = requestAnimationFrame(tick)
+    if (trackSliderProgress) rafRef.current = requestAnimationFrame(tick)
 
     return () => {
       clearInterval(intervalRef.current)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [bannerType, instanceRef, autoplayMs, slides.length])
+  }, [bannerType, instanceRef, autoplayMs, slides.length, trackSliderProgress])
 
-  const dotsWrapperClass = isMobile
-    ? "absolute left-1/2 bottom-10 -translate-x-1/2 z-[120] flex flex-row gap-2 pointer-events-auto"
-    : isTablet
-    ? "absolute left-1/2 bottom-12 -translate-x-1/2 z-[120] flex flex-row gap-2.5 pointer-events-auto"
-    : "absolute right-4 top-1/2 -translate-y-1/2 z-[120] flex flex-col gap-3 pointer-events-auto"
-
-  const ringSize = isMobile ? 16 : isTablet ? 17 : 18
-  const ringInnerSize = isMobile ? 10 : isTablet ? 11 : 12
+  const renderSliderControls = () => banner?.sliderShowControls !== false && slides.length > 1 && <SliderControls
+    count={slides.length}
+    current={currentSlide}
+    progress={progress}
+    color={banner?.sliderControlColor}
+    theme={banner?.sliderControlTheme}
+    position={banner?.sliderControlPosition}
+    size={banner?.sliderControlSize}
+    showCounter={banner?.sliderShowCounter === true}
+    showProgress={banner?.sliderShowProgress !== false}
+    onPrevious={() => instanceRef.current?.prev()}
+    onNext={() => instanceRef.current?.next()}
+  />
 
   const sharedStyleTag = (
     <style>{`
@@ -810,25 +801,6 @@ export default function CarouselBanner() {
         100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: drop-shadow(0 0 8px rgba(255,255,255,.25)); }
       }
 
-      .rb-ring{
-        border-radius:9999px;
-        display:grid;place-items:center;
-        background:rgba(255,255,255,.32);
-        backdrop-filter: blur(8px);
-        border:1px solid rgba(255,255,255,.42);
-        box-shadow: 0 8px 22px rgba(0,0,0,.22);
-        transition: transform .2s ease;
-      }
-      .rb-ring:hover{ transform: scale(1.08); }
-      .rb-ring__inner{
-        border-radius:9999px;
-        background:rgba(255,255,255,.65);
-        border:1px solid rgba(212,175,55,.78);
-      }
-      .rb-ring__inner--active{
-        background:rgba(212,175,55,.98);
-      }
-
       @media (prefers-reduced-motion: reduce) {
         * { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
       }
@@ -848,9 +820,42 @@ export default function CarouselBanner() {
     )
   }
 
+  if (useTemplate && bannerType === 'slider') {
+    return <div className={heroWrapClass} style={heroWrapStyle}
+      onMouseEnter={() => { isPaused.current = true }}
+      onMouseLeave={() => { startTsRef.current = performance.now() - progress * autoplayMs; isPaused.current = false }}>
+      <div className={heroContainerClass} style={heroContainerStyle}>
+        <BannerTemplateView banner={banner} sections={bannerSections}>
+          <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
+            {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
+              <img src={selectDeviceImage(slide, heightDevice)} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: positionForDevice(slide, heightDevice) }} />
+            </div>)}
+          </div>
+        </BannerTemplateView>
+        {renderSliderControls()}
+      </div>
+    </div>
+  }
+
+  if (useTemplate && bannerType === 'image') {
+    return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
+      <BannerTemplateView banner={banner} sections={bannerSections}>
+        {banner?.imageUrl && <img src={selectSingleImage(banner, heightDevice)} alt="Portada de la tienda" style={{ objectFit: normalizeFit(banner.imageFit), objectPosition: positionForDevice(banner, heightDevice, true) }} />}
+      </BannerTemplateView>
+    </div></div>
+  }
+
+  if (useTemplate && bannerType === 'video') {
+    return <div className={heroWrapClass} style={heroWrapStyle}><div className={heroContainerClass} style={heroContainerStyle}>
+      <BannerTemplateView banner={banner} sections={bannerSections}>
+        {banner?.videoUrl && <video src={banner.videoUrl} autoPlay={!!banner.videoAutoplay} muted={!!banner.videoMuted} loop={!!banner.videoLoop} playsInline />}
+      </BannerTemplateView>
+    </div></div>
+  }
+
   if (bannerType === "video") {
     const videoUrl = String(banner?.videoUrl || "").trim()
-    const videoBtnPayload = pickButtons(banner?.videoButtons, banner?.videoButton)
+    const videoBtnPayload = plainMedia ? [] : pickButtons(banner?.videoButtons, banner?.videoButton)
 
     return (
       <div className={heroWrapClass} style={heroWrapStyle}>
@@ -883,15 +888,13 @@ export default function CarouselBanner() {
   }
 
   if (bannerType === "image") {
-    const imageUrl = String(banner?.imageUrl || "").trim()
-    const imageLink = String(banner?.imageLink || "").trim()
+    const imageUrl = String(selectSingleImage(banner, heightDevice) || "").trim()
+    const imageLink = plainMedia ? "" : String(banner?.imageLink || "").trim()
 
     const imageFit = normalizeFit(banner?.imageFit)
-    const imagePosX = clamp0_100(banner?.imagePosX, 50)
-    const imagePosY = clamp0_100(banner?.imagePosY, 50)
-    const imageObjectPosition = `${imagePosX}% ${imagePosY}%`
+    const imageObjectPosition = positionForDevice(banner, heightDevice, true)
 
-    const imageBtnPayload = pickButtons(banner?.imageButtons, banner?.imageButton)
+    const imageBtnPayload = plainMedia ? [] : pickButtons(banner?.imageButtons, banner?.imageButton)
 
     const Img = (
       <img
@@ -939,9 +942,10 @@ export default function CarouselBanner() {
           {renderMovableButtons(imageBtnPayload, imageLink, true, true)}
         </div>
 
-        {selectedImage && (
+        {selectedImage && createPortal(
           <div
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-auto animate-fade-in"
+            style={{zIndex:10000}}
             onClick={() => setSelectedImage(null)}
           >
             <div
@@ -949,6 +953,8 @@ export default function CarouselBanner() {
               onClick={(e) => e.stopPropagation()}
             >
               <button
+                type="button"
+                aria-label="Cerrar imagen ampliada"
                 onClick={() => setSelectedImage(null)}
                 className="absolute top-2 right-2 bg-white rounded-full p-1 shadow z-10"
               >
@@ -961,7 +967,7 @@ export default function CarouselBanner() {
                 draggable={false}
               />
             </div>
-          </div>
+          </div>, document.body
         )}
       </div>
     )
@@ -988,26 +994,25 @@ export default function CarouselBanner() {
         <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
           {slides.map((slide, idx) => {
             const fit = normalizeFit(slide?.fit)
-            const posX = clamp0_100(slide?.posX, 50)
-            const posY = clamp0_100(slide?.posY, 50)
-            const objectPosition = `${posX}% ${posY}%`
+            const objectPosition = positionForDevice(slide, heightDevice)
 
-            const slideButtons = pickButtons(slide?.buttons, slide?.button)
+            const slideButtons = plainMedia ? [] : pickButtons(slide?.buttons, slide?.button)
             const isActive = idx === currentSlide
 
             return (
               <div
                 key={idx}
                 className="keen-slider__slide relative h-full w-full"
+                data-active={isActive}
                 onClick={(e) => {
                   if (isClickFromButton(e)) return
-                  setSelectedImage(slide.image)
+                  setSelectedImage(selectDeviceImage(slide, heightDevice))
                 }}
                 role="button"
                 tabIndex={0}
               >
                 <img
-                  src={slide.image}
+                  src={selectDeviceImage(slide, heightDevice)}
                   alt={`Slide ${idx + 1}`}
                   className="absolute inset-0 w-full h-full"
                   style={{
@@ -1024,50 +1029,13 @@ export default function CarouselBanner() {
           })}
         </div>
 
-        {loaded && slides.length > 1 && (
-          <div className={dotsWrapperClass}>
-            {slides.map((_, i) => {
-              const active = i === currentSlide
-              const deg = Math.max(0, Math.min(1, active ? progress : 0)) * 360
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => {
-                    instanceRef.current?.moveToIdx(i)
-                    startTsRef.current = performance.now()
-                    setProgress(0)
-                    setShowButtons(false)
-                    if (btnTimerRef.current) clearTimeout(btnTimerRef.current)
-                  }}
-                  className="rb-ring"
-                  aria-label={`Ir al slide ${i + 1}`}
-                  style={{
-                    width: `${ringSize}px`,
-                    height: `${ringSize}px`,
-                    backgroundImage: active
-                      ? `conic-gradient(rgba(212,175,55,.95) ${deg}deg, rgba(255,255,255,.15) 0deg)`
-                      : "none",
-                  }}
-                  title={active ? "Reproduciendo" : "Ir al slide"}
-                >
-                  <span
-                    className={"rb-ring__inner " + (active ? "rb-ring__inner--active" : "")}
-                    style={{
-                      width: `${ringInnerSize}px`,
-                      height: `${ringInnerSize}px`,
-                    }}
-                  />
-                </button>
-              )
-            })}
-          </div>
-        )}
+        {renderSliderControls()}
       </div>
 
-      {selectedImage && (
+      {selectedImage && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-auto animate-fade-in"
+          style={{zIndex:10000}}
           onClick={() => setSelectedImage(null)}
         >
           <div
@@ -1075,6 +1043,8 @@ export default function CarouselBanner() {
             onClick={(e) => e.stopPropagation()}
           >
             <button
+              type="button"
+              aria-label="Cerrar imagen ampliada"
               onClick={() => setSelectedImage(null)}
               className="absolute top-2 right-2 bg-white rounded-full p-1 shadow z-10"
             >
@@ -1087,7 +1057,7 @@ export default function CarouselBanner() {
               draggable={false}
             />
           </div>
-        </div>
+        </div>, document.body
       )}
     </div>
   )

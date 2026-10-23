@@ -1605,7 +1605,7 @@ export default function ProductDetailPageEditor() {
                 }
               />
               <Toggle
-                label="Mostrar tallas"
+                label="Mostrar tamaños"
                 checked={form.productDetailConfig.showSizes}
                 onChange={(value) => updateDetailConfig({ showSizes: value })}
               />

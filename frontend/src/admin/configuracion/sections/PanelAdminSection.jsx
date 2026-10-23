@@ -571,11 +571,11 @@ const ADMIN_THEME_OPTIONS = [
   {
     value: 'roseLuxuryLight',
     label: 'Rosa luxury',
-    description: 'Composición editorial, curvas couture y brillo de boutique.',
+    description: 'Composición editorial, curvas suaves y acabados luminosos.',
   },
   {
     value: 'goldBoutiqueLight',
-    label: 'Dorado boutique',
+    label: 'Dorado elegante',
     description: 'Marcos interiores, ritmo clásico y detalles tipo joyería.',
   },
   {

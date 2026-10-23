@@ -1471,7 +1471,7 @@ export default function Login({ initialSettings, loaderModel }) {
         </div>
 
         <div className="rb-couture-foot">
-          <span>Rosa Signature · Private Edition</span>
+          <span>Administración · Acceso privado</span>
           <span><i /> Entorno protegido</span>
         </div>
       </div>

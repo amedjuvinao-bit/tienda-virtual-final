@@ -25,6 +25,13 @@ import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAd
 import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
 import { AdminLogoutGate } from './admin/loading/AdminLogoutPending';
 import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
+import { storySectionOrder } from './lib/storefrontStoryConfig';
+import StorefrontStory from './components/StorefrontStory';
+import StorefrontActionFeedback from './components/StorefrontActionFeedback';
+import StorefrontScrollRestoration from './components/StorefrontScrollRestoration';
+import { StorefrontSettingsContext } from './context/StorefrontSettingsContext';
+import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
+import './storefrontSectionMotion.css';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
@@ -47,6 +54,7 @@ const DynamicPage = lazy(() => import('./pages/DynamicPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const Carrito = lazy(() => import('./pages/Carrito'));
 const Favoritos = lazy(() => import('./pages/Favoritos'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const Login = lazy(() => import('./admin/Login'));
@@ -80,18 +88,6 @@ const AppearancePage = lazy(() => import('./admin/AppearancePage'));
 
 const RB_SETTINGS_TICK_KEY = 'rb_site_settings_tick';
 
-function ScrollToHash() {
-  const { hash, pathname } = useLocation();
-
-  useEffect(() => {
-    if (!hash) return;
-    const el = document.getElementById(hash.replace('#', ''));
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [hash, pathname]);
-
-  return null;
-}
-
 function AdminDocumentRoute() {
   const { pathname } = useLocation();
 
@@ -116,26 +112,25 @@ function GlobalFloatingButtons({ theme }) {
   return (
     <>
       <WhatsAppButton config={theme?.global?.whatsapp} />
-      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} />}
+      {pathname === '/' && <ScrollButton config={theme?.global?.scrollButtons} motionConfig={theme?.global?.sectionMotion} buttonAnimation={theme?.banner?.templateConfigs?.[theme?.banner?.templateId]?.buttonAnimation} />}
     </>
   );
 }
 
-function Home({ theme }) {
+function Home({ theme, store }) {
+  const components={tendencia:TrendingSection,look:LookSection,complementos:ComplementosLook,categorias:CategoriasSection,instagram:InstagramSection,tiktok:TiktokSection,informacion:InformacionSection};
+
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col">
       <Header />
-      <div className="flex-grow">
+      <StorefrontStory config={theme?.global?.sectionMotion}>
         <section id="banner" className="w-full"><CarouselBanner /></section>
-        <section id="tendencia" className="w-full"><TrendingSection theme={theme} /></section>
-        <section id="look" className="w-full"><LookSection theme={theme} /></section>
-        <section id="complementos" className="w-full"><ComplementosLook theme={theme} imageSrc="/SeccionComplementos/Complementos.png" /></section>
-        <section id="categorias" className="w-full"><CategoriasSection theme={theme} /></section>
-        <section id="instagram" className="w-full"><InstagramSection theme={theme} posts={[]} /></section>
-        <section id="tiktok" className="w-full"><TiktokSection theme={theme} posts={[]} /></section>
-        <section id="informacion" className="w-full"><InformacionSection theme={theme} /></section>
-        <section id="footer" className="w-full"><FooterSection theme={theme} /></section>
-      </div>
+        {storySectionOrder(theme?.sections).filter(id=>isStorefrontSectionVisible(theme,id)).map(id=>{
+          const Component=components[id];
+          return <section key={id} id={id} className="storefront-section-shell w-full"><Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/></section>;
+        })}
+        <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
+      </StorefrontStory>
     </div>
   );
 }
@@ -153,11 +148,14 @@ export default function App() {
   const [adminLoader, setAdminLoader] = useState(getRememberedAdminLoader);
   const [siteSettingsFromServer, setSiteSettingsFromServer] = useState(null);
 
-  const reloadTheme = async () => {
+  const settingsRequest = useRef(0);
+  const reloadTheme = async ({ silent = false } = {}) => {
+    const requestId = ++settingsRequest.current;
     let succeeded = false;
     try {
-      if (!window.location.pathname.startsWith('/admin')) setLoadingPage(true);
+      if (!silent && !window.location.pathname.startsWith('/admin')) setLoadingPage(true);
       const data = await fetchSiteSettings();
+      if (requestId !== settingsRequest.current) return false;
       const nextLoader = normalizeAdminLoader(data?.admin?.loader);
       setAdminLoader(nextLoader);
       rememberAdminLoader(nextLoader);
@@ -170,19 +168,19 @@ export default function App() {
           global: normalizeGlobalConfig(data.theme?.global),
         };
         setThemeFromServer(normalizedTheme);
-        console.log('theme.sections =', normalizedTheme?.sections);
         applyTheme(normalizedTheme);
-        console.log('Tema aplicado desde /api/site-settings');
       }
       succeeded = true;
       adminConnectionErrorLogged.current = false;
       setAdminConnectionError(false);
     } catch (error) {
+      if (requestId !== settingsRequest.current) return false;
       if (!adminConnectionErrorLogged.current) console.error('Error cargando site settings:', error);
       adminConnectionErrorLogged.current = true;
       if (window.location.pathname.startsWith('/admin')) setAdminConnectionError(true);
     } finally {
       const finish = () => {
+        if (requestId !== settingsRequest.current) return;
         setLoadingPage(false);
         if (succeeded || !window.location.pathname.startsWith('/admin')) setThemeReady(true);
       };
@@ -221,14 +219,17 @@ export default function App() {
 
   useEffect(() => {
     const onEvent = () => reloadTheme();
+    const onFocus = () => reloadTheme({ silent: true });
     const onStorage = (event) => {
       if (event.key === RB_SETTINGS_TICK_KEY) reloadTheme();
     };
 
+    window.addEventListener('focus', onFocus);
     window.addEventListener('rb_site_settings_updated', onEvent);
     window.addEventListener('storage', onStorage);
 
     return () => {
+      window.removeEventListener('focus', onFocus);
       window.removeEventListener('rb_site_settings_updated', onEvent);
       window.removeEventListener('storage', onStorage);
     };
@@ -238,20 +239,23 @@ export default function App() {
     <AuthProvider>
       <FavoritesProvider>
         <CartProvider>
+          <StorefrontSettingsContext.Provider value={siteSettingsFromServer}>
           <BrowserRouter>
             <AdminDocumentRoute />
+            <StorefrontScrollRestoration ready={themeReady} />
+            <StorefrontActionFeedback />
             <BackupMaintenanceNotice adminPanelReady={themeReady} />
             <AppConfirmProvider>
               <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
-                <ScrollToHash />
                 <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
                 <GlobalFloatingButtons theme={themeFromServer} />
                 {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
 
                 <AdminLogoutGate>
                 {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
-                  <Route path="/" element={<Home theme={themeFromServer} />} />
+                  <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
+                  <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/p/:id" element={<ProductDetail />} />
                   <Route path="/admin/login" element={<Login initialSettings={siteSettingsFromServer} loaderModel={adminLoader} />} />
@@ -259,6 +263,7 @@ export default function App() {
                   <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/carrito" element={<Carrito />} />
                   <Route path="/favoritos" element={<Favoritos />} />
+                  <Route path="/buscar" element={<SearchResults theme={themeFromServer} />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
                   <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />
@@ -294,6 +299,8 @@ export default function App() {
                     <Route path="configuracion/facturacion" element={<Navigate to="/admin/facturacion/configuracion" replace />} />
                     <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/instagram" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/tiktok" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/correo" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/login-admin" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/panel-admin" element={protectAdminContent(<ConfiguracionPage />)} />
@@ -321,6 +328,7 @@ export default function App() {
               </Suspense>
             </AppConfirmProvider>
           </BrowserRouter>
+          </StorefrontSettingsContext.Provider>
         </CartProvider>
       </FavoritesProvider>
     </AuthProvider>

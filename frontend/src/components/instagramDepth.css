@@ -1,0 +1,82 @@
+/* A separate 3D scene keeps the satin background fixed while each photo occupies its own plane. */
+.ig-editorial[data-depth3d='true'] .ig-editorial__photos {
+  perspective: var(--ig-perspective);
+  perspective-origin: 50% 38%;
+  transform-style: preserve-3d;
+}
+.ig-editorial[data-depth3d='true'] .ig-editorial__photo {
+  --photo-pointer-x: 0deg;
+  --photo-pointer-y: 0deg;
+  --photo-light-x: 24%;
+  --photo-light-y: 12%;
+  --photo-hover-depth: 0px;
+  --ig-card-rest-transform: translateZ(var(--photo-depth)) rotateX(var(--photo-tilt-x)) rotateY(var(--photo-tilt-y)) rotateZ(var(--photo-rotate)) scale(var(--photo-rest-scale));
+  transform: translateZ(calc(var(--photo-depth) + var(--photo-hover-depth))) rotateX(calc(var(--photo-tilt-x) + var(--photo-pointer-x))) rotateY(calc(var(--photo-tilt-y) + var(--photo-pointer-y))) rotateZ(var(--photo-rotate)) scale(var(--photo-rest-scale));
+  transform-style: preserve-3d;
+  transform-origin: center;
+  box-shadow: 0 2px 4px #642c3320, 0 16px 22px rgb(74 20 32 / var(--ig-shadow)), 0 28px 40px rgb(74 20 32 / calc(var(--ig-shadow) * .7));
+  transition: transform var(--ig-duration) cubic-bezier(.2,.7,.2,1), box-shadow var(--ig-duration) ease;
+}
+/* The back sits behind the printed face. The illuminated rim gives the edge visible thickness. */
+.ig-editorial[data-depth3d='true'] .ig-editorial__photo::before {
+  content: '';
+  position: absolute;
+  inset: calc(-.5 * var(--ig-thickness));
+  border-radius: calc(var(--ig-radius) + 2px);
+  background: linear-gradient(125deg, #fff9e7 0%, #e2bba4 32%, #976f64 73%, #f6d9c4 100%);
+  border: 1px solid #ffefd4;
+  transform: translate3d(calc(var(--ig-thickness) * .3), calc(var(--ig-thickness) * .45), calc(-1 * var(--ig-thickness)));
+  box-shadow: 0 1px 0 #fff9, 0 5px 9px #58213540;
+  pointer-events: none;
+}
+.ig-editorial[data-depth3d='true'] .ig-editorial__photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid #fff6;
+  background: radial-gradient(ellipse at var(--photo-light-x) var(--photo-light-y), #fff9 0%, #fff0 58%), linear-gradient(120deg, #fff5 0%, #fff0 30%, #fff0 65%, #55203935 100%);
+  opacity: var(--ig-lighting);
+  transform: translateZ(1px);
+  pointer-events: none;
+}
+.ig-editorial[data-depth3d='true'] .ig-editorial__post-action {
+  transform: translateZ(20px) scale(.92);
+  box-shadow: 0 7px 15px #55203933, inset 0 1px 0 #fff7;
+}
+.ig-editorial[data-depth3d='true'] .ig-editorial__photo:focus-visible .ig-editorial__post-action {
+  transform: translateZ(20px) scale(1);
+}
+/* Additional publications retain their grid footprint and receive the same rim and lighting. */
+.ig-editorial[data-depth3d='true'] .ig-editorial__extra .ig-editorial__photo {
+  transform: perspective(var(--ig-perspective)) rotateX(var(--photo-tilt-x)) rotateY(var(--photo-tilt-y));
+}
+@media (hover: hover) and (pointer: fine) {
+  .ig-editorial[data-depth3d='true']:not([data-motion='none']) .ig-editorial__photos .ig-editorial__photo:hover {
+    --photo-hover-depth: var(--ig-hover-depth);
+    transform: translateZ(calc(var(--photo-depth) + var(--photo-hover-depth))) rotateX(calc(var(--photo-tilt-x) + var(--photo-pointer-x))) rotateY(calc(var(--photo-tilt-y) + var(--photo-pointer-y))) rotateZ(var(--photo-rotate)) scale(var(--photo-rest-scale));
+    box-shadow: 0 5px 7px #642c332e, 0 28px 38px rgb(74 20 32 / var(--ig-shadow)), 0 54px 70px rgb(74 20 32 / calc(var(--ig-shadow) * .7));
+  }
+  .ig-editorial[data-depth3d='true'] .ig-editorial__photo:hover .ig-editorial__post-action { transform: translateZ(20px) scale(1); }
+}
+/* Touch layouts keep their grid geometry. Relief, cast shadows and light remain visible. */
+@container (max-width: 767px) {
+  .ig-editorial[data-depth3d='true'] .ig-editorial__photo,
+  .ig-editorial[data-depth3d='true'] .ig-editorial__extra .ig-editorial__photo,
+  .ig-editorial[data-depth3d='true']:not([data-motion='none']) .ig-editorial__photos .ig-editorial__photo:hover {
+    transform: none;
+    box-shadow: 0 2px 4px #642c332e, 0 10px 16px rgb(74 20 32 / var(--ig-shadow));
+  }
+  .ig-editorial[data-depth3d='true'] .ig-editorial__photo::before { inset: -1px; transform: translate3d(0, 2px, -1px); }
+  .ig-editorial[data-depth3d='true'] .ig-editorial__post-action { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ig-editorial[data-depth3d='true'] .ig-editorial__photos .ig-editorial__photo:hover { transform: var(--ig-card-rest-transform) !important; }
+  .ig-editorial[data-depth3d='true'] .ig-editorial__extra .ig-editorial__photo:hover { transform: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @container (max-width: 767px) {
+    .ig-editorial[data-depth3d='true'] .ig-editorial__photos .ig-editorial__photo:hover { transform: none !important; }
+  }
+}

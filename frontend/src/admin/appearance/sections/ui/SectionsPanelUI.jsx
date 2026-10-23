@@ -1,7 +1,10 @@
 // src/admin/appearance/sections/ui/SectionsPanelUI.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button, Field, Input } from "./UiComponents";
-import { isHexColor, clampNumber } from "./sectionHelpers";
+import "./sectionModal.css";
+import { clampNumber } from "./sectionHelpers";
+import SectionColorPicker from "./SectionColorPicker";
 
 // ✅ IMPORTANTE: se mantiene porque CardImageMover sí consulta imágenes del producto por productId
 import api from "../../../../lib/api";
@@ -35,7 +38,7 @@ export function TabButton({ active, children, onClick }) {
       className={[
         "px-3 py-2 rounded-xl text-sm font-bold border transition",
         active
-          ? "bg-neutral-900 text-white border-neutral-900"
+          ? "section-editor-accent text-white section-editor-accent-border"
           : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
       ].join(" ")}
     >
@@ -47,10 +50,9 @@ export function TabButton({ active, children, onClick }) {
 // ============================================
 // ✅ Modal reusable (overlay + panel)
 // ============================================
-export function ModalShell({ open, title, onClose, children }) {
+export function ModalShell({ open, title, onClose, disabled = false, children }) {
   const isOpen = typeof open === "boolean" ? open : true;
-  const contentRef = useRef(null);
-  const scrollTopRef = useRef(0);
+  const dialogRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,35 +67,29 @@ export function ModalShell({ open, title, onClose, children }) {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const previousFocus = document.activeElement;
+    dialogRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
+      previousFocus?.focus?.();
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const el = contentRef.current;
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollTop = scrollTopRef.current || 0;
-    });
-  });
-
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[9999]">
+  return createPortal(
+    <div className="section-modal" role="presentation">
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="section-modal__backdrop"
         onClick={onClose}
-        aria-label="Cerrar"
+        aria-label="Cerrar editor"
       />
-      <div className="absolute inset-0 p-3 sm:p-6 flex items-center justify-center">
-        <div className="w-full max-w-6xl max-h-[90vh] rounded-2xl bg-white shadow-xl border border-neutral-200 overflow-hidden relative">
+      <div className="section-modal__positioner">
+        <div ref={dialogRef} tabIndex={-1} className="section-modal__panel" role="dialog" aria-modal="true" aria-label={title || "Editar sección"}>
           {title ? (
-            <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
-              <div className="text-base sm:text-lg font-extrabold text-neutral-900">
+            <div className="section-modal__header">
+              <div className="section-modal__title">
                 {title}
               </div>
               <Button type="button" kind="ghost" onClick={onClose}>
@@ -103,22 +99,14 @@ export function ModalShell({ open, title, onClose, children }) {
           ) : null}
 
           <div
-            ref={contentRef}
-            onScroll={() => {
-              const el = contentRef.current;
-              if (el) scrollTopRef.current = el.scrollTop;
-            }}
-            className={
-              title
-                ? "p-4 overflow-y-auto max-h-[calc(90vh-70px)]"
-                : "p-4 overflow-y-auto max-h-[90vh]"
-            }
+            className="section-modal__content"
+            data-section-modal-scroll="true"
           >
-            {children}
+            <fieldset disabled={disabled} className="section-modal__fields">{children}</fieldset>
           </div>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
@@ -202,38 +190,16 @@ export function ColorField({
   value,
   onChange,
   onHelp,
-  palettes = ["rosa", "neutros", "dorados"],
+  palettes,
 }) {
-  const safe = typeof value === "string" ? value : "";
-  const valid = isHexColor(safe);
-
-  const setColor = (v) => onChange?.(v);
-
   return (
     <Field label={label} hint={hint}>
-      <div className="grid grid-cols-[minmax(0,1fr)_44px_32px] gap-2 items-center">
-        <Input
-          value={safe}
-          onChange={(e) => setColor(e.target.value)}
-          placeholder="#ffffff"
-        />
-
-        <input
-          type="color"
-          value={valid ? safe : "#000000"}
-          onChange={(e) => setColor(e.target.value)}
-          className="w-11 h-10 p-0 border border-neutral-200 rounded-lg bg-white cursor-pointer"
-          title="Elegir color"
-        />
-
-        <HelpButton onClick={onHelp} />
-      </div>
-
-      {!valid && safe ? (
-        <div className="mt-2 text-xs text-rose-700">
-          Color inválido. Usa formato <b>#RGB</b> o <b>#RRGGBB</b>.
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="flex-1 min-w-0">
+          <SectionColorPicker label={label} value={value} onChange={onChange} palettes={palettes} />
         </div>
-      ) : null}
+        {onHelp ? <HelpButton onClick={onHelp} /> : null}
+      </div>
     </Field>
   );
 }
@@ -402,8 +368,8 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
       if (nextMain) onChangeImages?.({ mainImage: nextMain, hoverImage: nextHover });
     } catch (e) {
       console.error("CardImageMover: error consultando producto:", e);
-      setImgs([]);
-      setError("No pude cargar las imágenes de este producto.");
+      setImgs([...new Set([item?.mainImage, item?.hoverImage].filter(Boolean))]);
+      setError("No se pudieron consultar otras fotos del catálogo. Puedes seguir usando las fotos guardadas o subir una nueva.");
     } finally {
       setLoading(false);
     }
@@ -459,17 +425,17 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
   };
 
   const selectedHint = useMemo(() => {
-    if (!main && !hover) return "Sin selección";
-    return `Principal: ${main ? "OK" : "—"} · Hover: ${hover ? "OK" : "—"}`;
-  }, [main, hover]);
+    if (!main && !hover) return "Elige una foto para empezar";
+    return `Editando foto ${mode === "main" ? "principal" : "al pasar el cursor"}`;
+  }, [main, hover, mode]);
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-3">
+    <div className="section-product-editor__image-picker rounded-xl border border-neutral-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-extrabold text-neutral-900">Imágenes del producto</div>
+          <div className="text-sm font-extrabold text-neutral-900">Fotos de la tarjeta</div>
           <div className="text-xs text-neutral-500">
-            Elige una miniatura como <b>Principal</b> o <b>Hover</b>.
+            Selecciona qué foto quieres cambiar y elige una miniatura.
           </div>
           <div className="mt-1 text-[11px] text-neutral-500">{selectedHint}</div>
         </div>
@@ -481,11 +447,11 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
             className={[
               "px-2 py-1 rounded-lg border text-xs font-semibold",
               mode === "main"
-                ? "bg-neutral-900 text-white border-neutral-900"
+                ? "section-editor-accent text-white section-editor-accent-border"
                 : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
             ].join(" ")}
           >
-            Elegir Principal
+            Principal
           </button>
           <button
             type="button"
@@ -493,11 +459,11 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
             className={[
               "px-2 py-1 rounded-lg border text-xs font-semibold",
               mode === "hover"
-                ? "bg-neutral-900 text-white border-neutral-900"
+                ? "section-editor-accent text-white section-editor-accent-border"
                 : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
             ].join(" ")}
           >
-            Elegir Hover
+            Al pasar el cursor
           </button>
         </div>
       </div>
@@ -507,7 +473,7 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
           {loading ? "Cargando..." : "Recargar"}
         </Button>
 
-        <label className="inline-flex items-center px-3 py-2 rounded-xl bg-neutral-900 text-white text-xs font-medium cursor-pointer shadow-sm hover:bg-neutral-800 transition">
+        <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
           <span className="mr-1">{loading ? "Procesando..." : "Subir imagen"}</span>
           <input
             type="file"
@@ -518,17 +484,15 @@ export function CardImageMover({ productId, item, uploadToCloudinary, onChangeIm
           />
         </label>
 
-        {!uploadToCloudinary ? (
-          <span className="text-[11px] text-neutral-400">(uploadToCloudinary no está disponible)</span>
-        ) : null}
+        {!uploadToCloudinary ? <span className="text-[11px] text-neutral-500">La carga de imágenes no está disponible.</span> : null}
       </div>
 
-      {error ? <div className="mt-2 text-xs text-rose-700">{error}</div> : null}
+      {error ? <div className="mt-2 text-xs text-amber-800" role="status">{error}</div> : null}
 
       <div className="mt-3 grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
         {!imgs.length && !loading ? (
           <div className="col-span-full text-xs text-neutral-500">
-            No hay imágenes disponibles para este producto (o no pude cargarlas).
+            Aún no hay fotos para elegir. Sube una imagen para esta tarjeta.
           </div>
         ) : null}
 
@@ -632,7 +596,7 @@ export function ToggleChip({ active, onClick, children }) {
       className={[
         "px-3 py-2 rounded-xl border text-sm font-semibold transition",
         active
-          ? "bg-neutral-900 text-white border-neutral-900"
+          ? "section-editor-accent text-white section-editor-accent-border"
           : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50",
       ].join(" ")}
     >

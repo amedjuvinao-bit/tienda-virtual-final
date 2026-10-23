@@ -1,5 +1,6 @@
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/PageEditor.jsx
+import { ADMIN_SECTION_LABELS } from "../appearance/appearanceLabels";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import BlockConfigPanel from "./BlockConfigPanel";
@@ -9,15 +10,11 @@ import { API_BASE_URL } from "../../config/apiBaseUrl";
 const API_BASE = API_BASE_URL;
 
 const BLOCK_OPTIONS = [
-  { value: "banner", label: "Banner" },
-  { value: "tendencia", label: "En tendencia" },
-  { value: "look", label: "Look" },
-  { value: "complementos", label: "Complementos" },
-  { value: "categorias", label: "Categorías" },
-  { value: "instagram", label: "Instagram" },
-  { value: "tiktok", label: "TikTok" },
-  { value: "informacion", label: "Información" },
+  { value: "banner", label: "Portada" },
+  ...Object.entries(ADMIN_SECTION_LABELS).map(([value, label]) => ({ value, label })),
 ];
+
+const blockLabel = (type) => BLOCK_OPTIONS.find((option) => option.value === type)?.label || "Bloque";
 
 export default function PageEditor() {
   const navigate = useNavigate();
@@ -386,7 +383,7 @@ export default function PageEditor() {
               <div key={block.id} className="border p-3 rounded space-y-2">
                 <div className="flex justify-between items-center gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-medium">{block.type}</span>
+                    <span className="font-medium">{blockLabel(block.type)}</span>
                     <span className="text-xs text-gray-400">#{index + 1}</span>
                   </div>
 
@@ -460,7 +457,7 @@ export default function PageEditor() {
               <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4">
                 <div>
                   <div className="text-xl font-bold text-neutral-900">
-                    Editar bloque: {editingBlock.type}
+                    Editar bloque: {blockLabel(editingBlock.type)}
                   </div>
                   <div className="text-sm text-neutral-500">
                     Configura este bloque sin afectar el resto de la página.

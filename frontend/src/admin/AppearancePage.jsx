@@ -1,467 +1,44 @@
-import { adminFetch } from '../lib/api';
-// src/admin/AppearancePage.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import api, { adminFetch } from "../lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
-import { fetchSiteSettings, saveSiteSettings } from "../lib/siteSettingsApi";
+import { fetchAppearanceSettings, fetchSiteSettings, saveSiteSettings } from "../lib/siteSettingsApi";
 import { applyTheme } from "../theme/applyTheme";
+import PremiumAdminNavIcon from "./components/PremiumAdminNavIcon";
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
-import { normalizeGlobalConfig } from "./appearance/general/generalHelpers";
+import { validateAppearanceDraft } from "./appearance/appearanceValidation";
+import { verifyAppearanceSave } from "./appearance/verifyAppearanceSave";
 import { API_BASE_URL } from "../config/apiBaseUrl";
-
-// ✅ Banner separado
 import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
-import AdminModuleHero from "./components/AdminModuleHero";
-import {
-  LOOK_SECTION_DEFAULTS,
-  normalizeLookSection,
-} from "./appearance/sections/look/lookSectionHelpers";
+import useAdminPermissions from "./security/useAdminPermissions";
+import AdminLoadingScreen from "./loading/AdminLoadingScreen";
+import { getRememberedAdminLoader } from "./loading/adminLoaderConfig";
+import { buildThemeFromServer, buildMenusFromServer, normalizeThemeForSave, getValueAtPath, deepEqual } from "./appearance/appearanceModel";
+import './appearance/appearanceWorkspace.css';
 
 const API_BASE = API_BASE_URL;
 
-// ✅ clave para “avisar” al frontend (CarouselBanner) que recargue settings
 const RB_SETTINGS_TICK_KEY = "rb_site_settings_tick";
 
-const Input = ({ label, ...rest }) => (
-  <label className="block mb-3 min-w-0">
-    <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
-    <input
-      className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-400"
-      {...rest}
-    />
-  </label>
-);
-
-const Select = ({ label, children, ...rest }) => (
-  <label className="block mb-3 min-w-0">
-    <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
-    <select
-      className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
-      {...rest}
-    >
-      {children}
-    </select>
-  </label>
-);
-
-// 🔹 ColorInput seguro: nunca manda "" al input type="color"
-const ColorInput = ({ value, onChange }) => {
-  const isHex = (v) =>
-    typeof v === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim());
-
-  const safeColor = isHex(value) ? value : "#ffffff";
-
-  return (
-    <div className="grid grid-cols-[56px_1fr] gap-3 w-full min-w-0">
-      <input
-        type="color"
-        className="h-10 w-14 rounded border"
-        value={safeColor}
-        onChange={onChange}
-      />
-      <input
-        className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-400"
-        value={value || ""}
-        onChange={onChange}
-        placeholder="#FFFFFF"
-      />
-    </div>
-  );
-};
-
-// ✅ botón default del banner (lo usa el normalizador)
-const buildDefaultButton = () => ({
-  enabled: true,
-  kind: "image", // image | text
-  imageUrl: "/ImgBotones/VerMas2.png",
-  text: "",
-  link: "",
-  posX: 50,
-  posY: 92,
-  widthPx: 200,
-
-  // animación (solo config)
-  anim: "inherit", // inherit | none | fade | slideup | pop | glow | ...
-  animDurationMs: 600,
-  animDelayMs: 0,
-});
-
-// ==============================
-// ✅ SECCIONES BASE (Estrategia B)
-// - Siempre existen estas secciones “diseñadas”
-// - Si faltan en BD, se crean automáticamente
-// - Si existen en BD, se respetan y NO se pisan
-// - Si el usuario crea más, se permiten y quedan después
-// Nota: Para “link” profesional sin rutas, usa anclas por id: #tendencia, #look, etc.
-// (⚠️ Banner NO va aquí: el banner se configura por su pestaña aparte)
-// ==============================
-const DEFAULT_SECTION_STYLE = {
-  bgColor: "#ffffff",
-  textColor: "#111111",
-  accentColor: "#d4af37",
-  titleSizePx: 42,
-  subtitleSizePx: 16,
-  cardRadiusPx: 18,
-  imageHeightPx: 260,
-  spacingPx: 16,
-  titleWeight: 800,
-  subtitleWeight: 400,
-};
-
-const BASE_SECTIONS = [
-  { id: "tendencia", name: "En tendencia", title: "EN TENDENCIA", subtitle: "" },
-  { id: "look", name: "Looks", title: "LOOKS", subtitle: "" },
-  { id: "complementos", name: "Complementos", title: "COMPLEMENTOS", subtitle: "" },
-  { id: "categorias", name: "Categorías", title: "CATEGORÍAS", subtitle: "" },
-  { id: "instagram", name: "Instagram", title: "INSTAGRAM", subtitle: "" },
-  { id: "tiktok", name: "TikTok", title: "TIKTOK", subtitle: "" },
-  { id: "informacion", name: "Información", title: "INFORMACIÓN", subtitle: "" },
-];
-
-function buildBaseSection(base) {
-  if (base.id === "look") {
-    return normalizeLookSection({
-      ...LOOK_SECTION_DEFAULTS,
-      id: "look",
-      name: base.name,
-      label: base.name,
-      title: base.title,
-      subtitle: base.subtitle,
-      enabled: true,
-    });
-  }
-
-  return {
-    id: base.id,
-    enabled: true,
-    name: base.name,
-    title: base.title,
-    subtitle: base.subtitle,
-    titleImage: "",
-    style: { ...DEFAULT_SECTION_STYLE },
-    items: [],
-  };
-}
-
-function ensureBaseSections(inputSections) {
-  const arr = Array.isArray(inputSections) ? inputSections : [];
-  const byId = new Map(
-    arr
-      .filter((s) => s && typeof s === "object")
-      .map((s) => [String(s.id || "").trim(), s])
-      .filter(([id]) => !!id)
-  );
-
-  const result = [];
-
-  // 1) Garantiza las base en el orden correcto
-  for (const base of BASE_SECTIONS) {
-    const existing = byId.get(base.id);
-    if (existing) {
-      if (base.id === "look") {
-        result.push(
-          normalizeLookSection({
-            ...existing,
-            id: "look",
-            name:
-              typeof existing?.name === "string" && existing.name.trim()
-                ? existing.name
-                : base.name,
-            label:
-              typeof existing?.label === "string" && existing.label.trim()
-                ? existing.label
-                : base.name,
-            title: typeof existing?.title === "string" ? existing.title : base.title,
-            subtitle:
-              typeof existing?.subtitle === "string" ? existing.subtitle : base.subtitle,
-          })
-        );
-      } else {
-        result.push(existing); // respeta lo guardado en BD
-      }
-    } else {
-      result.push(buildBaseSection(base));
-    }
-  }
-
-  // 2) Agrega secciones extra (si el usuario crea nuevas) sin borrarlas
-  for (const s of arr) {
-    const id = String(s?.id || "").trim();
-    if (!id) continue;
-    const isBase = BASE_SECTIONS.some((b) => b.id === id);
-    if (!isBase) result.push(s);
-  }
-
-  return result;
-}
-
-// 🔹 Normalizador: garantiza que siempre existan colors, fonts, header, footer, banner y sections
-function buildThemeFromServer(themeRaw) {
-  const t = themeRaw || {};
-
-  const bannerRaw = t?.banner || {};
-
-  const normalizedSlides = Array.isArray(bannerRaw?.slides)
-    ? bannerRaw.slides.map((s) => ({
-        image: "",
-        link: "",
-        posX: 50,
-        posY: 50,
-        fit: "cover",
-        ...(s || {}),
-        button: {
-          ...buildDefaultButton(),
-          ...(s?.button || {}),
-        },
-      }))
-    : [];
-
-  const normalizedImagePosX = Number.isFinite(Number(bannerRaw?.imagePosX))
-    ? Number(bannerRaw.imagePosX)
-    : 50;
-
-  const normalizedImagePosY = Number.isFinite(Number(bannerRaw?.imagePosY))
-    ? Number(bannerRaw.imagePosY)
-    : 50;
-
-  const normalizedImageFit = bannerRaw?.imageFit === "contain" ? "contain" : "cover";
-
-  const bannerDefaults = {
-    type: "slider", // slider | image | video
-    slides: [],
-    imageUrl: "",
-    imageLink: "",
-    videoUrl: "",
-    videoAutoplay: true,
-    videoMuted: true,
-    videoLoop: true,
-    heightMode: "auto", // auto | fullscreen
-    heightPx: 520,
-
-    imagePosX: 50,
-    imagePosY: 50,
-    imageFit: "cover",
-
-    imageButton: buildDefaultButton(),
-    videoButton: buildDefaultButton(),
-
-    sliderIntervalMs: 3500,
-    sliderShowProgress: true,
-  };
-
-  return {
-    colors: {
-      primary: "",
-      secondary: "",
-      text: "",
-      background: "",
-      accent: "",
-      ...(t.colors || {}),
-    },
-    fonts: {
-      base: "",
-      headings: "",
-      fontSize: 16,
-      lineHeight: 1.6,
-      ...(t.fonts || {}),
-    },
-    radius: {
-      sm: 6,
-      md: 10,
-      lg: 14,
-      ...(t.radius || {}),
-    },
-    spacing: {
-      base: 8,
-      ...(t.spacing || {}),
-    },
-    logo: {
-      light: "",
-      dark: "",
-      ...(t.logo || {}),
-    },
-    favicon: t.favicon || "",
-    global: normalizeGlobalConfig(t.global),
-
-    header: {
-      bgColor: "",
-      bgOpacity: 1,
-
-      textColor: "",
-      linkColor: "",
-      menuAnimation: "soft",
-
-      iconColor: "",
-      iconHoverColor: "",
-      iconAnimation: "soft",
-
-      fontPreset: "",
-      fontFamily: "",
-      fontSizePx: 16,
-
-      logoLight: "",
-      logoDark: "",
-      logoHeightPx: 80,
-
-      // ✅ NUEVO: menú móvil premium
-      mobileMenuBgColor: "#fffdfd",
-      mobileMenuTextColor: "#1f1f1f",
-      mobileMenuBorderColor: "#e7c2cf",
-      mobileMenuAccentColor: "#b76e79",
-      mobileMenuMutedColor: "#8a6b74",
-      mobileMenuTitleColor: "#1f1f1f",
-
-      mobileMenuButtonBg: "#d8b2bf",
-      mobileMenuButtonTextColor: "#7b4f5f",
-      mobileMenuSecondaryButtonBg: "#ffffff",
-      mobileMenuSecondaryButtonTextColor: "#9d6275",
-
-      mobileMenuSocialBg: "#c98ea2",
-      mobileMenuSocialIconColor: "#ffffff",
-
-      mobileMenuOverlayColor: "#000000",
-      mobileMenuOverlayOpacity: 0.35,
-
-      mobileMenuFontFamily: "",
-      mobileMenuAnimation: "slide-left",
-      mobileMenuAnimationDurationMs: 300,
-      mobileMenuWidthPercent: 88,
-
-      ...(t.header || {}),
-    },
-
-    // ✅ SECCIONES (Estrategia B)
-    // - siempre existen las “base”
-    // - si el usuario creó nuevas, también quedan guardadas
-    sections: ensureBaseSections(t.sections),
-
-    footer: {
-      bgColor: "",
-      textColor: "",
-      ...(t.footer || {}),
-    },
-
-    banner: {
-      ...bannerDefaults,
-      ...(bannerRaw || {}),
-
-      slides: normalizedSlides,
-      imagePosX: normalizedImagePosX,
-      imagePosY: normalizedImagePosY,
-      imageFit: normalizedImageFit,
-
-      imageButton: {
-        ...buildDefaultButton(),
-        ...(bannerRaw?.imageButton || {}),
-      },
-      videoButton: {
-        ...buildDefaultButton(),
-        ...(bannerRaw?.videoButton || {}),
-      },
-
-      sliderIntervalMs: Number.isFinite(Number(bannerRaw?.sliderIntervalMs))
-        ? Number(bannerRaw.sliderIntervalMs)
-        : bannerDefaults.sliderIntervalMs,
-      sliderShowProgress: bannerRaw?.sliderShowProgress !== false,
-    },
-  };
-}
-
-// ✅ Normalizador de menús
-function buildMenusFromServer(menusRaw) {
-  const m = menusRaw || {};
-  return {
-    header: Array.isArray(m.header) ? m.header : [],
-    footer: Array.isArray(m.footer) ? m.footer : [],
-  };
-}
-
-// ✅ FIX: normaliza banner antes de guardar (evita que se “pierda” al guardar secciones)
-function normalizeThemeForSave(theme) {
-  const draft = structuredClone(theme || {});
-  if (!draft.banner) return draft;
-
-  draft.sections = ensureBaseSections(draft.sections).map((section) => {
-    const id = String(section?.id || "").trim().toLowerCase();
-    if (id === "look") return normalizeLookSection(section);
-    return section;
-  });
-
-  const b = draft.banner || {};
-  const type = String(b.type || "slider");
-
-  // ✅ FIX CLAVE (REAL): el schema de Mongo exige slides[].image (NO imageUrl)
-  if (Array.isArray(b.slides)) {
-    b.slides = b.slides.map((s) => {
-      const slide = s || {};
-      const img = slide.image || slide.imageUrl || slide.url || slide.src || "";
-      const link = slide.link || slide.href || slide.to || "";
-      const cleaned = { ...slide, image: img, link };
-
-      // opcional: limpiar alias para no mandar basura (no afecta el render)
-      delete cleaned.imageUrl;
-      delete cleaned.url;
-      delete cleaned.src;
-      delete cleaned.imageURL;
-
-      return cleaned;
-    });
-  }
-
-  // UI -> Backend (el backend suele usar autoplayMs)
-  const uiInterval = Number(b.sliderIntervalMs);
-  if (Number.isFinite(uiInterval) && uiInterval > 0) {
-    b.autoplayMs = uiInterval;
-  }
-
-  // No mandes campos solo-UI al backend (evita inconsistencias)
-  delete b.sliderIntervalMs;
-  delete b.sliderShowProgress;
-
-  // Asegura imageUrl si el tipo es imagen (por si algún panel guardó en otro nombre)
-  if (type === "image") {
-    if (!b.imageUrl || String(b.imageUrl).trim() === "") {
-      const fallback = b.image || b.url || b.imageSrc || b.imageURL || "";
-      if (fallback) b.imageUrl = fallback;
-    }
-  }
-
-  // Asegura videoUrl si el tipo es video
-  if (type === "video") {
-    if (!b.videoUrl || String(b.videoUrl).trim() === "") {
-      const fallback = b.video || b.url || b.videoSrc || b.videoURL || "";
-      if (fallback) b.videoUrl = fallback;
-    }
-  }
-
-  draft.banner = b;
-  return draft;
-}
-
-function getValueAtPath(obj, path) {
-  const keys = String(path || "").split(".");
-  let ref = obj;
-  for (const key of keys) {
-    if (ref == null) return undefined;
-    ref = ref[key];
-  }
-  return ref;
-}
-
-function deepEqual(a, b) {
-  if (Object.is(a, b)) return true;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch (_) {
-    return false;
-  }
-}
-
 export default function AppearancePage() {
+  const { can } = useAdminPermissions();
+  const canEditAppearance = can('appearance:update');
+  const canEditSections = can('appearance:sections');
+  const canEditMenus = can('appearance:menus');
+  const canEditAny = canEditAppearance || canEditSections || canEditMenus;
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [serverSnapshot, setServerSnapshot] = useState(null);
+  const [storeIdentity, setStoreIdentity] = useState({});
+  const [appearanceRevision, setAppearanceRevision] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveConflict, setSaveConflict] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(null);
+  const savingRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState("general");
   const [theme, setTheme] = useState(buildThemeFromServer(null));
@@ -470,9 +47,42 @@ export default function AppearancePage() {
   const [menus, setMenus] = useState(buildMenusFromServer(null));
   const [menusSnapshot, setMenusSnapshot] = useState(buildMenusFromServer(null));
 
-  // ✅ Upload state (LOGO)
-  const [logoLightFile, setLogoLightFile] = useState(null);
-  const [logoDarkFile, setLogoDarkFile] = useState(null);
+  const normalizedSnapshot = useMemo(() => serverSnapshot ? normalizeThemeForSave(serverSnapshot) : null, [serverSnapshot]);
+  const changedAreas = useMemo(() => {
+    if (!serverSnapshot) return [];
+    const current = normalizeThemeForSave(theme);
+    const original = normalizedSnapshot;
+    const changed = new Set();
+    for (const key of Object.keys(current)) {
+      if (!deepEqual(current[key], original[key])) {
+        changed.add(['header', 'banner', 'sections', 'footer'].includes(key) ? key : 'general');
+      }
+    }
+    if (!deepEqual(menus.header, menusSnapshot.header)) changed.add('header');
+    if (!deepEqual(menus.footer, menusSnapshot.footer)) changed.add('footer');
+    return [...changed];
+  }, [theme, serverSnapshot, normalizedSnapshot, menus, menusSnapshot]);
+
+  useEffect(() => {
+    if (changedAreas.length && ['success', 'info'].includes(saveMessage?.type)) setSaveMessage(null);
+  }, [changedAreas.length, saveMessage]);
+
+  useEffect(() => {
+    if (!saveMessage || saveMessage.type === 'error') return undefined;
+    const timeout = window.setTimeout(() => setSaveMessage((current) => current === saveMessage ? null : current), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [saveMessage]);
+
+  useEffect(() => {
+    if (!changedAreas.length) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [changedAreas.length]);
+
   const [uploading, setUploading] = useState(false);
 
   // ✅ Páginas dinámicas para rutas del Header
@@ -482,53 +92,55 @@ export default function AppearancePage() {
   const routeOptions = useMemo(
     () => ({
       public: [
-        { label: "Home", value: "/" },
-        { label: "Lo Nuevo", value: "/lo-nuevo" },
+        { label: "Inicio", value: "/" },
+        { label: "Lo Nuevo", value: "/#tendencia" },
         { label: "Carrito", value: "/carrito" },
         { label: "Favoritos", value: "/favoritos" },
-        { label: "Checkout", value: "/checkout" },
-        { label: "Gracias", value: "/gracias" },
-        { label: "Producto (por id o slug)", value: "/producto/:id" },
-        { label: "Producto corto (por id o slug)", value: "/p/:id" },
 
         ...dynamicPages.map((page) => ({
           label: `Página · ${page.name}`,
           value: `/pagina/${page.slug}`,
         })),
       ],
-      admin: [
-        { label: "Login admin", value: "/admin/login" },
-        { label: "Admin · Dashboard", value: "/admin/dashboard" },
-        { label: "Admin · Productos", value: "/admin/productos" },
-        { label: "Admin · Productos (nuevo)", value: "/admin/productos/nuevo" },
-        { label: "Admin · Productos (editar)", value: "/admin/productos/editar/:id" },
-        { label: "Admin · Carritos", value: "/admin/carritos" },
-        { label: "Admin · Favoritos", value: "/admin/favoritos" },
-        { label: "Admin · Órdenes", value: "/admin/ordenes" },
-        { label: "Admin · Apariencia", value: "/admin/apariencia" },
-      ],
-      util: [{ label: "Probe Site Settings", value: "/probe-site-settings" }],
     }),
     [dynamicPages]
   );
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
-        const settings = await fetchSiteSettings();
+        const settings = await fetchAppearanceSettings();
+        if (!settings?.theme || !settings?.menus ||
+          !Number.isSafeInteger(settings.appearanceRevision) || settings.appearanceRevision < 0) {
+          throw new Error("La configuración de apariencia llegó incompleta.");
+        }
+        if (cancelled) return;
         const merged = buildThemeFromServer(settings?.theme);
         setTheme(merged);
+        setStoreIdentity(settings.store || {});
         setServerSnapshot(merged);
+        setAppearanceRevision(settings.appearanceRevision);
+        setSaveConflict(false);
+        setSaveMessage(null);
         applyTheme(merged);
 
         const mergedMenus = buildMenusFromServer(settings?.menus);
         setMenus(mergedMenus);
         setMenusSnapshot(mergedMenus);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("No se pudo cargar Apariencia:", error);
+          setLoadError(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [loadAttempt]);
 
   useEffect(() => {
     (async () => {
@@ -562,29 +174,37 @@ export default function AppearancePage() {
   const setPath = useCallback((path, value) => {
     setTheme((prev) => {
       const currentValue = getValueAtPath(prev, path);
-      if (deepEqual(currentValue, value)) {
+      const nextValue = typeof value === 'function' ? value(currentValue, prev) : value;
+      if (deepEqual(currentValue, nextValue)) {
         return prev;
       }
 
-      const draft = structuredClone(prev);
       const keys = String(path || "").split(".");
+      const draft = { ...prev };
       let ref = draft;
-
-      for (let i = 0; i < keys.length - 1; i++) {
-        if (!ref[keys[i]] || typeof ref[keys[i]] !== "object") {
-          ref[keys[i]] = {};
-        }
-        ref = ref[keys[i]];
+      let original = prev;
+      for (const key of keys.slice(0, -1)) {
+        const branch = original?.[key];
+        ref[key] = Array.isArray(branch) ? [...branch] : { ...branch };
+        ref = ref[key];
+        original = branch;
       }
-
-      ref[keys.at(-1)] = value;
+      ref[keys.at(-1)] = nextValue;
       return draft;
     });
   }, []);
 
-  const onPreview = () => applyTheme(theme);
+  const onPreview = () => {
+    applyTheme(theme);
+    if (!changedAreas.length) setSaveMessage({ type: 'info', text: 'La vista previa ya muestra la configuración guardada.' });
+  };
 
   const onReset = () => {
+    if (savingRef.current || saveConflict) return;
+    if (!changedAreas.length) {
+      setSaveMessage({ type: 'info', text: 'No hay cambios por descartar.' });
+      return;
+    }
     if (serverSnapshot) {
       const merged = buildThemeFromServer(serverSnapshot);
       setTheme(merged);
@@ -594,8 +214,7 @@ export default function AppearancePage() {
       const mm = buildMenusFromServer(menusSnapshot);
       setMenus(mm);
     }
-    setLogoLightFile(null);
-    setLogoDarkFile(null);
+    setSaveMessage(null);
   };
 
   // ✅ Helpers del menú header
@@ -617,6 +236,7 @@ export default function AppearancePage() {
         title: "Nuevo botón",
         type: "url",
         ref: "/",
+        icon: "grid",
         children: [],
       });
       return draft;
@@ -645,193 +265,70 @@ export default function AppearancePage() {
 
   // ✅ Subir archivo a Cloudinary usando tu backend (campo por defecto: "image")
   const uploadToCloudinaryViaBackend = async (file, fieldName = "image") => {
-    const url = `${API_BASE}/api/uploads`;
     const form = new FormData();
     form.append(fieldName, file);
 
-    const res = await adminFetch(url, {
-      method: "POST",
-      body: form,
-    });
-
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Error subiendo archivo: HTTP ${res.status} ${t}`);
+    let data;
+    try {
+      ({ data } = await api.post('/api/uploads', form));
+    } catch (error) {
+      throw new Error(error?.userMessage || error?.response?.data?.message || error?.response?.data?.error || 'No se pudo subir la imagen. Inténtalo de nuevo.');
     }
 
-    const data = await res.json();
     if (!data?.url) throw new Error("El backend no devolvió { url }");
     return data.url;
   };
 
-  const onUploadLogo = async (which) => {
-    try {
-      const file = which === "light" ? logoLightFile : logoDarkFile;
-      if (!file) {
-        alert("Selecciona una imagen primero.");
-        return;
-      }
-
-      setUploading(true);
-      const uploadedUrl = await uploadToCloudinaryViaBackend(file, "image");
-
-      if (which === "light") {
-        setPath("header.logoLight", uploadedUrl);
-        setLogoLightFile(null);
-      } else {
-        setPath("header.logoDark", uploadedUrl);
-        setLogoDarkFile(null);
-      }
-
-      applyTheme({
-        ...theme,
-        header: {
-          ...(theme.header || {}),
-          [which === "light" ? "logoLight" : "logoDark"]: uploadedUrl,
-        },
-      });
-
-      alert("Logo subido a Cloudinary ✅ (ahora dale Guardar para dejarlo fijo)");
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || "Error subiendo logo");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const onSave = async () => {
+    if (savingRef.current || saveConflict || serverSnapshot === null || appearanceRevision === null || uploading) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveConflict(false);
+    setSaveMessage(null);
+    const showValidation = (message) => setSaveMessage({ type: 'error', text: message });
     try {
-      const hexOk = (v) => !v || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
-
-      const c = theme.colors || {};
-      if (![c.primary, c.secondary, c.text, c.background, c.accent].every(hexOk)) {
-        alert("Revisa que todos los colores generales sean hex válidos (#RRGGBB).");
-        return;
-      }
-
-      const h = theme.header || {};
-      const headerColorList = [
-        h.bgColor,
-        h.textColor,
-        h.linkColor,
-        h.iconColor,
-        h.iconHoverColor,
-        h.mobileMenuBgColor,
-        h.mobileMenuTextColor,
-        h.mobileMenuBorderColor,
-        h.mobileMenuAccentColor,
-        h.mobileMenuMutedColor,
-        h.mobileMenuTitleColor,
-        h.mobileMenuButtonBg,
-        h.mobileMenuButtonTextColor,
-        h.mobileMenuSecondaryButtonBg,
-        h.mobileMenuSecondaryButtonTextColor,
-        h.mobileMenuSocialBg,
-        h.mobileMenuSocialIconColor,
-        h.mobileMenuOverlayColor,
-      ];
-
-      if (!headerColorList.every(hexOk)) {
-        alert("Revisa que los colores del Header sean hex válidos (#RRGGBB).");
-        return;
-      }
-
-      const op = Number(h.bgOpacity);
-      if (Number.isNaN(op) || op < 0 || op > 1) {
-        alert("La transparencia del header debe estar entre 0 y 1.");
-        return;
-      }
-
-      const mobileOverlayOpacity = Number(h.mobileMenuOverlayOpacity);
-      if (
-        Number.isNaN(mobileOverlayOpacity) ||
-        mobileOverlayOpacity < 0 ||
-        mobileOverlayOpacity > 1
-      ) {
-        alert("La opacidad del overlay del menú móvil debe estar entre 0 y 1.");
-        return;
-      }
-
-      const lh = Number(h.logoHeightPx);
-      if (Number.isNaN(lh) || lh < 30 || lh > 160) {
-        alert("El tamaño del logo debe estar entre 30 y 160 px.");
-        return;
-      }
-
-      const mobileAnimDuration = Number(h.mobileMenuAnimationDurationMs);
-      if (
-        Number.isNaN(mobileAnimDuration) ||
-        mobileAnimDuration < 120 ||
-        mobileAnimDuration > 1200
-      ) {
-        alert("La duración de animación del menú móvil debe estar entre 120 y 1200 ms.");
-        return;
-      }
-
-      const mobileWidth = Number(h.mobileMenuWidthPercent);
-      if (Number.isNaN(mobileWidth) || mobileWidth < 60 || mobileWidth > 100) {
-        alert("El ancho del menú móvil debe estar entre 60% y 100%.");
-        return;
-      }
-
-      // ✅ Validación básica banner (tipo + altura + sliderInterval)
-      const b = theme.banner || {};
-      const bannerType = String(b.type || "slider");
-      if (!["slider", "image", "video"].includes(bannerType)) {
-        alert("El tipo de banner debe ser: slider, image o video.");
-        return;
-      }
-      const hm = String(b.heightMode || "auto");
-      if (!["auto", "fullscreen"].includes(hm)) {
-        alert("heightMode debe ser: auto o fullscreen.");
-        return;
-      }
-      if (hm === "auto") {
-        const hp = Number(b.heightPx);
-        if (Number.isNaN(hp) || hp < 240 || hp > 1200) {
-          alert("La altura del banner (px) debe estar entre 240 y 1200.");
-          return;
-        }
-      }
-      if (bannerType === "slider") {
-        const iv = Number(b.sliderIntervalMs);
-        if (Number.isFinite(iv) && (iv < 1000 || iv > 15000)) {
-          alert("En slider: el intervalo (ms) debe estar entre 1000 y 15000.");
-          return;
-        }
-        const slides = Array.isArray(b.slides) ? b.slides : [];
-        const bad = slides.find((s) => s && s.image === "");
-        if (bad) {
-          alert("En slider: cada slide debe tener una imagen (o elimina el slide vacío).");
-          return;
+      const normalizedTheme = normalizeThemeForSave(theme);
+      const originalTheme = normalizeThemeForSave(serverSnapshot);
+      const changedTheme = {};
+      for (const key of Object.keys(normalizedTheme)) {
+        if (!deepEqual(normalizedTheme[key], originalTheme[key])) {
+          changedTheme[key] = normalizedTheme[key];
         }
       }
 
-      const cleanedHeaderMenu = (menus?.header || []).map((it) => ({
-        ...it,
-        title: String(it?.title || "").trim(),
-        type: String(it?.type || "url").trim(),
-        ref: String(it?.ref || "").trim(),
-        children: Array.isArray(it?.children) ? it.children : [],
-      }));
+      const changedMenus = {};
+      if (!deepEqual(menus.header, menusSnapshot.header)) {
+        changedMenus.header = (menus.header || []).map((it) => ({
+          ...it,
+          title: String(it?.title || '').trim(),
+          type: String(it?.type || 'url').trim(),
+          ref: String(it?.ref || '').trim(),
+          children: Array.isArray(it?.children) ? it.children : [],
+        }));
+      }
+      if (!deepEqual(menus.footer, menusSnapshot.footer)) changedMenus.footer = menus.footer;
 
-      const payload = {
-        theme: normalizeThemeForSave(theme), // ✅ FIX CLAVE
-        menus: {
-          ...(menus || {}),
-          header: cleanedHeaderMenu,
-        },
-      };
+      const payload = { appearanceRevision };
+      if (Object.keys(changedTheme).length) payload.theme = changedTheme;
+      if (Object.keys(changedMenus).length) payload.menus = changedMenus;
+      if (!payload.theme && !payload.menus) {
+        setSaveMessage({ type: 'info', text: 'No hay cambios por guardar.' });
+        return;
+      }
+
+      const validationError = validateAppearanceDraft({ theme, changedTheme, changedMenus });
+      if (validationError) { showValidation(validationError); return; }
 
       const saved = await saveSiteSettings(payload);
+      await verifyAppearanceSave({ saved, changedTheme, normalizedTheme, originalTheme, fetchPublicSettings: () => fetchSiteSettings() });
 
       const merged = buildThemeFromServer(saved?.theme || theme);
       setServerSnapshot(merged);
+      setAppearanceRevision(saved.appearanceRevision);
       setTheme(merged);
       applyTheme(merged);
 
-      const mergedMenus = buildMenusFromServer(saved?.menus || payload.menus);
+      const mergedMenus = buildMenusFromServer(saved?.menus || menus);
       setMenus(mergedMenus);
       setMenusSnapshot(mergedMenus);
 
@@ -841,61 +338,68 @@ export default function AppearancePage() {
         window.dispatchEvent(new Event("rb_site_settings_updated"));
       } catch (_) {}
 
-      alert("Apariencia guardada ✅");
+      setSaveMessage({ type: 'success', text: 'Cambios guardados. La tienda pública ya usa esta configuración.' });
     } catch (err) {
       console.error("❌ Error guardando apariencia:", err);
-      alert(err.userMessage || "Error al guardar apariencia.");
+      if (Number.isSafeInteger(err.appearanceRevision)) setAppearanceRevision(err.appearanceRevision);
+      if (err.appearanceSnapshot) setServerSnapshot(buildThemeFromServer(err.appearanceSnapshot));
+      if (['APPEARANCE_REVISION_CONFLICT', 'APPEARANCE_REVISION_REQUIRED'].includes(err?.response?.data?.error)) {
+        setSaveConflict(true);
+      } else {
+        setSaveMessage({ type: 'error', text: err.userMessage || err.message || 'Error al guardar apariencia.' });
+      }
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
-  if (loading) return <div className="p-6">Cargando apariencia…</div>;
+  if (loading) return <AdminLoadingScreen compact model={getRememberedAdminLoader()} message="Cargando Apariencia…" />;
+  if (loadError) {
+    return (
+      <div className="admin-widget-surface mx-auto max-w-xl rounded-2xl p-6" role="alert">
+        <h1 className="text-xl font-semibold">No se pudo cargar Apariencia</h1>
+        <p className="mt-2 text-sm">La configuración guardada no está disponible. Vuelve a intentar para editarla sin perder el diseño vigente.</p>
+        <button type="button" className="mt-4 rounded-xl px-4 py-2 font-semibold" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+          Reintentar carga
+        </button>
+      </div>
+    );
+  }
 
-  // ✅ Tabs: reemplazado Home/Body por Secciones
   const tabs = [
-    { id: "general", label: "General", detail: "Colores y tipografías", icon: Palette },
-    { id: "header", label: "Encabezado", detail: "Logo y navegación", icon: LayoutTemplate },
-    { id: "banner", label: "Banner", detail: "Portada visual", icon: Image },
-    { id: "sections", label: "Secciones", detail: "Contenido de inicio", icon: Rows3 },
-    { id: "footer", label: "Pie de página", detail: "Cierre y enlaces", icon: Type },
+    { id: "general", label: "General", detail: "Herramientas y animación", icon: Palette, help: "Configura la animación global, WhatsApp, navegación y pantalla de carga." },
+    { id: "header", label: "Encabezado", detail: "Logo y menú", icon: LayoutTemplate, help: "Configura el logo y los enlaces del menú." },
+    { id: "banner", label: "Portada", detail: "Imagen o video", icon: Image, help: "Configura la primera imagen o video que ve el cliente." },
+    { id: "sections", label: "Secciones", detail: "Página de inicio", icon: Rows3, help: "Organiza el contenido debajo de la portada." },
+    { id: "footer", label: "Pie de página", detail: "Datos y enlaces", icon: Type, help: "Configura la información del final de la tienda." },
   ];
+  const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const canEditCurrentArea = activeTab === 'sections'
+    ? canEditSections
+    : activeTab === 'header'
+      ? canEditAppearance || canEditMenus
+      : canEditAppearance;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
-      <AdminModuleHero
-        icon={Palette}
-        eyebrow="Identidad visual de la tienda"
-        title="Apariencia del sitio"
-        description="Personaliza el estilo público de la tienda y revisa cada cambio antes de guardarlo."
-        actions={(
-          <>
-          <button
-            onClick={onPreview}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
-            type="button"
-          >
-            <Eye size={17} /> Aplicar
+    <div className="appearance-workspace mx-auto max-w-6xl p-4 md:p-6">
+      {saveConflict && (
+        <div className="admin-widget-surface rounded-2xl p-4" role="alert">
+          <p>La Apariencia guardada cambió mientras editabas. Tus cambios siguen en este panel; no se sobrescribió la versión guardada.</p>
+          <button type="button" className="mt-3 rounded-xl border px-4 py-2" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+            Cargar versión actual y descartar mis cambios
           </button>
-          <button
-            onClick={onSave}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white"
-            style={{ background: 'var(--admin-primary)' }}
-            type="button"
-          >
-            <Save size={17} /> Guardar
-          </button>
-          <button
-            onClick={onReset}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-            style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
-            type="button"
-          >
-            <RotateCcw size={17} /> Restaurar
-          </button>
-          </>
-        )}
-      >
-        <nav className="admin-module-hero__metrics" aria-label="Áreas de apariencia">
+        </div>
+      )}
+      <header className="appearance-workspace__header">
+        <div className="appearance-workspace__intro">
+          <h1>Apariencia de la tienda</h1>
+          <p>
+            {changedAreas.length > 0 && <span className="appearance-workspace__pending" title={`Pendiente: ${tabs.filter((tab) => changedAreas.includes(tab.id)).map((tab) => tab.label).join(', ')}.`}>{changedAreas.length} {changedAreas.length === 1 ? 'área pendiente' : 'áreas pendientes'} por guardar</span>}
+            <span className="appearance-workspace__help">{canEditCurrentArea ? currentTab.help : 'Solo lectura para tu perfil.'}</span>
+          </p>
+        </div>
+        <nav className="appearance-navigation" aria-label="Áreas de apariencia">
           {tabs.map((tab) => {
             const TabIcon = tab.icon;
             const selected = activeTab === tab.id;
@@ -903,114 +407,115 @@ export default function AppearancePage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="admin-module-hero__metric admin-module-hero__nav-card"
+                className="appearance-navigation__item"
                 data-active={selected}
+                aria-pressed={selected}
+                aria-label={`${tab.label} ${tab.detail}`}
+                title={`${tab.label}: ${tab.detail}`}
                 type="button"
               >
-                <TabIcon size={19} />
+                <TabIcon size={18} aria-hidden="true" />
                 <span>
                   <strong>{tab.label}</strong>
                   <small>{tab.detail}</small>
                 </span>
+                {changedAreas.includes(tab.id) && <span className="appearance-navigation__pending" aria-label="Cambios sin guardar" title="Cambios sin guardar" />}
               </button>
             );
           })}
         </nav>
-      </AdminModuleHero>
+      </header>
+      {saveMessage && createPortal(
+        <div className="appearance-feedback" data-feedback={saveMessage.type} role={saveMessage.type === 'error' ? 'alert' : 'status'} aria-live={saveMessage.type === 'error' ? 'assertive' : 'polite'}>
+          <span className="appearance-feedback__indicator" aria-hidden="true" />
+          <div><strong>{saveMessage.type === 'success' ? 'Cambios guardados' : saveMessage.type === 'error' ? 'Revisa los cambios' : 'Estado de Apariencia'}</strong><p>{saveMessage.text}</p></div>
+          <button type="button" onClick={() => setSaveMessage(null)} aria-label="Cerrar aviso" title="Cerrar aviso">×</button>
+        </div>, document.body
+      )}
+      {createPortal(
+        <div className="appearance-action-dock" role="group" aria-label="Acciones de apariencia">
+          <button onClick={onPreview} disabled={saving} className="appearance-action appearance-action--secondary" type="button" aria-label="Aplicar aquí" data-tooltip="Aplicar aquí"><PremiumAdminNavIcon icon={Eye} compact /></button>
+          <button onClick={onReset} disabled={saving || saveConflict} className="appearance-action appearance-action--secondary" type="button" aria-label="Descartar cambios" data-tooltip="Descartar cambios"><PremiumAdminNavIcon icon={RotateCcw} compact /></button>
+          <button onClick={onSave} disabled={saving || uploading || saveConflict || !canEditAny} className="appearance-action appearance-action--primary" type="button" aria-label={saving ? 'Guardando…' : 'Guardar cambios'} data-tooltip={saving ? 'Guardando…' : 'Guardar cambios'}><PremiumAdminNavIcon icon={Save} compact /></button>
+        </div>, document.body
+      )}
 
       {/* Contenido */}
-      <main className="admin-widget-surface min-w-0 overflow-hidden rounded-[28px] border">
-        <div className="p-4 md:p-5 min-w-0">
+      <main className="appearance-workspace__editor min-w-0">
+        <fieldset disabled={saving} className="min-w-0">
+        <div className="min-w-0">
           {/* GENERAL */}
-          {activeTab === "general" && <GeneralPanel theme={theme} setPath={setPath} />}
+          {activeTab === "general" && <fieldset disabled={!canEditAppearance}><GeneralPanel
+            theme={theme} setPath={setPath} uploading={uploading} setUploading={setUploading}
+            savedRevision={appearanceRevision}
+            uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
+          /></fieldset>}
 
           {/* HEADER */}
           {activeTab === "header" && (
             <HeaderPanel
               theme={theme}
+              store={storeIdentity}
               setPath={setPath}
               menus={menus}
               routeOptions={routeOptions}
               uploading={uploading}
-              onPreview={onPreview}
-              onUploadLogo={onUploadLogo}
-              setLogoLightFile={setLogoLightFile}
-              setLogoDarkFile={setLogoDarkFile}
+              setUploading={setUploading}
+              savedRevision={appearanceRevision}
+              uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
               addHeaderMenuItem={addHeaderMenuItem}
               removeHeaderMenuItem={removeHeaderMenuItem}
               moveHeaderMenuItem={moveHeaderMenuItem}
               setHeaderMenuItem={setHeaderMenuItem}
+              canEditTheme={canEditAppearance}
+              canEditMenus={canEditMenus}
             />
           )}
 
           {/* ✅ BANNER */}
           {activeTab === "banner" && (
+            <fieldset disabled={!canEditAppearance}>
             <BannerPanel
               theme={theme}
+              store={storeIdentity}
               setPath={setPath}
+              disabled={saving || !canEditAppearance}
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
-              onPreview={onPreview}
             />
+            </fieldset>
           )}
 
           {/* ✅ SECCIONES (reemplaza Home/Body) */}
           {activeTab === "sections" && (
+            <fieldset disabled={!canEditSections}>
             <SectionsPanel
               theme={theme}
               setPath={setPath}
+              disabled={saving || !canEditSections}
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinary={uploadToCloudinaryViaBackend}
             />
+            </fieldset>
           )}
 
           {/* ✅ FOOTER separado */}
           {activeTab === "footer" && (
+            <fieldset disabled={!canEditAppearance}>
             <FooterPanel
+              store={storeIdentity}
               theme={theme}
               setPath={setPath}
               uploading={uploading}
               setUploading={setUploading}
               uploadToCloudinaryViaBackend={uploadToCloudinaryViaBackend}
             />
+            </fieldset>
           )}
         </div>
-
-        {/* Barra inferior sticky */}
-        <div className="border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="p-3 flex flex-col md:flex-row gap-2 md:gap-3 md:items-center md:justify-end">
-            <div className="text-xs text-gray-500 md:mr-auto">
-              Consejo: usa <span className="font-medium">Ver cambios</span> para previsualizar y
-              luego <span className="font-medium">Guardar</span>.
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={onPreview}
-                className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
-                type="button"
-              >
-                Aplicar (vista previa)
-              </button>
-              <button
-                onClick={onSave}
-                className="px-4 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700"
-                type="button"
-              >
-                Guardar cambios
-              </button>
-              <button
-                onClick={onReset}
-                className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50"
-                type="button"
-              >
-                Reset a valores del servidor
-              </button>
-            </div>
-          </div>
-        </div>
+        </fieldset>
       </main>
     </div>
   );

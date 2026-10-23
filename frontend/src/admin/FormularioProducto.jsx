@@ -2913,7 +2913,7 @@ export default function FormularioProducto() {
                   </div>
                   <div className="md:col-span-2">
                     <FieldLabel>Descripción aduanera</FieldLabel>
-                    <input value={customsDescription} onChange={(e) => setCustomsDescription(e.target.value)} maxLength={250} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Vestido de algodón para mujer" />
+                    <input value={customsDescription} onChange={(e) => setCustomsDescription(e.target.value)} maxLength={250} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Descripción y material del producto" />
                   </div>
                   <div>
                     <FieldLabel>Código HS (6 a 10 dígitos)</FieldLabel>

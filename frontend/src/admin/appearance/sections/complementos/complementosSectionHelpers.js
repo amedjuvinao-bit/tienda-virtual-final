@@ -1,3 +1,4 @@
+import { normalizeLookSection } from '../look/lookSectionHelpers';
 // src/admin/appearance/sections/complementos/complementosSectionHelpers.js
 export const COMPLEMENTOS_SECTION_ID = "complementos";
 
@@ -9,10 +10,17 @@ export const COMPLEMENTOS_SECTION_DEFAULTS = {
   enabled: true,
 
   config: {
-    imageSrc: "/ImgComplementos/ComplementosBanner.png",
+    imageSrc: "/complementos/cristal-floral-desktop.webp",
+    mobileImageSrc: "/complementos/cristal-floral-mobile.webp",
+    sectionBackgroundImage: "",
+    title: "Complementos",
+    subtitle: "Detalles que hacen más especial cada historia",
+    titleEnabled: true,
+    subtitleEnabled: true,
+    dividerEnabled: true,
     imageAlt: "Complementos",
     linkHref: "/complementos",
-    buttonText: "Conócelos",
+    buttonText: "Explorar complementos",
     buttonEnabled: true,
 
     // ✅ Ayuda para el usuario en el panel
@@ -21,33 +29,76 @@ export const COMPLEMENTOS_SECTION_DEFAULTS = {
   },
 
   style: {
-    sectionMarginTopPx: 48,
+    sectionMarginTopPx: 32,
+    sectionPaddingBottomPx: 32,
+    sectionBackgroundMode: "continuity",
+    sectionBackgroundColor: "#f2d6d0",
     sectionPaddingXPx: 16,
-    contentMaxWidthPx: 1152,
+    contentMaxWidthPx: 1440,
+    layout: "frame",
+    titleColor: "#701b37",
+    subtitleColor: "#793249",
+    titleFontFamily: "Georgia, serif",
+    titleFontSizePx: 64,
+    titleWeight: 400,
+    subtitleFontSizePx: 14,
+    subtitleLetterSpacingPx: 2,
+    contentPosition: "left",
+    contentAlign: "center",
+    contentWidthPercent: 48,
+    contentPaddingPx: 36,
+    contentGapPx: 16,
+    imagePositionX: 50,
+    imagePositionY: 50,
+    mobileImagePositionX: 50,
+    mobileImagePositionY: 35,
+    mobileHeightPx: 600,
+    mobileTitleFontSizePx: 36,
+    mobileSubtitleFontSizePx: 12,
+    mobileButtonFontSizePx: 16,
+    mobileContentPaddingPx: 24,
+    mobileContentPosition: "bottom",
+    mobileImageObjectFit: "cover",
+    mobileSectionPaddingXPx: 12,
+    mobileImageRadiusPx: 24,
+    bannerBg: "#f3c8d0",
+    frameEnabled: true,
+    frameInsetPx: 18,
+    frameColor: "#fff3ed",
+    frameWidthPx: 1,
+    frameOpacity: 85,
+    panelTintPercent: 9,
+    panelBlurPx: 4,
+    overlayColor: "#f6d9df",
+    overlayOpacity: 0,
+    buttonTintPercent: 8,
+    buttonBlurPx: 2,
+    buttonBorderColor: "#fff4ee",
+    buttonBorderPx: 1,
 
     imageRadiusPx: 24,
-    imageBorderPx: 4,
+    imageBorderPx: 0,
     imageBorderColor: "#ffffff",
     imageShadow: true,
 
-    ringWidthPx: 4,
+    ringWidthPx: 0,
     ringColor: "#e9d5ff",
 
     // ✅ Controles de tamaño de imagen
     imageWidthPercent: 100,
-    imageHeightPx: 320,
+    imageHeightPx: 440,
     imageObjectFit: "cover",
 
     buttonPosXPercent: 20,
     buttonPosYPercent: 60,
 
-    buttonBg: "rgba(255,255,255,0.85)",
+    buttonBg: "#ffffff",
     buttonTextColor: "#70464b",
-    buttonRadiusPx: 12,
+    buttonRadiusPx: 32,
     buttonShadow: true,
 
     buttonFontSizePx: 16,
-    buttonFontWeight: 600,
+    buttonFontWeight: 400,
     buttonPx: 24,
     buttonPy: 10,
     buttonGapPx: 8,
@@ -61,7 +112,7 @@ export const COMPLEMENTOS_SECTION_DEFAULTS = {
     // ✅ Flecha configurable
     buttonArrowStyle: "arrow-right",
 
-    buttonAnimation: "soft-float",
+    buttonAnimation: "glint",
   },
 };
 
@@ -82,11 +133,22 @@ function asBool(value, fallback = false) {
 export function normalizeComplementosSectionConfig(input = {}) {
   const base = COMPLEMENTOS_SECTION_DEFAULTS.config;
 
+  const oldDefaults = ["/ImgComplementos/ComplementosBanner.png", "/SeccionComplementos/Complementos.png"];
+  const source = asString(input?.imageSrc, base.imageSrc).trim() || base.imageSrc;
+  const migratedDefault = oldDefaults.includes(source);
   return {
-    imageSrc: asString(input?.imageSrc, base.imageSrc).trim() || base.imageSrc,
-    imageAlt: asString(input?.imageAlt, base.imageAlt).trim() || base.imageAlt,
-    linkHref: asString(input?.linkHref, base.linkHref).trim() || base.linkHref,
-    buttonText: asString(input?.buttonText, base.buttonText).trim() || base.buttonText,
+    imageSrc: migratedDefault ? base.imageSrc : source,
+    mobileImageSrc: asString(input?.mobileImageSrc,
+      source === base.imageSrc || migratedDefault ? base.mobileImageSrc : "").trim(),
+    sectionBackgroundImage: asString(input?.sectionBackgroundImage, base.sectionBackgroundImage).trim(),
+    title: asString(input?.title, base.title),
+    subtitle: asString(input?.subtitle, base.subtitle),
+    titleEnabled: asBool(input?.titleEnabled, base.titleEnabled),
+    subtitleEnabled: asBool(input?.subtitleEnabled, base.subtitleEnabled),
+    dividerEnabled: asBool(input?.dividerEnabled, base.dividerEnabled),
+    imageAlt: asString(input?.imageAlt, base.imageAlt),
+    linkHref: asString(input?.linkHref, base.linkHref),
+    buttonText: asString(input?.buttonText, base.buttonText),
     buttonEnabled: asBool(input?.buttonEnabled, base.buttonEnabled),
 
     // ✅ Texto de ayuda editable / persistente
@@ -100,6 +162,7 @@ export function normalizeComplementosSectionStyle(input = {}) {
   const base = COMPLEMENTOS_SECTION_DEFAULTS.style;
 
   return {
+    ...normalizeFloralStyle(input),
     sectionMarginTopPx: clampNumber(
       input?.sectionMarginTopPx,
       0,
@@ -236,7 +299,7 @@ export function normalizeComplementosSectionStyle(input = {}) {
       ? asString(input?.buttonArrowStyle).trim()
       : base.buttonArrowStyle,
 
-    buttonAnimation: ["none", "soft-float", "pulse"].includes(
+    buttonAnimation: ["none", "soft-float", "pulse", "glint"].includes(
       asString(input?.buttonAnimation).trim()
     )
       ? asString(input?.buttonAnimation).trim()
@@ -257,5 +320,66 @@ export function normalizeComplementosSection(section = {}) {
     enabled: asBool(section?.enabled, base.enabled),
     config: normalizeComplementosSectionConfig(section?.config),
     style: normalizeComplementosSectionStyle(section?.style),
+  };
+}
+
+// Keep navigation within a normal web URL; reject executable and protocol-relative URLs.
+export function safeComplementosHref(value) {
+  const href = typeof value === "string" ? value.trim() : "";
+  if (/^\/(?![\/\\])[^\\\s]*$/.test(href) || /^https?:\/\/[^\s]+$/i.test(href)) return href;
+  return "/complementos";
+}
+
+const FLORAL_RANGES = {
+  sectionPaddingBottomPx: [0, 160],
+  titleFontSizePx: [20, 100], titleWeight: [100, 900], subtitleFontSizePx: [10, 28],
+  subtitleLetterSpacingPx: [0, 6], contentWidthPercent: [25, 70], contentPaddingPx: [16, 80],
+  contentGapPx: [4, 40], imagePositionX: [0, 100], imagePositionY: [0, 100],
+  mobileImagePositionX: [0, 100], mobileImagePositionY: [0, 100], mobileHeightPx: [360, 900],
+  mobileTitleFontSizePx: [20, 64], mobileSubtitleFontSizePx: [10, 24],
+  mobileButtonFontSizePx: [12, 24], mobileContentPaddingPx: [16, 48],
+  mobileSectionPaddingXPx: [0, 32], mobileImageRadiusPx: [0, 48],
+  frameInsetPx: [0, 48], frameWidthPx: [0, 4], frameOpacity: [0, 100],
+  panelTintPercent: [0, 70], panelBlurPx: [0, 20], overlayOpacity: [0, 80],
+  buttonTintPercent: [0, 85], buttonBlurPx: [0, 20], buttonBorderPx: [0, 4],
+};
+function normalizeFloralStyle(input) {
+  const base = COMPLEMENTOS_SECTION_DEFAULTS.style;
+  const output = {};
+  for (const [key, [min, max]] of Object.entries(FLORAL_RANGES)) {
+    const value = input?.[key];
+    output[key] = value == null || value === "" ? base[key] : clampNumber(value, min, max, base[key]);
+  }
+  for (const key of ["sectionBackgroundColor", "titleColor", "subtitleColor", "titleFontFamily", "bannerBg", "frameColor", "overlayColor", "buttonBorderColor"]) {
+    output[key] = asString(input?.[key], base[key]) || base[key];
+  }
+  for (const [key, options] of Object.entries({
+    sectionBackgroundMode: ["continuity", "global", "custom", "color"],
+    layout: ["frame", "immersive", "floating"], contentPosition: ["left", "center", "right"],
+    contentAlign: ["left", "center", "right"], mobileContentPosition: ["top", "bottom"],
+    mobileImageObjectFit: ["cover", "contain"],
+  })) output[key] = options.includes(input?.[key]) ? input[key] : base[key];
+  output.frameEnabled = asBool(input?.frameEnabled, base.frameEnabled);
+  return output;
+}
+
+
+// Reuse the source section's current backdrop rather than freezing a copy in Complementos.
+export function resolveComplementosBackdrop(theme, section) {
+  const mode = section.style.sectionBackgroundMode;
+  if (mode === "global") return { color: theme?.colors?.background || "#ffffff", image: "", wash: 0 };
+  if (mode === "color" || mode === "custom") return {
+    color: section.style.sectionBackgroundColor,
+    image: mode === "custom" ? section.config.sectionBackgroundImage : "",
+    wash: 0,
+  };
+  const entries = Array.isArray(theme?.sections) ? theme.sections : [];
+  const source = entries.find((item) => item?.id === "look" || item?.type === "look");
+  const look = normalizeLookSection(source);
+  if (look.style.layoutPreset === "classic") return { color: source?.style?.bgColor || theme?.colors?.background || "#f2d6d0", image: "", wash: 0 };
+  return {
+    color: look.style.editorialBackgroundColor,
+    image: look.config.editorialBackgroundImage || "/looks-editorial-background.webp",
+    wash: 16,
   };
 }

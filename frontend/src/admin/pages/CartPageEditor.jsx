@@ -1018,7 +1018,7 @@ export default function CartPageEditor() {
                 }
               />
               <Input
-                label="Etiqueta talla"
+                label="Etiqueta de tamaño"
                 value={form.cartPageConfig.sizeLabelText}
                 onChange={(e) =>
                   updateCartConfig({ sizeLabelText: e.target.value })
@@ -1481,7 +1481,7 @@ export default function CartPageEditor() {
                         }}
                       />
                       <div className="min-w-0 break-words" style={{ color: style.textPrimaryColor }}>
-                        Vestido ejemplo
+                        Producto de ejemplo
                       </div>
                     </div>
 
@@ -1905,7 +1905,7 @@ export default function CartPageEditor() {
                         <div className="flex-1">
                           <h3 className="font-semibold">Producto ejemplo</h3>
                           <p className="text-sm">Color: Rosa</p>
-                          <p className="text-sm">Talla: 8</p>
+                          <p className="text-sm">Tamaño: mediano</p>
                           <p className="text-sm">Precio: $120.000</p>
 
                           <div className="mt-2 flex items-center gap-2">

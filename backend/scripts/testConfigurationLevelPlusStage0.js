@@ -62,6 +62,8 @@ assertPermissions({ admin: {} }, ['settings:panel']);
 assertPermissions({ loginAdmin: {} }, ['settings:login']);
 assertPermissions({ billing: {} }, ['billing:settings']);
 assertPermissions({ menus: {} }, ['appearance:menus']);
+assertPermissions({ theme: { sections: [] } }, ['appearance:sections']);
+assertPermissions({ theme: { sections: [], header: {} } }, ['appearance:sections', 'appearance:update']);
 assertPermissions(
   { theme: { colors: {} } },
   ['appearance:update']
@@ -75,9 +77,10 @@ assertPermissions(
   ['settings:shipping']
 );
 assertPermissions(
-  { theme: { colors: {}, global: { payments: {}, envios: {} } }, menus: {} },
+  { theme: { colors: {}, sections: [], global: { payments: {}, envios: {} } }, menus: {} },
   [
     'appearance:update',
+    'appearance:sections',
     'appearance:menus',
     'settings:payments',
     'settings:shipping',

@@ -68,7 +68,7 @@ export const VARIANT_PRESETS = [
   {
     value: 'none',
     label: 'Sin variantes',
-    helper: 'Usa esta opción cuando el producto no cambia por talla, color o presentación.',
+    helper: 'Usa esta opción cuando el producto no cambia por tamaño, color o presentación.',
     axisLabel: 'Variante',
     axes: [],
     suggestions: [],

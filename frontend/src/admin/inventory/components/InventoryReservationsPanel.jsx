@@ -654,7 +654,7 @@ export default function InventoryReservationsPanel() {
                               applySearch();
                             }
                           }}
-                          placeholder="Reserva, orden, producto, SKU, sede, talla o color..."
+                          placeholder="Reserva, orden, producto, SKU, sede, tamaño o color..."
                           className="w-full px-4 py-3 text-sm transition"
                           style={styles.input}
                         />

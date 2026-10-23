@@ -2,20 +2,18 @@ import postcss from 'postcss';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import pageEditorSource from '../pages/PageEditor.jsx?raw';
+import sectionsPanelSource from '../appearance/sections/SectionsPanel.jsx?raw';
+import footerEditorialSource from '../appearance/footer/FooterEditorialEditor.jsx?raw';
 import { applyAdminGlobalStyles } from './adminGlobalStyles';
 
 const embeddedPreviewEditors = import.meta.glob(
   [
-    '../appearance/banner/BannerPanel.jsx',
-    '../appearance/footer/FooterPanel.jsx',
+    '../appearance/banner/BannerDevicePreview.jsx',
+    '../appearance/footer/FooterClassicPanel.jsx',
     '../appearance/header/HeaderPanel.jsx',
-    '../appearance/sections/SectionsPanel.jsx',
-    '../appearance/sections/categorias/CategoriasSectionUI.jsx',
-    '../appearance/sections/complementos/ComplementosSectionUI.jsx',
+    '../appearance/general/SectionMotionPreview.jsx',
+    '../appearance/sections/ui/StorefrontSectionPreview.jsx',
     '../appearance/sections/editor/CardsEditor.jsx',
-    '../appearance/sections/info/infoSectionUI.jsx',
-    '../appearance/sections/instagram/InstagramSectionUI.jsx',
-    '../appearance/sections/look/LookSectionUI.jsx',
     '../appearance/sections/tiktok/TiktokSectionUI.jsx',
     '../pages/CartPageEditor.jsx',
     '../pages/CatalogPageEditor.jsx',
@@ -61,6 +59,14 @@ describe('admin storefront preview isolation', () => {
     'marks the real preview canvas in %s',
     (_path, source) => {
       expect(source).toContain('data-admin-storefront-preview="true"');
+    }
+  );
+
+  it.each([['secciones', sectionsPanelSource], ['pie editorial', footerEditorialSource]])(
+    'uses the shared isolated canvas for %s',
+    (_name, source) => {
+      expect(source).toMatch(/import StorefrontSectionPreview from/);
+      expect(source).toContain('<StorefrontSectionPreview ');
     }
   );
 

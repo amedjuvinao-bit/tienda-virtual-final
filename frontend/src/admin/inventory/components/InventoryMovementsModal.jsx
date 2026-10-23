@@ -1042,7 +1042,7 @@ export default function InventoryMovementsModal({
                           Nota
                         </p>
                         <p className="mt-1 text-sm leading-6" style={styles.cardMuted}>
-                          Este historial muestra los movimientos del producto, sede, talla y color seleccionados. Los movimientos aplicados se pueden reversar sin borrar el historial.
+                          Este historial muestra los movimientos del producto, sede, tamaño y color seleccionados. Los movimientos aplicados se pueden reversar sin borrar el historial.
                         </p>
                       </div>
                     </div>
@@ -1055,7 +1055,7 @@ export default function InventoryMovementsModal({
           <footer className="shrink-0 px-5 py-4 md:px-8" style={styles.footer}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-sm" style={styles.muted}>
-                Historial filtrado por producto, sede, talla y color seleccionado.
+                Historial filtrado por producto, sede, tamaño y color seleccionado.
               </p>
 
               <button
