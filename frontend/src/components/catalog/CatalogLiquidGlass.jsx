@@ -1,8 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
+import CatalogGlassMaterialFilter from './CatalogGlassMaterialFilter';
 
 // Horizontal optical surface with a separate shared bevel; no texture stretching.
 export default function CatalogLiquidGlass({ presentation }) {
   const layer = useRef(null);
+  const id = `catalog-material-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   useEffect(() => {
     const host = layer.current?.parentElement;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -19,9 +21,15 @@ export default function CatalogLiquidGlass({ presentation }) {
     return () => { host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', reset); reduced?.removeEventListener?.('change', reset); reset(); };
   }, [presentation.motion]);
   return <div ref={layer} className="catalog-liquid" aria-hidden="true">
+    <svg className="catalog-liquid__filters" width="0" height="0" focusable="false">
+      <defs>
+        <CatalogGlassMaterialFilter id={`${id}-surface`} color={presentation.headerTint} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection}/>
+        <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} density={2.2}/>
+      </defs>
+    </svg>
     <div className="catalog-liquid__material">
-      <div className="catalog-liquid__surface"/>
-      <div className="catalog-liquid__bevel"/>
+      <div className="catalog-liquid__surface" style={{ filter: `url(#${id}-surface)` }}/>
+      <div className="catalog-liquid__bevel" style={{ filter: `url(#${id}-bevel)` }}/>
     </div>
     <div className="catalog-liquid__rim"/>
     <div className="catalog-liquid__shine"/>

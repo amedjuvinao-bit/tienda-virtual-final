@@ -34,15 +34,24 @@ it('reemplaza una vez el título gráfico anterior y luego respeta las eleccione
   expect(buildSafeCatalogConfig({ ...config, titleMode:'image', presentation:{ ...config.presentation, titleFont:'sans', titleSize:32 } })).toMatchObject({ titleMode:'image', presentation:{ titleFont:'sans', titleSize:32 } });
 });
 
-it('calibra la paleta una vez, conserva los colores previos y respeta ajustes posteriores', () => {
+it('conserva los colores del usuario al preparar el cristal y respeta ajustes posteriores', () => {
   const old = { title:'Mi catálogo', sourceMode:'manual', manualProductIdsText:'p1', presentation:{styleVersion:3,headerVersion:1,headerTint:'#f8b4d9',textColor:'#ffc4d5',accentColor:'#ffc4d5',headerReflection:0,headerHeight:164,headerIcon:'none',backgroundImage:'/my-background.webp'} };
   const config=buildSafeCatalogConfig(old);
-  expect(buildSafeCatalogConfig({...old,presentation:{...old.presentation,styleVersion:1}}).cardUiConfig.titleColor).toBe('#562633');
-  expect(config.presentation).toMatchObject({glassPaletteVersion:1,headerTint:'#ffffff',textColor:'#562633',headerHeight:164,headerIcon:'none',backgroundImage:'/my-background.webp'});
+  expect(buildSafeCatalogConfig({...old,presentation:{...old.presentation,styleVersion:1}}).cardUiConfig.titleColor).toBe('#ffc4d5');
+  expect(config.presentation).toMatchObject({glassPaletteVersion:2,headerTint:'#f8b4d9',textColor:'#ffc4d5',headerHeight:164,headerIcon:'none',backgroundImage:'/my-background.webp'});
   expect(config.glassPaletteBackup).toMatchObject({headerTint:'#f8b4d9',textColor:'#ffc4d5',headerReflection:0});
   expect(config).toMatchObject({title:old.title,sourceMode:'manual',manualProductIdsText:'p1'});
   expect(buildSafeCatalogConfig(config)).toEqual(config);
   const customized=buildSafeCatalogConfig({...config,presentation:{...config.presentation,headerTint:'#123456',textColor:'#345678',headerMaterialOpacity:0,headerReflection:0}});
   expect(customized.presentation).toMatchObject({headerTint:'#123456',textColor:'#345678',headerMaterialOpacity:0,headerReflection:0});
   expect(customized.glassPaletteBackup).toEqual(config.glassPaletteBackup);
+});
+
+it('reemplaza solo los colores cálidos del preset anterior y permite elegir dorado después', () => {
+  const old = {presentation:{styleVersion:3,headerVersion:1,glassPaletteVersion:1,glassColor:'#ffffff',accentColor:'#2244cc',headerContrastColor:'#a66348',headerEdgeColor:'#e9bda3',headerReflectionColor:'#fff9f2',headerShadowColor:'#123456',headerIconColor:'#ac744c',headerReflection:0}};
+  const next = buildSafeCatalogConfig(old);
+  expect(next.presentation).toMatchObject({glassPaletteVersion:2,headerContrastColor:'#2244cc',headerEdgeColor:'#2244cc',headerReflectionColor:'#ffffff',headerShadowColor:'#123456',headerIconColor:'#2244cc',headerReflection:0});
+  expect(next.glassPaletteBackup.headerEdgeColor).toBe('#e9bda3');
+  expect(buildSafeCatalogConfig(next)).toEqual(next);
+  expect(buildSafeCatalogConfig({...next,presentation:{...next.presentation,headerEdgeColor:'#e9bda3'}}).presentation.headerEdgeColor).toBe('#e9bda3');
 });

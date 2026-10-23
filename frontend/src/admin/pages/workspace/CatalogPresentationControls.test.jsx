@@ -67,6 +67,6 @@ it('recupera la paleta de cristal en un paso sin modificar las medidas del usuar
   await user.click(screen.getByRole('tab',{name:'Medidas',exact:true}));
   fireEvent.change(screen.getByLabelText('Altura mínima del encabezado (px)'),{target:{value:'164'}});
   await user.click(screen.getByRole('button',{name:'Aplicar paleta de cristal',exact:true}));
-  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#ffffff',headerBadgeColor:'#713a42',headerHeight:164,glassPaletteVersion:1});
+  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#fff6f0',headerBadgeColor:'#984d62',headerHeight:164,glassPaletteVersion:2});
   expect(screen.getByText('Paleta aplicada a la vista previa. Guarda los cambios para conservarla.')).toHaveAttribute('role','status');
 });

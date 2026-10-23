@@ -27,7 +27,7 @@ it('conserva y normaliza la personalización completa del encabezado sin perder 
   expect(style['--ch-fill']).toContain('#123456 0%');
   expect(style['--ch-layer-opacity']).toBe(0);
   expect(style['--ch-edge-width']).toBe('0px');
-  expect(buildCatalogPresentation({ headerTint:'red;display:none', headerIcon:'invalid' })).toMatchObject({headerTint:'#fff6f0',headerIcon:'bags'});
+  expect(buildCatalogPresentation({ headerTint:'red;display:none', headerIcon:'invalid' })).toMatchObject({headerTint:'#ffffff',headerIcon:'bags'});
 });
 
 it('permite ajustar y desactivar el acabado de cristal', () => {
@@ -36,10 +36,10 @@ it('permite ajustar y desactivar el acabado de cristal', () => {
   expect(buildCatalogPresentation({headerMaterialOpacity:'invalid'}).headerMaterialOpacity).toBe(.9);
 });
 
-it('conserva los reflejos cálidos al elegir blanco para el cristal', () => {
-  const style = catalogPresentationStyle(buildCatalogPresentation({headerTint:'#ffffff'}));
-  expect(style['--ch-material-hue']).toBe('0deg');
-  expect(style['--ch-edge']).toBe('#c49b7b');
-  expect(style['--ch-contrast']).toContain('#b57560');
+it('hereda los colores de la escena sin introducir bordes o reflejos dorados', () => {
+  const config = buildCatalogPresentation({glassColor:'#ffffff',accentColor:'#2244cc',textColor:'#112244'});
+  const style = catalogPresentationStyle(config);
+  expect(config).toMatchObject({headerTint:'#ffffff',headerEdgeColor:'#2244cc',headerContrastColor:'#2244cc',headerReflectionColor:'#ffffff',headerShadowColor:'#112244',headerIconColor:'#2244cc'});
+  expect(style).not.toHaveProperty('--ch-material-hue');
   expect(style['--ch-fill']).toContain('#ffffff');
 });

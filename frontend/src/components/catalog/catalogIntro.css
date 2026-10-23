@@ -58,9 +58,10 @@
 /* The horizontal surface keeps its native proportions; the shared original
    bevel is drawn independently so neither texture nor corner highlights stretch. */
 .catalog-liquid { position:absolute; inset:0; border-radius:inherit; overflow:hidden; pointer-events:none; z-index:0; }
+.catalog-liquid__filters { position:absolute; pointer-events:none; }
 .catalog-liquid__material {
   position:absolute; inset:0; border-radius:inherit; overflow:hidden;
-  opacity:var(--ch-material-opacity); filter:hue-rotate(var(--ch-material-hue));
+  opacity:var(--ch-material-opacity);
 }
 .catalog-liquid__surface {
   position:absolute; inset:-12%;

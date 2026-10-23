@@ -16,7 +16,7 @@ export function buildCatalogPresentation(raw = {}) {
     ...buildCatalogHeaderAppearance(cfg),
     styleVersion: number(cfg.styleVersion, 0, 3, 0),
     headerVersion: number(cfg.headerVersion, 0, 1, 0),
-    glassPaletteVersion: number(cfg.glassPaletteVersion, 0, 1, 0),
+    glassPaletteVersion: number(cfg.glassPaletteVersion, 0, 2, 0),
     showPhotoCount: cfg.showPhotoCount === true,
     filterSectionBorders: cfg.filterSectionBorders === true,
     layout: cfg.layout === 'grid' ? 'grid' : 'glass-grid',

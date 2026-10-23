@@ -1,4 +1,4 @@
-import { applyCatalogGlassPalette, CATALOG_GLASS_PALETTE_VERSION } from './catalogGlassPalette';
+import { upgradeCatalogGlassPalette, CATALOG_GLASS_PALETTE_VERSION } from './catalogGlassPalette';
 import { buildCatalogPresentation } from './catalogPresentation';
 
 export const EDITORIAL_STYLE_VERSION = 3;
@@ -42,8 +42,8 @@ export function applyCatalogEditorialPreset(raw = {}) {
 export function prepareCatalogEditorialConfig(raw) {
   const presentation = buildCatalogPresentation(raw.presentation);
   if (presentation.layout !== 'glass-grid') return raw;
-  // Calibrate before older migrations derive their card and filter colors.
-  let current = presentation.glassPaletteVersion < CATALOG_GLASS_PALETTE_VERSION ? applyCatalogGlassPalette(raw) : raw;
+  // Remove the old preset's warm defaults without recalibrating user colors.
+  let current = presentation.glassPaletteVersion < CATALOG_GLASS_PALETTE_VERSION ? upgradeCatalogGlassPalette(raw) : raw;
   if (presentation.styleVersion < EDITORIAL_STYLE_VERSION) {
     const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
     current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(current) : current;
