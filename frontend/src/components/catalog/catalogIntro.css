@@ -9,27 +9,23 @@
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
   display:flex; align-items:center; justify-content:space-between; gap:24px;
   isolation:isolate; padding:var(--ch-padding) calc(var(--ch-padding) + 10px);
-  min-height:var(--ch-height); margin:0 0 8px 8px;
-  border:var(--ch-edge-width) solid var(--ch-edge); border-radius:var(--ch-radius);
-  background:linear-gradient(118deg,transparent 22%,var(--ch-reflection) 23%,transparent 29%,transparent 42%,var(--ch-reflection) 43%,transparent 50%,transparent 70%),
-    linear-gradient(180deg,var(--ch-fill),transparent 60%,var(--ch-fill));
-  box-shadow:inset 0 3px 2px var(--ch-reflection),inset 0 6px 7px var(--ch-reflection),
-    inset 0 -4px 3px var(--ch-contrast),inset 0 -8px 10px var(--ch-fill),
-    inset 4px 0 3px var(--ch-reflection),inset -4px 0 4px var(--ch-contrast),
-    0 12px 18px var(--ch-shadow),0 3px 5px var(--ch-shadow);
+  min-height:var(--ch-height); margin:0 0 6px 4px;
+  border:var(--ch-edge-width) solid color-mix(in srgb,var(--ch-edge) 45%,transparent);
+  border-radius:var(--ch-radius);
+  background:radial-gradient(ellipse at 92% 115%,var(--ch-contrast),transparent 58%),
+    linear-gradient(115deg,var(--ch-fill),transparent 50%,var(--ch-fill));
+  box-shadow:inset 0 1px 1px var(--ch-reflection),inset 0 -2px 4px var(--ch-fill),
+    0 12px 24px var(--ch-shadow),0 2px 3px var(--ch-shadow);
   backdrop-filter:blur(var(--ch-blur)); -webkit-backdrop-filter:blur(var(--ch-blur));
 }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass::before {
-  display:block; content:""; position:absolute; z-index:-1; inset:10px 14px -8px -8px;
-  width:auto; height:auto; border-radius:var(--ch-radius); border:var(--ch-edge-width) solid var(--ch-reflection);
-  background:linear-gradient(120deg,var(--ch-fill),transparent); pointer-events:none;
-  box-shadow:inset 0 1px 2px var(--ch-reflection),0 3px 7px var(--ch-shadow); opacity:var(--ch-layer-opacity);
+  display:block; content:""; position:absolute; z-index:-1; inset:4px 5px -5px -4px;
+  width:auto; height:auto; border-radius:inherit;
+  border:var(--ch-edge-width) solid var(--ch-reflection);
+  background:transparent; pointer-events:none;
+  box-shadow:0 2px 4px var(--ch-shadow); opacity:var(--ch-layer-opacity);
 }
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after {
-  display:block; content:""; position:absolute; inset:5px; width:auto; height:auto;
-  border:var(--ch-edge-width) solid var(--ch-edge); border-top-color:var(--ch-reflection); border-left-color:var(--ch-reflection);
-  background:linear-gradient(180deg,var(--ch-fill),transparent 24%); border-radius:max(0px,calc(var(--ch-radius) - 5px)); pointer-events:none;
-}
+.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after { display:none; }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-hero-top { flex:1; min-width:0; gap:9px; }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-hero-badge {
   padding:5px 13px; border:1px solid var(--ch-reflection); border-radius:999px;
@@ -57,34 +53,31 @@
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:min(var(--ch-padding),16px); gap:6px; }
   .cpv-glass-bags { width:calc(var(--ch-icon-size) * .35); }
 }
-/* The same optical material used by Information, sized without stretching corners. */
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
-  background:var(--ch-fill); backdrop-filter:blur(var(--ch-blur)); -webkit-backdrop-filter:blur(var(--ch-blur));
-  box-shadow:0 16px 24px var(--ch-shadow),0 3px 5px var(--ch-shadow);
-}
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after { display:none; }
+/* Continuous glass, built for any aspect ratio: no stretched portrait frame. */
 .catalog-liquid { position:absolute; inset:0; border-radius:inherit; overflow:hidden; pointer-events:none; z-index:0; }
 .catalog-liquid__material {
-  position:absolute; inset:0; border:32px solid transparent; border-radius:inherit;
-  border-image:url('/information/glass.webp') 38 / 32px / 0 stretch;
-  mask-image:linear-gradient(90deg,#000 12px,transparent 32px,transparent calc(100% - 32px),#000 calc(100% - 12px)),
-    linear-gradient(180deg,#000 12px,transparent 32px,transparent calc(100% - 32px),#000 calc(100% - 12px));
-  filter:hue-rotate(var(--ch-material-hue)) saturate(var(--ch-material-saturation)); opacity:var(--ch-material-opacity);
+  position:absolute; inset:0; border-radius:inherit; padding:calc(2px + var(--ch-edge-width));
+  background:linear-gradient(135deg,var(--ch-reflection),var(--ch-edge) 15%,var(--ch-reflection) 25%,
+    transparent 43%,var(--ch-edge) 67%,var(--ch-reflection) 80%,var(--ch-edge));
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  opacity:var(--ch-material-opacity);
 }
-/* The portrait artwork has an opaque center: use only its optical border.
-   The surface tint remains controlled by --ch-fill on the glass container. */
 .catalog-liquid__rim {
-  position:absolute; inset:0; border-radius:inherit; border:var(--ch-edge-width) solid var(--ch-edge);
-  box-shadow:inset 0 2px 2px var(--ch-reflection),inset 0 -2px 2px var(--ch-contrast);
+  position:absolute; inset:4px; border-radius:max(0px,calc(var(--ch-radius) - 4px));
+  box-shadow:inset 0 1px 2px var(--ch-reflection),inset 0 -1px 3px var(--ch-contrast);
+  opacity:var(--ch-material-opacity);
 }
 .catalog-liquid__shine {
   position:absolute; inset:0; border-radius:inherit;
-  background:radial-gradient(ellipse at var(--ch-pointer-x,28%) var(--ch-pointer-y,0%),var(--ch-reflection),transparent 60%);
-  mask-image:linear-gradient(180deg,#000,transparent 28%,transparent 70%,#000);
+  background:radial-gradient(ellipse at var(--ch-pointer-x,28%) var(--ch-pointer-y,0%),var(--ch-reflection),transparent 58%);
+  mask-image:linear-gradient(180deg,#000,transparent 28%,transparent 82%,#000);
 }
-.catalog-liquid__shine::after {
-  content:""; position:absolute; inset:0; border-radius:inherit; opacity:.65;
-  background:linear-gradient(110deg,transparent 15%,var(--ch-reflection) 26%,transparent 34%,transparent 72%,var(--ch-reflection) 85%,transparent 91%);
-  mask-image:linear-gradient(180deg,#000,transparent 45%,#000);
+.catalog-liquid__caustics {
+  position:absolute; inset:0; width:100%; height:100%; fill:none;
+  stroke:var(--ch-reflection); stroke-width:1.2; opacity:var(--ch-material-opacity);
 }
+.catalog-liquid__caustics path { vector-effect:non-scaling-stroke; }
+.catalog-liquid__caustics path:nth-child(2) { stroke-width:4; opacity:.25; }
+.catalog-liquid__caustics path:nth-child(3) { opacity:.55; }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-hero-top,.cpv-hero-glass>.cpv-glass-bags { position:relative; z-index:1; }

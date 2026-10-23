@@ -38,7 +38,7 @@ const groups = [
     ['headerReflection', 'Intensidad de los reflejos (0 a 1)', [0, 1, .05]],
     ['headerShadowColor', 'Color de la sombra del encabezado', 'color'],
     ['headerShadow', 'Intensidad de la sombra (0 a 1)', [0, 1, .05]],
-    ['headerMaterialOpacity', 'Intensidad de la textura de Información (0 a 1)', [0, 1, .05]],
+    ['headerMaterialOpacity', 'Intensidad del acabado de cristal (0 a 1)', [0, 1, .05]],
     ['headerBlur', 'Desenfoque del encabezado (px)', [0, 32, 1]],
     ['headerRadius', 'Esquinas del encabezado (px)', [0, 40, 1]],
     ['headerHeight', 'Altura mínima del encabezado (px)', [80, 240, 1]],

@@ -653,7 +653,7 @@ try {
     if (await page.locator('.cpv-product-item').count() !== 8) throw Error('Editorial dropped products');
     await page.getByRole('heading', { name:'Últimas tendencias', exact:true }).waitFor();
     if (await page.locator('.cpv-title-image').count()) throw Error('Legacy title artwork bypasses the approved typography');
-    if (!(await page.locator('.catalog-liquid__material').evaluate(node => getComputedStyle(node).borderImageSource)).includes('/information/glass.webp')) throw Error('Shared Information glass material is missing');
+    if (!(await page.locator('.catalog-liquid__material').evaluate(node => getComputedStyle(node).maskComposite)).includes('exclude')) throw Error('Continuous glass rim is missing');
     if (width === 1440) {
       const hero = await page.locator('.cpv-hero-glass').boundingBox();
       await page.mouse.move(hero.x + hero.width * .7,hero.y + hero.height * .5);

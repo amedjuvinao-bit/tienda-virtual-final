@@ -30,7 +30,7 @@ it('conserva y normaliza la personalización completa del encabezado sin perder 
   expect(buildCatalogPresentation({ headerTint:'red;display:none', headerIcon:'invalid' })).toMatchObject({headerTint:'#fff6f0',headerIcon:'bags'});
 });
 
-it('permite ajustar y desactivar la textura compartida de Información', () => {
+it('permite ajustar y desactivar el acabado de cristal', () => {
   expect(buildCatalogPresentation({headerMaterialOpacity:0}).headerMaterialOpacity).toBe(0);
   expect(buildCatalogPresentation({headerMaterialOpacity:900}).headerMaterialOpacity).toBe(1);
   expect(buildCatalogPresentation({headerMaterialOpacity:'invalid'}).headerMaterialOpacity).toBe(.9);
@@ -38,7 +38,7 @@ it('permite ajustar y desactivar la textura compartida de Información', () => {
 
 it('conserva los reflejos cálidos al elegir blanco para el cristal', () => {
   const style = catalogPresentationStyle(buildCatalogPresentation({headerTint:'#ffffff'}));
-  expect(style['--ch-material-saturation']).toBe(1);
-  expect(style['--ch-material-hue']).toBe('0deg');
+  expect(style['--ch-edge']).toBe('#c49b7b');
+  expect(style['--ch-contrast']).toContain('#b57560');
   expect(style['--ch-fill']).toContain('#ffffff');
 });

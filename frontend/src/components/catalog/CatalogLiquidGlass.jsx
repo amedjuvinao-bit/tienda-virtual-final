@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-// Reuse the optical material from the Information section; no business photo needed.
+// Responsive optical layers without a fixed-size raster frame.
 export default function CatalogLiquidGlass({ presentation }) {
   const layer = useRef(null);
   useEffect(() => {
@@ -22,5 +22,10 @@ export default function CatalogLiquidGlass({ presentation }) {
     <div className="catalog-liquid__material"/>
     <div className="catalog-liquid__rim"/>
     <div className="catalog-liquid__shine"/>
+    <svg className="catalog-liquid__caustics" viewBox="0 0 1000 160" preserveAspectRatio="none" focusable="false">
+      <path d="M600 -12 C790 8 900 24 1020 115"/>
+      <path d="M615 -12 C795 12 910 36 1020 125"/>
+      <path d="M-30 112 C100 162 260 155 480 168"/>
+    </svg>
   </div>;
 }
