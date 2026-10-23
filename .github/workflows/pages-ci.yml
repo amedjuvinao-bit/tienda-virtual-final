@@ -19,7 +19,7 @@ jobs:
         working-directory: frontend
       - run: npm run test:pages-module
         working-directory: frontend
-      - run: npx playwright install --with-deps chromium
+      - run: node node_modules/playwright/cli.js install --with-deps chromium
         working-directory: frontend
       - run: npm run test:e2e:pages-module
         working-directory: frontend
