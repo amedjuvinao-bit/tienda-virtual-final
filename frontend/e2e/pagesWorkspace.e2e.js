@@ -89,7 +89,7 @@ const products = Array.from({ length: 8 }, (_, i) => ({
   categories: ["Destacados"],
   stock: 10,
 }));
-const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import'/src/index.css';createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
+const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
 const server = await createServer({
   root,
   cacheDir: "/tmp/pages-ui-vite-cache",
@@ -290,18 +290,20 @@ try {
       )
         throw Error("Draft is not dirty");
       if (device.id === "desktop" && kind === "catalog") {
-        const prompt = page
-          .waitForEvent("dialog")
-          .then((dialog) => dialog.dismiss());
-        await page.evaluate(() => history.back());
-        await prompt;
-        await page.waitForURL("**/admin/catalogo/catalog");
-        if (
-          (await page
-            .getByLabel("Nombre de la página", { exact: true })
-            .inputValue()) !== "Catálogo editado desktop"
-        )
-          throw Error("Browser back discarded a draft");
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const prompt = page
+            .waitForEvent("dialog")
+            .then((dialog) => dialog.dismiss());
+          await page.evaluate(() => history.back());
+          await prompt;
+          await page.waitForURL("**/admin/catalogo/catalog");
+          if (
+            (await page
+              .getByLabel("Nombre de la página", { exact: true })
+              .inputValue()) !== "Catálogo editado desktop"
+          )
+            throw Error("Browser back discarded a draft");
+        }
       }
       await page
         .getByRole("button", { name: "Contenido", exact: true })

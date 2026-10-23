@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { registerPageDraftNavigationGuard } from "./pageDraftNavigationGuard";
+
 export default function usePageDraft(form) {
   const [baseline, setBaseline] = useState(null),
     [notice, setNotice] = useState(null),
@@ -45,12 +47,12 @@ export default function usePageDraft(form) {
       } else if (previous)
         window.history.pushState(previous.state, "", previous.href);
     };
-    window.addEventListener("popstate", onPopState, true);
+    const unregisterNavigation = registerPageDraftNavigationGuard(onPopState);
     window.addEventListener("beforeunload", beforeUnload);
     return () => {
       delete document.documentElement.dataset.pageDraftDirty;
       window.removeEventListener("beforeunload", beforeUnload);
-      window.removeEventListener("popstate", onPopState, true);
+      unregisterNavigation();
     };
   }, [dirty]);
   const markSaved = useCallback((value) => {
