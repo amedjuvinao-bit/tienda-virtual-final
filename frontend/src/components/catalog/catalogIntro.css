@@ -4,25 +4,9 @@
   --ch-detail:color-mix(in srgb,var(--ch-text) 18%,transparent);
   --ch-icon-outline:color-mix(in srgb,var(--ch-icon-color) 40%,var(--ch-text));
   --ch-control-reflection:color-mix(in srgb,var(--ch-reflection) 32%,transparent);
-  display:flex; align-items:center; justify-content:space-between; gap:24px;
-  position:relative; overflow:visible; isolation:isolate; padding:var(--ch-padding) calc(var(--ch-padding) + 10px);
-  min-height:var(--ch-height); margin:0 0 6px 4px;
-  border:var(--ch-edge-width) solid var(--ch-edge);
-  border-radius:var(--ch-radius);
-  background:transparent;
-  box-shadow:0 17px 25px -16px var(--ch-shadow);
+  position:relative; padding:0; margin:0;
+  border:0; border-radius:0; background:none; box-shadow:none;
 }
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::before,
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after {
-  display:block; content:""; position:absolute; z-index:-1; inset:3px;
-  width:auto; height:auto; border-radius:inherit;
-  border:var(--ch-edge-width) solid var(--ch-edge);
-  background:none;
-  pointer-events:none; box-shadow:0 3px 7px var(--ch-shadow);
-  opacity:var(--ch-layer-opacity);
-}
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::before { transform:translate(4px,-6px) rotate(-.45deg); }
-.cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after { transform:translate(-4px,6px) rotate(.35deg); }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-hero-badge {
   padding:5px 13px; border:1px solid var(--ch-reflection); border-radius:999px;
   color:color-mix(in srgb,var(--ch-badge-text) 40%,var(--ch-text)); background:color-mix(in srgb,var(--ch-badge-tint) 65%,transparent);
@@ -42,11 +26,11 @@
   color:var(--ch-icon-color); opacity:var(--ch-icon-opacity); filter:drop-shadow(0 1px 1px var(--ch-detail)) drop-shadow(0 5px 4px var(--ch-shadow)); pointer-events:none;
 }
 @media(max-width:767px) {
-  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:var(--ch-padding); gap:10px; }
+  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { gap:10px; }
   .cpv-glass-bags { width:calc(var(--ch-icon-size) * .49); }
 }
 @media(max-width:380px) {
-  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:min(var(--ch-padding),16px); gap:6px; }
+  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { gap:6px; }
   .cpv-glass-bags { width:calc(var(--ch-icon-size) * .35); }
 }
 /* Keep the face smooth; optical artwork is confined to the frame. */
@@ -70,7 +54,7 @@
     linear-gradient(180deg,#000,transparent 4px,transparent calc(100% - 4px),#000);
 }
 .cpv-hero-glass>:is(.cpv-hero-badge,.cpv-title-wrap,.cpv-glass-bags) { position:relative; z-index:1; min-width:0; }
-/* One glass surface for the heading and its catalog controls. */
+/* Unboxed heading and catalog controls, with glass styling on individual controls. */
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
   display:grid; grid-template-columns:minmax(0,1fr) auto;
   grid-template-areas:"copy icon" "controls controls"; gap:9px 20px;
@@ -85,7 +69,7 @@
   position:relative; z-index:1; grid-area:controls; min-width:0;
   display:grid; grid-template-columns:minmax(160px,1fr) auto auto auto;
   align-items:center; gap:10px 12px; margin:0; padding:12px 0 0;
-  border:0; border-top:1px solid var(--ch-reflection); border-radius:0;
+  border:0; border-radius:0;
   background:none; box-shadow:none; backdrop-filter:none;
 }
 .cpv-hero-glass .cpv-commandbar .cpv-discovery,

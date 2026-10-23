@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
-import CatalogLiquidGlass from './CatalogLiquidGlass';
 import CatalogGlassBags from './CatalogGlassBags';
 
 export default function CatalogIntro({ config: safeConfig, page, children }) {
@@ -48,9 +47,7 @@ export default function CatalogIntro({ config: safeConfig, page, children }) {
       </nav>
     )}
 
-    {/* The glass frame must not inherit the classic header's opaque surface. */}
     <section className={glass ? 'cpv-hero-glass' : 'cpv-hero'}>
-      {glass && <CatalogLiquidGlass presentation={safeConfig.presentation} />}
       {glass ? heading : <div className="cpv-hero-top">{heading}</div>}
       {glass && safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
       {glass && children}
