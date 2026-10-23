@@ -35,16 +35,20 @@ export default function PageEditorWorkspace({
   const root = useRef(null),
     toolbar = useRef(null);
   useEffect(() => {
-    const update = () =>
-      root.current?.style.setProperty(
-        "--pages-toolbar-height",
-        `${toolbar.current?.offsetHeight || 130}px`,
-      );
+    const adminHeader = root.current?.closest('main')?.querySelector('.admin-header-panel');
+    const update = () => {
+      root.current?.style.setProperty('--pages-toolbar-height', `${toolbar.current?.offsetHeight || 130}px`);
+      const headerVisible = adminHeader && getComputedStyle(adminHeader).display !== 'none';
+      const offset = headerVisible ? adminHeader.offsetHeight + (parseFloat(getComputedStyle(adminHeader).top) || 0) + 10 : 0;
+      root.current?.style.setProperty('--pages-admin-offset', `${offset}px`);
+    };
     const observer =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     if (toolbar.current) observer?.observe(toolbar.current);
+    if (adminHeader) observer?.observe(adminHeader);
+    window.addEventListener('resize', update);
     update();
-    return () => observer?.disconnect();
+    return () => { observer?.disconnect(); window.removeEventListener('resize', update); };
   }, []);
   const changeTab = (id) => {
     onTabChange(id);

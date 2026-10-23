@@ -62,8 +62,37 @@ const groups = [
     ['motionStrength', 'Profundidad del parallax (px)', [0, 40, 1]],
   ]},
 ];
+const fields = new Map(groups.flatMap(group => group.fields).map(field => [field[0], field]));
+const topics = [
+  { id:'layout', title:'Distribución', keys:['layout','maxWidth','topSpacing','gap','filterSectionBorders'] },
+  { id:'background', title:'Fondo', keys:['backgroundColor','backgroundOpacity','textColor','accentColor','glassColor','glassOpacity','glassBlur','radius'] },
+  { id:'header', title:'Encabezado', sections:[
+    { id:'material', title:'Cristal', keys:['headerTint','headerOpacity','headerContrastColor','headerContrast','headerBlur','headerLayers'] },
+    { id:'light', title:'Bordes y luz', keys:['headerEdgeColor','headerEdgeWidth','headerReflectionColor','headerReflection','headerShadowColor','headerShadow'] },
+    { id:'text', title:'Texto', keys:['titleFont','titleSize','headerTextColor','headerBadgeColor','headerBadgeTint'] },
+    { id:'size', title:'Medidas', keys:['headerRadius','headerHeight','headerPadding'] },
+    { id:'icon', title:'Bolsas', keys:['headerIcon','headerIconColor','headerIconSize','headerIconOpacity'] },
+  ] },
+  { id:'products', title:'Productos', keys:['rimStyle','rimColor','rimOpacity','imageRatio','cardTitleSize','cardPriceSize','showPhotoCount','showDescription','showOptions'] },
+  { id:'motion', title:'Movimiento', keys:['motion','motionStrength'] },
+];
+function TopicTabs({ items, selected, onSelect, id, label }) {
+  return <div className="catalog-settings-tabs" role="tablist" aria-label={label}>
+    {items.map((item, index) => <button key={item.id} type="button" role="tab" id={`${id}-tab-${item.id}`} aria-selected={selected === item.id} aria-controls={`${id}-panel-${item.id}`} tabIndex={selected === item.id ? 0 : -1}
+      onClick={() => onSelect(item.id)} onKeyDown={event => {
+        let next;
+        if (event.key === 'ArrowRight') next = (index + 1) % items.length;
+        if (event.key === 'ArrowLeft') next = (index + items.length - 1) % items.length;
+        if (event.key === 'Home') next = 0;
+        if (event.key === 'End') next = items.length - 1;
+        if (next !== undefined) { event.preventDefault(); onSelect(items[next].id); document.getElementById(`${id}-tab-${items[next].id}`)?.focus(); }
+      }}>{item.title}</button>)}
+  </div>;
+}
 export default function CatalogPresentationControls({ value, onChange }) {
   const id = useId();
+  const [topic, setTopic] = useState('layout');
+  const [headerSection, setHeaderSection] = useState('material');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const patch = (key, next) => onChange({ [key]: next });
@@ -86,19 +115,22 @@ export default function CatalogPresentationControls({ value, onChange }) {
     } catch (error) { setMessage(error.message || 'No se pudo subir la imagen.'); }
     finally { setUploading(false); }
   }
-  return <div className="mt-6 space-y-6 border-t border-gray-200 pt-5">
-    <p className="text-sm text-gray-600">Todos los productos comparten una cuadrícula uniforme. Los bordes ópticos usan el mismo acabado de Inicio y se adaptan al tamaño de cada tarjeta. El fondo puede funcionar únicamente con color; la imagen es opcional.</p>
-    {groups.map(group => <fieldset key={group.title} className="min-w-0">
-      <legend className="mb-3 text-sm font-semibold text-gray-800">{group.title}</legend>
-      <div className="grid gap-3 md:grid-cols-2">{group.fields.map(([key, label, type]) => <label key={key} className={`block min-w-0 text-sm text-gray-700 ${type === 'boolean' ? 'flex items-center justify-between gap-3 rounded-xl border p-3' : ''}`}>
+  return <div className="catalog-presentation-controls mt-6 space-y-4 border-t border-gray-200 pt-5">
+    <p className="text-sm text-gray-600">Elige un tema. Los cambios se muestran en la vista previa y se publican al guardar.</p>
+    <TopicTabs items={topics} selected={topic} onSelect={setTopic} id={id} label="Temas de diseño del catálogo"/>
+    {topics.map(group => <div key={group.id} role="tabpanel" id={`${id}-panel-${group.id}`} aria-labelledby={`${id}-tab-${group.id}`} hidden={topic !== group.id}>
+      {group.sections && <TopicTabs items={group.sections} selected={headerSection} onSelect={setHeaderSection} id={`${id}-header`} label="Ajustes del encabezado"/>}
+      {(group.sections || [group]).map(section => <div key={section.id} role={group.sections ? 'tabpanel' : undefined} id={`${id}-header-panel-${section.id}`} aria-labelledby={group.sections ? `${id}-header-tab-${section.id}` : undefined} hidden={!!group.sections && headerSection !== section.id}>
+      <div className="grid gap-3 md:grid-cols-2">{section.keys.map(key => fields.get(key)).map(([key, label, type]) => <label key={key} className={`block min-w-0 text-sm text-gray-700 ${type === 'boolean' ? 'flex items-center justify-between gap-3 rounded-xl border p-3' : ''}`}>
         <span id={`${id}-${key}`} className="mb-1 block">{label}</span>
         {type === 'boolean' ? <input aria-labelledby={`${id}-${key}`} type="checkbox" checked={value[key]} onChange={event => patch(key, event.target.checked)} className="h-4 w-4 accent-pink-600"/> :
           Array.isArray(type) && Array.isArray(type[0]) ? <select aria-labelledby={`${id}-${key}`} className={fieldClass} value={value[key]} onChange={event => patch(key, event.target.value)}>{type.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select> :
           type === 'color' ? <input aria-labelledby={`${id}-${key}`} type="color" className={`${fieldClass} h-10`} value={value[key]} onChange={event => patch(key, event.target.value)}/> :
           <input aria-labelledby={`${id}-${key}`} type="number" className={fieldClass} value={value[key]} min={type[0]} max={type[1]} step={type[2]} onChange={event => patch(key, event.target.value === '' ? '' : Number(event.target.value))}/>}
       </label>)}</div>
-    </fieldset>)}
-    <fieldset className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
+    </div>)}
+    </div>)}
+    <fieldset hidden={topic !== 'background'} className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
       <label className="block text-sm text-gray-700">Dirección de la imagen de fondo<input className={fieldClass} value={value.backgroundImage} onChange={event => patch('backgroundImage', event.target.value)} placeholder="https://… o /imagen.webp"/></label>
       <label className="block text-sm text-gray-700">Subir imagen de fondo<input className={`${fieldClass} mt-1`} type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={uploading} onChange={upload}/></label>
       <button type="button" className="rounded-xl border px-3 py-2 text-sm" disabled={uploading || !value.backgroundImage} onClick={() => patch('backgroundImage', '')}>Quitar imagen de fondo</button>

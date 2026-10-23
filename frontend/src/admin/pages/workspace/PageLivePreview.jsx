@@ -15,6 +15,7 @@ export default function PageLivePreview({
       window.matchMedia?.("(max-width: 767px)")?.matches ? "mobile" : "desktop",
     ),
     [available, setAvailable] = useState(0),
+    [maxHeight, setMaxHeight] = useState(600),
     [loaded, setLoaded] = useState(false);
   draftRef.current = draft;
   const width = device === "mobile" ? 390 : 1280,
@@ -53,10 +54,19 @@ export default function PageLivePreview({
   }, [draft]);
   useEffect(() => {
     const node = container.current,
-      update = () => setAvailable(node?.clientWidth || 0);
+      update = () => {
+        setAvailable(node?.clientWidth || 0);
+        const aside = node?.closest('.pages-workspace__preview');
+        const top = aside ? parseFloat(getComputedStyle(aside).top) || 0 : 0;
+        setMaxHeight(Math.max(140, window.innerHeight - top - (expanded ? 160 : 130)));
+      };
     const observer =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     if (node) observer?.observe(node);
+    const workspace = node?.closest('.pages-workspace');
+    if (workspace) observer?.observe(workspace.querySelector('.pages-workspace__bar'));
+    const adminHeader = workspace?.closest('main')?.querySelector('.admin-header-panel');
+    if (adminHeader) observer?.observe(adminHeader);
     window.addEventListener("resize", update);
     update();
     return () => {
@@ -98,6 +108,7 @@ export default function PageLivePreview({
     };
   }, [expanded, onClose]);
   const scale = available ? Math.min(1, available / width) : 0;
+  const frameHeight = scale ? Math.min(height, Math.max(200, maxHeight / scale)) : height;
   const content = (
     <section
       className="page-live-preview"
@@ -147,7 +158,7 @@ export default function PageLivePreview({
       >
         <div
           className="page-live-preview__stage"
-          style={{ height: height * scale }}
+          style={{ height: frameHeight * scale }}
         >
           <iframe
             ref={frame}
@@ -161,7 +172,7 @@ export default function PageLivePreview({
                 window.location.origin,
               );
             }}
-            style={{ width, height, transform: `scale(${scale})` }}
+            style={{ width, height: frameHeight, transform: `scale(${scale})` }}
           />
         </div>
         {!loaded && (

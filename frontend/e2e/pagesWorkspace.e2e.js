@@ -414,15 +414,23 @@ try {
       if (kind === "catalog" && device.id === "desktop") {
         await page.getByRole('button', { name: 'Diseño', exact: true }).click();
         await page.getByRole('button', { name: 'Estructura visual', exact: true, expanded: true }).waitFor();
+        await page.getByRole('tab', {name:'Productos', exact:true}).click();
         await page.getByLabel('Borde de las tarjetas', { exact: true }).selectOption('fine');
         await frame.locator('.catalog-ecard[data-rim="fine"]').first().waitFor();
         await page.getByLabel('Borde de las tarjetas', { exact: true }).selectOption('optical');
+        await page.getByRole('tab', {name:'Encabezado', exact:true}).click();
+        await page.getByRole('tab', {name:'Texto', exact:true}).click();
         await page.getByLabel('Tamaño del título de catálogo (px)', { exact: true }).fill('40');
+        await page.getByRole('tab', {name:'Fondo', exact:true}).click();
         await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
         await page.getByLabel('Dirección de la imagen de fondo', { exact: true }).fill('/information/satin.webp');
+        await page.getByRole('tab', {name:'Encabezado', exact:true}).click();
+        await page.getByRole('tab', {name:'Cristal', exact:true}).click();
         await page.getByLabel('Color del cristal del encabezado', { exact:true }).fill('#d4eee1');
+        await page.getByRole('tab', {name:'Bordes y luz', exact:true}).click();
         await page.getByLabel('Color del borde del encabezado', { exact:true }).fill('#24785a');
         await page.getByLabel('Intensidad de los reflejos (0 a 1)', { exact:true }).fill('0.3');
+        await page.getByRole('tab', {name:'Bolsas', exact:true}).click();
         await page.getByLabel('Adorno del encabezado', { exact:true }).selectOption('none');
         await frame.locator('.cpv-glass-bags').waitFor({state:'detached'});
         await page.waitForFunction(() => {
@@ -617,6 +625,27 @@ try {
       }),
     );
   }
+  for (const width of [1440, 1280, 1024]) {
+    await page.setViewportSize({width,height:900});
+    await page.goto('http://127.0.0.1:5205/admin/catalogo/catalog');
+    await page.locator('.pages-workspace__form').waitFor();
+    await page.getByRole('button', {name:'Diseño',exact:true}).click();
+    await page.getByRole('tab', {name:'Encabezado',exact:true}).click();
+    await page.locator('.pages-workspace__form').evaluate(node => { node.style.minHeight='1800px'; });
+    for (const offset of [500,1000]) {
+      await page.evaluate(offset => window.scrollTo(0,document.querySelector('.pages-workspace__grid').getBoundingClientRect().top + scrollY + offset),offset);
+      await page.waitForFunction(() => {
+        const node=document.querySelector('.pages-workspace__preview');
+        return Math.abs(node.getBoundingClientRect().top - parseFloat(getComputedStyle(node).top)) < 3;
+      });
+      const bounds=await page.locator('.pages-workspace__preview').boundingBox();
+      if (bounds.y < 0 || bounds.y+bounds.height > 902) throw Error('Preview leaves viewport at '+width);
+    }
+    await page.screenshot({path:artifactDirectory+'/sticky-preview-'+width+'.png'});
+    console.log(JSON.stringify({stickyPreview:true,width,scrollOffsets:[500,1000]}));
+    await page.locator('.pages-workspace__form').evaluate(node => { node.style.minHeight=''; });
+    await page.evaluate(() => scrollTo(0,0));
+  }
   for (const width of [1440, 1100, 1024, 880, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto('http://127.0.0.1:5205/catalog-editorial-audit');
@@ -676,6 +705,7 @@ try {
     JSON.stringify({ writes, errors }, null, 2),
   );
 } catch (error) {
+  console.error("E2E_ERROR", error);
   console.log(
     "FAILURE_STATE",
     await page?.evaluate(() => ({
