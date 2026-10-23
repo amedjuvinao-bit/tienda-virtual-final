@@ -39,6 +39,7 @@ export function catalogHeaderAppearanceStyle(cfg) {
     '--ch-contrast': mix(c.headerContrastColor, c.headerContrast),
     '--ch-edge': c.headerEdgeColor, '--ch-edge-width': `${c.headerEdgeWidth}px`,
     '--ch-light': c.headerReflectionColor, '--ch-reflection': mix(c.headerReflectionColor, c.headerReflection),
+    '--ch-reflection-opacity': c.headerReflection,
     '--ch-shadow': mix(c.headerShadowColor, c.headerShadow),
     '--ch-blur': `${c.headerBlur}px`, '--ch-radius': `${c.headerRadius}px`,
     '--ch-height': `${c.headerHeight}px`, '--ch-padding': `${c.headerPadding}px`,

@@ -1,10 +1,9 @@
-import React, { useEffect, useId, useRef } from 'react';
-import CatalogGlassMaterialFilter from './CatalogGlassMaterialFilter';
+import React, { useEffect, useRef } from 'react';
+import './catalogLiquidFrame.css';
 
-// Clear interior. The artwork is restricted to the bevel around the perimeter.
+// All paint is restricted to the perimeter. There is no interior surface.
 export default function CatalogLiquidGlass({ presentation }) {
   const layer = useRef(null);
-  const id = `catalog-material-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   useEffect(() => {
     const host = layer.current?.parentElement;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -12,23 +11,32 @@ export default function CatalogLiquidGlass({ presentation }) {
     let frame = 0;
     const move = event => {
       if (event.pointerType !== 'mouse' || reduced?.matches) return;
-      const bounds = host.getBoundingClientRect(), x = (event.clientX - bounds.left) / bounds.width * 100, y = (event.clientY - bounds.top) / bounds.height * 100;
+      const bounds = host.getBoundingClientRect();
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => { host.style.setProperty('--ch-pointer-x', `${x}%`); host.style.setProperty('--ch-pointer-y', `${y}%`); });
+      frame = requestAnimationFrame(() => {
+        host.style.setProperty('--ch-pointer-x', `${(event.clientX - bounds.left) / bounds.width * 100}%`);
+        host.style.setProperty('--ch-pointer-y', `${(event.clientY - bounds.top) / bounds.height * 100}%`);
+      });
     };
-    const reset = () => { cancelAnimationFrame(frame); host.style.removeProperty('--ch-pointer-x'); host.style.removeProperty('--ch-pointer-y'); };
-    host.addEventListener('pointermove', move); host.addEventListener('pointerleave', reset); reduced?.addEventListener?.('change', reset);
-    return () => { host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', reset); reduced?.removeEventListener?.('change', reset); reset(); };
+    const reset = () => {
+      cancelAnimationFrame(frame);
+      host.style.removeProperty('--ch-pointer-x');
+      host.style.removeProperty('--ch-pointer-y');
+    };
+    host.addEventListener('pointermove', move);
+    host.addEventListener('pointerleave', reset);
+    reduced?.addEventListener?.('change', reset);
+    return () => {
+      host.removeEventListener('pointermove', move);
+      host.removeEventListener('pointerleave', reset);
+      reduced?.removeEventListener?.('change', reset);
+      reset();
+    };
   }, [presentation.motion]);
-  return <div ref={layer} className="catalog-liquid" aria-hidden="true">
-    <svg className="catalog-liquid__filters" width="0" height="0" focusable="false">
-      <defs>
-        <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} depthColor={presentation.headerMaterialDepthColor} depth={Math.min(1, presentation.headerMaterialDepth * 1.6)} shadeScale={.6}/>
-      </defs>
-    </svg>
-    <div className="catalog-liquid__material">
-      <div className="catalog-liquid__bevel" style={{ filter: `url(#${id}-bevel)` }}/>
-    </div>
-    <div className="catalog-liquid__shine"/>
+
+  return <div ref={layer} className="catalog-liquid" data-empty={presentation.headerEdgeWidth === 0} aria-hidden="true">
+    <span className="catalog-liquid__bevel" />
+    <span className="catalog-liquid__facet" />
+    <span className="catalog-liquid__shine" />
   </div>;
 }
