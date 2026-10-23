@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-// Preserve the same optical artwork as the Information cards.
+// Horizontal optical surface with a separate shared bevel; no texture stretching.
 export default function CatalogLiquidGlass({ presentation }) {
   const layer = useRef(null);
   useEffect(() => {
@@ -19,9 +19,11 @@ export default function CatalogLiquidGlass({ presentation }) {
     return () => { host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', reset); reduced?.removeEventListener?.('change', reset); reset(); };
   }, [presentation.motion]);
   return <div ref={layer} className="catalog-liquid" aria-hidden="true">
-    <div className="catalog-liquid__material"/>
+    <div className="catalog-liquid__material">
+      <div className="catalog-liquid__surface"/>
+      <div className="catalog-liquid__bevel"/>
+    </div>
     <div className="catalog-liquid__rim"/>
     <div className="catalog-liquid__shine"/>
-
   </div>;
 }
