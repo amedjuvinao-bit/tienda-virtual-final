@@ -13,6 +13,7 @@ export function buildCatalogPresentation(raw = {}) {
   const cfg = raw && typeof raw === 'object' ? raw : {};
   return {
     styleVersion: number(cfg.styleVersion, 0, 3, 0),
+    headerVersion: number(cfg.headerVersion, 0, 1, 0),
     showPhotoCount: cfg.showPhotoCount === true,
     filterSectionBorders: cfg.filterSectionBorders === true,
     layout: cfg.layout === 'grid' ? 'grid' : 'glass-grid',

@@ -1,10 +1,10 @@
 /* Compact optical-glass heading. Product grid and classic layout are independent. */
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
   display:flex; align-items:center; justify-content:space-between; gap:24px;
-  isolation:isolate; padding:18px 28px; min-height:126px; margin:0 0 8px 8px;
-  border:1px solid #fff9f0; border-radius:22px;
-  background:linear-gradient(115deg,#ffffff80,#fff9f02b 48%,#ffffff65);
-  box-shadow:inset 0 2px 2px #fff,inset 0 -2px 3px #c39b7860,inset 2px 0 2px #e7bd9760,0 10px 22px #63332912,0 2px 4px #76413216;
+  isolation:isolate; padding:18px 28px; min-height:116px; margin:0 0 8px 8px;
+  border:1px solid #d9b593; border-radius:22px;
+  background:linear-gradient(115deg,#ffffffa1,#fff9f03b 48%,#ffffff80);
+  box-shadow:inset 0 2px 2px #fff,inset 0 -3px 4px #b787626b,inset 3px 0 3px #e7bd9780,0 10px 18px #63332920,0 2px 4px #76413220;
   backdrop-filter:blur(var(--catalog-blur)); -webkit-backdrop-filter:blur(var(--catalog-blur));
 }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass::before {
@@ -15,7 +15,7 @@
 }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass::after {
   display:block; content:""; position:absolute; inset:3px; width:auto; height:auto;
-  border:1px solid #d1a5806b; border-top-color:#fff; border-left-color:#e8cdb7;
+  border:1px solid #bf936d9c; border-top-color:#fff; border-left-color:#e8cdb7;
   background:none; border-radius:19px; pointer-events:none;
 }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-hero-top { flex:1; min-width:0; gap:9px; }
@@ -33,7 +33,7 @@
 }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass .cpv-title-image { max-width:100%; max-height:76px; }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass :is(.cpv-subtitle,.cpv-description) { margin:6px 0 0; line-height:1.45; }
-.cpv-glass-bags { flex:0 0 auto; width:164px; height:112px; color:var(--catalog-accent); filter:drop-shadow(0 5px 4px #87583c13); pointer-events:none; }
+.cpv-glass-bags { flex:0 0 auto; width:180px; height:110px; color:var(--catalog-accent); filter:drop-shadow(0 5px 4px #87583c13); pointer-events:none; }
 @media(max-width:767px) {
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:15px 16px; gap:10px; min-height:112px; border-radius:18px; }
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass::before { border-radius:18px; }

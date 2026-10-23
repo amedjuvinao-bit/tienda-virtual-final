@@ -6,14 +6,14 @@ export default function CatalogGlassBags() {
   return <svg className="cpv-glass-bags" viewBox="0 0 220 150" fill="none" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id={`${id}-edge`} x1="30" y1="10" x2="190" y2="145" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#fffaf2"/><stop offset=".18" stopColor="#bd8564"/><stop offset=".32" stopColor="#fffaf4"/><stop offset=".53" stopColor="#d1a07e"/><stop offset=".72" stopColor="#fff"/><stop offset="1" stopColor="#ad735d"/>
+        <stop stopColor="#fffaf2"/><stop offset=".18" stopColor="#a66742"/><stop offset=".32" stopColor="#fffaf4"/><stop offset=".53" stopColor="#b88058"/><stop offset=".72" stopColor="#fff"/><stop offset="1" stopColor="#955c40"/>
       </linearGradient>
       <linearGradient id={`${id}-glass`} x1="40" y1="45" x2="185" y2="140" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#fff" stopOpacity=".65"/><stop offset=".45" stopColor="currentColor" stopOpacity=".08"/><stop offset=".8" stopColor="#fff" stopOpacity=".32"/><stop offset="1" stopColor="currentColor" stopOpacity=".16"/>
+        <stop stopColor="#fff" stopOpacity=".38"/><stop offset=".45" stopColor="currentColor" stopOpacity=".12"/><stop offset=".8" stopColor="#fff" stopOpacity=".32"/><stop offset="1" stopColor="currentColor" stopOpacity=".16"/>
       </linearGradient>
     </defs>
     <ellipse cx="119" cy="139" rx="78" ry="5" fill="currentColor" opacity=".08"/>
-    <g stroke={`url(#${id}-edge)`} strokeWidth="2" strokeLinejoin="round">
+    <g stroke={`url(#${id}-edge)`} strokeWidth="2.4" strokeLinejoin="round">
       <path d="M111 48 178 52 188 128 111 135 99 124Z" fill={`url(#${id}-glass)`}/>
       <path d="m111 48 1 87m66-83-10 8-56-4m56 4 5 66 15 2m-15-2-61 9"/>
       <path d="M126 58V31c0-28 35-27 35 1v29m-30-3V32c0-20 25-20 25 0v28"/>

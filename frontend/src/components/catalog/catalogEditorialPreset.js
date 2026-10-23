@@ -40,11 +40,19 @@ export function applyCatalogEditorialPreset(raw = {}) {
 }
 export function prepareCatalogEditorialConfig(raw) {
   const presentation = buildCatalogPresentation(raw.presentation);
-  if (presentation.layout !== 'glass-grid' || presentation.styleVersion >= EDITORIAL_STYLE_VERSION) return raw;
-  const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
-  const current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(raw) : raw;
-  return { ...current, presentation: { ...presentation, ...current.presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage }, cardUiConfig: { ...current.cardUiConfig, imageFit: 'contain' } };
-
+  if (presentation.layout !== 'glass-grid') return raw;
+  let current = raw;
+  if (presentation.styleVersion < EDITORIAL_STYLE_VERSION) {
+    const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
+    current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(raw) : raw;
+    current = { ...current, presentation: { ...presentation, ...current.presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage }, cardUiConfig: { ...current.cardUiConfig, imageFit: 'contain' } };
+  }
+  // Adopt the approved typographic heading once; keep the uploaded artwork available
+  // and allow subsequent explicit changes from the editor to remain authoritative.
+  if (presentation.headerVersion < 1) {
+    current = { ...current, titleMode: 'text', presentation: { ...current.presentation, headerVersion: 1, titleFont: 'serif', titleSize: 44 } };
+  }
+  return current;
 }
 export function restoreCatalogVisualBackup(config) {
   if (!config.visualBackup) return config;

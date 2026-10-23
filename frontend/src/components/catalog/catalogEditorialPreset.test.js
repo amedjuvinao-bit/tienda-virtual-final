@@ -25,3 +25,11 @@ it('convierte el diseño con arco a una cuadrícula sin fondo obligatorio y cons
   expect(config.presentation).not.toHaveProperty('featuredShape');
   expect(config.cardUiConfig.titleColor).toBe('#123456');
 });
+
+it('reemplaza una vez el título gráfico anterior y luego respeta las elecciones del editor', () => {
+  const old = { title:'Últimas tendencias', titleMode:'image', titleImage:'/title-western.png', presentation:{ layout:'glass-grid', styleVersion:3, titleFont:'inherit' } };
+  const config = buildSafeCatalogConfig(old);
+  expect(config).toMatchObject({ title:old.title, titleMode:'text', titleImage:old.titleImage, presentation:{ headerVersion:1, titleFont:'serif', titleSize:44 } });
+  expect(buildSafeCatalogConfig(config)).toEqual(config);
+  expect(buildSafeCatalogConfig({ ...config, titleMode:'image', presentation:{ ...config.presentation, titleFont:'sans', titleSize:32 } })).toMatchObject({ titleMode:'image', presentation:{ titleFont:'sans', titleSize:32 } });
+});
