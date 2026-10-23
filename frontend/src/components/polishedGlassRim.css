@@ -1,0 +1,8 @@
+.polished-glass-rim {
+  --pg-light:var(--ch-light,#fff);
+  --pg-edge:var(--catalog-accent,#984d62);
+  --pg-depth:color-mix(in srgb,var(--pg-edge) 55%,transparent);
+  position:absolute; inset:0; display:block; border-radius:inherit;
+  pointer-events:none; z-index:4; opacity:var(--pg-opacity,1);
+}
+.polished-glass-rim svg { display:block; overflow:hidden; border-radius:inherit; }

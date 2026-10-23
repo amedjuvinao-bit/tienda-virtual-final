@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import './catalogLiquidFrame.css';
+import PolishedGlassRim from '../PolishedGlassRim';
 
 // All paint is restricted to the perimeter. There is no interior surface.
 export default function CatalogLiquidGlass({ presentation }) {
@@ -34,9 +35,7 @@ export default function CatalogLiquidGlass({ presentation }) {
     };
   }, [presentation.motion]);
 
-  return <div ref={layer} className="catalog-liquid" data-empty={presentation.headerEdgeWidth === 0} aria-hidden="true">
-    <span className="catalog-liquid__bevel" />
-    <span className="catalog-liquid__facet" />
-    <span className="catalog-liquid__shine" />
+  return <div ref={layer} className="catalog-liquid" data-empty={presentation.headerEdgeWidth === 0} data-layers={presentation.headerLayers} aria-hidden="true">
+    <PolishedGlassRim radius={presentation.headerRadius} width={8 + presentation.headerEdgeWidth * 2} reflection={presentation.headerReflection}/>
   </div>;
 }

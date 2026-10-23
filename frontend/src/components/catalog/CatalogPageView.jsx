@@ -17,6 +17,8 @@ import { catalogPresentationStyle } from "./catalogPresentation";
 import useCatalogDepth from "./useCatalogDepth";
 import { catalogContinuityBackdrop } from "./catalogBackdrop";
 import CatalogSearchControls from "./CatalogSearchControls";
+import PolishedGlassRim from "../PolishedGlassRim";
+import "./catalogPolishedGlass.css";
 import {
   Filter,
   ChevronLeft,
@@ -400,6 +402,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
               >
                 {sidebarVisible && (
                   <>
+                    {editorial && <PolishedGlassRim radius={presentation.radius} width={10}/>}
                     <button
                       className="cpv-collapse-btn"
                       onClick={() => setSidebarVisible(false)}

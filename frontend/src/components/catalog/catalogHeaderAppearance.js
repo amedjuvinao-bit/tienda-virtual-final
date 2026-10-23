@@ -35,6 +35,7 @@ export function catalogHeaderAppearanceStyle(cfg) {
   const mix = (color, opacity) => `color-mix(in srgb, ${color} ${opacity * 100}%, transparent)`;
   return {
     '--ch-material-opacity': c.headerMaterialOpacity,
+    '--ch-depth-color': c.headerMaterialDepthColor, '--ch-depth-strength': c.headerMaterialDepth,
     '--ch-tint': c.headerTint, '--ch-fill': mix(c.headerTint, c.headerOpacity),
     '--ch-contrast': mix(c.headerContrastColor, c.headerContrast),
     '--ch-edge': c.headerEdgeColor, '--ch-edge-width': `${c.headerEdgeWidth}px`,

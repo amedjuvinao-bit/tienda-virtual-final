@@ -220,7 +220,7 @@ function Preview() {
                   page={draft}
                   catalogConfig={draft.catalogConfig}
                   theme={settings?.theme}
-                  footer={draft.useFooter !== false ? <FooterSection theme={settings?.theme} store={settings?.store} /> : null}
+                  footer={draft.useFooter !== false ? <FooterSection theme={settings?.theme} store={settings?.store} polishedGlass /> : null}
                 />
               ) : (
                 <DetailPreview draft={draft} />
