@@ -38,6 +38,7 @@ it('permite ajustar y desactivar el acabado de cristal', () => {
 
 it('conserva los reflejos cálidos al elegir blanco para el cristal', () => {
   const style = catalogPresentationStyle(buildCatalogPresentation({headerTint:'#ffffff'}));
+  expect(style['--ch-material-hue']).toBe('0deg');
   expect(style['--ch-edge']).toBe('#c49b7b');
   expect(style['--ch-contrast']).toContain('#b57560');
   expect(style['--ch-fill']).toContain('#ffffff');

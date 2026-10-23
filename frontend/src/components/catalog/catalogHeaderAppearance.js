@@ -28,11 +28,19 @@ export function buildCatalogHeaderAppearance(cfg = {}) {
     headerIconOpacity: bounded(cfg.headerIconOpacity, 0, 1, 1),
   };
 }
+// Retint the shared artwork while preserving its white specular highlights.
+function materialHue(color) {
+  const [r,g,b] = color.slice(1).match(/../g).map(part => parseInt(part,16) / 255);
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), delta=max-min;
+  if (!delta) return 0;
+  const hue=max===r ? ((g-b)/delta)%6 : max===g ? (b-r)/delta+2 : (r-g)/delta+4;
+  return (hue*60+360)%360-24;
+}
 export function catalogHeaderAppearanceStyle(cfg) {
   const c = buildCatalogHeaderAppearance(cfg);
   const mix = (color, opacity) => `color-mix(in srgb, ${color} ${opacity * 100}%, transparent)`;
   return {
-    '--ch-material-opacity': c.headerMaterialOpacity,
+    '--ch-material-opacity': c.headerMaterialOpacity, '--ch-material-hue': `${materialHue(c.headerTint)}deg`,
     '--ch-tint': c.headerTint, '--ch-fill': mix(c.headerTint, c.headerOpacity),
     '--ch-contrast': mix(c.headerContrastColor, c.headerContrast),
     '--ch-edge': c.headerEdgeColor, '--ch-edge-width': `${c.headerEdgeWidth}px`,
