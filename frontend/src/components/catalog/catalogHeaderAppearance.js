@@ -31,7 +31,8 @@ export function buildCatalogHeaderAppearance(cfg = {}) {
 function materialTint(color) {
   const [r,g,b] = color.slice(1).match(/../g).map(part => parseInt(part,16) / 255);
   const max=Math.max(r,g,b), min=Math.min(r,g,b), delta=max-min;
-  if (!delta) return {hue:0,saturation:0};
+  // A neutral surface must preserve the warm optical highlights, not turn the artwork silver.
+  if (!delta) return {hue:0,saturation:1};
   let hue=max===r ? ((g-b)/delta)%6 : max===g ? (b-r)/delta+2 : (r-g)/delta+4;
   hue=(hue*60+360)%360;
   return {hue:hue-24,saturation:1};

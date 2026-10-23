@@ -35,3 +35,10 @@ it('permite ajustar y desactivar la textura compartida de Información', () => {
   expect(buildCatalogPresentation({headerMaterialOpacity:900}).headerMaterialOpacity).toBe(1);
   expect(buildCatalogPresentation({headerMaterialOpacity:'invalid'}).headerMaterialOpacity).toBe(.9);
 });
+
+it('conserva los reflejos cálidos al elegir blanco para el cristal', () => {
+  const style = catalogPresentationStyle(buildCatalogPresentation({headerTint:'#ffffff'}));
+  expect(style['--ch-material-saturation']).toBe(1);
+  expect(style['--ch-material-hue']).toBe('0deg');
+  expect(style['--ch-fill']).toContain('#ffffff');
+});
