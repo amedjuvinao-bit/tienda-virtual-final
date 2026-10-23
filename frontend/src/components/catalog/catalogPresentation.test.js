@@ -18,3 +18,14 @@ describe('presentación editorial compartida', () => {
     expect(config).toMatchObject({ layout: 'grid', textColor: '#562633', titleFont: 'serif', motionStrength: 18 });
   });
 });
+
+it('conserva y normaliza la personalización completa del encabezado sin perder valores cero', () => {
+  const config = buildSafeCatalogConfig({ presentation:{ headerVersion:1, styleVersion:3, headerTint:'#123456', headerOpacity:0, headerReflection:0, headerContrast:0, headerShadow:0, headerLayers:false, headerIcon:'none', headerIconColor:'#abcdef', headerEdgeWidth:0, headerRadius:0, headerHeight:999 } });
+  expect(config.presentation).toMatchObject({ headerTint:'#123456', headerOpacity:0, headerReflection:0, headerContrast:0, headerShadow:0, headerLayers:false, headerIcon:'none', headerIconColor:'#abcdef', headerEdgeWidth:0, headerRadius:0, headerHeight:240 });
+  expect(buildSafeCatalogConfig(config)).toEqual(config);
+  const style = catalogPresentationStyle(config.presentation);
+  expect(style['--ch-fill']).toContain('#123456 0%');
+  expect(style['--ch-layer-opacity']).toBe(0);
+  expect(style['--ch-edge-width']).toBe('0px');
+  expect(buildCatalogPresentation({ headerTint:'red;display:none', headerIcon:'invalid' })).toMatchObject({headerTint:'#fff6f0',headerIcon:'bags'});
+});

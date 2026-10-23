@@ -6,10 +6,10 @@ export default function CatalogGlassBags() {
   return <svg className="cpv-glass-bags" viewBox="0 0 220 150" fill="none" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id={`${id}-edge`} x1="30" y1="10" x2="190" y2="145" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#fffaf2"/><stop offset=".18" stopColor="#a66742"/><stop offset=".32" stopColor="#fffaf4"/><stop offset=".53" stopColor="#b88058"/><stop offset=".72" stopColor="#fff"/><stop offset="1" stopColor="#955c40"/>
+        <stop stopColor="var(--ch-light)"/><stop offset=".18" stopColor="var(--ch-icon-color)"/><stop offset=".32" stopColor="var(--ch-light)"/><stop offset=".53" stopColor="var(--ch-icon-color)"/><stop offset=".72" stopColor="var(--ch-light)"/><stop offset="1" stopColor="var(--ch-icon-color)"/>
       </linearGradient>
       <linearGradient id={`${id}-glass`} x1="40" y1="45" x2="185" y2="140" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#fff" stopOpacity=".38"/><stop offset=".45" stopColor="currentColor" stopOpacity=".12"/><stop offset=".8" stopColor="#fff" stopOpacity=".32"/><stop offset="1" stopColor="currentColor" stopOpacity=".16"/>
+        <stop stopColor="var(--ch-icon-color)" stopOpacity=".38"/><stop offset=".45" stopColor="currentColor" stopOpacity=".12"/><stop offset=".8" stopColor="var(--ch-icon-color)" stopOpacity=".32"/><stop offset="1" stopColor="currentColor" stopOpacity=".16"/>
       </linearGradient>
     </defs>
     <ellipse cx="119" cy="139" rx="78" ry="5" fill="currentColor" opacity=".08"/>
@@ -21,6 +21,6 @@ export default function CatalogGlassBags() {
       <path d="m39 77 7 65m52-70-9 9-50 5m50-5 9 52 14 2m-14-2-52 9"/>
       <path d="M50 85V61c0-26 29-27 31-3l2 24M55 85V62c0-19 21-20 22-3l2 23"/>
     </g>
-    <path d="m115 61 2 59m-74-30 5 40m68-79 49 4" stroke="#fff" strokeOpacity=".75" strokeWidth="1.3" strokeLinecap="round"/>
+    <path d="m115 61 2 59m-74-30 5 40m68-79 49 4" stroke="var(--ch-light)" strokeOpacity=".75" strokeWidth="1.3" strokeLinecap="round"/>
   </svg>;
 }

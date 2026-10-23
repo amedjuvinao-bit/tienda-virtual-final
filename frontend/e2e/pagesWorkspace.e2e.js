@@ -420,6 +420,16 @@ try {
         await page.getByLabel('Tamaño del título de catálogo (px)', { exact: true }).fill('40');
         await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
         await page.getByLabel('Dirección de la imagen de fondo', { exact: true }).fill('/information/satin.webp');
+        await page.getByLabel('Color del cristal del encabezado', { exact:true }).fill('#d4eee1');
+        await page.getByLabel('Color del borde del encabezado', { exact:true }).fill('#24785a');
+        await page.getByLabel('Intensidad de los reflejos (0 a 1)', { exact:true }).fill('0.3');
+        await page.getByLabel('Adorno del encabezado', { exact:true }).selectOption('none');
+        await frame.locator('.cpv-glass-bags').waitFor({state:'detached'});
+        await page.waitForFunction(() => {
+          const node=document.querySelector('iframe')?.contentDocument?.querySelector('.cpv-page');
+          return node?.style.getPropertyValue('--ch-tint') === '#d4eee1' && node?.style.getPropertyValue('--ch-edge') === '#24785a';
+        });
+
         await page.waitForFunction(() => {
           const node = document.querySelector('iframe')?.contentDocument?.querySelector('.cpv-page');
           return node?.style.getPropertyValue('--catalog-title-size') === '40px' && node?.style.getPropertyValue('--catalog-glass-fill') === '45%' && node?.style.getPropertyValue('--catalog-backdrop').includes('/information/satin.webp');
@@ -462,9 +472,11 @@ try {
         throw Error("Draft omitted from save");
       if (kind === 'catalog' && device.id === 'desktop') {
         if (payload.catalogConfig.presentation.titleSize !== 40 || payload.catalogConfig.presentation.glassOpacity !== .45) throw Error('Editorial controls omitted from save');
+        if (payload.catalogConfig.presentation.headerTint !== '#d4eee1' || payload.catalogConfig.presentation.headerEdgeColor !== '#24785a' || payload.catalogConfig.presentation.headerIcon !== 'none' || payload.catalogConfig.presentation.headerReflection !== .3) throw Error('Header customization omitted from save');
         await page.reload();
         await frame.getByText(publicTitle, { exact: true }).first().waitFor();
         if (!(await frame.locator('.cpv-page').getAttribute('style')).includes('--catalog-glass-fill: 45%')) throw Error('Editorial style did not persist after reload');
+        if (!(await frame.locator('.cpv-page').getAttribute('style')).includes('--ch-tint: #d4eee1') || await frame.locator('.cpv-glass-bags').count()) throw Error('Header customization did not persist after reload');
       }
       console.log(
         JSON.stringify({

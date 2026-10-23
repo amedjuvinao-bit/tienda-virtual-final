@@ -1,3 +1,4 @@
+import { buildCatalogHeaderAppearance, catalogHeaderAppearanceStyle } from './catalogHeaderAppearance';
 // Shared by the public catalog and its draft editor. No product data is duplicated.
 const number = (value, min, max, fallback) => {
   if (value === '' || value == null) return fallback;
@@ -12,6 +13,7 @@ export function catalogImageUrl(value) {
 export function buildCatalogPresentation(raw = {}) {
   const cfg = raw && typeof raw === 'object' ? raw : {};
   return {
+    ...buildCatalogHeaderAppearance(cfg),
     styleVersion: number(cfg.styleVersion, 0, 3, 0),
     headerVersion: number(cfg.headerVersion, 0, 1, 0),
     showPhotoCount: cfg.showPhotoCount === true,
@@ -46,6 +48,7 @@ export function buildCatalogPresentation(raw = {}) {
 export function catalogPresentationStyle(config) {
   const font = { inherit: 'var(--font-headings, inherit)', serif: '"Catalog Editorial", Georgia, serif', sans: 'var(--font-base, system-ui, sans-serif)' };
   return {
+    ...catalogHeaderAppearanceStyle(config),
     '--catalog-bg': config.backgroundColor,
     '--catalog-backdrop': config.backgroundImage ? `url(${JSON.stringify(config.backgroundImage)})` : 'none',
     '--catalog-backdrop-opacity': config.backgroundOpacity,

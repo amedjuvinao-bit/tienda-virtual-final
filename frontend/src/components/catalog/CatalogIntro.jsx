@@ -48,7 +48,7 @@ export default function CatalogIntro({ config: safeConfig, page }) {
                     ) : null}
                   </div>
                 </div>
-                {glass && <CatalogGlassBags />}
+                {glass && safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
               </section>
 
   </>;

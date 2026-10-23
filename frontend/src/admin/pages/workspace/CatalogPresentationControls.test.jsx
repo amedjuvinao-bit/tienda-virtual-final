@@ -26,3 +26,12 @@ it('sube un fondo sin sobrescribir ajustes editados durante la subida y permite 
   await user.click(screen.getByRole('button', { name: 'Quitar imagen de fondo' }));
   expect(screen.getByLabelText('Dirección de la imagen de fondo')).toHaveValue('');
 });
+
+it('permite cambiar los colores, materiales y adorno del encabezado desde el panel', () => {
+  render(<Editor/>);
+  fireEvent.change(screen.getByLabelText('Color del cristal del encabezado'), {target:{value:'#123456'}});
+  fireEvent.change(screen.getByLabelText('Intensidad de los reflejos (0 a 1)'), {target:{value:'0'}});
+  fireEvent.change(screen.getByLabelText('Adorno del encabezado'), {target:{value:'none'}});
+  fireEvent.click(screen.getByLabelText('Mostrar segunda capa de cristal'));
+  expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({headerTint:'#123456',headerReflection:0,headerIcon:'none',headerLayers:false});
+});
