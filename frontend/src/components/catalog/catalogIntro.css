@@ -64,7 +64,7 @@
 }
 .catalog-liquid__surface {
   position:absolute; inset:-12%;
-  background:url('/catalog/glass-horizontal.webp') center / cover no-repeat;
+  background:url('/catalog/glass-horizontal-clear-v2.webp') center / cover no-repeat;
 }
 .catalog-liquid__bevel {
   position:absolute; inset:-2px; border:18px solid transparent; border-radius:inherit;

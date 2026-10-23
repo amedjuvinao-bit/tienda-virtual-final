@@ -655,7 +655,7 @@ try {
     if (await page.locator('.cpv-title-image').count()) throw Error('Legacy title artwork bypasses the approved typography');
     const surface = await page.locator('.catalog-liquid__surface').evaluate(node => ({source:getComputedStyle(node).backgroundImage,size:getComputedStyle(node).backgroundSize}));
     const bevel = await page.locator('.catalog-liquid__bevel').evaluate(node => ({source:getComputedStyle(node).borderImageSource,slice:getComputedStyle(node).borderImageSlice}));
-    if (!surface.source.includes('/catalog/glass-horizontal.webp') || surface.size !== 'cover') throw Error('Horizontal glass surface is missing or distorted');
+    if (!surface.source.includes('/catalog/glass-horizontal-clear-v2.webp') || surface.size !== 'cover') throw Error('Horizontal glass surface is missing or distorted');
     if (!bevel.source.includes('/information/glass.webp') || bevel.slice.includes('fill')) throw Error('Glass bevel must be separate from the optical surface');
     if (width === 1440) {
       const hero = await page.locator('.cpv-hero-glass').boundingBox();
