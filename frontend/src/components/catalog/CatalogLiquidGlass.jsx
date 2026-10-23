@@ -23,8 +23,8 @@ export default function CatalogLiquidGlass({ presentation }) {
   return <div ref={layer} className="catalog-liquid" aria-hidden="true">
     <svg className="catalog-liquid__filters" width="0" height="0" focusable="false">
       <defs>
-        <CatalogGlassMaterialFilter id={`${id}-surface`} color={presentation.headerTint} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection}/>
-        <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} density={1.1} contourColor={presentation.headerTextColor} contourOpacity={.24}/>
+        <CatalogGlassMaterialFilter id={`${id}-surface`} color={presentation.headerTint} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} depthColor={presentation.headerMaterialDepthColor} depth={presentation.headerMaterialDepth}/>
+        <CatalogGlassMaterialFilter id={`${id}-bevel`} color={presentation.headerEdgeColor} reflectionColor={presentation.headerReflectionColor} reflection={presentation.headerReflection} depthColor={presentation.headerMaterialDepthColor} depth={Math.min(1, presentation.headerMaterialDepth * 1.6)} shadeScale={.6}/>
       </defs>
     </svg>
     <div className="catalog-liquid__material">

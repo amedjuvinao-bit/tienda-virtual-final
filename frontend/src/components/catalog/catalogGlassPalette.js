@@ -9,6 +9,7 @@ export const CATALOG_GLASS_PALETTE = Object.freeze({
   headerReflectionColor: '#ffffff', headerReflection: .82,
   headerShadowColor: '#562633', headerShadow: .18,
   headerMaterialOpacity: .82,
+  headerMaterialDepth: .38, headerMaterialDepthColor: '#984d62',
   headerTextColor: '#562633', headerBadgeColor: '#984d62', headerBadgeTint: '#ffffff',
   headerIconColor: '#984d62', headerIconOpacity: 1,
 });
@@ -23,6 +24,7 @@ export function buildCatalogGlassPalette(presentation = {}) {
     headerEdgeColor: presentation.accentColor || CATALOG_GLASS_PALETTE.accentColor,
     headerReflectionColor: '#ffffff',
     headerShadowColor: presentation.textColor || CATALOG_GLASS_PALETTE.textColor,
+    headerMaterialDepthColor: presentation.accentColor || CATALOG_GLASS_PALETTE.accentColor,
     headerTextColor: presentation.textColor || CATALOG_GLASS_PALETTE.textColor,
     headerBadgeColor: presentation.accentColor || CATALOG_GLASS_PALETTE.accentColor,
     headerBadgeTint: presentation.glassColor || '#ffffff',

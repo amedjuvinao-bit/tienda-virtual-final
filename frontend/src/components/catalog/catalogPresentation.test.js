@@ -36,6 +36,13 @@ it('permite ajustar y desactivar el acabado de cristal', () => {
   expect(buildCatalogPresentation({headerMaterialOpacity:'invalid'}).headerMaterialOpacity).toBe(.9);
 });
 
+it('conserva el color y profundidad del relieve, incluido el cero, en el contrato del catálogo', () => {
+  const config = buildSafeCatalogConfig({presentation:{styleVersion:3,glassPaletteVersion:2,headerMaterialDepthColor:'#2244cc',headerMaterialDepth:0}});
+  expect(config.presentation).toMatchObject({headerMaterialDepthColor:'#2244cc',headerMaterialDepth:0});
+  expect(buildSafeCatalogConfig(config)).toEqual(config);
+  expect(buildCatalogPresentation({headerMaterialDepth:4,headerMaterialDepthColor:'invalid',headerEdgeColor:'#123456'})).toMatchObject({headerMaterialDepth:1,headerMaterialDepthColor:'#123456'});
+});
+
 it('hereda los colores de la escena sin introducir bordes o reflejos dorados', () => {
   const config = buildCatalogPresentation({glassColor:'#ffffff',accentColor:'#2244cc',textColor:'#112244'});
   const style = catalogPresentationStyle(config);

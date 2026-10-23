@@ -14,6 +14,8 @@ export function buildCatalogHeaderAppearance(cfg = {}) {
     headerShadowColor: hex(cfg.headerShadowColor, hex(cfg.textColor, '#562633')),
     headerShadow: bounded(cfg.headerShadow, 0, 1, .16),
     headerMaterialOpacity: bounded(cfg.headerMaterialOpacity, 0, 1, .9),
+    headerMaterialDepthColor: hex(cfg.headerMaterialDepthColor, hex(cfg.headerEdgeColor, hex(cfg.accentColor, '#984d62'))),
+    headerMaterialDepth: bounded(cfg.headerMaterialDepth, 0, 1, .38),
     headerBlur: bounded(cfg.headerBlur, 0, 32, 16),
     headerRadius: bounded(cfg.headerRadius, 0, 40, 22),
     headerHeight: bounded(cfg.headerHeight, 80, 240, 116),
