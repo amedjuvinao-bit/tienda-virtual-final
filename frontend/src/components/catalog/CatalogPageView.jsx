@@ -37,7 +37,7 @@ const colClasses = {
 const DEFAULT_MIN = 0;
 const DEFAULT_MAX = 10_000_000;
 
-export default function CatalogPageView({ page = null, catalogConfig = {}, theme }) {
+export default function CatalogPageView({ page = null, catalogConfig = {}, theme, footer = null }) {
   const safeConfig = useMemo(
     () => buildSafeCatalogConfig(catalogConfig),
     [catalogConfig],
@@ -558,7 +558,9 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
             </CatalogFilterDrawer>
           )}
         </div>
+        {backdrop && footer && <div className="cpv-footer">{footer}</div>}
       </div>
+      {!backdrop && footer}
     </>
   );
 }

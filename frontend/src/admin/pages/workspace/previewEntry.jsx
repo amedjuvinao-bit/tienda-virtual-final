@@ -220,11 +220,12 @@ function Preview() {
                   page={draft}
                   catalogConfig={draft.catalogConfig}
                   theme={settings?.theme}
+                  footer={draft.useFooter !== false ? <FooterSection theme={settings?.theme} store={settings?.store} /> : null}
                 />
               ) : (
                 <DetailPreview draft={draft} />
               )}
-              {draft.useFooter !== false && <FooterSection />}
+              {draft.pageType !== "catalog" && draft.useFooter !== false && <FooterSection theme={settings?.theme} store={settings?.store} />}
             </div>
           </FavoritesContext.Provider>
         </CartContext.Provider>

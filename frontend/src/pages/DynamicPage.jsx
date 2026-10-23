@@ -355,9 +355,8 @@ export default function DynamicPage({ theme }) {
           page={page}
           catalogConfig={page?.catalogConfig || {}}
           theme={theme}
+          footer={page.useFooter !== false ? <FooterSection theme={theme} /> : null}
         />
-
-        {page.useFooter !== false && <FooterSection theme={theme} />}
       </div>
     );
   }

@@ -113,3 +113,7 @@
   background-repeat:no-repeat; background-attachment:fixed;
 }
 .cpv-page[data-background="continuity"]::before { display:none; }
+/* The footer shares the same canvas instead of painting a second scene. */
+.cpv-page[data-background="continuity"] > .cpv-footer { margin-top:auto; }
+.cpv-page[data-background="continuity"] > .cpv-footer footer { background:none !important; }
+.cpv-page[data-background="continuity"] > .cpv-footer .footer-ed::before { display:none; }
