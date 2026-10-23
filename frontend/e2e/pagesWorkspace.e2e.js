@@ -414,9 +414,9 @@ try {
       if (kind === "catalog" && device.id === "desktop") {
         await page.getByRole('button', { name: 'Diseño', exact: true }).click();
         await page.getByRole('button', { name: 'Estructura visual', exact: true, expanded: true }).waitFor();
-        await page.getByLabel('Forma del protagonista', { exact: true }).selectOption('rounded');
-        await frame.locator('.cpv-page[data-feature-shape="rounded"]').waitFor();
-        await page.getByLabel('Forma del protagonista', { exact: true }).selectOption('arch');
+        await page.getByLabel('Borde de las tarjetas', { exact: true }).selectOption('fine');
+        await frame.locator('.catalog-ecard[data-rim="fine"]').first().waitFor();
+        await page.getByLabel('Borde de las tarjetas', { exact: true }).selectOption('optical');
         await page.getByLabel('Tamaño del título de catálogo (px)', { exact: true }).fill('40');
         await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
         await page.getByLabel('Dirección de la imagen de fondo', { exact: true }).fill('/information/satin.webp');
@@ -611,7 +611,9 @@ try {
     await page.getByRole('heading', { name: 'Producto 1', exact: true }).waitFor();
     if (await page.locator('.cpv-product-item').count() !== 8) throw Error('Editorial dropped products');
     const featuredCount = await page.locator('.cpv-product-item--featured').count();
-    if (featuredCount !== (width >= 1100 ? 1 : 0)) throw Error('Incorrect responsive featured layout at ' + width);
+    if (featuredCount !== 0) throw Error('Conventional grid contains a featured frame');
+    if (await page.locator('.look-glass-rim').count() !== 8) throw Error('Homepage optical rims are missing');
+    await page.waitForFunction(() => document.querySelectorAll('.look-glass-rim svg').length === 8);
     if (!(await page.locator('.cpv-title').evaluate(node => getComputedStyle(node).fontFamily)).includes('Georgia')) throw Error('Editorial typography not applied');
     const refined = await page.locator('.catalog-ecard').first().evaluate(node => ({ border:getComputedStyle(node).borderTopWidth, padding:getComputedStyle(node).paddingTop, title:node.style.getPropertyValue('--ecard-title') }));
     if (refined.border !== '1px' || refined.padding !== '0px' || refined.title !== '#562633') throw Error('Legacy styles still contaminate the editorial design');
@@ -621,6 +623,7 @@ try {
     }));
     if (collision) throw Error('Editorial controls collide with product details');
     const geometry = await page.locator('.cpv-product-item').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+    if (geometry.some(box => Math.abs(box.width - geometry[0].width) > 1)) throw Error('Catalog columns are not uniform');
     for (let i = 0; i < geometry.length; i++) for (let j = i + 1; j < geometry.length; j++) {
       const a = geometry[i], b = geometry[j];
       if (Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1) throw Error('Editorial product overlap at ' + width);

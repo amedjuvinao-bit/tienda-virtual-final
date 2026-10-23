@@ -4,8 +4,8 @@ import { buildCatalogPresentation, catalogImageUrl, catalogPresentationStyle } f
 
 describe('presentación editorial compartida', () => {
   it('conserva ajustes guardados y limita valores inválidos sin perder el cero', () => {
-    const config = buildSafeCatalogConfig({ presentation: { styleVersion: 2, glassOpacity: 0, backgroundOpacity: 0, glassBlur: 100, gap: -1, motion: 'invalid', titleSize: 38, backgroundImage: '', featuredEnabled: false }, cardUiConfig: { titleColor: '#123456', cardPaddingPx: 7 } });
-    expect(config.presentation).toMatchObject({ glassOpacity: 0, backgroundOpacity: 0, glassBlur: 32, gap: 8, motion: 'parallax', backgroundImage: '', featuredEnabled: false });
+    const config = buildSafeCatalogConfig({ presentation: { styleVersion: 2, glassOpacity: 0, backgroundOpacity: 0, glassBlur: 100, gap: -1, motion: 'invalid', titleSize: 38, backgroundImage: '', rimStyle: "none" }, cardUiConfig: { titleColor: '#123456', cardPaddingPx: 7 } });
+    expect(config.presentation).toMatchObject({ glassOpacity: 0, backgroundOpacity: 0, glassBlur: 32, gap: 8, motion: 'parallax', backgroundImage: '', rimStyle: "none" });
     expect(config.cardUiConfig).toMatchObject({ titleColor: '#123456', cardPaddingPx: 7 });
     expect(buildSafeCatalogConfig(config)).toEqual(config);
     expect(catalogPresentationStyle(config.presentation)['--catalog-backdrop']).toBe('none');

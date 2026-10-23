@@ -6,13 +6,13 @@ import { catalogImageUrl } from '../../../components/catalog/catalogPresentation
 const fieldClass = 'w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800';
 const groups = [
   { title: 'Composición', fields: [
-    ['layout', 'Composición del catálogo', [['editorial', 'Editorial con profundidad'], ['grid', 'Cuadrícula clásica']]],
+    ['layout', 'Composición del catálogo', [['glass-grid', 'Cuadrícula con cristal'], ['grid', 'Cuadrícula clásica']]],
     ['showPhotoCount', 'Mostrar cantidad de fotos', 'boolean'],
     ['filterSectionBorders', 'Separar filtros en paneles con borde', 'boolean'],
-    ['featuredEnabled', 'Destacar el primer resultado', 'boolean'],
-    ['featuredShape', 'Forma del protagonista', [['arch', 'Arco'], ['rounded', 'Esquinas de la tarjeta'], ['square', 'Rectangular']]],
-    ['featuredFit', 'Encuadre del protagonista', [['cover', 'Cubrir el espacio'], ['contain', 'Mostrar imagen completa']]],
-    ['featuredPosition', 'Posición vertical de la foto (%)', [0, 100, 1]],
+    ['rimStyle', 'Borde de las tarjetas', [['optical', 'Cristal óptico de Inicio'], ['fine', 'Línea fina'], ['none', 'Sin borde']]],
+    ['rimColor', 'Reflejo del borde de cristal', 'color'],
+    ['rimOpacity', 'Intensidad del borde de cristal (0 a 1)', [0, 1, .05]],
+    ['imageRatio', 'Proporción de las fotografías', [['square', 'Cuadrada'], ['portrait', 'Vertical'], ['landscape', 'Horizontal']]],
     ['maxWidth', 'Ancho máximo de la escena (px)', [960, 1920, 10]],
     ['topSpacing', 'Espacio superior bajo el encabezado (px)', [0, 240, 1]],
     ['gap', 'Separación entre productos (px)', [8, 48, 1]],
@@ -63,7 +63,7 @@ export default function CatalogPresentationControls({ value, onChange }) {
     finally { setUploading(false); }
   }
   return <div className="mt-6 space-y-6 border-t border-gray-200 pt-5">
-    <p className="text-sm text-gray-600">La vista previa usa estos mismos ajustes. El protagonista es el primer resultado visible: respeta la búsqueda, los filtros, el orden y la paginación. Se amplía en escritorio con al menos cinco resultados y tres columnas; en móvil se conserva una cuadrícula fácil de recorrer.</p>
+    <p className="text-sm text-gray-600">Todos los productos comparten una cuadrícula uniforme. Los bordes ópticos usan el mismo acabado de Inicio y se adaptan al tamaño de cada tarjeta. El fondo puede funcionar únicamente con color; la imagen es opcional.</p>
     {groups.map(group => <fieldset key={group.title} className="min-w-0">
       <legend className="mb-3 text-sm font-semibold text-gray-800">{group.title}</legend>
       <div className="grid gap-3 md:grid-cols-2">{group.fields.map(([key, label, type]) => <label key={key} className={`block min-w-0 text-sm text-gray-700 ${type === 'boolean' ? 'flex items-center justify-between gap-3 rounded-xl border p-3' : ''}`}>

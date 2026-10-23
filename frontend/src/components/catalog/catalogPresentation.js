@@ -12,12 +12,12 @@ export function catalogImageUrl(value) {
 export function buildCatalogPresentation(raw = {}) {
   const cfg = raw && typeof raw === 'object' ? raw : {};
   return {
-    styleVersion: number(cfg.styleVersion, 0, 2, 0),
+    styleVersion: number(cfg.styleVersion, 0, 3, 0),
     showPhotoCount: cfg.showPhotoCount === true,
     filterSectionBorders: cfg.filterSectionBorders === true,
-    layout: cfg.layout === 'grid' ? 'grid' : 'editorial',
+    layout: cfg.layout === 'grid' ? 'grid' : 'glass-grid',
     backgroundColor: color(cfg.backgroundColor, '#f8ece7'),
-    backgroundImage: catalogImageUrl(cfg.backgroundImage ?? '/instagram/editorial-satin.webp'),
+    backgroundImage: catalogImageUrl(cfg.backgroundImage ?? ''),
     backgroundOpacity: number(cfg.backgroundOpacity, 0, 1, .32),
     textColor: color(cfg.textColor, '#562633'),
     accentColor: color(cfg.accentColor, '#984d62'),
@@ -30,10 +30,10 @@ export function buildCatalogPresentation(raw = {}) {
     topSpacing: number(cfg.topSpacing, 0, 240, 106),
     titleSize: number(cfg.titleSize, 24, 80, 44),
     titleFont: ['inherit', 'serif', 'sans'].includes(cfg.titleFont) ? cfg.titleFont : 'serif',
-    featuredEnabled: cfg.featuredEnabled !== false,
-    featuredShape: ['arch', 'rounded', 'square'].includes(cfg.featuredShape) ? cfg.featuredShape : 'arch',
-    featuredFit: cfg.featuredFit === 'contain' ? 'contain' : 'cover',
-    featuredPosition: number(cfg.featuredPosition, 0, 100, 35),
+    rimStyle: ['optical', 'fine', 'none'].includes(cfg.rimStyle) ? cfg.rimStyle : 'optical',
+    rimColor: color(cfg.rimColor, '#984d62'),
+    rimOpacity: number(cfg.rimOpacity, 0, 1, .9),
+    imageRatio: ['square', 'portrait', 'landscape'].includes(cfg.imageRatio) ? cfg.imageRatio : 'square',
     cardTitleSize: number(cfg.cardTitleSize, 11, 24, 15),
     cardPriceSize: number(cfg.cardPriceSize, 11, 24, 15),
     showDescription: cfg.showDescription === true,
@@ -61,7 +61,6 @@ export function catalogPresentationStyle(config) {
     '--catalog-title-font': font[config.titleFont],
     '--catalog-card-title': `${config.cardTitleSize}px`,
     '--catalog-card-price': `${config.cardPriceSize}px`,
-    '--catalog-feature-fit': config.featuredFit,
-    '--catalog-feature-position': `center ${config.featuredPosition}%`,
+    '--catalog-image-ratio': { square: '1 / 1', portrait: '4 / 5', landscape: '4 / 3' }[config.imageRatio],
   };
 }

@@ -1,6 +1,6 @@
 import { buildCatalogPresentation } from './catalogPresentation';
 
-export const EDITORIAL_STYLE_VERSION = 2;
+export const EDITORIAL_STYLE_VERSION = 3;
 
 // Upgrade the visual settings together, once. Subsequent individual edits remain authoritative.
 // Keep the earlier settings recoverable; no products, text, source or query options are changed.
@@ -13,11 +13,11 @@ export function applyCatalogEditorialPreset(raw = {}) {
       cardUiConfig: raw.cardUiConfig || {}, filterUiConfig: raw.filterUiConfig || {},
       columnControlsUiConfig: raw.columnControlsUiConfig || {}, presentation: raw.presentation || {},
     } : null),
-    presentation: { ...presentation, layout: 'editorial', styleVersion: EDITORIAL_STYLE_VERSION, showOptions: false, filterSectionBorders: false },
+    presentation: { ...presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, showOptions: false, filterSectionBorders: false },
     cardUiConfig: {
       ...raw.cardUiConfig, cardBg: glass, cardBorderColor: '#ffffff', cardBorderWidthPx: 1,
       cardRadiusPx: 16, cardPaddingPx: 0, cardShadowStyle: 'soft', showBorder: true, showShadow: true,
-      imageRadiusPx: 0, showImageBg: false, imageFit: 'cover', titleColor: ink, priceColor: ink,
+      imageRadiusPx: 12, showImageBg: true, imageBg: glass, imageFit: 'contain', titleColor: ink, priceColor: ink,
       oldPriceColor: '#987e82', metaColor: '#987e82', titleFontFamily: 'cormorant', priceFontFamily: 'jost',
       favoriteIconName: 'heart', cartIconName: 'shopping-bag', favoriteIconColor: accent, favoriteActiveColor: accent, cartIconColor: accent,
       favoriteButtonBg: glass, cartButtonBg: glass, favoriteButtonOpacity: .85, cartButtonOpacity: .85,
@@ -40,8 +40,11 @@ export function applyCatalogEditorialPreset(raw = {}) {
 }
 export function prepareCatalogEditorialConfig(raw) {
   const presentation = buildCatalogPresentation(raw.presentation);
-  return presentation.layout === 'editorial' && presentation.styleVersion < EDITORIAL_STYLE_VERSION
-    ? applyCatalogEditorialPreset(raw) : raw;
+  if (presentation.layout !== 'glass-grid' || presentation.styleVersion >= EDITORIAL_STYLE_VERSION) return raw;
+  const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
+  const current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(raw) : raw;
+  return { ...current, presentation: { ...presentation, ...current.presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage }, cardUiConfig: { ...current.cardUiConfig, imageFit: 'contain' } };
+
 }
 export function restoreCatalogVisualBackup(config) {
   if (!config.visualBackup) return config;

@@ -6,12 +6,13 @@ import { useFavorites } from '../../context/FavoritesContext';
 import { buildCatalogCartIntent } from '../ProductCard';
 import { normalizeToCss } from './catalogColors';
 import './catalogEditorialCard.css';
+import LookGlassRim from '../LookGlassRim';
 
 const fonts = { cormorant: '"Catalog Editorial", Georgia, serif', playfair: '"Catalog Editorial", Georgia, serif', jost: 'Jost, system-ui, sans-serif', inter: 'Inter, system-ui, sans-serif' };
 const shadows = { none: 'none', soft: '0 8px 24px #5626330c', medium: '0 12px 28px #5626331c', strong: '0 18px 40px #5626332c' };
 const money = value => Number(value || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-export default function CatalogEditorialCard({ product, config, featured = false }) {
+export default function CatalogEditorialCard({ product, config }) {
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
   const navigate = useNavigate();
@@ -34,8 +35,10 @@ export default function CatalogEditorialCard({ product, config, featured = false
     '--ecard-radius': `${card.cardRadiusPx}px`, '--ecard-padding': `${card.cardPaddingPx}px`,
     '--ecard-shadow': card.showShadow ? shadows[card.cardShadowStyle] : 'none',
     '--ecard-image-radius': `${card.imageRadiusPx}px`, '--ecard-image-bg': card.showImageBg ? card.imageBg : 'transparent',
-    '--ecard-image-fit': featured ? presentation.featuredFit : card.imageFit,
-    '--ecard-image-position': featured ? `center ${presentation.featuredPosition}%` : 'center',
+    '--ecard-image-fit': card.imageFit,
+    '--ecard-image-position': 'center',
+    '--look-accent': presentation.rimColor,
+    '--catalog-rim-opacity': presentation.rimOpacity,
     '--ecard-title': card.titleColor, '--ecard-price': card.priceColor, '--ecard-meta': card.metaColor,
     '--ecard-title-font': fonts[card.titleFontFamily] || 'inherit', '--ecard-price-font': fonts[card.priceFontFamily] || 'inherit',
     '--ecard-favorite-bg': card.favoriteButtonBg, '--ecard-favorite-fill': `${card.favoriteButtonOpacity * 100}%`,
@@ -43,12 +46,14 @@ export default function CatalogEditorialCard({ product, config, featured = false
     '--ecard-action-border': card.actionButtonBorderColor, '--ecard-action-border-width': `${card.actionButtonBorderWidthPx}px`,
   };
   const favorite = <button type="button" className="catalog-ecard__favorite" aria-label="Favorito" aria-pressed={selected} onClick={() => toggleFavorite(product)} style={{ color: selected ? card.favoriteActiveColor : card.favoriteIconColor }}><Favorite size={17} strokeWidth={1.5} fill={selected && card.favoriteIconName !== 'sparkles' ? 'currentColor' : 'none'}/></button>;
-  return <article className={`catalog-ecard ${featured ? 'catalog-ecard--featured' : ''}`} style={style}>
+  return <article className="catalog-ecard" data-rim={card.showBorder ? presentation.rimStyle : 'none'} style={style}>
+    {card.showBorder && presentation.rimStyle === 'optical' && <LookGlassRim variant="card" radius={card.cardRadiusPx}/>}
+
     <div className="catalog-ecard__photo">
       <Link className="catalog-ecard__photo-link" to={destination} aria-label={`Ver ${product.title}`}>
-        <img src={cover} alt={product.title || ''} loading={featured ? 'eager' : 'lazy'} decoding="async" onError={() => { if (!failedImage) setFailedImage(true); }}/>
+        <img src={cover} alt={product.title || ''} loading="lazy" decoding="async" onError={() => { if (!failedImage) setFailedImage(true); }}/>
       </Link>
-      {!featured && favorite}
+      {favorite}
     </div>
     {intent.unavailable && <span className="catalog-ecard__availability">{product.active === false ? 'Inactivo' : 'Agotado'}</span>}
     <footer className="catalog-ecard__footer">
@@ -63,7 +68,6 @@ export default function CatalogEditorialCard({ product, config, featured = false
         {presentation.showPhotoCount && count > 1 && <span className="catalog-ecard__photo-count"><Images size={11}/>{count} fotos</span>}
       </div>
       <div className="catalog-ecard__actions">
-        {featured && favorite}
         <button type="button" className="catalog-ecard__cart" aria-label={action} title={action} disabled={intent.unavailable} style={{ color: card.cartIconColor }} onClick={() => { if (intent.unavailable) return; if (intent.requiresSelection) navigate(destination); else addToCart(intent.payload); }}><Cart size={17} strokeWidth={1.5}/>{card.cartIconName === 'bag-heart' && <Heart size={8} className="catalog-ecard__bag-heart"/>}</button>
       </div>
     </footer>

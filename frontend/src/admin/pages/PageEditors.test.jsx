@@ -217,11 +217,11 @@ it("guarda descubrimiento, filtros, tarjetas y columnas del catálogo con el mis
   await user.click(screen.getByRole('button', { name: 'Diseño', exact: true }));
   await user.click(screen.getByLabelText('Mostrar búsqueda de productos'));
   await user.selectOptions(screen.getByLabelText('Orden inicial'), 'price');
-  await user.selectOptions(screen.getByLabelText('Forma del protagonista'), 'rounded');
+  await user.selectOptions(screen.getByLabelText('Borde de las tarjetas'), 'fine');
   fireEvent.change(screen.getByLabelText('Tamaño del título de catálogo (px)'), { target: { value: '38' } });
   fireEvent.change(screen.getByLabelText('Dirección de la imagen de fondo'), { target: { value: 'https://example.test/scene.webp' } });
   await user.selectOptions(screen.getByLabelText('Movimiento de la escena'), 'none');
-  expect(JSON.parse(screen.getByTestId('live-draft').textContent).catalogConfig.presentation).toMatchObject({ featuredShape: 'rounded', titleSize: 38, motion: 'none', backgroundImage: 'https://example.test/scene.webp' });
+  expect(JSON.parse(screen.getByTestId('live-draft').textContent).catalogConfig.presentation).toMatchObject({ rimStyle: 'fine', titleSize: 38, motion: 'none', backgroundImage: 'https://example.test/scene.webp' });
   await user.click(screen.getByRole('button', { name: 'Estilo del filtro', exact: true }));
   await user.click(screen.getByRole('button', { name: 'Estilo profesional del filtro', exact: true }));
   fireEvent.change(screen.getByRole('textbox', { name: 'Fondo del panel', exact: true }), { target: { value: '#123456' } });
@@ -233,5 +233,5 @@ it("guarda descubrimiento, filtros, tarjetas y columnas del catálogo con el mis
   fireEvent.change(screen.getByRole('textbox', { name: 'Fondo botón normal', exact: true }), { target: { value: '#abcdef' } });
   await user.click(screen.getByRole('button', { name: 'Guardar cambios', exact: true }));
   await screen.findByText('Cambios guardados. La página pública ya usa esta configuración.');
-  expect(lastPayload.catalogConfig).toMatchObject({ presentation: { featuredShape: 'rounded', titleSize: 38, motion: 'none', backgroundImage: 'https://example.test/scene.webp' }, showSearch: false, defaultSort: 'price', filterUiConfig: { panelBg: '#123456' }, cardUiConfig: { cardBg: '#654321' }, columnControlsUiConfig: { buttonBgColor: '#abcdef' } });
+  expect(lastPayload.catalogConfig).toMatchObject({ presentation: { rimStyle: 'fine', titleSize: 38, motion: 'none', backgroundImage: 'https://example.test/scene.webp' }, showSearch: false, defaultSort: 'price', filterUiConfig: { panelBg: '#123456' }, cardUiConfig: { cardBg: '#654321' }, columnControlsUiConfig: { buttonBgColor: '#abcdef' } });
 });

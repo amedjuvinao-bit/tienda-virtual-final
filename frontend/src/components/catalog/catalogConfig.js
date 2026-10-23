@@ -335,7 +335,7 @@ function buildSafeCatalogConfig(raw) {
         ? cfg.emptyText
         : "Intenta cambiar los filtros para ver más resultados.",
     filterUiConfig: buildSafeFilterUiConfig({
-      ...(presentation.layout === 'editorial' ? {
+      ...(presentation.layout === 'glass-grid' ? {
         panelBg: presentation.glassColor, panelBorderColor: '#ffffff', panelTitleColor: presentation.textColor,
         sectionHeaderBg: presentation.glassColor, sectionHeaderTextColor: presentation.textColor,
         accentColor: presentation.accentColor, accentColor2: presentation.accentColor,
@@ -344,7 +344,7 @@ function buildSafeCatalogConfig(raw) {
       ...cfg.filterUiConfig,
     }),
     cardUiConfig: buildSafeCardUiConfig({
-      ...(presentation.layout === 'editorial' ? {
+      ...(presentation.layout === 'glass-grid' ? {
         cardBg: presentation.glassColor, cardBorderColor: '#ffffff', cardRadiusPx: 18, cardPaddingPx: 0,
         imageRadiusPx: 0, titleColor: presentation.textColor, priceColor: presentation.textColor,
         cartIconColor: presentation.accentColor, favoriteIconColor: presentation.accentColor,
@@ -353,7 +353,7 @@ function buildSafeCatalogConfig(raw) {
       ...cfg.cardUiConfig,
     }),
     columnControlsUiConfig: buildSafeColumnControlsUiConfig(
-      { ...(presentation.layout === 'editorial' ? {
+      { ...(presentation.layout === 'glass-grid' ? {
         buttonBgColor: presentation.glassColor, buttonBorderColor: '#ffffff', buttonIconColor: presentation.accentColor,
         activeButtonBorderColor: presentation.accentColor, activeButtonIconColor: presentation.accentColor,
         hoverButtonIconColor: presentation.accentColor, hoverButtonBorderColor: presentation.accentColor,

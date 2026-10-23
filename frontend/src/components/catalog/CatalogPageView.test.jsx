@@ -235,18 +235,19 @@ describe("catálogo conectado", () => {
 });
 
 
-it('destaca únicamente el primer resultado real sin duplicar ni alterar el orden y permite desactivarlo', async () => {
+it('presenta todos los resultados en una cuadrícula sin destacar ninguno y permite configurar los bordes', async () => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
   fetch.mockResolvedValue(response(result(1, Array.from({ length: 6 }, (_, i) => ({ ...product, _id: `p${i}`, title: `Artículo ${i}` })))));
-  const rendered = mount({ showFilters: false, presentation: { featuredEnabled: true, featuredShape: 'rounded', motion: 'none', titleSize: 38 } });
+  const rendered = mount({ showFilters: false, presentation: { rimStyle: 'optical', motion: 'none', titleSize: 38 } });
   await screen.findByText('Artículo 0');
   const items = [...rendered.container.querySelectorAll('.cpv-product-item')];
   expect(items).toHaveLength(6);
   expect(items.map(item => item.querySelector('h3').textContent)).toEqual(Array.from({ length: 6 }, (_, i) => `Artículo ${i}`));
-  expect(items[0]).toHaveClass('cpv-product-item--featured');
+  expect(items.every(item => item.className === 'cpv-product-item')).toBe(true);
+  expect(rendered.container.querySelectorAll('.look-glass-rim')).toHaveLength(6);
   expect(rendered.container.querySelector('.cpv-page')).toHaveAttribute('data-motion', 'none');
   rendered.unmount();
-  mount({ showFilters: false, presentation: { featuredEnabled: false } });
+  mount({ showFilters: false, presentation: { rimStyle: 'none' } });
   await screen.findByText('Artículo 0');
-  expect(document.querySelector('.cpv-product-item--featured')).toBeNull();
+  expect(document.querySelector('.look-glass-rim')).toBeNull();
 });

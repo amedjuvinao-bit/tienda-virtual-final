@@ -10,7 +10,7 @@ export default function useCatalogDepth(config) {
     const update = () => {
       frame = undefined;
       if (!node) return;
-      const allowed = config.layout === 'editorial' && config.motion === 'parallax' && !media?.matches && window.innerWidth >= 768;
+      const allowed = config.layout === 'glass-grid' && config.motion === 'parallax' && !media?.matches && window.innerWidth >= 768;
       const offset = allowed ? Math.max(-1, Math.min(1, -node.getBoundingClientRect().top / window.innerHeight)) * config.motionStrength : 0;
       node.style.setProperty('--catalog-depth', `${offset}px`);
     };

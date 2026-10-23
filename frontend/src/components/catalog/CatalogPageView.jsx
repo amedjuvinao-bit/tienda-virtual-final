@@ -114,9 +114,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
   const effectiveCols = cols;
   const renderedCols = effectiveCols;
 
-  const editorial = presentation.layout === "editorial";
-  // Feature only the first result in its original server order. Never inject an unrelated product.
-  const hasFeatured = editorial && presentation.featuredEnabled && renderedCols >= 3 && viewportWidth >= 1100 && filteredProducts.length >= 5;
+  const editorial = presentation.layout === "glass-grid";
   const gridStyle = {
     "--catalog-columns": renderedCols,
     gap: isMobile ? "14px" : renderedCols === 1 ? "18px" : "22px",
@@ -193,7 +191,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
 
   return (
     <>
-      <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-motion={presentation.motion} data-feature-shape={presentation.featuredShape} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial ? catalogPresentationStyle(presentation) : undefined}>
+      <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial ? catalogPresentationStyle(presentation) : undefined}>
         <div className="cpv-shell">
           {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}/></div>}
           <div className="cpv-main-grid">
@@ -392,7 +390,6 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
               <div
                 className={`cpv-grid ${colClasses[renderedCols] || colClasses[4]}`}
                 style={gridStyle}
-                data-featured={hasFeatured}
                 data-columns={renderedCols}
                 aria-busy={productsLoading}
                 aria-label="Productos del catálogo"
@@ -423,12 +420,12 @@ export default function CatalogPageView({ page = null, catalogConfig = {} }) {
                   filteredProducts.map((product, idx) => (
                     <div
                       key={product._id}
-                      className={`cpv-product-item ${hasFeatured && idx === 0 ? "cpv-product-item--featured" : ""}`}
+                      className="cpv-product-item"
                       style={{
                         animationDelay: `${Math.min(idx * 45, 420)}ms`,
                       }}
                     >
-                      {editorial ? <CatalogEditorialCard product={product} config={safeConfig} featured={hasFeatured && idx === 0}/> : <ProductCard product={product} cols={renderedCols} cardUiConfig={safeConfig.cardUiConfig}/>}
+                      {editorial ? <CatalogEditorialCard product={product} config={safeConfig}/> : <ProductCard product={product} cols={renderedCols} cardUiConfig={safeConfig.cardUiConfig}/>}
 
                     </div>
                   ))
