@@ -1,3 +1,4 @@
+import { buildCatalogPresentation } from "./catalogPresentation";
 function clampInt(value, min, max, fallback) {
   const n = Number.parseInt(value, 10);
   if (!Number.isFinite(n)) return fallback;
@@ -245,8 +246,10 @@ function buildSafeColumnControlsUiConfig(raw) {
 
 function buildSafeCatalogConfig(raw) {
   const cfg = raw && typeof raw === "object" ? raw : {};
+  const presentation = buildCatalogPresentation(cfg.presentation);
 
   return {
+    presentation,
     title: typeof cfg.title === "string" ? cfg.title : "",
     subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : "",
     description: typeof cfg.description === "string" ? cfg.description : "",
@@ -329,10 +332,30 @@ function buildSafeCatalogConfig(raw) {
       typeof cfg.emptyText === "string" && cfg.emptyText.trim()
         ? cfg.emptyText
         : "Intenta cambiar los filtros para ver más resultados.",
-    filterUiConfig: buildSafeFilterUiConfig(cfg.filterUiConfig),
-    cardUiConfig: buildSafeCardUiConfig(cfg.cardUiConfig),
+    filterUiConfig: buildSafeFilterUiConfig({
+      ...(presentation.layout === 'editorial' ? {
+        panelBg: presentation.glassColor, panelBorderColor: '#ffffff', panelTitleColor: presentation.textColor,
+        sectionHeaderBg: presentation.glassColor, sectionHeaderTextColor: presentation.textColor,
+        accentColor: presentation.accentColor, accentColor2: presentation.accentColor,
+        chipTextColor: presentation.textColor, sectionTitleSizePx: 15, contentTextSizePx: 12,
+      } : {}),
+      ...cfg.filterUiConfig,
+    }),
+    cardUiConfig: buildSafeCardUiConfig({
+      ...(presentation.layout === 'editorial' ? {
+        cardBg: presentation.glassColor, cardBorderColor: '#ffffff', cardRadiusPx: 18, cardPaddingPx: 0,
+        imageRadiusPx: 0, titleColor: presentation.textColor, priceColor: presentation.textColor,
+        cartIconColor: presentation.accentColor, favoriteIconColor: presentation.accentColor,
+        favoriteActiveColor: presentation.accentColor, favoriteIconName: 'heart', cartIconName: 'shopping-bag',
+      } : {}),
+      ...cfg.cardUiConfig,
+    }),
     columnControlsUiConfig: buildSafeColumnControlsUiConfig(
-      cfg.columnControlsUiConfig,
+      { ...(presentation.layout === 'editorial' ? {
+        buttonBgColor: presentation.glassColor, buttonBorderColor: '#ffffff', buttonIconColor: presentation.accentColor,
+        activeButtonBorderColor: presentation.accentColor, activeButtonIconColor: presentation.accentColor,
+        hoverButtonIconColor: presentation.accentColor, hoverButtonBorderColor: presentation.accentColor,
+      } : {}), ...cfg.columnControlsUiConfig },
     ),
   };
 }

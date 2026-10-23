@@ -234,3 +234,20 @@ describe("catálogo conectado", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+
+it('destaca únicamente el primer resultado real sin duplicar ni alterar el orden y permite desactivarlo', async () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
+  fetch.mockResolvedValue(response(result(1, Array.from({ length: 6 }, (_, i) => ({ ...product, _id: `p${i}`, title: `Artículo ${i}` })))));
+  const rendered = mount({ showFilters: false, presentation: { featuredEnabled: true, featuredShape: 'rounded', motion: 'none', titleSize: 38 } });
+  await screen.findByText('Artículo 0');
+  const items = [...rendered.container.querySelectorAll('.cpv-product-item')];
+  expect(items).toHaveLength(6);
+  expect(items.map(item => item.querySelector('h3').textContent)).toEqual(Array.from({ length: 6 }, (_, i) => `Artículo ${i}`));
+  expect(items[0]).toHaveClass('cpv-product-item--featured');
+  expect(rendered.container.querySelector('.cpv-page')).toHaveAttribute('data-motion', 'none');
+  rendered.unmount();
+  mount({ showFilters: false, presentation: { featuredEnabled: false } });
+  await screen.findByText('Artículo 0');
+  expect(document.querySelector('.cpv-product-item--featured')).toBeNull();
+});

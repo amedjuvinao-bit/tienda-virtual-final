@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import PageLoadState from "./workspace/PageLoadState";
 import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
 import SectionCard from "./workspace/EditorSection";
+import CatalogPresentationControls from "./workspace/CatalogPresentationControls";
 import usePageDraft from "./workspace/usePageDraft";
 import { buildSafeCatalogConfig, buildSafeCardUiConfig, buildSafeFilterUiConfig, buildSafeColumnControlsUiConfig } from '../../components/catalog/catalogConfig';
 import { API_BASE_URL } from "../../config/apiBaseUrl";
@@ -1339,6 +1340,7 @@ export default function CatalogPageEditor() {
                   }
                 />
               </div>
+              <CatalogPresentationControls value={form.catalogConfig.presentation} onChange={patch => setForm(prev => ({ ...prev, catalogConfig: { ...prev.catalogConfig, presentation: { ...prev.catalogConfig.presentation, ...patch } } }))}/>
             </SectionCard>
           )}
 

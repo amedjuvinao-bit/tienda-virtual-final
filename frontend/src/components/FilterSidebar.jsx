@@ -161,7 +161,7 @@ function FilterSection({
 }) {
   return (
     <div
-      className={`overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
+      className={`catalog-filter-section overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
       style={{
         borderRadius: `${isMobile ? Math.max(ui.sectionRadiusPx - 2, 16) : ui.sectionRadiusPx}px`,
         border: `${ui.borderWidthPx}px solid ${hexToRgba(ui.panelBorderColor, 0.95)}`,
@@ -360,8 +360,11 @@ export default function FilterSidebar({
 
   return (
     <div
-      className={`space-y-4 sm:space-y-5 ${ui.stickyHeader ? "md:sticky md:top-24" : ""}`}
+      data-presentation={catalogConfig?.presentation?.layout}
+      className={`catalog-filters space-y-4 sm:space-y-5 ${ui.stickyHeader ? "md:sticky md:top-24" : ""}`}
       style={{
+        '--catalog-filter-bg': ui.panelBg,
+        '--catalog-filter-shadow': { none: 'none', soft: '0 4px 14px #56263308', medium: '0 8px 22px #56263314', strong: '0 12px 30px #56263324' }[ui.shadowStyle],
         gap: `${isMobile ? Math.max(ui.sectionGapPx - 6, 12) : ui.sectionGapPx}px`,
       }}
     >
@@ -374,7 +377,7 @@ export default function FilterSidebar({
         </p>
       )}
       <div
-        className={`overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
+        className={`catalog-filter-intro overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
         style={{
           borderRadius: `${isMobile ? Math.max(ui.radiusPx - 2, 20) : ui.radiusPx}px`,
           border: `${ui.borderWidthPx}px solid ${hexToRgba(ui.panelBorderColor, 0.95)}`,

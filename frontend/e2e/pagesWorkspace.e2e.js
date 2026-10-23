@@ -100,7 +100,7 @@ const products = Array.from({ length: 8 }, (_, i) => ({
     },
   ],
 }));
-const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import PublicCatalog from'/src/components/catalog/CatalogPageView.jsx';import{CartContext}from'/src/context/CartContext.jsx';import{FavoritesContext}from'/src/context/FavoritesContext.jsx';function PublicAudit(){return <CartContext.Provider value={{cart:[],totalItems:0,subtotal:0,addToCart:p=>window.__catalogCart=p}}><FavoritesContext.Provider value={{favorites:[],isFavorite:()=>false,toggleFavorite:p=>window.__catalogFavorite=p}}><PublicCatalog catalogConfig={{limit:2,sourceMode:'categories',allowedCategoriesText:'Destacados',showHeroBadge:false,initialMaxPrice:300000}}/></FavoritesContext.Provider></CartContext.Provider>}import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/catalog-audit' element={<PublicAudit/>}/><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
+const fixture = `import React from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import AdminLayout from'/src/admin/AdminLayout.jsx';import PagesAdmin from'/src/admin/pages/PagesAdmin.jsx';import Catalog from'/src/admin/pages/CatalogPageEditor.jsx';import Detail from'/src/admin/pages/ProductDetailPageEditor.jsx';import Page from'/src/admin/pages/PageEditor.jsx';import PublicCatalog from'/src/components/catalog/CatalogPageView.jsx';import{CartContext}from'/src/context/CartContext.jsx';import{FavoritesContext}from'/src/context/FavoritesContext.jsx';function PublicAudit({editorial=false}){return <CartContext.Provider value={{cart:[],totalItems:0,subtotal:0,addToCart:p=>window.__catalogCart=p}}><FavoritesContext.Provider value={{favorites:[],isFavorite:()=>false,toggleFavorite:p=>window.__catalogFavorite=p}}><PublicCatalog catalogConfig={{limit:editorial?8:2,sourceMode:'categories',allowedCategoriesText:'Destacados',showHeroBadge:false,initialMaxPrice:300000}}/></FavoritesContext.Provider></CartContext.Provider>}import'/src/index.css';import{installPageDraftNavigationGuard}from'/src/admin/pages/workspace/pageDraftNavigationGuard.js';installPageDraftNavigationGuard();createRoot(document.getElementById('root')).render(<BrowserRouter><Routes><Route path='/catalog-audit' element={<PublicAudit/>}/><Route path='/catalog-editorial-audit' element={<PublicAudit editorial/>}/><Route path='/admin' element={<AdminLayout initialSettings={${JSON.stringify(settings)}}/>}><Route path='paginas' element={<PagesAdmin/>}/><Route path='catalogo/:id' element={<Catalog/>}/><Route path='product-detail/:id' element={<Detail/>}/><Route path='paginas/:id' element={<Page/>}/></Route></Routes></BrowserRouter>);`;
 const server = await createServer({
   root,
   cacheDir: "/tmp/pages-ui-vite-cache",
@@ -126,7 +126,7 @@ const server = await createServer({
         s.middlewares.use(async (req, res, next) => {
           if (
             !req.url.split("?")[0].startsWith("/admin/") &&
-            !req.url.startsWith("/catalog-audit")
+            !req.url.startsWith("/catalog-")
           )
             return next();
           res.setHeader("Content-Type", "text/html");
@@ -410,6 +410,20 @@ try {
         .getByText(publicTitle, { exact: true })
         .first()
         .waitFor({ timeout: 12000 });
+      if (kind === "catalog" && device.id === "desktop") {
+        await page.getByRole('button', { name: 'Diseño', exact: true }).click();
+        await page.getByRole('button', { name: 'Estructura visual', exact: true, expanded: true }).waitFor();
+        await page.getByLabel('Forma del protagonista', { exact: true }).selectOption('rounded');
+        await frame.locator('.cpv-page[data-feature-shape="rounded"]').waitFor();
+        await page.getByLabel('Forma del protagonista', { exact: true }).selectOption('arch');
+        await page.getByLabel('Tamaño del título de catálogo (px)', { exact: true }).fill('40');
+        await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
+        await page.getByLabel('Dirección de la imagen de fondo', { exact: true }).fill('/information/satin.webp');
+        await page.waitForFunction(() => {
+          const node = document.querySelector('iframe')?.contentDocument?.querySelector('.cpv-page');
+          return node?.style.getPropertyValue('--catalog-title-size') === '40px' && node?.style.getPropertyValue('--catalog-glass-fill') === '45%' && node?.style.getPropertyValue('--catalog-backdrop').includes('/information/satin.webp');
+        });
+      }
       if (kind === "detail") {
         const count = writes.length;
         await frame
@@ -445,6 +459,12 @@ try {
           : payload.productDetailConfig.titleOverride) !== publicTitle
       )
         throw Error("Draft omitted from save");
+      if (kind === 'catalog' && device.id === 'desktop') {
+        if (payload.catalogConfig.presentation.titleSize !== 40 || payload.catalogConfig.presentation.glassOpacity !== .45) throw Error('Editorial controls omitted from save');
+        await page.reload();
+        await frame.getByText(publicTitle, { exact: true }).first().waitFor();
+        if (!(await frame.locator('.cpv-page').getAttribute('style')).includes('--catalog-glass-fill: 45%')) throw Error('Editorial style did not persist after reload');
+      }
       console.log(
         JSON.stringify({
           device: device.id,
@@ -583,6 +603,33 @@ try {
         colors: true,
       }),
     );
+  }
+  for (const width of [1440, 1100, 1024, 880, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto('http://127.0.0.1:5205/catalog-editorial-audit');
+    await page.getByRole('heading', { name: 'Producto 1', exact: true }).waitFor();
+    if (await page.locator('.cpv-product-item').count() !== 8) throw Error('Editorial dropped products');
+    const featuredCount = await page.locator('.cpv-product-item--featured').count();
+    if (featuredCount !== (width >= 1100 ? 1 : 0)) throw Error('Incorrect responsive featured layout at ' + width);
+    if (!(await page.locator('.cpv-title').evaluate(node => getComputedStyle(node).fontFamily)).includes('Georgia')) throw Error('Editorial typography not applied');
+    const geometry = await page.locator('.cpv-product-item').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+    for (let i = 0; i < geometry.length; i++) for (let j = i + 1; j < geometry.length; j++) {
+      const a = geometry[i], b = geometry[j];
+      if (Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1) throw Error('Editorial product overlap at ' + width);
+    }
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Editorial overflow at ' + width);
+    await page.locator('.cpv-product-item img').evaluateAll(images => Promise.all(images.map(image => image.decode().catch(() => {}))));
+    await page.screenshot({ path: artifactDirectory + '/catalog-editorial-' + width + '.png', fullPage: true, animations: 'disabled' });
+    await page.getByLabel('Ordenar productos').selectOption('-title');
+    await page.waitForFunction(() => document.querySelector('.cpv-product-item h3')?.textContent === 'Producto 8');
+    await page.getByRole('textbox', { name: 'Buscar productos' }).fill('Producto 6');
+    await page.getByRole('textbox', { name: 'Buscar productos' }).press('Enter');
+    await page.waitForFunction(() => document.querySelectorAll('.cpv-product-item').length === 1 && document.querySelector('.cpv-product-item h3')?.textContent === 'Producto 6');
+    if (await page.locator('.cpv-product-item').count() !== 1 || await page.locator('.cpv-product-item--featured').count()) throw Error('Editorial injected a featured product into search');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    if (await page.locator('.cpv-product-item').evaluate(node => getComputedStyle(node).animationName) !== 'none') throw Error('Reduced motion ignored');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    console.log(JSON.stringify({ editorialCatalog:true, width, products:8, overlaps:false, sort:true, search:true, reducedMotion:true }));
   }
   if (errors.length) throw Error("Browser errors " + JSON.stringify(errors));
   console.log(

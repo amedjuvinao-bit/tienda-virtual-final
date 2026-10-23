@@ -266,6 +266,7 @@ export default function ProductCard({
   }, [cover, images]);
 
   const cardStyle = {
+    "--product-card-bg": safeCardUi.cardBg,
     backgroundColor: safeCardUi.cardBg,
     boxShadow: !safeCardUi.showShadow || safeCardUi.cardShadowStyle === 'none' ? 'none' : ({ soft: '0 4px 16px rgba(40,30,40,.06)', medium: '0 10px 25px rgba(40,30,40,.1)', strong: '0 16px 38px rgba(40,30,40,.16)' })[safeCardUi.cardShadowStyle],
     borderColor: safeCardUi.cardBorderColor,
@@ -348,9 +349,9 @@ export default function ProductCard({
   };
 
   return (
-    <div className="w-full">
+    <div className="product-card w-full">
       <div
-        className={`group border bg-white transition hover:shadow-lg ${
+        className={`product-card__surface group border bg-white transition hover:shadow-lg ${
           isList ? 'overflow-hidden rounded-[28px]' : 'rounded-[28px]'
         }`}
         style={cardStyle}
@@ -358,19 +359,19 @@ export default function ProductCard({
         <div
           className={
             isList
-              ? 'flex flex-col md:flex-row md:items-start md:gap-8'
-              : ''
+              ? 'product-card__body flex flex-col md:flex-row md:items-start md:gap-8'
+              : 'product-card__body'
           }
         >
           <div
-            className={`relative overflow-hidden border border-[#eeddb8] ${
+            className={`product-card__media relative overflow-hidden border border-[#eeddb8] ${
               isList ? 'w-full md:w-[290px] md:min-w-[290px] md:max-w-[290px]' : ''
             }`}
             style={imageStyle}
           >
             <Link to={linkTo}>
               <div
-                className={`overflow-hidden ${
+                className={`product-card__image overflow-hidden ${
                   isList ? 'aspect-[4/5] md:h-[340px] md:aspect-auto' : 'aspect-[4/5]'
                 }`}
                 style={imageStyle}
@@ -459,14 +460,14 @@ export default function ProductCard({
           </div>
 
           <div
-            className={`min-w-0 text-left ${
+            className={`product-card__details min-w-0 text-left ${
               isList
                 ? 'flex flex-1 flex-col px-1 pt-4 pb-1 md:pt-4 md:pr-6 md:pb-4'
                 : 'px-1 pt-2 pb-1'
             }`}
           >
             <h3
-              className={`font-semibold leading-[1.2] ${
+              className={`product-card__title font-semibold leading-[1.2] ${
                 isList
                   ? 'max-w-[520px] text-[18px] sm:text-[20px] md:text-[22px]'
                   : 'line-clamp-2 text-[16px] sm:text-[18px] md:text-[20px]'
@@ -477,7 +478,7 @@ export default function ProductCard({
             </h3>
 
             {visibleColors.length > 0 && (
-              <div className={`${isList ? 'mt-3' : 'mt-1'} flex items-center gap-1.5`}>
+              <div className={`product-card__options ${isList ? 'mt-3' : 'mt-1'} flex items-center gap-1.5`}>
                 {!isList && (
                   <span
                     className="text-[9px] font-semibold uppercase tracking-[0.14em]"
@@ -521,8 +522,8 @@ export default function ProductCard({
               <span
                 className={
                   isList
-                    ? 'text-[24px] font-semibold md:text-[26px]'
-                    : 'text-[15px] font-semibold sm:text-[16px]'
+                    ? 'product-card__price text-[24px] font-semibold md:text-[26px]'
+                    : 'product-card__price text-[15px] font-semibold sm:text-[16px]'
                 }
                 style={priceStyle}
               >
@@ -532,7 +533,7 @@ export default function ProductCard({
 
             {description ? (
               <p
-                className={`opacity-85 ${
+                className={`product-card__description opacity-85 ${
                   isList
                     ? 'mt-3 max-w-[520px] text-[13px] leading-6 md:text-[14px]'
                     : 'mt-1 text-[10px] leading-4 sm:text-[11px]'
