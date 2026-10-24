@@ -47,7 +47,7 @@ export default function CatalogEditorialCard({ product, config }) {
   };
   const favorite = <button type="button" className="catalog-ecard__favorite" aria-label="Favorito" aria-pressed={selected} onClick={() => toggleFavorite(product)} style={{ color: selected ? card.favoriteActiveColor : card.favoriteIconColor }}><Favorite size={17} strokeWidth={1.5} fill={selected && card.favoriteIconName !== 'sparkles' ? 'currentColor' : 'none'}/></button>;
   return <article className="catalog-ecard" data-rim={card.showBorder ? presentation.rimStyle : 'none'} style={style}>
-    {card.showBorder && presentation.rimStyle === 'optical' && <PolishedGlassRim radius={card.cardRadiusPx} width={11}/>}
+    {card.showBorder && presentation.rimStyle === 'optical' && <PolishedGlassRim radius={card.cardRadiusPx} width={9}/>}
 
     <div className="catalog-ecard__photo">
       <Link className="catalog-ecard__photo-link" to={destination} aria-label={`Ver ${product.title}`}>

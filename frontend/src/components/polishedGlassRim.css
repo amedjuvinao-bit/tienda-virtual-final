@@ -5,6 +5,14 @@
   /* The reflection keeps a white core even when the saved tint is dark. */
   --pg-highlight:color-mix(in srgb,#fff 88%,var(--pg-light));
   position:absolute; inset:0; display:block; border-radius:inherit;
-  pointer-events:none; z-index:4; opacity:var(--pg-opacity,1);
+  pointer-events:none; z-index:4;
 }
-.polished-glass-rim svg { display:block; overflow:hidden; border-radius:inherit; }
+.polished-glass-rim svg { position:relative; display:block; overflow:hidden; border-radius:inherit; opacity:var(--pg-opacity,1); }
+.polished-glass-rim__refraction {
+  position:absolute; inset:0; padding:var(--pg-width); border-radius:inherit;
+  opacity:var(--pg-opacity,1);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}

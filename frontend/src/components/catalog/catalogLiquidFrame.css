@@ -1,7 +1,7 @@
 /* A measured smooth rim; its unfilled center reveals the page canvas. */
 .catalog-liquid {
   position:absolute; inset:0; z-index:0; border-radius:inherit;
-  pointer-events:none; filter:drop-shadow(0 4px 3px var(--ch-shadow));
+  pointer-events:none;
 }
 .catalog-liquid[data-empty="true"] { display:none; }
 .catalog-liquid>.polished-glass-rim {
