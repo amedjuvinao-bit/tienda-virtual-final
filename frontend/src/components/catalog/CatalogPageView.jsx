@@ -218,6 +218,13 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
     buttons[next].focus();
   };
 
+  const resultCount = safeConfig.showToolbar && safeConfig.showResultCount ? (
+    <span className="cpv-result-pill" role="status" aria-live="polite">
+      <strong>{productsLoading ? "…" : productPagination.totalProducts}</strong>
+      {productPagination.totalProducts === 1 ? " producto" : " productos"}
+    </span>
+  ) : null;
+
   const hasCommandBar = safeConfig.showSearch || safeConfig.showSort || safeConfig.showToolbar || activeFilters.length > 0 || query.q;
   const commandBar = hasCommandBar ? (
     <div className="cpv-commandbar">
@@ -258,22 +265,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
         <div className="cpv-toolbar">
           <div className="cpv-toolbar-left">
             {editorial && safeConfig.showFilters && safeConfig.showFilterFab && <button type="button" className="cpv-inline-filter" aria-label="Mostrar/ocultar filtros" aria-expanded={isMobile ? mobileDrawerOpen : sidebarVisible} onClick={() => isMobile ? setMobileDrawerOpen(true) : setSidebarVisible(value => !value)}><Filter size={15}/><span>Filtros</span></button>}
-            {safeConfig.showResultCount && (
-              <span
-                className="cpv-result-pill"
-                role="status"
-                aria-live="polite"
-              >
-                <strong>
-                  {productsLoading
-                    ? "…"
-                    : productPagination.totalProducts}
-                </strong>
-                {productPagination.totalProducts === 1
-                  ? " producto"
-                  : " productos"}
-              </span>
-            )}
+            {!editorial && resultCount}
           </div>
 
           <div className={`cpv-col-controls${editorial ? ' cpv-view-dock' : ''}`} role="group" aria-label="Vista de productos" onKeyDown={editorial ? navigateViews : undefined} style={editorial ? {
@@ -391,7 +383,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
     <>
       <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-background={backdrop ? "continuity" : "custom"} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial || backdrop ? presentationStyle : undefined}>
         <div className="cpv-shell">
-          {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page}>{commandBar}</CatalogIntro></div>}
+          {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page} resultCount={resultCount}>{commandBar}</CatalogIntro></div>}
           <div className="cpv-main-grid">
             {safeConfig.showFilters && !isMobile && (
               <aside
