@@ -67,6 +67,6 @@ export function catalogPresentationStyle(config) {
     '--catalog-title-font': font[config.titleFont],
     '--catalog-card-title': `${config.cardTitleSize}px`,
     '--catalog-card-price': `${config.cardPriceSize}px`,
-    '--catalog-image-ratio': { square: '1 / 1', portrait: '4 / 5', landscape: '4 / 3' }[config.imageRatio],
+    '--catalog-image-ratio': { square: '1 / 1.12', portrait: '4 / 5.6', landscape: '4 / 3.36' }[config.imageRatio],
   };
 }
