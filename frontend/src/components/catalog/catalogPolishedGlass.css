@@ -9,7 +9,7 @@
   background:linear-gradient(150deg,color-mix(in srgb,var(--ch-fill) 35%,transparent),transparent 40%,color-mix(in srgb,var(--ch-fill) 15%,transparent));
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
-  box-shadow:inset 0 1px 1px var(--catalog-reflection),0 8px 18px -10px var(--ch-shadow);
+  box-shadow:0 8px 18px -10px var(--ch-shadow);
 }
 .cpv-page[data-layout="glass-grid"] .catalog-filter-intro {
   background:color-mix(in srgb,var(--catalog-filter-bg) 18%,transparent) !important;
@@ -17,11 +17,11 @@
 }
 .cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible {
   --catalog-face-radius:var(--catalog-radius);
-  --catalog-rim-gutter:10px;
+  --catalog-rim-gutter:0px;
   isolation:isolate; border-color:transparent;
   backdrop-filter:none; -webkit-backdrop-filter:none;
   background:linear-gradient(145deg,color-mix(in srgb,var(--catalog-specular) 14%,transparent),transparent 45%),color-mix(in srgb,var(--catalog-glass-color) 8%,transparent);
-  box-shadow:inset 0 2px 3px var(--catalog-reflection),inset 0 -4px 8px color-mix(in srgb,var(--catalog-accent) 12%,transparent),0 12px 24px -18px var(--ch-shadow);
+  box-shadow:0 12px 24px -18px var(--ch-shadow);
 }
 .cpv-page[data-layout="glass-grid"] .cpv-sidebar > .polished-glass-rim { --pg-opacity:var(--ch-material-opacity); }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard {
@@ -29,15 +29,17 @@
   background:linear-gradient(135deg,color-mix(in srgb,var(--catalog-specular) 3%,transparent),transparent 35%,color-mix(in srgb,var(--catalog-specular) 2%,transparent)),color-mix(in srgb,var(--ecard-bg) calc(var(--catalog-glass-fill) * .18),transparent);
   box-shadow:var(--ecard-shadow),inset 0 2px 3px color-mix(in srgb,var(--catalog-specular) 80%,transparent),inset 0 -4px 6px color-mix(in srgb,var(--look-accent) 18%,transparent);
 }
-.cpv-page[data-layout="glass-grid"] .catalog-ecard > .polished-glass-rim { --pg-edge:var(--look-accent); --pg-opacity:var(--catalog-rim-opacity); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard > .polished-glass-rim { --pg-edge:var(--ecard-border); --pg-opacity:var(--catalog-rim-opacity); }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] {
   /* Reserve the glass lip instead of painting it over the product image. */
-  --catalog-rim-gutter:11px;
+  --catalog-rim-gutter:var(--ecard-border-width);
   backdrop-filter:none; -webkit-backdrop-filter:none;
-  padding:max(var(--ecard-padding),var(--catalog-rim-gutter));
+  border-width:0;
+  padding:calc(var(--ecard-padding) + var(--catalog-rim-gutter));
+  box-shadow:var(--ecard-shadow);
 }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] .catalog-ecard__photo {
-  border-radius:max(var(--ecard-image-radius),calc(var(--ecard-radius) - max(var(--ecard-padding),var(--catalog-rim-gutter))));
+  border-radius:max(var(--ecard-image-radius),calc(var(--ecard-radius) - var(--ecard-padding) - var(--catalog-rim-gutter)));
   background:color-mix(in srgb,var(--ecard-image-bg) calc(var(--catalog-glass-fill) * .15),transparent);
 }
 /* Frost only the inset face: a filter on the parent would prevent the rim
@@ -73,6 +75,10 @@
   --pg-depth:color-mix(in srgb,var(--fe-ink) 35%,transparent);
   --pg-opacity:var(--fe-art-alpha);
 }
+.cpv-page[data-background="continuity"] > .cpv-footer .footer-ed[data-glass="polished"] {
+  border:0;
+  box-shadow:0 calc(var(--fe-depth) * .5) var(--fe-depth) calc(var(--fe-depth) * -.4) color-mix(in srgb,var(--fe-ink) 20%,transparent);
+}
 .cpv-page[data-background="continuity"] > .cpv-footer .footer-ed[data-glass="polished"],
 .cpv-footer .footer-ed[data-glass="polished"] .footer-ed__glass {
   backdrop-filter:none; -webkit-backdrop-filter:none;
@@ -93,12 +99,10 @@
   --pg-depth:color-mix(in srgb,var(--fe-ink) 35%,transparent);
   --pg-opacity:var(--fe-art-alpha);
 }
-.cpv-footer .footer-ed[data-glass="polished"] .footer-ed__glass {
-  box-shadow:inset 0 1px 2px var(--fe-edge),inset 0 -4px 5px color-mix(in srgb,var(--fe-tint) 50%,transparent),0 7px 16px -10px color-mix(in srgb,var(--fe-ink) 35%,transparent);
+.footer-ed[data-glass="polished"] .footer-ed__glass {
+  border:0;
+  box-shadow:0 calc(var(--fe-depth) * .5) var(--fe-depth) calc(var(--fe-depth) * -.4) color-mix(in srgb,var(--fe-ink) 20%,transparent);
 }
 @container footer-editorial (max-width:700px) {
   .footer-ed[data-glass="polished"] { padding-bottom:max(16px,min(var(--fe-padding-bottom),24px)); }
-}
-@media(max-width:767px) {
-  .cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] { --catalog-rim-gutter:9px; }
 }

@@ -35,7 +35,7 @@ export default function FooterEditorial({ theme, store, preview=false, polishedG
     view?.scrollTo({top:0,behavior:view.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   }
   return <div className="footer-ed-viewport"><footer ref={root} onClickCapture={footerClickFeedback} className="footer-ed" aria-label="Pie de página" style={style} data-glass={polishedGlass ? 'polished' : undefined} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
-    {polishedGlass && <PolishedGlassRim radius={c.radius} width={12}/>}
+    {polishedGlass && <PolishedGlassRim radius={c.radius} width={Math.min(6,c.depth / 4)}/>}
     <div className="footer-ed__inner">
       {c.newsletterEnabled && <div className="footer-ed__top">
         <header className="footer-ed__invitation">{c.headline && <h2>{c.headline}</h2>}{c.description && <p>{c.description}</p>}</header>

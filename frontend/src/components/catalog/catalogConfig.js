@@ -57,7 +57,7 @@ function buildSafeFilterUiConfig(raw) {
       typeof cfg.chipTextColor === "string" ? cfg.chipTextColor : "#374151",
     radiusPx: clampInt(cfg.radiusPx, 8, 40, 22),
     sectionRadiusPx: clampInt(cfg.sectionRadiusPx, 6, 32, 18),
-    borderWidthPx: clampInt(cfg.borderWidthPx, 1, 4, 1),
+    borderWidthPx: clampInt(cfg.borderWidthPx, 0, 4, 1),
     shadowStyle:
       cfg.shadowStyle === "none" ||
       cfg.shadowStyle === "soft" ||

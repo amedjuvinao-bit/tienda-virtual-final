@@ -5,7 +5,7 @@ import { glassBevelMasks } from './glassBevelMasks';
 
 // A broad, softly lit lip follows the actual corner radius. Its center stays
 // unpainted; only the edge catches light, never the image or the panel face.
-export default function PolishedGlassRim({ radius = 24, width = 10, reflection = 1, className = '' }) {
+export default function PolishedGlassRim({ radius = 24, width = 2, reflection = 1, className = '' }) {
   const host = useRef(null), id = `polished-${useId().replace(/:/g, '')}`;
   const [size, setSize] = useState({ w: 0, h: 0, r: radius });
   useLayoutEffect(() => {
@@ -24,10 +24,12 @@ export default function PolishedGlassRim({ radius = 24, width = 10, reflection =
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [radius]);
+  }, [radius, width]);
   const { w, h } = size, rim = Math.min(width, w / 16, h / 8);
-  const refraction = useMemo(() => glassRefractionMap(w, h, size.r, rim), [w, h, size.r, rim]);
-  const bevel = useMemo(() => glassBevelMasks(w, h, size.r, rim), [w, h, size.r, rim]);
+  // Thin borders are a single stroke. The wider lens is only needed when
+  // explicitly selected; it must never impose a minimum on the editor.
+  const refraction = useMemo(() => rim > 2 ? glassRefractionMap(w, h, size.r, rim) : '', [w, h, size.r, rim]);
+  const bevel = useMemo(() => rim > 2 ? glassBevelMasks(w, h, size.r, rim) : null, [w, h, size.r, rim]);
   const contour = (inset, props) => <rect x={inset} y={inset}
     width={Math.max(0, w - inset * 2)} height={Math.max(0, h - inset * 2)}
     rx={Math.max(0, Math.min(size.r, w / 2, h / 2) - inset)} fill="none" {...props}/>;
@@ -37,7 +39,7 @@ export default function PolishedGlassRim({ radius = 24, width = 10, reflection =
       <span className="polished-glass-rim__depth" style={{ maskImage: `url(${bevel.shade})`, WebkitMaskImage: `url(${bevel.shade})` }}/>
       <span className="polished-glass-rim__shine" style={{ maskImage: `url(${bevel.light})`, WebkitMaskImage: `url(${bevel.light})` }}/>
     </>}
-    {w > 12 && h > 12 && <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none" focusable="false">
+    {w > 12 && h > 12 && rim > 0 && <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none" focusable="false">
       <defs>
         {refraction && <filter id={`${id}-refract`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
           <feImage href={refraction} x="0" y="0" width={w} height={h} preserveAspectRatio="none" result="displacement"/>
@@ -57,9 +59,9 @@ export default function PolishedGlassRim({ radius = 24, width = 10, reflection =
           {contour(rim * .5, { stroke: '#fff', strokeWidth: rim })}
         </mask>
       </defs>
-      {!bevel && contour(.8, { stroke: 'var(--pg-edge)', strokeWidth: 1.1, opacity: .35 })}
+      {!bevel && contour(rim * .5, { stroke: 'var(--pg-edge)', strokeWidth: rim, opacity: .65 })}
       <g opacity="var(--pg-shine)">
-        {!bevel && contour(rim * .5, { stroke: `url(#${id}-lip)`, strokeWidth: 1.3 })}
+        {!bevel && contour(rim * .5, { stroke: `url(#${id}-lip)`, strokeWidth: rim })}
         <g mask={`url(#${id}-perimeter)`} opacity=".45">
           <ellipse className="polished-glass-rim__glint" cx={w * .22} cy="0" rx={Math.min(100, w * .2)} ry={rim * 1.4} fill={`url(#${id}-glint)`}/>
         </g>

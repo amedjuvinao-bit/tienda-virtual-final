@@ -35,3 +35,15 @@ it('updates its geometry on resize, isolates gradients and disconnects observers
   unmount();
   expect(disconnect).toHaveBeenCalledTimes(2);
 });
+
+it('honors thin and zero widths without keeping a hidden minimum when edited', () => {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600);
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(240);
+  const { container, rerender } = render(<PolishedGlassRim width={1}/>);
+  for (const width of [1, 6, .5, 0, 2]) {
+    rerender(<PolishedGlassRim width={width}/>);
+    expect(container.firstChild.style.getPropertyValue('--pg-width')).toBe(`${width}px`);
+    if (width === 0) expect(container.querySelector('svg')).toBeNull();
+    else expect(container.querySelector('svg > rect')).toHaveAttribute('stroke-width', String(width));
+  }
+});

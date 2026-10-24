@@ -24,16 +24,16 @@ export function glassBevelPixels(width, height, radius, rim, mapWidth, mapHeight
       const corner = Math.abs(nx * ny) * 2;
       const returnLight = Math.min(1, .84 + Math.max(ny, 0) * .15 + Math.max(-nx, 0) * .1 + corner * .15);
       const grazingLight = .8 + Math.max(0, -nx - ny) * .1 + corner * .1;
-      const fade = Math.min(1, (rim - distance) / .8);
+      const fade = Math.min(1, (rim - distance) / Math.min(.8, rim * .2));
       const shine = (
-        bell(distance, 1.5, .52) * grazingLight * .94 +
+        bell(distance, rim * .115, Math.max(.2, rim * .04)) * grazingLight * .94 +
         bell(distance, rim * .65, rim * .16) * returnLight * .96 +
         Math.sin(distance / rim * Math.PI) * .035
       ) * fade;
       const depth = (
-        bell(distance, .55, .48) * .8 +
+        bell(distance, rim * .042, Math.max(.2, rim * .037)) * .8 +
         bell(distance, rim * .32, rim * .14) * .52 +
-        bell(distance, rim * .94, .65) * .22
+        bell(distance, rim * .94, Math.max(.2, rim * .05)) * .22
       ) * fade;
       const index = (y * mapWidth + x) * 4;
       light[index] = light[index + 1] = light[index + 2] = 255;

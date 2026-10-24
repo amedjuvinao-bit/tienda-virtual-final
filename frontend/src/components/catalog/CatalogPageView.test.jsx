@@ -76,6 +76,29 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it('aplica al cristal los grosores del panel y permite quitarlos sin conservar marcos fijos', async () => {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600);
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300);
+  const config = { presentation: { styleVersion: 4, headerEdgeWidth: 1 }, cardUiConfig: { cardBorderWidthPx: 1 }, filterUiConfig: { borderWidthPx: 1 } };
+  const view = mount(config);
+  await screen.findByText('Libro especial');
+  const header = () => view.container.querySelector('.catalog-liquid > .polished-glass-rim');
+  const card = () => view.container.querySelector('.catalog-ecard > .polished-glass-rim');
+  const filters = () => view.container.querySelector('.cpv-sidebar > .polished-glass-rim');
+  for (const node of [header(), card(), filters()]) expect(node.style.getPropertyValue('--pg-width')).toBe('1px');
+  const change = (headerEdgeWidth, cardBorderWidthPx, borderWidthPx) => view.rerender(<MemoryRouter initialEntries={['/pagina/catalogo']}><Shell config={{ ...config, presentation: { ...config.presentation, headerEdgeWidth }, cardUiConfig: { cardBorderWidthPx }, filterUiConfig: { borderWidthPx } }}/></MemoryRouter>);
+  change(4, 5, 3);
+  await waitFor(() => expect(header().style.getPropertyValue('--pg-width')).toBe('4px'));
+  expect(card().style.getPropertyValue('--pg-width')).toBe('5px');
+  expect(filters().style.getPropertyValue('--pg-width')).toBe('3px');
+  change(0, 0, 0);
+  await waitFor(() => expect(header().querySelector('svg')).toBeNull());
+  expect(card()).toBeNull();
+  expect(view.container.querySelector('.catalog-ecard')).toHaveAttribute('data-rim', 'none');
+  expect(filters().querySelector('svg')).toBeNull();
 });
 
 describe("catálogo conectado", () => {

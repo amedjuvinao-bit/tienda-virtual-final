@@ -1503,12 +1503,12 @@ export default function CatalogPageEditor() {
                     <Input
                       label="Ancho borde (px)"
                       type="number"
-                      min="1"
+                      min="0"
                       max="4"
                       value={form.catalogConfig.filterUiConfig.borderWidthPx}
                       onChange={(e) =>
                         updateFilterUiConfig({
-                          borderWidthPx: clampInt(e.target.value, 1, 4, 1),
+                          borderWidthPx: clampInt(e.target.value, 0, 4, 1),
                         })
                       }
                     />
@@ -1920,7 +1920,7 @@ export default function CatalogPageEditor() {
                     </Select>
 
                     <Input
-                      label="Ancho borde card (px)"
+                      label="Grosor del borde de la tarjeta (px)"
                       type="number"
                       min="0"
                       max="6"
