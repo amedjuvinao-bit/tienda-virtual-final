@@ -14,7 +14,7 @@ export function applyCatalogEditorialPreset(raw = {}) {
       cardUiConfig: raw.cardUiConfig || {}, filterUiConfig: raw.filterUiConfig || {},
       columnControlsUiConfig: raw.columnControlsUiConfig || {}, presentation: raw.presentation || {},
     } : null),
-    presentation: { ...presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, showOptions: false, filterSectionBorders: false },
+    presentation: { ...presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, filterVersion: 1, showOptions: false, filterSectionBorders: false },
     cardUiConfig: {
       ...raw.cardUiConfig, cardBg: glass, cardBorderColor: '#ffffff', cardBorderWidthPx: 1,
       cardRadiusPx: 26, cardPaddingPx: 0, cardShadowStyle: 'soft', showBorder: true, showShadow: true,
@@ -29,7 +29,7 @@ export function applyCatalogEditorialPreset(raw = {}) {
       sectionHeaderBg: glass, sectionHeaderTextColor: ink, accentColor: accent, accentColor2: accent,
       chipBg: glass, chipTextColor: ink, radiusPx: 16, sectionRadiusPx: 10, borderWidthPx: 1,
       shadowStyle: 'none', sectionGapPx: 12, titleSizePx: 20, sectionTitleSizePx: 15, contentTextSizePx: 12,
-      showSectionIcons: false, showCounters: false, showSelectedSummary: false,
+      showSectionIcons: false, showCounters: false, showSelectedSummary: true, colorDotSizePx: 20,
     },
     columnControlsUiConfig: {
       ...raw.columnControlsUiConfig, buttonBgColor: glass, buttonBorderColor: '#ffffff', buttonIconColor: accent,
@@ -76,6 +76,13 @@ export function prepareCatalogEditorialConfig(raw) {
   // and allow subsequent explicit changes from the editor to remain authoritative.
   if (presentation.headerVersion < 1) {
     current = { ...current, titleMode: 'text', presentation: { ...current.presentation, headerVersion: 1, titleFont: 'serif', titleSize: 44 } };
+  }
+  if (presentation.filterVersion < 1) {
+    current = { ...current,
+      presentation: { ...current.presentation, filterVersion: 1 },
+      filterUiConfig: { ...current.filterUiConfig, showSelectedSummary: true, showSectionIcons: false, showCounters: false,
+        colorDotSizePx: current.filterUiConfig?.colorDotSizePx ?? 20, sectionGapPx: current.filterUiConfig?.sectionGapPx ?? 12 },
+    };
   }
   return current;
 }

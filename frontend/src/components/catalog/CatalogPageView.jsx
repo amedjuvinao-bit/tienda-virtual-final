@@ -19,6 +19,7 @@ import { catalogContinuityBackdrop } from "./catalogBackdrop";
 import CatalogSearchControls from "./CatalogSearchControls";
 import PolishedGlassRim from "../PolishedGlassRim";
 import "./catalogPolishedGlass.css";
+import "./catalogFilters.css";
 import {
   Filter,
   ChevronLeft,
@@ -75,6 +76,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
     setSearch,
     setSort,
     clear,
+    clearFilters,
   } = useCatalogQuery(safeConfig, viewportWidth);
   const {
     categories: selectedCategories,
@@ -401,7 +403,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                       title="Ocultar filtros"
                       aria-label="Ocultar filtros"
                     >
-                      <ChevronLeft size={16} color="#9ca3af" />
+                      <ChevronLeft size={16} />
                     </button>
 
                     {!editorial && <div className="cpv-sidebar-title">
@@ -416,6 +418,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                       onColorChange={setSelectedColors}
                       priceRange={priceRange}
                       onPriceChange={setPriceRange}
+                      onClearFilters={clearFilters}
                       filterUiConfig={safeConfig.filterUiConfig}
                       catalogConfig={safeConfig}
                     />
@@ -548,6 +551,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                 onColorChange={setSelectedColors}
                 priceRange={priceRange}
                 onPriceChange={setPriceRange}
+                onClearFilters={clearFilters}
                 filterUiConfig={safeConfig.filterUiConfig}
                 catalogConfig={safeConfig}
               />

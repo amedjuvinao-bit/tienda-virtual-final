@@ -40,6 +40,7 @@ export default function useCatalogQuery(config, width) {
     setSearch: (q) =>
       update({ q: q.trim().replace(/\s+/g, " ").slice(0, 160) }),
     setSort: (sort) => update({ sort }),
+    clearFilters: () => update({ categories: [], colors: [], priceRange: [0, 10_000_000] }),
     clear: () =>
       update({
         q: "",

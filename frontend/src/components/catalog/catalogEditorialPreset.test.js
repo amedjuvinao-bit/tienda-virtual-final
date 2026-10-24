@@ -76,3 +76,11 @@ it('adopta fotos a sangre y botones transparentes una sola vez sin alterar curva
   const changed=buildSafeCatalogConfig({...next,cardUiConfig:{...next.cardUiConfig,imageFit:'contain',favoriteButtonOpacity:0,cartButtonOpacity:1}});
   expect(changed.cardUiConfig).toMatchObject({imageFit:'contain',favoriteButtonOpacity:0,cartButtonOpacity:1});
 });
+
+
+it('adopta el resumen del filtro una vez y respeta después el panel sin repetir cambios de tarjeta', () => {
+  const raw = {presentation:{styleVersion:5,headerVersion:1,glassPaletteVersion:2},cardUiConfig:{imageFit:'contain'},filterUiConfig:{showSelectedSummary:false,accentColor:'#123456',colorDotSizePx:34}};
+  const next=buildSafeCatalogConfig(raw);
+  expect(next).toMatchObject({presentation:{filterVersion:1},cardUiConfig:{imageFit:'contain'},filterUiConfig:{showSelectedSummary:true,accentColor:'#123456',colorDotSizePx:34}});
+  expect(buildSafeCatalogConfig({...next,filterUiConfig:{...next.filterUiConfig,showSelectedSummary:false}}).filterUiConfig.showSelectedSummary).toBe(false);
+});

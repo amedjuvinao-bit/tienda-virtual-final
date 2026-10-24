@@ -54,15 +54,6 @@
 @media(prefers-reduced-motion:reduce) {
   .cpv-page[data-layout="glass-grid"]::before { translate:0 0; }
 }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro { background:transparent !important; border:0 !important; box-shadow:none !important; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro>div { padding:8px 4px 12px; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro .items-start>.shrink-0 { display:none; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro h2 { font:500 20px/1.2 Georgia,serif; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro p { font-size:11px; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-section { box-shadow:var(--catalog-filter-shadow) !important; background:color-mix(in srgb,var(--catalog-filter-bg) var(--catalog-glass-fill,58%),transparent) !important; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-section>button { padding:10px; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-section>button .shrink-0:not(svg) { width:24px !important; height:24px !important; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-section li label { box-shadow:none !important; padding:8px; border-radius:10px; }
 .cpv-page[data-layout="glass-grid"] .cpv-result-pill strong { color:var(--catalog-ink); }
 .cpv-page[data-layout="glass-grid"] .cpv-col-controls { background:transparent; border:0; }
 @media(max-width:767px) {
@@ -84,13 +75,6 @@
 .cpv-page[data-layout="glass-grid"] .cpv-toolbar-left { flex-wrap:nowrap; gap:12px; }
 .cpv-inline-filter { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border:1px solid #ffffffa3; border-radius:999px; background:#ffffff40; font-size:12px; color:var(--catalog-ink); }
 .cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible { padding:16px 14px; width:224px; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro p { display:none; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-intro h2 { font-family:'Catalog Editorial',Georgia,serif; }
-.catalog-filters[data-presentation="glass-grid"][data-section-borders="false"] .catalog-filter-section { border:0 !important; border-bottom:1px solid #ffffff80 !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; }
-.catalog-filters[data-presentation="glass-grid"][data-section-borders="false"] .catalog-filter-section>button { background:transparent !important; padding:12px 4px; }
-.catalog-filters[data-presentation="glass-grid"][data-section-borders="false"] .catalog-filter-section li label { border:0 !important; background:transparent !important; padding:7px 0; }
-.catalog-filters[data-presentation="glass-grid"][data-section-borders="false"] .catalog-filter-section li label:has(input:checked) { background:color-mix(in srgb,var(--catalog-accent) 8%,transparent) !important; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-section>button .font-semibold { font-family:'Catalog Editorial',Georgia,serif; font-size:17px !important; font-weight:400; }
 @media(max-width:767px) {
   .cpv-page[data-layout="glass-grid"] .cpv-commandbar { grid-template-columns:minmax(0,1fr); padding:12px; gap:12px; }
   .cpv-page[data-layout="glass-grid"] .cpv-commandbar .cpv-col-controls { justify-self:start; }
@@ -99,11 +83,6 @@
 @media(prefers-reduced-motion:reduce) { .cpv-page[data-layout="glass-grid"] .cpv-product-item { animation:none; } }
 .cpv-page[data-layout="glass-grid"] .cpv-editorial-heading { margin-bottom:22px; }
 .cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible { margin-top:0; }
-.catalog-filters[data-presentation="glass-grid"] { container-type:inline-size; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices { grid-template-columns:minmax(0,1fr); }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices>div { min-width:0; border-radius:12px; }
-.catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices input { min-width:0; font-size:12px; }
-@container(min-width:300px) { .catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 /* Match the continuous storefront canvas, including its fixed image position.
    No catalog wash or moving local image is painted over the shared background. */

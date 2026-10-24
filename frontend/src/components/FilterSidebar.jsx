@@ -4,13 +4,15 @@ import { Range } from "react-range";
 import {
   ChevronDown,
   Search,
-  Sparkles,
+  Check,
+  X,
   SlidersHorizontal,
   Palette,
   BadgeDollarSign,
 } from "lucide-react";
 import useCatalogFacets from "./catalog/useCatalogFacets";
 import { prettyColor, normalizeToCss } from "./catalog/catalogColors";
+import { getColorDisplayName } from "../utils/colorDisplay";
 
 // ===== Precio =====
 const MIN_PRICE = 0;
@@ -28,7 +30,7 @@ const buildPalette = (values) => {
     ).trim();
     if (!value || seen.has(value.toLowerCase())) return [];
     seen.add(value.toLowerCase());
-    return [{ value, css: normalizeToCss(value), label: prettyColor(value) }];
+    return [{ value, css: normalizeToCss(color), label: getColorDisplayName(typeof color === "object" ? color : prettyColor(value)) }];
   });
 };
 
@@ -107,7 +109,7 @@ function buildSafeUiConfig(raw) {
         : "#374151",
     radiusPx: clampNumber(cfg.radiusPx, 8, 40, 22),
     sectionRadiusPx: clampNumber(cfg.sectionRadiusPx, 6, 32, 18),
-    borderWidthPx: clampNumber(cfg.borderWidthPx, 1, 4, 1),
+    borderWidthPx: clampNumber(cfg.borderWidthPx, 0, 4, 1),
     shadowStyle:
       cfg.shadowStyle === "none" ||
       cfg.shadowStyle === "soft" ||
@@ -159,6 +161,7 @@ function FilterSection({
   badge = null,
   isMobile = false,
 }) {
+  const contentId = useId();
   return (
     <div
       className={`catalog-filter-section overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
@@ -184,6 +187,8 @@ function FilterSection({
           color: ui.sectionHeaderTextColor,
         }}
         onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={contentId}
       >
         <div className="flex min-w-0 items-center gap-2.5">
           {ui.showSectionIcons && icon ? (
@@ -233,7 +238,8 @@ function FilterSection({
 
       {isOpen && (
         <div
-          className={`px-3 pb-3 pt-3 sm:px-4 sm:pb-4 ${getSectionAnimationClass(
+          id={contentId}
+          className={`catalog-filter-content px-3 pb-3 pt-3 sm:px-4 sm:pb-4 ${getSectionAnimationClass(
             ui.animation,
           )}`}
           style={{
@@ -254,6 +260,7 @@ export default function FilterSidebar({
   onColorChange = () => {},
   priceRange = [MIN_PRICE, MAX_PRICE],
   onPriceChange = () => {},
+  onClearFilters,
   filterUiConfig = {},
   catalogConfig,
 }) {
@@ -272,6 +279,8 @@ export default function FilterSidebar({
   } = useCatalogFacets(catalogConfig);
   const categoryPrefix = useId();
   const [categorySearch, setCategorySearch] = useState("");
+  const [minDraft, setMinDraft] = useState(null);
+  const [maxDraft, setMaxDraft] = useState(null);
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
@@ -353,18 +362,52 @@ export default function FilterSidebar({
   }, [availableCategories, categorySearch]);
 
   const TICKS = [0, 1_000_000, 5_000_000, MAX_PRICE];
-  const activeCount = selectedCategories.length + selectedColors.length;
+  const isGlass = catalogConfig?.presentation?.layout === "glass-grid";
+  const hasPriceFilter = safeRange[0] !== MIN_PRICE || safeRange[1] !== MAX_PRICE;
+  const activeCount = selectedCategories.length + selectedColors.length + Number(hasPriceFilter);
+  const activeFilters = [
+    ...selectedCategories.map(value => ({ key: `category-${value}`, label: value, remove: () => toggleCategory(value) })),
+    ...selectedColors.map(value => ({ key: `color-${value}`, label: getColorDisplayName(prettyColor(value)), remove: () => toggleColor(value) })),
+    ...(hasPriceFilter ? [{ key: "price", label: `$${formatMoney(safeRange[0])} – $${formatMoney(safeRange[1])}`, remove: () => onPriceChange([MIN_PRICE, MAX_PRICE]) }] : []),
+  ];
+  const clearFilters = () => {
+    if (onClearFilters) onClearFilters();
+    else {
+      onCategoryChange([]);
+      onColorChange([]);
+      onPriceChange([MIN_PRICE, MAX_PRICE]);
+    }
+    setCategorySearch("");
+    setMinDraft(null);
+    setMaxDraft(null);
+  };
   const dotSize = isMobile
-    ? Math.max(ui.colorDotSizePx - 2, 20)
-    : Math.max(ui.colorDotSizePx, 24);
+    ? Math.max(ui.colorDotSizePx - 2, 16)
+    : ui.colorDotSizePx;
 
   return (
     <div
       data-presentation={catalogConfig?.presentation?.layout}
+      data-animation={ui.animation}
       data-section-borders={catalogConfig?.presentation?.filterSectionBorders}
-      className={`catalog-filters space-y-4 sm:space-y-5 ${ui.stickyHeader ? "md:sticky md:top-24" : ""}`}
+      className={`catalog-filters ${isGlass ? "" : "space-y-4 sm:space-y-5"} ${ui.stickyHeader ? "md:sticky md:top-24" : ""}`}
       style={{
         '--catalog-filter-bg': ui.panelBg,
+        '--cf-ink': ui.chipTextColor,
+        '--cf-title': ui.panelTitleColor,
+        '--cf-muted': ui.panelSubtitleColor,
+        '--cf-section-ink': ui.sectionHeaderTextColor,
+        '--cf-accent': ui.accentColor,
+        '--cf-accent-2': ui.accentColor2,
+        '--cf-border': ui.panelBorderColor,
+        '--cf-chip-bg': ui.chipBg,
+        '--cf-section-bg': ui.sectionHeaderBg,
+        '--cf-title-size': `${ui.titleSizePx}px`,
+        '--cf-section-size': `${ui.sectionTitleSizePx}px`,
+        '--cf-text-size': `${ui.contentTextSizePx}px`,
+        '--cf-section-radius': `${ui.sectionRadiusPx}px`,
+        '--cf-border-width': `${ui.borderWidthPx}px`,
+        '--cf-dot-size': `${dotSize}px`,
         '--catalog-filter-shadow': { none: 'none', soft: '0 4px 14px #56263308', medium: '0 8px 22px #56263314', strong: '0 12px 30px #56263324' }[ui.shadowStyle],
         gap: `${isMobile ? Math.max(ui.sectionGapPx - 6, 12) : ui.sectionGapPx}px`,
       }}
@@ -429,35 +472,20 @@ export default function FilterSidebar({
             </div>
           </div>
 
-          {ui.showSelectedSummary && (
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] sm:text-xs font-medium"
-                style={{
-                  background: `linear-gradient(135deg, ${hexToRgba(
-                    ui.accentColor,
-                    0.12,
-                  )}, ${hexToRgba(ui.accentColor2, 0.14)})`,
-                  color: ui.accentColor,
-                  border: `1px solid ${hexToRgba(ui.accentColor, 0.12)}`,
-                }}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                {activeCount > 0
-                  ? `${activeCount} filtros activos`
-                  : "Sin filtros activos"}
-              </span>
-
-              <span
-                className="inline-flex items-center rounded-full px-3 py-1.5 text-[11px] sm:text-xs font-medium"
-                style={{
-                  background: "rgba(255,255,255,0.76)",
-                  color: ui.sectionHeaderTextColor,
-                  border: `1px solid ${hexToRgba(ui.panelBorderColor, 0.9)}`,
-                }}
-              >
-                ${formatMoney(safeRange[0])} — ${formatMoney(safeRange[1])}
-              </span>
+          {ui.showSelectedSummary && activeCount > 0 && (
+            <div className="catalog-filter-active" aria-label="Filtros activos">
+              <div className="catalog-filter-active__heading">
+                <span>Activos <span className="sr-only">({activeCount})</span></span>
+                <button type="button" onClick={clearFilters}>Limpiar</button>
+              </div>
+              <div className="catalog-filter-active__chips">
+                {activeFilters.map(({key, label, remove}) => (
+                  <button key={key} type="button" onClick={remove}
+                    aria-label={`Quitar filtro: ${label}`} title={`Quitar ${label}`}>
+                    <span>{label}</span><X size={12} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -487,8 +515,9 @@ export default function FilterSidebar({
                 type="text"
                 value={categorySearch}
                 onChange={(e) => setCategorySearch(e.target.value)}
-                placeholder="Buscar categoría..."
-                className="w-full rounded-[18px] border bg-white/90 py-3 pl-10 pr-3 outline-none transition focus:ring-2"
+                placeholder="Buscar categoría…"
+                aria-label="Buscar categoría"
+                className="catalog-filter-search w-full rounded-[18px] border bg-white/90 py-3 pl-10 pr-3 outline-none transition focus:ring-2"
                 style={{
                   borderColor: hexToRgba(ui.panelBorderColor, 0.95),
                   fontSize: `${isMobile ? 13 : ui.contentTextSizePx}px`,
@@ -519,7 +548,7 @@ export default function FilterSidebar({
             No hay categorías para mostrar.
           </div>
         ) : (
-          <ul className="max-h-60 sm:max-h-72 space-y-2 overflow-auto pr-1">
+          <ul className="catalog-filter-categories max-h-60 sm:max-h-72 space-y-2 overflow-auto pr-1">
             {filteredCategories.map(({ name, count }) => {
               const checked = selectedCategories.some(
                 (c) => c.toLowerCase() === name.toLowerCase(),
@@ -533,7 +562,7 @@ export default function FilterSidebar({
                 <li key={name}>
                   <label
                     htmlFor={safeId}
-                    className="flex cursor-pointer items-center justify-between gap-2 rounded-[18px] border px-3 py-2.5 transition duration-200 hover:-translate-y-[1px]"
+                    className="catalog-filter-category flex cursor-pointer items-center justify-between gap-2 rounded-[18px] border px-3 py-2.5 transition duration-200 hover:-translate-y-[1px]"
                     style={{
                       borderColor: checked
                         ? hexToRgba(ui.accentColor, 0.55)
@@ -613,7 +642,7 @@ export default function FilterSidebar({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-6">
+          <div className={isGlass ? "catalog-filter-colors" : "grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-6"}>
             {paletteToUse.map(({ value: c, css, label }, i) => {
               const isSelected = selectedColors.some(
                 (s) => s.toLowerCase() === String(c).toLowerCase(),
@@ -625,28 +654,22 @@ export default function FilterSidebar({
                   type="button"
                   title={label}
                   onClick={() => toggleColor(c)}
-                  className={`relative mx-auto rounded-full border transition-all duration-200 ${
-                    isSelected
-                      ? "scale-110 shadow-md"
-                      : "opacity-95 hover:scale-110 hover:shadow-sm"
-                  }`}
-                  style={{
-                    width: `${dotSize}px`,
-                    height: `${dotSize}px`,
+                  className={isGlass ? "catalog-filter-color" : `relative mx-auto rounded-full border transition-all duration-200 ${isSelected ? "scale-110 shadow-md" : "opacity-95 hover:scale-110 hover:shadow-sm"}`}
+                  style={isGlass ? undefined : {
+                    width: `${dotSize}px`, height: `${dotSize}px`,
                     backgroundColor: css || "#f1edf3",
                     borderColor: isSelected ? ui.accentColor : "#d1d5db",
-                    boxShadow: isSelected
-                      ? `0 0 0 5px ${hexToRgba(ui.accentColor, 0.16)}`
-                      : c.toLowerCase() === "#ffffff"
-                        ? "inset 0 0 0 1px #d1d5db"
-                        : "0 6px 14px rgba(0,0,0,0.04)",
+                    boxShadow: isSelected ? `0 0 0 5px ${hexToRgba(ui.accentColor, 0.16)}` : "0 6px 14px rgba(0,0,0,0.04)",
                   }}
                   aria-label={label}
                   aria-pressed={isSelected}
                 >
-                  {!css && (
-                    <span style={{ fontSize: 9 }}>{label.slice(0, 2)}</span>
-                  )}
+                  {isGlass ? <>
+                    <span className="catalog-filter-color__swatch" style={{backgroundColor: css || "transparent"}} aria-hidden="true">
+                      {isSelected ? <Check size={12} strokeWidth={2.5} /> : !css ? <span>?</span> : null}
+                    </span>
+                    <span className="catalog-filter-color__name">{label}</span>
+                  </> : !css ? <span style={{fontSize: 9}}>{label.slice(0, 2)}</span> : null}
                 </button>
               );
             })}
@@ -660,11 +683,11 @@ export default function FilterSidebar({
         isOpen={openPrice}
         onToggle={() => setOpenPrice(!openPrice)}
         ui={ui}
-        badge={`De ${formatMoney(safeRange[0])} a ${formatMoney(safeRange[1])}`}
+        badge={isGlass ? null : `De ${formatMoney(safeRange[0])} a ${formatMoney(safeRange[1])}`}
         isMobile={isMobile}
       >
         <div className="px-0.5 pt-1">
-          <div className="relative rounded-[18px] border bg-white/72 px-2 py-1 sm:px-3">
+          <div className="catalog-filter-range relative rounded-[18px] border bg-white/72 px-2 py-1 sm:px-3">
             <Range
               step={STEP_PRICE}
               min={MIN_PRICE}
@@ -684,11 +707,11 @@ export default function FilterSidebar({
                   <div
                     key={key}
                     {...rest}
-                    className="relative h-14 select-none"
+                    className="catalog-filter-range__track relative h-14 select-none"
                   >
-                    <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-gray-200" />
+                    <div className="catalog-filter-range__base absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-gray-200" />
                     <div
-                      className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full"
+                      className="catalog-filter-range__fill absolute top-1/2 h-2 -translate-y-1/2 rounded-full"
                       style={{
                         left: `${leftPct}%`,
                         right: `${rightPct}%`,
@@ -697,7 +720,7 @@ export default function FilterSidebar({
                         boxShadow: `0 4px 14px ${hexToRgba(ui.accentColor, 0.18)}`,
                       }}
                     />
-                    <div className="absolute inset-x-0 top-[calc(50%+16px)] text-[10px] text-gray-500">
+                    <div className="catalog-filter-range__ticks absolute inset-x-0 top-[calc(50%+16px)] text-[10px] text-gray-500">
                       {TICKS.map((t) => {
                         const left = (t / MAX_PRICE) * 100;
                         return (
@@ -732,10 +755,13 @@ export default function FilterSidebar({
                   <div
                     key={key}
                     {...rest}
-                    className={`relative rounded-full border-2 bg-white shadow-md transition-transform duration-200 ${
+                    aria-label={index === 0 ? "Precio mínimo del rango" : "Precio máximo del rango"}
+                    aria-valuetext={`$${formatMoney(value)}`}
+                    className={`catalog-filter-range__thumb relative rounded-full border-2 bg-white shadow-md transition-transform duration-200 ${
                       isDragged ? "scale-110" : "hover:scale-110"
                     }`}
                     style={{
+                      ...rest.style,
                       width: isMobile ? "20px" : "22px",
                       height: isMobile ? "20px" : "22px",
                       borderColor: ui.accentColor2,
@@ -785,13 +811,19 @@ export default function FilterSidebar({
               <div className="flex items-center gap-1">
                 <span style={{ color: ui.panelSubtitleColor }}>$</span>
                 <input
-                  type="number"
+                  type={isGlass ? "text" : "number"}
                   inputMode="numeric"
                   min={MIN_PRICE}
                   max={MAX_PRICE}
                   aria-label="Precio mínimo"
-                  value={safeRange[0]}
-                  onChange={(e) => handleMin(e.target.value)}
+                  value={isGlass ? minDraft ?? formatMoney(safeRange[0]) : safeRange[0]}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                    if (isGlass) setMinDraft(raw);
+                    if (!isGlass || (raw !== "" && Number(raw) <= safeRange[1])) handleMin(raw);
+                  }}
+                  onBlur={() => { if (minDraft !== null) { handleMin(minDraft); setMinDraft(null); } }}
+                  onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
                   className="w-full bg-transparent outline-none text-[13px] sm:text-[14px]"
                   style={{ color: ui.chipTextColor }}
                 />
@@ -815,13 +847,19 @@ export default function FilterSidebar({
               <div className="flex items-center gap-1">
                 <span style={{ color: ui.panelSubtitleColor }}>$</span>
                 <input
-                  type="number"
+                  type={isGlass ? "text" : "number"}
                   inputMode="numeric"
                   min={MIN_PRICE}
                   max={MAX_PRICE}
                   aria-label="Precio máximo"
-                  value={safeRange[1]}
-                  onChange={(e) => handleMax(e.target.value)}
+                  value={isGlass ? maxDraft ?? formatMoney(safeRange[1]) : safeRange[1]}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                    if (isGlass) setMaxDraft(raw);
+                    if (!isGlass || (raw !== "" && Number(raw) >= safeRange[0])) handleMax(raw);
+                  }}
+                  onBlur={() => { if (maxDraft !== null) { handleMax(maxDraft); setMaxDraft(null); } }}
+                  onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
                   className="w-full bg-transparent outline-none text-[13px] sm:text-[14px]"
                   style={{ color: ui.chipTextColor }}
                 />

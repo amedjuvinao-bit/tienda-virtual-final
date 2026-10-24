@@ -186,7 +186,7 @@ describe("catálogo conectado", () => {
   });
   it("usa categorías del alcance y envía el nombre real del color sin añadir tonos inventados", async () => {
     mount({ sourceMode: "categories", allowedCategoriesText: "Hogar" });
-    const color = await screen.findByRole("button", { name: "rojo" });
+    const color = await screen.findByRole("button", { name: "Rojo" });
     expect(api.get.mock.calls[0][0]).toContain("categoryScope=Hogar");
     expect(
       screen.queryByRole("button", { name: "Lila" }),
@@ -198,7 +198,7 @@ describe("catálogo conectado", () => {
       ).toBe("rojo"),
     );
     expect(
-      screen.getByRole("button", { name: "rojo", pressed: true }),
+      screen.getByRole("button", { name: "Rojo", pressed: true }),
     ).toHaveAttribute("aria-pressed", "true");
   });
   it("conecta favoritos y compra con la variante correcta y respeta el estilo de la tarjeta", async () => {
@@ -273,4 +273,43 @@ it('presenta todos los resultados en una cuadrícula sin destacar ninguno y perm
   mount({ showFilters: false, presentation: { rimStyle: 'none' } });
   await screen.findByText('Artículo 0');
   expect(document.querySelector('.catalog-ecard > .polished-glass-rim')).toBeNull();
+});
+
+
+it('quita filtros individuales y limpia categoría, color y precio juntos conservando búsqueda, orden y alcance', async () => {
+  mount({ sourceMode: 'categories', allowedCategoriesText: 'Hogar' }, '/pagina/catalogo?cats=Hogar&colors=rojo&min=80000&max=180000&q=Libro&sort=price');
+  await screen.findByRole('button', {name: 'Rojo', pressed: true});
+  const active = screen.getByLabelText('Filtros activos');
+  expect(active).toHaveTextContent('Hogar');
+  expect(active).toHaveTextContent('Rojo');
+  expect(active).toHaveTextContent('80.000');
+  fireEvent.click(screen.getByRole('button', {name: 'Quitar filtro: Rojo'}));
+  await waitFor(() => expect(new URLSearchParams(screen.getByTestId('url').textContent).get('colors')).toBe(''));
+  expect(screen.getByTestId('url')).toHaveTextContent('cats=Hogar');
+  fireEvent.click(screen.getByRole('button', {name: 'Limpiar', exact: true}));
+  await waitFor(() => {
+    const params = new URLSearchParams(screen.getByTestId('url').textContent);
+    expect(params.get('cats')).toBe('');
+    expect(params.get('colors')).toBe('');
+    expect(params.get('min')).toBe('0');
+    expect(params.get('max')).toBe('10000000');
+    expect(params.get('q')).toBe('Libro');
+    expect(params.get('sort')).toBe('price');
+  });
+  expect(screen.queryByLabelText('Filtros activos')).not.toBeInTheDocument();
+  expect(new URL(fetch.mock.calls.at(-1)[0]).searchParams.get('categoryScope')).toBe('Hogar');
+});
+
+
+it('permite reescribir precios sin limitar cada dígito y recupera el formato al terminar', async () => {
+  mount({}, '/pagina/catalogo?min=80000&max=500000');
+  const max=await screen.findByLabelText('Precio máximo', {exact:true});
+  fireEvent.change(max, {target:{value:''}});
+  fireEvent.change(max, {target:{value:'1'}});
+  expect(max).toHaveValue('1');
+  expect(screen.getByLabelText('Precio máximo del rango')).toHaveAttribute('aria-valuenow','500000');
+  fireEvent.change(max, {target:{value:'180000'}});
+  fireEvent.blur(max);
+  await waitFor(()=>expect(max).toHaveValue('180.000'));
+  expect(screen.getByLabelText('Precio máximo del rango')).toHaveAttribute('aria-valuenow','180000');
 });
