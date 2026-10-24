@@ -1945,6 +1945,7 @@ export default function CatalogPageEditor() {
                       }
                     />
 
+                    {form.catalogConfig.presentation.layout !== "glass-grid" && (
                     <Input
                       label="Radio imagen (px)"
                       type="number"
@@ -1957,6 +1958,7 @@ export default function CatalogPageEditor() {
                         })
                       }
                     />
+                    )}
 
                     <Select
                       label="Sombra de card"

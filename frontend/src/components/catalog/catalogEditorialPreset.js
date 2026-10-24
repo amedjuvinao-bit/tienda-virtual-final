@@ -1,7 +1,7 @@
 import { upgradeCatalogGlassPalette, CATALOG_GLASS_PALETTE_VERSION } from './catalogGlassPalette';
 import { buildCatalogPresentation } from './catalogPresentation';
 
-export const EDITORIAL_STYLE_VERSION = 4;
+export const EDITORIAL_STYLE_VERSION = 5;
 
 // Upgrade the visual settings together, once. Subsequent individual edits remain authoritative.
 // Keep the earlier settings recoverable; no products, text, source or query options are changed.
@@ -18,10 +18,10 @@ export function applyCatalogEditorialPreset(raw = {}) {
     cardUiConfig: {
       ...raw.cardUiConfig, cardBg: glass, cardBorderColor: '#ffffff', cardBorderWidthPx: 1,
       cardRadiusPx: 26, cardPaddingPx: 0, cardShadowStyle: 'soft', showBorder: true, showShadow: true,
-      imageRadiusPx: 12, showImageBg: true, imageBg: glass, imageFit: 'contain', titleColor: ink, priceColor: ink,
+      imageRadiusPx: 12, showImageBg: true, imageBg: glass, imageFit: 'cover', titleColor: ink, priceColor: ink,
       oldPriceColor: '#987e82', metaColor: '#987e82', titleFontFamily: 'cormorant', priceFontFamily: 'jost',
       favoriteIconName: 'heart', cartIconName: 'shopping-bag', favoriteIconColor: accent, favoriteActiveColor: accent, cartIconColor: accent,
-      favoriteButtonBg: glass, cartButtonBg: glass, favoriteButtonOpacity: .85, cartButtonOpacity: .85,
+      favoriteButtonBg: glass, cartButtonBg: glass, favoriteButtonOpacity: .18, cartButtonOpacity: .18,
       actionButtonBorderColor: '#ffffff', actionButtonBorderWidthPx: 1,
     },
     filterUiConfig: {
@@ -45,10 +45,11 @@ export function prepareCatalogEditorialConfig(raw) {
   // Remove the old preset's warm defaults without recalibrating user colors.
   let current = presentation.glassPaletteVersion < CATALOG_GLASS_PALETTE_VERSION ? upgradeCatalogGlassPalette(raw) : raw;
   if (presentation.styleVersion < EDITORIAL_STYLE_VERSION) {
-    const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
+    const backgroundImage = presentation.styleVersion < 4 && ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
     current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(current) : current;
     const card = current.cardUiConfig || {};
-    const optical = presentation.rimStyle === 'optical' && card.showBorder !== false;
+    const glassButtonOpacity = value => value == null || [1, .85].includes(Number(value)) ? .18 : value;
+    const optical = presentation.styleVersion < 4 && presentation.rimStyle === 'optical' && card.showBorder !== false;
     const oldCardRadius = card.cardRadiusPx == null || [16, 18].includes(Number(card.cardRadiusPx));
     // Replace only the old automatic corners. Once version 4 is adopted,
     // later radius edits remain authoritative within the editor's bounds.
@@ -63,7 +64,12 @@ export function prepareCatalogEditorialConfig(raw) {
         columnControlsUiConfig: current.columnControlsUiConfig || {}, presentation: current.presentation || {},
       },
       presentation: { ...presentation, ...current.presentation, ...corners, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage },
-      cardUiConfig: { ...card, ...(presentation.styleVersion < 3 ? { imageFit: 'contain' } : {}), ...(optical && oldCardRadius ? { cardRadiusPx: 26 } : {}) },
+      cardUiConfig: {
+        ...card, imageFit: 'cover',
+        favoriteButtonOpacity: glassButtonOpacity(card.favoriteButtonOpacity),
+        cartButtonOpacity: glassButtonOpacity(card.cartButtonOpacity),
+        ...(optical && oldCardRadius ? { cardRadiusPx: 26 } : {}),
+      },
     };
   }
   // Adopt the approved typographic heading once; keep the uploaded artwork available

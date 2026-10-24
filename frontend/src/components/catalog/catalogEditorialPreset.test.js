@@ -7,7 +7,7 @@ it('coordina el estilo anterior una sola vez y conserva contenido, alcance y cop
     presentation:{ styleVersion:1, backgroundImage:'/my-background.webp', glassOpacity:.45 },
     cardUiConfig:{ titleColor:'#0066ff', priceColor:'#ff00ff', cardPaddingPx:12, cardRadiusPx:40 }, filterUiConfig:{ panelBorderColor:'#0066ff' } };
   const config=buildSafeCatalogConfig(old);
-  expect(config).toMatchObject({ title:old.title, titleImage:old.titleImage, sourceMode:'categories', allowedCategoriesText:'Hogar', defaultSort:'price', presentation:{ styleVersion:4, backgroundImage:'/my-background.webp', glassOpacity:.45 }, cardUiConfig:{ titleColor:'#562633', priceColor:'#562633', cardPaddingPx:0, cardRadiusPx:26 } });
+  expect(config).toMatchObject({ title:old.title, titleImage:old.titleImage, sourceMode:'categories', allowedCategoriesText:'Hogar', defaultSort:'price', presentation:{ styleVersion:5, backgroundImage:'/my-background.webp', glassOpacity:.45 }, cardUiConfig:{ titleColor:'#562633', priceColor:'#562633', cardPaddingPx:0, cardRadiusPx:26 } });
   expect(config.visualBackup.cardUiConfig).toEqual(old.cardUiConfig);
   expect(buildSafeCatalogConfig(config)).toEqual(config);
   const custom=buildSafeCatalogConfig({ ...config, cardUiConfig:{ ...config.cardUiConfig, titleColor:'#123456', cardPaddingPx:7 } });
@@ -21,7 +21,7 @@ it('no migra los estilos de una cuadrícula clásica', () => {
 
 it('convierte el diseño con arco a una cuadrícula sin fondo obligatorio y conserva personalizaciones', () => {
   const config = buildSafeCatalogConfig({ presentation: { layout:'editorial', styleVersion:2, featuredEnabled:true, featuredShape:'arch', backgroundImage:'/instagram/editorial-satin.webp' }, cardUiConfig: { titleColor:'#123456' } });
-  expect(config.presentation).toMatchObject({ layout:'glass-grid', backgroundImage:'', rimStyle:'optical', imageRatio:'square', styleVersion:4 });
+  expect(config.presentation).toMatchObject({ layout:'glass-grid', backgroundImage:'', rimStyle:'optical', imageRatio:'square', styleVersion:5 });
   expect(config.presentation).not.toHaveProperty('featuredShape');
   expect(config.cardUiConfig.titleColor).toBe('#123456');
 });
@@ -29,7 +29,7 @@ it('convierte el diseño con arco a una cuadrícula sin fondo obligatorio y cons
 it('adopta una vez las curvas del bisel y conserva ajustes personalizados y cambios posteriores', () => {
   const old = {presentation:{styleVersion:3,headerVersion:1,glassPaletteVersion:2,radius:18,headerRadius:22},cardUiConfig:{cardRadiusPx:16,imageFit:'cover'}};
   const next = buildSafeCatalogConfig(old);
-  expect(next).toMatchObject({presentation:{styleVersion:4,radius:26,headerRadius:40},cardUiConfig:{cardRadiusPx:26,imageFit:'cover'}});
+  expect(next).toMatchObject({presentation:{styleVersion:5,radius:26,headerRadius:40},cardUiConfig:{cardRadiusPx:26,imageFit:'cover'}});
   expect(next.visualBackup.cardUiConfig).toEqual(old.cardUiConfig);
   expect(buildSafeCatalogConfig(next)).toEqual(next);
   expect(buildSafeCatalogConfig({...next,presentation:{...next.presentation,radius:0,headerRadius:0},cardUiConfig:{...next.cardUiConfig,cardRadiusPx:8}})).toMatchObject({presentation:{radius:0,headerRadius:0},cardUiConfig:{cardRadiusPx:8}});
@@ -65,4 +65,14 @@ it('reemplaza solo los colores cálidos del preset anterior y permite elegir dor
   expect(next.glassPaletteBackup.headerEdgeColor).toBe('#e9bda3');
   expect(buildSafeCatalogConfig(next)).toEqual(next);
   expect(buildSafeCatalogConfig({...next,presentation:{...next.presentation,headerEdgeColor:'#e9bda3'}}).presentation.headerEdgeColor).toBe('#e9bda3');
+});
+
+it('adopta fotos a sangre y botones transparentes una sola vez sin alterar curvas personalizadas', () => {
+  const raw={presentation:{styleVersion:4,headerVersion:1,glassPaletteVersion:2},cardUiConfig:{imageFit:'contain',cardRadiusPx:16,favoriteButtonOpacity:.85,cartButtonOpacity:.37}};
+  const next=buildSafeCatalogConfig(raw);
+  expect(next).toMatchObject({presentation:{styleVersion:5},cardUiConfig:{imageFit:'cover',cardRadiusPx:16,favoriteButtonOpacity:.18,cartButtonOpacity:.37}});
+  expect(next.visualBackup.cardUiConfig).toEqual(raw.cardUiConfig);
+  expect(buildSafeCatalogConfig(next)).toEqual(next);
+  const changed=buildSafeCatalogConfig({...next,cardUiConfig:{...next.cardUiConfig,imageFit:'contain',favoriteButtonOpacity:0,cartButtonOpacity:1}});
+  expect(changed.cardUiConfig).toMatchObject({imageFit:'contain',favoriteButtonOpacity:0,cartButtonOpacity:1});
 });
