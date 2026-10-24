@@ -2,6 +2,8 @@
   --pg-light:var(--ch-light,#fff);
   --pg-edge:var(--catalog-accent,#984d62);
   --pg-depth:color-mix(in srgb,var(--pg-edge) 55%,transparent);
+  /* The reflection keeps a white core even when the saved tint is dark. */
+  --pg-highlight:color-mix(in srgb,#fff 88%,var(--pg-light));
   position:absolute; inset:0; display:block; border-radius:inherit;
   pointer-events:none; z-index:4; opacity:var(--pg-opacity,1);
 }

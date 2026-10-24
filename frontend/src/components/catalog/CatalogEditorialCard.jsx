@@ -9,7 +9,7 @@ import './catalogEditorialCard.css';
 import PolishedGlassRim from '../PolishedGlassRim';
 
 const fonts = { cormorant: '"Catalog Editorial", Georgia, serif', playfair: '"Catalog Editorial", Georgia, serif', jost: 'Jost, system-ui, sans-serif', inter: 'Inter, system-ui, sans-serif' };
-const shadows = { none: 'none', soft: '0 8px 24px #5626330c', medium: '0 12px 28px #5626331c', strong: '0 18px 40px #5626332c' };
+const shadows = { none: '0 0 0 transparent', soft: '0 8px 24px #5626330c', medium: '0 12px 28px #5626331c', strong: '0 18px 40px #5626332c' };
 const money = value => Number(value || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 export default function CatalogEditorialCard({ product, config }) {
@@ -33,7 +33,7 @@ export default function CatalogEditorialCard({ product, config }) {
     '--ecard-bg': card.cardBg, '--ecard-border': card.cardBorderColor,
     '--ecard-border-width': `${card.showBorder ? card.cardBorderWidthPx : 0}px`,
     '--ecard-radius': `${card.cardRadiusPx}px`, '--ecard-padding': `${card.cardPaddingPx}px`,
-    '--ecard-shadow': card.showShadow ? shadows[card.cardShadowStyle] : 'none',
+    '--ecard-shadow': card.showShadow ? shadows[card.cardShadowStyle] : shadows.none,
     '--ecard-image-radius': `${card.imageRadiusPx}px`, '--ecard-image-bg': card.showImageBg ? card.imageBg : 'transparent',
     '--ecard-image-fit': card.imageFit,
     '--ecard-image-position': 'center',
@@ -47,7 +47,7 @@ export default function CatalogEditorialCard({ product, config }) {
   };
   const favorite = <button type="button" className="catalog-ecard__favorite" aria-label="Favorito" aria-pressed={selected} onClick={() => toggleFavorite(product)} style={{ color: selected ? card.favoriteActiveColor : card.favoriteIconColor }}><Favorite size={17} strokeWidth={1.5} fill={selected && card.favoriteIconName !== 'sparkles' ? 'currentColor' : 'none'}/></button>;
   return <article className="catalog-ecard" data-rim={card.showBorder ? presentation.rimStyle : 'none'} style={style}>
-    {card.showBorder && presentation.rimStyle === 'optical' && <PolishedGlassRim radius={card.cardRadiusPx} width={8}/>}
+    {card.showBorder && presentation.rimStyle === 'optical' && <PolishedGlassRim radius={card.cardRadiusPx} width={11}/>}
 
     <div className="catalog-ecard__photo">
       <Link className="catalog-ecard__photo-link" to={destination} aria-label={`Ver ${product.title}`}>

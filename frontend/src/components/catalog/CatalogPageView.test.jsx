@@ -200,7 +200,7 @@ describe("catálogo conectado", () => {
     fireEvent.click(screen.getByRole("button", { name: /favorito/i }));
     expect(toggleFavorite).toHaveBeenCalledWith(selected);
     expect(container.querySelector('.catalog-ecard').style.getPropertyValue('--ecard-border-width')).toBe('0px');
-    expect(container.querySelector('.catalog-ecard').style.getPropertyValue('--ecard-shadow')).toBe('none');
+    expect(container.querySelector('.catalog-ecard').style.getPropertyValue('--ecard-shadow')).toBe('0 0 0 transparent');
     expect(screen.getByText(/35.000/)).toBeInTheDocument();
   });
   it("bloquea agregar productos agotados y conserva navegación al detalle", async () => {

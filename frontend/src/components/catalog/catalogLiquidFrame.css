@@ -5,10 +5,10 @@
 }
 .catalog-liquid[data-empty="true"] { display:none; }
 .catalog-liquid>.polished-glass-rim {
-  --pg-light:var(--ch-reflection);
+  --pg-light:var(--ch-light);
   --pg-edge:var(--ch-edge);
   --pg-depth:color-mix(in srgb,var(--ch-depth-color) calc(var(--ch-depth-strength) * 100%),transparent);
   --pg-opacity:var(--ch-material-opacity);
 }
-.catalog-liquid[data-layers="false"] .polished-glass-rim rect:nth-of-type(n+3) { display:none; }
-.catalog-liquid .polished-glass-rim ellipse:first-of-type { cx:var(--ch-pointer-x,26%); }
+.catalog-liquid[data-layers="false"] .polished-glass-rim__diffusion { display:none; }
+.catalog-liquid .polished-glass-rim__glint { cx:var(--ch-pointer-x,22%); }

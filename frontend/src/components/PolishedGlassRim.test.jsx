@@ -19,6 +19,7 @@ it('updates its geometry on resize, isolates gradients and disconnects observers
   const callbacks = [], disconnect = vi.fn();
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(() => height);
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({ borderTopLeftRadius: '0px' });
   vi.stubGlobal('ResizeObserver', class {
     constructor(callback) { callbacks.push(callback); }
     observe() {}
@@ -30,6 +31,7 @@ it('updates its geometry on resize, isolates gradients and disconnects observers
   width = 280; height = 400;
   act(() => callbacks.forEach(callback => callback()));
   expect([...container.querySelectorAll('svg')].every(svg => svg.getAttribute('viewBox') === '0 0 280 400')).toBe(true);
+  expect([...container.querySelectorAll('rect')].every(rect => rect.getAttribute('rx') === '0')).toBe(true);
   unmount();
   expect(disconnect).toHaveBeenCalledTimes(2);
 });

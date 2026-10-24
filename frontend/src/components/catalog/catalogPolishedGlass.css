@@ -1,42 +1,54 @@
 /* Smooth glass: relief stays on the measured perimeter, with a clean face. */
+.cpv-page[data-layout="glass-grid"] {
+  --catalog-specular:color-mix(in srgb,#fff 88%,var(--ch-light));
+  --catalog-reflection:color-mix(in srgb,var(--catalog-specular) calc(var(--ch-reflection-opacity) * 100%),transparent);
+}
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
   background:linear-gradient(150deg,color-mix(in srgb,var(--ch-fill) 35%,transparent),transparent 40%,color-mix(in srgb,var(--ch-fill) 15%,transparent));
   backdrop-filter:blur(calc(var(--ch-blur) * .24)) saturate(1.08);
   -webkit-backdrop-filter:blur(calc(var(--ch-blur) * .24)) saturate(1.08);
-  box-shadow:inset 0 1px 1px var(--ch-reflection),0 8px 18px -10px var(--ch-shadow);
+  box-shadow:inset 0 1px 1px var(--catalog-reflection),0 8px 18px -10px var(--ch-shadow);
 }
 .cpv-page[data-layout="glass-grid"] .catalog-filter-intro {
   background:color-mix(in srgb,var(--catalog-filter-bg) 18%,transparent) !important;
-  box-shadow:inset 0 1px 2px var(--ch-reflection) !important;
+  box-shadow:inset 0 1px 2px var(--catalog-reflection) !important;
 }
 .cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible {
   isolation:isolate; border-color:transparent;
-  background:linear-gradient(145deg,color-mix(in srgb,var(--ch-light) 14%,transparent),transparent 45%),color-mix(in srgb,var(--catalog-glass-color) 20%,transparent);
-  box-shadow:inset 0 2px 3px var(--ch-reflection),inset 0 -4px 8px color-mix(in srgb,var(--catalog-accent) 12%,transparent),0 12px 24px -18px var(--ch-shadow);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--catalog-specular) 14%,transparent),transparent 45%),color-mix(in srgb,var(--catalog-glass-color) 20%,transparent);
+  box-shadow:inset 0 2px 3px var(--catalog-reflection),inset 0 -4px 8px color-mix(in srgb,var(--catalog-accent) 12%,transparent),0 12px 24px -18px var(--ch-shadow);
 }
 .cpv-page[data-layout="glass-grid"] .cpv-sidebar > .polished-glass-rim { --pg-opacity:var(--ch-material-opacity); }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard {
   border-color:transparent;
-  background:linear-gradient(135deg,color-mix(in srgb,var(--ch-light) 12%,transparent),transparent 35%,color-mix(in srgb,var(--ch-light) 8%,transparent)),color-mix(in srgb,var(--ecard-bg) var(--catalog-glass-fill),transparent);
-  box-shadow:var(--ecard-shadow),inset 0 2px 3px color-mix(in srgb,var(--ch-light) 80%,transparent),inset 0 -4px 6px color-mix(in srgb,var(--look-accent) 18%,transparent);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--catalog-specular) 12%,transparent),transparent 35%,color-mix(in srgb,var(--catalog-specular) 8%,transparent)),color-mix(in srgb,var(--ecard-bg) var(--catalog-glass-fill),transparent);
+  box-shadow:var(--ecard-shadow),inset 0 2px 3px color-mix(in srgb,var(--catalog-specular) 80%,transparent),inset 0 -4px 6px color-mix(in srgb,var(--look-accent) 18%,transparent);
 }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard > .polished-glass-rim { --pg-edge:var(--look-accent); --pg-opacity:var(--catalog-rim-opacity); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] {
+  /* Reserve the glass lip instead of painting it over the product image. */
+  --catalog-rim-gutter:10px;
+  padding:max(var(--ecard-padding),var(--catalog-rim-gutter));
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] .catalog-ecard__photo {
+  border-radius:max(var(--ecard-image-radius),calc(var(--ecard-radius) - max(var(--ecard-padding),var(--catalog-rim-gutter))));
+}
 .cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="fine"] { border-color:var(--ecard-border); }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="none"] { box-shadow:var(--ecard-shadow); }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard__footer {
-  background:linear-gradient(160deg,color-mix(in srgb,var(--ch-light) 10%,transparent),transparent 50%);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--catalog-specular) 10%,transparent),transparent 50%);
 }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard button {
   border-radius:12px;
-  box-shadow:inset 0 1px 1px var(--ch-light),inset 0 -2px 3px color-mix(in srgb,var(--look-accent) 16%,transparent),0 3px 7px color-mix(in srgb,var(--look-accent) 12%,transparent);
+  box-shadow:inset 0 1px 1px var(--catalog-specular),inset 0 -2px 3px color-mix(in srgb,var(--look-accent) 16%,transparent),0 3px 7px color-mix(in srgb,var(--look-accent) 12%,transparent);
 }
 .cpv-page[data-layout="glass-grid"] .cpv-commandbar :is(.cpv-discovery form,.cpv-discovery select,.cpv-inline-filter,.cpv-col-btn,.cpv-filter-chip) {
-  border:1px solid color-mix(in srgb,var(--ch-edge) 50%,var(--ch-light)); outline:none;
-  background:linear-gradient(170deg,color-mix(in srgb,var(--ch-light) 38%,transparent),transparent 22%,transparent 72%,color-mix(in srgb,var(--ch-light) 20%,transparent)),color-mix(in srgb,var(--catalog-control-bg,var(--ch-badge-tint)) 30%,transparent);
-  box-shadow:inset 0 2px 2px var(--ch-reflection),inset 1px 0 2px color-mix(in srgb,var(--ch-light) 65%,transparent),inset 0 -3px 3px var(--ch-contrast),0 2px 2px color-mix(in srgb,var(--ch-light) 70%,transparent),0 5px 10px -5px var(--ch-shadow);
+  border:1px solid color-mix(in srgb,var(--ch-edge) 50%,var(--catalog-specular)); outline:none;
+  background:linear-gradient(170deg,color-mix(in srgb,var(--catalog-specular) 38%,transparent),transparent 22%,transparent 72%,color-mix(in srgb,var(--catalog-specular) 20%,transparent)),color-mix(in srgb,var(--catalog-control-bg,var(--ch-badge-tint)) 30%,transparent);
+  box-shadow:inset 0 2px 2px var(--catalog-reflection),inset 1px 0 2px color-mix(in srgb,var(--catalog-specular) 65%,transparent),inset 0 -3px 3px var(--ch-contrast),0 2px 2px color-mix(in srgb,var(--catalog-specular) 70%,transparent),0 5px 10px -5px var(--ch-shadow);
 }
 .cpv-page[data-layout="glass-grid"] .cpv-commandbar .cpv-col-btn.active {
-  box-shadow:inset 0 2px 3px var(--ch-reflection),inset 0 -3px 3px var(--ch-contrast),0 3px 7px var(--ch-shadow);
+  box-shadow:inset 0 2px 3px var(--catalog-reflection),inset 0 -3px 3px var(--ch-contrast),0 3px 7px var(--ch-shadow);
 }
 .footer-ed[data-glass="polished"] {
   padding-bottom:max(16px,var(--fe-padding-bottom));
@@ -59,4 +71,7 @@
 }
 @container footer-editorial (max-width:700px) {
   .footer-ed[data-glass="polished"] { padding-bottom:max(16px,min(var(--fe-padding-bottom),24px)); }
+}
+@media(max-width:767px) {
+  .cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] { --catalog-rim-gutter:8px; }
 }
