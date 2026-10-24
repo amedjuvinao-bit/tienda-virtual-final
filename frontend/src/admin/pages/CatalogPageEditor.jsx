@@ -6,7 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import PageLoadState from "./workspace/PageLoadState";
 import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
 import SectionCard from "./workspace/EditorSection";
-import CatalogPresentationControls from "./workspace/CatalogPresentationControls";
+import CatalogAppearancePanel from "./workspace/CatalogAppearancePanel";
 import usePageDraft from "./workspace/usePageDraft";
 import { buildSafeCatalogConfig, buildSafeCardUiConfig, buildSafeFilterUiConfig, buildSafeColumnControlsUiConfig } from '../../components/catalog/catalogConfig';
 import { API_BASE_URL } from "../../config/apiBaseUrl";
@@ -14,10 +14,13 @@ import { API_BASE_URL } from "../../config/apiBaseUrl";
 const API_BASE = API_BASE_URL;
 
 const EDITOR_TABS = [
-  { id: "header", label: "Título y presentación", group: "content" },
   { id: "products", label: "Productos", group: "content" },
-  { id: "visual", label: "Diseño del catálogo", group: "design" },
-  { id: "grid", label: "Distribución y filtros", group: "options" },
+  { id: "visual", label: "Fondo y cristal", group: "design" },
+  { id: "header", label: "Encabezado", group: "design" },
+  { id: "grid", label: "Distribución", group: "design" },
+  { id: "card-style", label: "Tarjetas de producto", group: "design" },
+  { id: "filter-style", label: "Filtros", group: "design" },
+  { id: "motion", label: "Animaciones", group: "design" },
   { id: "empty", label: "Sin resultados", group: "options" },
   { id: "general", label: "Datos de la página", group: "settings" },
 ];
@@ -26,51 +29,6 @@ const PRODUCT_SUBTABS = [
   { id: "universe", label: "Origen de productos" },
   { id: "categories", label: "Categorías" },
   { id: "manual", label: "Selección manual" },
-];
-
-const VISUAL_SUBTABS = [
-  { id: "layout", label: "Estructura" },
-  { id: "filter-style", label: "Estilo del filtro" },
-  { id: "card-style", label: "Tarjetas de producto" },
-];
-
-const SHADOW_OPTIONS = [
-  { value: "none", label: "Sin sombra" },
-  { value: "soft", label: "Suave" },
-  { value: "medium", label: "Media" },
-  { value: "strong", label: "Fuerte" },
-];
-
-const FILTER_ANIMATION_OPTIONS = [
-  { value: "none", label: "Sin animación" },
-  { value: "soft", label: "Suave" },
-  { value: "fade", label: "Desvanecimiento" },
-  { value: "slide", label: "Deslizamiento" },
-];
-
-const CARD_IMAGE_FIT_OPTIONS = [
-  { value: "cover", label: "Cubrir el espacio" },
-  { value: "contain", label: "Mostrar imagen completa" },
-];
-
-const FAVORITE_ICON_OPTIONS = [
-  { value: "star", label: "Estrella" },
-  { value: "heart", label: "Corazón" },
-  { value: "sparkles", label: "Destello" },
-];
-
-const CART_ICON_OPTIONS = [
-  { value: "shopping-cart", label: "Carrito clásico" },
-  { value: "shopping-bag", label: "Bolsa" },
-  { value: "bag-heart", label: "Bolsa con corazón" },
-];
-
-const FONT_FAMILY_OPTIONS = [
-  { value: "inherit", label: "Heredada del diseño" },
-  { value: "jost", label: "Jost" },
-  { value: "cormorant", label: "Cormorant Garamond" },
-  { value: "playfair", label: "Playfair Display" },
-  { value: "inter", label: "Inter" },
 ];
 
 const Input = ({ label, ...rest }) => (
@@ -117,34 +75,6 @@ const Select = ({ label, children, ...rest }) => (
   </label>
 );
 
-const ColorInput = ({ label, value, onChange }) => {
-  const safeValue = isHexColor(value) ? value : "#ec4899";
-
-  return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-
-      <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
-        <input
-          type="color"
-          aria-label={`Elegir ${label.toLowerCase()}`}
-          value={safeValue}
-          onChange={(e) => onChange({ target: { value: e.target.value } })}
-          className="h-10 w-12 cursor-pointer rounded border border-gray-200 bg-white"
-        />
-
-        <input
-          type="text"
-          aria-label={label}
-          value={value || ""}
-          onChange={(e) => onChange({ target: { value: e.target.value } })}
-          className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none"
-          placeholder="#ec4899"
-        />
-      </div>
-    </label>
-  );
-};
 
 
 function slugify(value) {
@@ -156,22 +86,6 @@ function slugify(value) {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
-}
-
-function clampInt(value, min, max, fallback) {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
-}
-
-function clampNumber(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
-}
-
-function isHexColor(value) {
-  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
 }
 
 function normalizeCsvText(value) {
@@ -461,7 +375,7 @@ export default function CatalogPageEditor() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [productsSubtab, setProductsSubtab] = useState("universe");
-  const [visualSubtab, setVisualSubtab] = useState("layout");
+  const [uploadingAppearance, setUploadingAppearance] = useState(false);
 
   const [allProducts, setAllProducts] = useState([]);
   const [availableProductCategories, setAvailableProductCategories] = useState([]);
@@ -696,6 +610,13 @@ export default function CatalogPageEditor() {
     }));
   };
 
+  const updateAppearance = (scope, patch) => {
+    const handlers = { catalog: updateCatalogConfig, presentation: updateCatalogPresentation,
+      cardUiConfig: updateCardUiConfig, filterUiConfig: updateFilterUiConfig,
+      columnControlsUiConfig: updateColumnControlsUiConfig };
+    handlers[scope](patch);
+  };
+
   const handleNameChange = (value) => setForm(previous => ({ ...previous, name: value }));
 
   const toggleCsvCategoryField = (fieldName, category) => {
@@ -815,6 +736,7 @@ export default function CatalogPageEditor() {
   };
 
   const handleSave = async () => {
+    if (uploadingTitleImage || uploadingAppearance) return;
     if (!form) return;
 
     const name = String(form.name || "").trim();
@@ -928,9 +850,10 @@ export default function CatalogPageEditor() {
       onBack={() => draft.leave(() => navigate("/admin/paginas"))}
       onSave={handleSave}
       saving={saving}
-      uploading={uploadingTitleImage}
+      uploading={uploadingTitleImage || uploadingAppearance}
       draft={draft}
       pageTypeLabel="Catálogo"
+      scrollToFieldsOnTabChange
     >
       <fieldset disabled={saving} className="pages-editor-fields">
       {activeTab === "general" && (
@@ -1018,28 +941,13 @@ export default function CatalogPageEditor() {
       )}
 
       {activeTab === "header" && (
-        <SectionCard
-          title="Encabezado del catálogo"
-          text="Título, subtítulo, descripción e imagen de título."
-        >
-          <div className="grid gap-3 md:grid-cols-2">
-            <Toggle
-              label="Usar título en texto"
-              checked={form.catalogConfig.titleMode === "text"}
-              onChange={(value) =>
-                updateCatalogConfig({ titleMode: value ? "text" : "image" })
-              }
-            />
-
-            <Toggle
-              label="Usar imagen de título"
-              checked={form.catalogConfig.titleMode === "image"}
-              onChange={(value) =>
-                updateCatalogConfig({ titleMode: value ? "image" : "text" })
-              }
-            />
-          </div>
-
+        <CatalogAppearancePanel key="header" section="header" config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance}
+          onApplyPreset={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}
+          onRestore={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}
+          content={<>
+          <Select label="Formato del título" value={form.catalogConfig.titleMode} onChange={event=>updateCatalogConfig({titleMode:event.target.value})}>
+            <option value="text">Texto</option><option value="image">Imagen</option>
+          </Select>
           <div className="grid gap-4 md:grid-cols-2">
             <Toggle label="Mostrar distintivo del catálogo" checked={form.catalogConfig.showHeroBadge} onChange={value => updateCatalogConfig({ showHeroBadge: value })}/>
             <Input label="Texto del distintivo" value={form.catalogConfig.heroBadge} onChange={e => updateCatalogConfig({ heroBadge: e.target.value })}/>
@@ -1065,6 +973,7 @@ export default function CatalogPageEditor() {
             placeholder="Texto descriptivo del catálogo"
           />
 
+          {form.catalogConfig.titleMode === "image" && (
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <Input
@@ -1140,7 +1049,8 @@ export default function CatalogPageEditor() {
               </div>
             </div>
           </div>
-        </SectionCard>
+          )}
+          </>}/>
       )}
 
       {activeTab === "products" && (
@@ -1285,1018 +1195,10 @@ export default function CatalogPageEditor() {
         </div>
       )}
 
-      {activeTab === "visual" && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-3">
-            <div className="flex flex-wrap gap-2">
-              {VISUAL_SUBTABS.map((tab) => (
-                <MiniTabButton
-                  key={tab.id}
-                  active={visualSubtab === tab.id}
-                  onClick={() => setVisualSubtab(tab.id)}
-                >
-                  {tab.label}
-                </MiniTabButton>
-              ))}
-            </div>
-          </div>
-
-          {visualSubtab === "layout" && (
-            <SectionCard
-              title="Estructura visual"
-              text="Activa u oculta partes del catálogo."
-            >
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <Toggle
-                  label="Mostrar ruta de navegación"
-                  checked={form.catalogConfig.showBreadcrumb}
-                  onChange={(value) =>
-                    updateCatalogConfig({ showBreadcrumb: value })
-                  }
-                />
-
-                <Toggle
-                  label="Mostrar filtros"
-                  checked={form.catalogConfig.showFilters}
-                  onChange={(value) => updateCatalogConfig({ showFilters: value })}
-                />
-
-                <Toggle label="Mostrar búsqueda de productos" checked={form.catalogConfig.showSearch} onChange={value => updateCatalogConfig({ showSearch: value })}/>
-                <Toggle label="Mostrar orden de productos" checked={form.catalogConfig.showSort} onChange={value => updateCatalogConfig({ showSort: value })}/>
-                <Select label="Orden inicial" value={form.catalogConfig.defaultSort} onChange={e => updateCatalogConfig({ defaultSort: e.target.value })}>
-                  <option value="-createdAt">Más recientes</option><option value="createdAt">Más antiguos</option><option value="title">Nombre: A a Z</option><option value="-title">Nombre: Z a A</option><option value="price">Menor precio</option><option value="-price">Mayor precio</option>
-                </Select>
-                <Toggle
-                  label="Mostrar barra de resultados"
-                  checked={form.catalogConfig.showToolbar}
-                  onChange={(value) => updateCatalogConfig({ showToolbar: value })}
-                />
-
-                <Toggle
-                  label="Mostrar botón flotante de filtros"
-                  checked={form.catalogConfig.showFilterFab}
-                  onChange={(value) =>
-                    updateCatalogConfig({ showFilterFab: value })
-                  }
-                />
-
-                <Toggle
-                  label="Mostrar contador de resultados"
-                  checked={form.catalogConfig.showResultCount}
-                  onChange={(value) =>
-                    updateCatalogConfig({ showResultCount: value })
-                  }
-                />
-              </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button type="button" className="rounded-xl border border-pink-200 bg-pink-50 px-4 py-2 text-sm text-pink-800" onClick={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}>Aplicar bordes de Inicio</button>
-                {form.catalogConfig.visualBackup && <button type="button" className="rounded-xl border px-4 py-2 text-sm" onClick={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}>Recuperar personalización anterior</button>}
-              </div>
-              <CatalogPresentationControls value={form.catalogConfig.presentation} onChange={updateCatalogPresentation}/>
-            </SectionCard>
-          )}
-
-          {visualSubtab === "filter-style" && (
-            <SectionCard
-              title="Estilo profesional del filtro"
-              text="Personaliza los colores, los espacios y los botones del filtro."
-            >
-              <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Colores principales
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ColorInput
-                      label="Fondo del panel"
-                      value={form.catalogConfig.filterUiConfig.panelBg}
-                      onChange={(e) =>
-                        updateFilterUiConfig({ panelBg: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color de borde del panel"
-                      value={form.catalogConfig.filterUiConfig.panelBorderColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          panelBorderColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color título principal"
-                      value={form.catalogConfig.filterUiConfig.panelTitleColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          panelTitleColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color subtítulo principal"
-                      value={form.catalogConfig.filterUiConfig.panelSubtitleColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          panelSubtitleColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo cabecera secciones"
-                      value={form.catalogConfig.filterUiConfig.sectionHeaderBg}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionHeaderBg: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Texto cabecera secciones"
-                      value={form.catalogConfig.filterUiConfig.sectionHeaderTextColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionHeaderTextColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color acento 1"
-                      value={form.catalogConfig.filterUiConfig.accentColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          accentColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color acento 2"
-                      value={form.catalogConfig.filterUiConfig.accentColor2}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          accentColor2: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo chips / items"
-                      value={form.catalogConfig.filterUiConfig.chipBg}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          chipBg: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Texto chips / items"
-                      value={form.catalogConfig.filterUiConfig.chipTextColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          chipTextColor: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Tamaños, bordes y comportamiento
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Input
-                      label="Radio panel (px)"
-                      type="number"
-                      min="8"
-                      max="40"
-                      value={form.catalogConfig.filterUiConfig.radiusPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          radiusPx: clampInt(e.target.value, 8, 40, 22),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Radio secciones (px)"
-                      type="number"
-                      min="6"
-                      max="32"
-                      value={form.catalogConfig.filterUiConfig.sectionRadiusPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionRadiusPx: clampInt(e.target.value, 6, 32, 18),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Ancho borde (px)"
-                      type="number"
-                      min="0"
-                      max="4"
-                      value={form.catalogConfig.filterUiConfig.borderWidthPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          borderWidthPx: clampInt(e.target.value, 0, 4, 1),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Separación entre bloques (px)"
-                      type="number"
-                      min="8"
-                      max="40"
-                      value={form.catalogConfig.filterUiConfig.sectionGapPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionGapPx: clampInt(e.target.value, 8, 40, 20),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño bolitas color (px)"
-                      type="number"
-                      min="16"
-                      max="40"
-                      value={form.catalogConfig.filterUiConfig.colorDotSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          colorDotSizePx: clampInt(e.target.value, 16, 40, 26),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño título panel (px)"
-                      type="number"
-                      min="16"
-                      max="32"
-                      value={form.catalogConfig.filterUiConfig.titleSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          titleSizePx: clampInt(e.target.value, 16, 32, 22),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño título secciones (px)"
-                      type="number"
-                      min="13"
-                      max="24"
-                      value={form.catalogConfig.filterUiConfig.sectionTitleSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionTitleSizePx: clampInt(e.target.value, 13, 24, 17),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño texto contenido (px)"
-                      type="number"
-                      min="11"
-                      max="20"
-                      value={form.catalogConfig.filterUiConfig.contentTextSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          contentTextSizePx: clampInt(e.target.value, 11, 20, 14),
-                        })
-                      }
-                    />
-
-                    <Select
-                      label="Tipo de sombra"
-                      value={form.catalogConfig.filterUiConfig.shadowStyle}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          shadowStyle: e.target.value,
-                        })
-                      }
-                    >
-                      {SHADOW_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Animación"
-                      value={form.catalogConfig.filterUiConfig.animation}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          animation: e.target.value,
-                        })
-                      }
-                    >
-                      {FILTER_ANIMATION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Toggle
-                      label="Mostrar íconos en secciones"
-                      checked={form.catalogConfig.filterUiConfig.showSectionIcons}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ showSectionIcons: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Mostrar contadores"
-                      checked={form.catalogConfig.filterUiConfig.showCounters}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ showCounters: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Mostrar resumen de filtros activos"
-                      checked={form.catalogConfig.filterUiConfig.showSelectedSummary}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ showSelectedSummary: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Buscador de categorías"
-                      checked={
-                        form.catalogConfig.filterUiConfig.categoriesSearchEnabled
-                      }
-                      onChange={(value) =>
-                        updateFilterUiConfig({
-                          categoriesSearchEnabled: value,
-                        })
-                      }
-                    />
-
-                    <Toggle
-                      label="Encabezado fijo en escritorio"
-                      checked={form.catalogConfig.filterUiConfig.stickyHeader}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ stickyHeader: value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {visualSubtab === "card-style" && (
-            <SectionCard
-              title="Estilo editable de cards"
-              text="Ajusta los botones, iconos, textos y bordes de las tarjetas."
-            >
-              <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Colores y tipografía
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ColorInput
-                      label="Fondo de card"
-                      value={form.catalogConfig.cardUiConfig.cardBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({ cardBg: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color de borde"
-                      value={form.catalogConfig.cardUiConfig.cardBorderColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardBorderColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo del contenedor de imagen"
-                      value={form.catalogConfig.cardUiConfig.imageBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({ imageBg: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color del título"
-                      value={form.catalogConfig.cardUiConfig.titleColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ titleColor: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color del precio"
-                      value={form.catalogConfig.cardUiConfig.priceColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ priceColor: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color del precio anterior"
-                      value={form.catalogConfig.cardUiConfig.oldPriceColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ oldPriceColor: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color de metadatos"
-                      value={form.catalogConfig.cardUiConfig.metaColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ metaColor: e.target.value })
-                      }
-                    />
-
-                    <Select
-                      label="Fuente del título"
-                      value={form.catalogConfig.cardUiConfig.titleFontFamily}
-                      onChange={(e) =>
-                        updateCardUiConfig({ titleFontFamily: e.target.value })
-                      }
-                    >
-                      {FONT_FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Fuente del precio"
-                      value={form.catalogConfig.cardUiConfig.priceFontFamily}
-                      onChange={(e) =>
-                        updateCardUiConfig({ priceFontFamily: e.target.value })
-                      }
-                    >
-                      {FONT_FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Fuente de metadatos"
-                      value={form.catalogConfig.cardUiConfig.metaFontFamily}
-                      onChange={(e) =>
-                        updateCardUiConfig({ metaFontFamily: e.target.value })
-                      }
-                    >
-                      {FONT_FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Botones, íconos y bordes
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ColorInput
-                      label="Fondo botón favorito"
-                      value={form.catalogConfig.cardUiConfig.favoriteButtonBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteButtonBg: e.target.value,
-                        })
-                      }
-                    />
-                    <Input
-                      label="Transparencia botón favorito"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={form.catalogConfig.cardUiConfig.favoriteButtonOpacity ?? 1}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteButtonOpacity: clampNumber(e.target.value, 0, 1, 1),
-                        })
-                      }
-                    />
-                    <Input
-                      label="Transparencia botón carrito"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={form.catalogConfig.cardUiConfig.cartButtonOpacity ?? 1}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartButtonOpacity: clampNumber(e.target.value, 0, 1, 1),
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo botón carrito"
-                      value={form.catalogConfig.cardUiConfig.cartButtonBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartButtonBg: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Borde botones"
-                      value={form.catalogConfig.cardUiConfig.actionButtonBorderColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          actionButtonBorderColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Grosor borde botones (px)"
-                      type="number"
-                      min="0"
-                      max="4"
-                      value={
-                        form.catalogConfig.cardUiConfig.actionButtonBorderWidthPx
-                      }
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          actionButtonBorderWidthPx: clampInt(
-                            e.target.value,
-                            0,
-                            4,
-                            1
-                          ),
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Ícono carrito"
-                      value={form.catalogConfig.cardUiConfig.cartIconColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartIconColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Favorito normal"
-                      value={form.catalogConfig.cardUiConfig.favoriteIconColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteIconColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Favorito activo"
-                      value={form.catalogConfig.cardUiConfig.favoriteActiveColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteActiveColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <Select
-                      label="Ícono de favorito"
-                      value={form.catalogConfig.cardUiConfig.favoriteIconName}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteIconName: e.target.value,
-                        })
-                      }
-                    >
-                      {FAVORITE_ICON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Ícono de carrito"
-                      value={form.catalogConfig.cardUiConfig.cartIconName}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartIconName: e.target.value,
-                        })
-                      }
-                    >
-                      {CART_ICON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Input
-                      label="Grosor del borde de la tarjeta (px)"
-                      type="number"
-                      min="0"
-                      max="6"
-                      value={form.catalogConfig.cardUiConfig.cardBorderWidthPx}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardBorderWidthPx: clampInt(e.target.value, 0, 6, 1),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Radio card (px)"
-                      type="number"
-                      min="8"
-                      max="40"
-                      value={form.catalogConfig.cardUiConfig.cardRadiusPx}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardRadiusPx: clampInt(e.target.value, 8, 40, 28),
-                        })
-                      }
-                    />
-
-                    {form.catalogConfig.presentation.layout !== "glass-grid" && (
-                    <Input
-                      label="Radio imagen (px)"
-                      type="number"
-                      min="0"
-                      max="40"
-                      value={form.catalogConfig.cardUiConfig.imageRadiusPx}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          imageRadiusPx: clampInt(e.target.value, 0, 40, 24),
-                        })
-                      }
-                    />
-                    )}
-
-                    <Select
-                      label="Sombra de card"
-                      value={form.catalogConfig.cardUiConfig.cardShadowStyle}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardShadowStyle: e.target.value,
-                        })
-                      }
-                    >
-                      {SHADOW_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Ajuste de imagen"
-                      value={form.catalogConfig.cardUiConfig.imageFit}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          imageFit: e.target.value,
-                        })
-                      }
-                    >
-                      {CARD_IMAGE_FIT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Toggle
-                      label="Mostrar borde"
-                      checked={form.catalogConfig.cardUiConfig.showBorder}
-                      onChange={(value) =>
-                        updateCardUiConfig({ showBorder: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Mostrar sombra"
-                      checked={form.catalogConfig.cardUiConfig.showShadow}
-                      onChange={(value) =>
-                        updateCardUiConfig({ showShadow: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Usar fondo en imagen"
-                      checked={form.catalogConfig.cardUiConfig.showImageBg}
-                      onChange={(value) =>
-                        updateCardUiConfig({ showImageBg: value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-        </div>
-      )}
-
-      {activeTab === "grid" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            title="Grilla del catálogo"
-            text="Control de columnas y límite inicial."
-          >
-            <div className="grid gap-4 md:grid-cols-3">
-              <Input
-                label="Máximo columnas desktop"
-                type="number"
-                min="1"
-                max="6"
-                value={form.catalogConfig.columnsDesktop}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    columnsDesktop: clampInt(e.target.value, 1, 6, 4),
-                  })
-                }
-              />
-
-              <Input
-                label="Máximo columnas tablet"
-                type="number"
-                min="1"
-                max="4"
-                value={form.catalogConfig.columnsTablet}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    columnsTablet: clampInt(e.target.value, 1, 4, 3),
-                  })
-                }
-              />
-
-              <Input
-                label="Máximo columnas móvil"
-                type="number"
-                min="1"
-                max="2"
-                value={form.catalogConfig.columnsMobile}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    columnsMobile: clampInt(e.target.value, 1, 2, 2),
-                  })
-                }
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Columnas iniciales desktop"
-                type="number"
-                min="1"
-                max="6"
-                value={form.catalogConfig.defaultColsDesktop}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    defaultColsDesktop: clampInt(e.target.value, 1, 6, 4),
-                  })
-                }
-              />
-
-              <Input
-                label="Columnas iniciales móvil"
-                type="number"
-                min="1"
-                max="2"
-                value={form.catalogConfig.defaultColsMobile}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    defaultColsMobile: clampInt(e.target.value, 1, 2, 2),
-                  })
-                }
-              />
-            </div>
-
-            <Input
-              label="Productos por página (0 usa 24)"
-              type="number"
-              min="0"
-              max="100"
-              value={form.catalogConfig.limit}
-              onChange={(e) =>
-                updateCatalogConfig({
-                  limit: clampInt(e.target.value, 0, 100, 0),
-                })
-              }
-            />
-          </SectionCard>
-
-          <SectionCard
-            title="Botones de columnas"
-            text="Aquí se controla el color de los botones de vista de columnas sin afectar la estructura de la card."
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <ColorInput
-                label="Fondo botón normal"
-                value={form.catalogConfig.columnControlsUiConfig.buttonBgColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonBgColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Borde botón normal"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.buttonBorderColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonBorderColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Ícono botón normal"
-                value={form.catalogConfig.columnControlsUiConfig.buttonIconColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonIconColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Fondo botón hover"
-                value={form.catalogConfig.columnControlsUiConfig.hoverButtonBgColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    hoverButtonBgColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Borde botón hover"
-                value={form.catalogConfig.columnControlsUiConfig.hoverButtonBorderColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    hoverButtonBorderColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Ícono botón hover"
-                value={form.catalogConfig.columnControlsUiConfig.hoverButtonIconColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    hoverButtonIconColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Fondo botón activo"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.activeButtonBgColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    activeButtonBgColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Borde botón activo"
-                value={
-                  form.catalogConfig.columnControlsUiConfig
-                    .activeButtonBorderColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    activeButtonBorderColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Ícono botón activo"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.activeButtonIconColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    activeButtonIconColor: e.target.value,
-                  })
-                }
-              />
-
-              <Input
-                label="Radio botón columnas (px)"
-                type="number"
-                min="8"
-                max="24"
-                value={form.catalogConfig.columnControlsUiConfig.buttonRadiusPx}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonRadiusPx: clampInt(e.target.value, 8, 24, 12),
-                  })
-                }
-              />
-
-              <Input
-                label="Grosor borde botón columnas (px)"
-                type="number"
-                min="1"
-                max="4"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.buttonBorderWidthPx
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonBorderWidthPx: clampInt(e.target.value, 1, 4, 1),
-                  })
-                }
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Filtros iniciales"
-            text="Estado inicial con el que debe abrir la página catálogo."
-          >
-            <Textarea
-              label="Colores iniciales (separados por coma)"
-              value={form.catalogConfig.initialColorsText}
-              onChange={(e) =>
-                updateCatalogConfig({
-                  initialColorsText: normalizeCsvText(e.target.value),
-                })
-              }
-              placeholder="Ej: #ffffff, dorado, rosa"
-            />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Precio mínimo inicial"
-                type="number"
-                min="0"
-                max="10000000"
-                value={form.catalogConfig.initialMinPrice}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    initialMinPrice: clampNumber(e.target.value, 0, 10000000, 0),
-                  })
-                }
-              />
-
-              <Input
-                label="Precio máximo inicial"
-                type="number"
-                min="0"
-                max="10000000"
-                value={form.catalogConfig.initialMaxPrice}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    initialMaxPrice: clampNumber(
-                      e.target.value,
-                      0,
-                      10000000,
-                      10000000
-                    ),
-                  })
-                }
-              />
-            </div>
-          </SectionCard>
-        </div>
+      {["visual", "grid", "card-style", "filter-style", "motion"].includes(activeTab) && (
+        <CatalogAppearancePanel key={activeTab} section={activeTab} config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance}
+          onApplyPreset={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}
+          onRestore={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}/>
       )}
 
       {activeTab === "empty" && (

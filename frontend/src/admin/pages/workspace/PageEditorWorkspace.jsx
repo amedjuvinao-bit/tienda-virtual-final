@@ -31,6 +31,7 @@ export default function PageEditorWorkspace({
   draft,
   children,
   pageTypeLabel,
+  scrollToFieldsOnTabChange = false,
 }) {
   const root = useRef(null),
     toolbar = useRef(null);
@@ -52,9 +53,12 @@ export default function PageEditorWorkspace({
   }, []);
   const changeTab = (id) => {
     onTabChange(id);
-    requestAnimationFrame(() =>
-      root.current?.scrollIntoView?.({ block: "start", behavior: "auto" }),
-    );
+    requestAnimationFrame(() => {
+      const target = scrollToFieldsOnTabChange
+        ? root.current?.querySelector('[data-editor-fields]')
+        : root.current;
+      target?.scrollIntoView?.({ block: "start", behavior: "auto" });
+    });
   };
   const [view, setView] = useState("edit");
   const group = tabs.find((tab) => tab.id === activeTab)?.group || "content";

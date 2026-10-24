@@ -81,7 +81,7 @@ const topics = [
   { id:'products', title:'Productos', keys:['rimStyle','rimColor','rimOpacity','imageRatio','cardTitleSize','cardPriceSize','showPhotoCount','showDescription','showOptions'] },
   { id:'motion', title:'Movimiento', keys:['motion','motionStrength'] },
 ];
-function TopicTabs({ items, selected, onSelect, id, label }) {
+export function TopicTabs({ items, selected, onSelect, id, label }) {
   return <div className="catalog-settings-tabs" role="tablist" aria-label={label}>
     {items.map((item, index) => <button key={item.id} type="button" role="tab" id={`${id}-tab-${item.id}`} aria-selected={selected === item.id} aria-controls={`${id}-panel-${item.id}`} tabIndex={selected === item.id ? 0 : -1}
       onClick={() => onSelect(item.id)} onKeyDown={event => {
@@ -94,7 +94,7 @@ function TopicTabs({ items, selected, onSelect, id, label }) {
       }}>{item.title}</button>)}
   </div>;
 }
-export default function CatalogPresentationControls({ value, onChange }) {
+export default function CatalogPresentationControls({ value, onChange, fieldKeys, showBackgroundImage = false, showPalette = false, onUploadingChange }) {
   const id = useId();
   const [topic, setTopic] = useState('layout');
   const [headerSection, setHeaderSection] = useState('material');
@@ -109,7 +109,7 @@ export default function CatalogPresentationControls({ value, onChange }) {
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type) || file.size > 12 * 1024 * 1024) {
       setMessage('Usa una imagen JPG, PNG, WebP o AVIF de hasta 12 MB.'); return;
     }
-    setUploading(true); setMessage('');
+    setUploading(true); onUploadingChange?.(true); setMessage('');
     try {
       const body = new FormData(); body.append('file', file);
       const response = await adminFetch(`${API_BASE_URL}/api/uploads`, { method: 'POST', body });
@@ -119,8 +119,30 @@ export default function CatalogPresentationControls({ value, onChange }) {
       onChange({ backgroundImage: data.url });
       setMessage('Imagen subida. Guarda los cambios para publicarla.');
     } catch (error) { setMessage(error.message || 'No se pudo subir la imagen.'); }
-    finally { setUploading(false); }
+    finally { setUploading(false); onUploadingChange?.(false); }
   }
+  if (fieldKeys) return <div className="catalog-presentation-controls catalog-presentation-controls--scoped">
+    {showPalette && (value.layout === 'glass-grid' && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pink-100 bg-pink-50/50 p-3">
+      <div><p className="text-sm font-semibold text-gray-800">Cristal luminoso</p><p className="text-xs text-gray-600">Reflejos blancos y bordes coordinados con los colores de la escena. Puedes ajustar cada valor después.</p></div>
+      <button type="button" className="shrink-0 rounded-xl border border-pink-200 bg-white px-3 py-2 text-sm text-pink-900 transition hover:bg-pink-50 hover:shadow-sm active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-700 motion-reduce:transition-none" onClick={() => { onChange(buildCatalogGlassPalette(value)); setPaletteApplied(true); }}>Aplicar paleta de cristal</button>
+      {paletteApplied && <p className="w-full text-xs text-gray-600" role="status">Paleta aplicada a la vista previa. Guarda los cambios para conservarla.</p>}
+    </div>)}
+    <div className="catalog-appearance-fields">{fieldKeys.filter(key => value.backgroundMode === 'custom' || !['backgroundColor','backgroundOpacity'].includes(key)).map(key => fields.get(key)).map(([key,label,type]) => <div className={`catalog-appearance-field${type==='boolean'?' catalog-appearance-field--toggle':''}`} key={key}>
+      <label htmlFor={`${id}-${key}`}>{label}</label>
+      {type==='boolean'?<input id={`${id}-${key}`} type="checkbox" checked={!!value[key]} onChange={event=>patch(key,event.target.checked)}/>:
+        Array.isArray(type)&&Array.isArray(type[0])?<select id={`${id}-${key}`} value={value[key]} onChange={event=>patch(key,event.target.value)}>{type.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select>:
+        type==='color'?<input id={`${id}-${key}`} type="color" value={value[key]} onChange={event=>patch(key,event.target.value)}/>:
+        <input id={`${id}-${key}`} type="number" value={value[key]} min={type[0]} max={type[1]} step={type[2]} onChange={event=>patch(key,event.target.value===''?'':Number(event.target.value))}/>}
+    </div>)}</div>
+    {showBackgroundImage && <><fieldset hidden={value.backgroundMode !== 'custom'} className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
+      <label className="block text-sm text-gray-700">Dirección de la imagen de fondo<input className={fieldClass} value={value.backgroundImage} onChange={event => patch('backgroundImage', event.target.value)} placeholder="https://… o /imagen.webp"/></label>
+      <label className="block text-sm text-gray-700">Subir imagen de fondo<input className={`${fieldClass} mt-1`} type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={uploading} onChange={upload}/></label>
+      <button type="button" className="rounded-xl border px-3 py-2 text-sm" disabled={uploading || !value.backgroundImage} onClick={() => patch('backgroundImage', '')}>Quitar imagen de fondo</button>
+      {(uploading || message) && <p className="text-sm" role="status">{uploading ? 'Subiendo imagen…' : message}</p>}
+    </fieldset>
+      {value.backgroundMode!=='custom'&&<p className="catalog-appearance-help">Este catálogo hereda el fondo continuo de Inicio. Puedes cambiarlo en Apariencia o elegir un fondo propio aquí.</p>}
+    </>}
+  </div>;
   return <div className="catalog-presentation-controls mt-6 space-y-4 border-t border-gray-200 pt-5">
     <p className="text-sm text-gray-600">Elige un tema. Los cambios se muestran en la vista previa y se publican al guardar.</p>
     {value.layout === 'glass-grid' && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pink-100 bg-pink-50/50 p-3">

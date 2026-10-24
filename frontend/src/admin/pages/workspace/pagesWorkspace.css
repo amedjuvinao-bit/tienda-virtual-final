@@ -1060,6 +1060,7 @@
 .catalog-settings-tabs [aria-selected="true"] { color:var(--admin-primary,#bd397c); background:color-mix(in srgb,var(--admin-primary,#bd397c) 10%,transparent) !important; font-weight:650; }
 .catalog-settings-tabs [role="tab"]:focus-visible { outline:2px solid var(--admin-primary,#bd397c); outline-offset:2px; }
 .catalog-presentation-controls [hidden] { display:none !important; }
+.pages-workspace__form { scroll-margin-top:calc(var(--pages-admin-offset,0px) + var(--pages-toolbar-height,130px) + 18px); }
 @media(min-width:768px) and (max-width:1200px) {
   .pages-workspace__grid { grid-template-columns:minmax(0,1fr) minmax(0,.95fr); }
   .pages-workspace__nav { position:static; grid-column:1/-1; grid-template-columns:repeat(4,minmax(0,1fr)); }
