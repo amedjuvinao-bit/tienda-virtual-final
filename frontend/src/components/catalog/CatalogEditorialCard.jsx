@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, Star, Sparkles, ShoppingBag, ShoppingCart, Images } from 'lucide-react';
+import { Heart, Star, Sparkles, ShoppingBag, ShoppingCart, Images, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { buildCatalogCartIntent } from '../ProductCard';
@@ -13,13 +13,16 @@ const shadows = { none: '0 0 0 transparent', soft: '0 8px 24px #5626330c', mediu
 const money = value => Number(value || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 export default function CatalogEditorialCard({ product, config }) {
-  const { addToCart } = useCart();
+  const { addToCart, cart = [] } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
   const navigate = useNavigate();
   const [failedImage, setFailedImage] = useState(false);
+  const [favoritePulse, setFavoritePulse] = useState(0);
+  const [cartPulse, setCartPulse] = useState(0);
   const card = config.cardUiConfig, presentation = config.presentation;
   const intent = useMemo(() => buildCatalogCartIntent(product), [product]);
-  const selected = isFavorite(product._id);
+  const selected = isFavorite(product);
+  const inCart = cart.some(item => String(item._id) === String(product._id) && Number(item.quantity) > 0);
   const destination = `/producto/${encodeURIComponent(product.slug || product._id)}`;
   const Favorite = { heart: Heart, star: Star, sparkles: Sparkles }[card.favoriteIconName] || Heart;
   const Cart = card.cartIconName === 'shopping-cart' ? ShoppingCart : ShoppingBag;
@@ -45,7 +48,23 @@ export default function CatalogEditorialCard({ product, config }) {
     '--ecard-cart-bg': card.cartButtonBg, '--ecard-cart-fill': `${card.cartButtonOpacity * 100}%`,
     '--ecard-action-border': card.actionButtonBorderColor, '--ecard-action-border-width': `${card.actionButtonBorderWidthPx}px`,
   };
-  const favorite = <button type="button" className="catalog-ecard__favorite" aria-label="Favorito" aria-pressed={selected} onClick={() => toggleFavorite(product)} style={{ color: selected ? card.favoriteActiveColor : card.favoriteIconColor }}><Favorite size={17} strokeWidth={1.5} fill={selected && card.favoriteIconName !== 'sparkles' ? 'currentColor' : 'none'}/></button>;
+  const handleFavorite = () => {
+    toggleFavorite(product);
+    setFavoritePulse(value => value + 1);
+  };
+  const handleCart = () => {
+    if (intent.unavailable) return;
+    setCartPulse(value => value + 1);
+    if (intent.requiresSelection) navigate(destination);
+    else addToCart(intent.payload);
+  };
+  const favorite = (
+    <button type="button" className="catalog-ecard__favorite" aria-label="Favorito"
+      aria-pressed={selected} data-pulse={favoritePulse ? (favoritePulse % 2 ? 'a' : 'b') : undefined}
+      onClick={handleFavorite} style={{ color: selected ? card.favoriteActiveColor : card.favoriteIconColor }}>
+      <Favorite size={17} strokeWidth={1.5} fill={selected && card.favoriteIconName !== 'sparkles' ? 'currentColor' : 'none'}/>
+    </button>
+  );
   return <article className="catalog-ecard" data-rim={card.showBorder && card.cardBorderWidthPx > 0 ? presentation.rimStyle : 'none'} style={style}>
     {card.showBorder && card.cardBorderWidthPx > 0 && presentation.rimStyle === 'optical' && <PolishedGlassRim radius={card.cardRadiusPx} width={card.cardBorderWidthPx}/>}
 
@@ -68,7 +87,14 @@ export default function CatalogEditorialCard({ product, config }) {
         {presentation.showPhotoCount && count > 1 && <span className="catalog-ecard__photo-count"><Images size={11}/>{count} fotos</span>}
       </div>
       <div className="catalog-ecard__actions">
-        <button type="button" className="catalog-ecard__cart" aria-label={action} title={action} disabled={intent.unavailable} style={{ color: card.cartIconColor }} onClick={() => { if (intent.unavailable) return; if (intent.requiresSelection) navigate(destination); else addToCart(intent.payload); }}><Cart size={17} strokeWidth={1.5}/>{card.cartIconName === 'bag-heart' && <Heart size={8} className="catalog-ecard__bag-heart"/>}</button>
+        <button type="button" className="catalog-ecard__cart" aria-label={action}
+          title={inCart && !intent.unavailable && !intent.requiresSelection ? "En el carrito · agregar otra unidad" : action}
+          aria-pressed={inCart} data-pulse={cartPulse ? (cartPulse % 2 ? 'a' : 'b') : undefined}
+          disabled={intent.unavailable} style={{ color: card.cartIconColor }} onClick={handleCart}>
+          <Cart size={17} strokeWidth={1.5}/>
+          {inCart ? <Check size={12} className="catalog-ecard__cart-check" aria-hidden="true"/>
+            : card.cartIconName === 'bag-heart' && <Heart size={8} className="catalog-ecard__bag-heart"/>}
+        </button>
       </div>
     </footer>
   </article>;

@@ -73,12 +73,34 @@
   backdrop-filter:none; -webkit-backdrop-filter:none;
 }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard button::after { content:none; }
-.cpv-page[data-layout="glass-grid"] .catalog-ecard button>svg:not(.catalog-ecard__bag-heart) {
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button>svg:not(.catalog-ecard__bag-heart):not(.catalog-ecard__cart-check) {
   width:23px; height:23px; stroke-width:1.8;
   filter:drop-shadow(0 1px 1px var(--catalog-specular)) drop-shadow(0 2px 2px color-mix(in srgb,var(--catalog-ink) 32%,transparent));
 }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard button:disabled { opacity:.65; }
 .cpv-page[data-layout="glass-grid"] .catalog-ecard__bag-heart { right:8px; bottom:9px; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button[aria-pressed="true"]>svg { stroke-width:2.2; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard__cart[aria-pressed="true"]>svg:first-child { fill:color-mix(in srgb,currentColor 24%,transparent); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard .catalog-ecard__cart-check {
+  position:absolute; right:2px; bottom:3px; width:12px; height:12px; stroke-width:3;
+  filter:drop-shadow(0 1px 1px var(--catalog-specular));
+}
+@keyframes catalog-action-pop-a {
+  0% { transform:scale(1) rotate(0); }
+  30% { transform:scale(.72) rotate(-14deg); }
+  65% { transform:scale(1.4) rotate(9deg); }
+  100% { transform:scale(1) rotate(0); }
+}
+@keyframes catalog-action-pop-b {
+  0% { transform:scale(1) rotate(0); }
+  30% { transform:scale(.72) rotate(-14deg); }
+  65% { transform:scale(1.4) rotate(9deg); }
+  100% { transform:scale(1) rotate(0); }
+}
+@media(prefers-reduced-motion:no-preference) {
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button[data-pulse="a"]>svg:first-child { animation:catalog-action-pop-a .55s cubic-bezier(.22,.8,.3,1); }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button[data-pulse="b"]>svg:first-child { animation:catalog-action-pop-b .55s cubic-bezier(.22,.8,.3,1); }
+}
 @media(prefers-reduced-motion:no-preference) {
   .cpv-page:not([data-motion="none"]) .catalog-ecard button>svg { transition:scale .2s ease; }
   .cpv-page:not([data-motion="none"]) .catalog-ecard button:hover:not(:disabled)>svg { scale:1.12; }
