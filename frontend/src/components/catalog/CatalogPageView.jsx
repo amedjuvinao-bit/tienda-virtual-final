@@ -402,7 +402,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
               >
                 {sidebarVisible && (
                   <>
-                    {editorial && <PolishedGlassRim radius={presentation.radius} width={10}/>}
+                    {editorial && <PolishedGlassRim radius={presentation.radius} width={14}/>}
                     <button
                       className="cpv-collapse-btn"
                       onClick={() => setSidebarVisible(false)}

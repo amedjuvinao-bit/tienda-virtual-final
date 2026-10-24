@@ -1,7 +1,7 @@
 import { upgradeCatalogGlassPalette, CATALOG_GLASS_PALETTE_VERSION } from './catalogGlassPalette';
 import { buildCatalogPresentation } from './catalogPresentation';
 
-export const EDITORIAL_STYLE_VERSION = 3;
+export const EDITORIAL_STYLE_VERSION = 4;
 
 // Upgrade the visual settings together, once. Subsequent individual edits remain authoritative.
 // Keep the earlier settings recoverable; no products, text, source or query options are changed.
@@ -17,7 +17,7 @@ export function applyCatalogEditorialPreset(raw = {}) {
     presentation: { ...presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, showOptions: false, filterSectionBorders: false },
     cardUiConfig: {
       ...raw.cardUiConfig, cardBg: glass, cardBorderColor: '#ffffff', cardBorderWidthPx: 1,
-      cardRadiusPx: 16, cardPaddingPx: 0, cardShadowStyle: 'soft', showBorder: true, showShadow: true,
+      cardRadiusPx: 26, cardPaddingPx: 0, cardShadowStyle: 'soft', showBorder: true, showShadow: true,
       imageRadiusPx: 12, showImageBg: true, imageBg: glass, imageFit: 'contain', titleColor: ink, priceColor: ink,
       oldPriceColor: '#987e82', metaColor: '#987e82', titleFontFamily: 'cormorant', priceFontFamily: 'jost',
       favoriteIconName: 'heart', cartIconName: 'shopping-bag', favoriteIconColor: accent, favoriteActiveColor: accent, cartIconColor: accent,
@@ -47,7 +47,24 @@ export function prepareCatalogEditorialConfig(raw) {
   if (presentation.styleVersion < EDITORIAL_STYLE_VERSION) {
     const backgroundImage = ['/instagram/editorial-satin.webp', '/catalog/editorial-architecture-v1.webp'].includes(presentation.backgroundImage) ? '' : presentation.backgroundImage;
     current = presentation.styleVersion < 2 ? applyCatalogEditorialPreset(current) : current;
-    current = { ...current, presentation: { ...presentation, ...current.presentation, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage }, cardUiConfig: { ...current.cardUiConfig, imageFit: 'contain' } };
+    const card = current.cardUiConfig || {};
+    const optical = presentation.rimStyle === 'optical' && card.showBorder !== false;
+    const oldCardRadius = card.cardRadiusPx == null || [16, 18].includes(Number(card.cardRadiusPx));
+    // Replace only the old automatic corners. Once version 4 is adopted,
+    // later radius edits remain authoritative within the editor's bounds.
+    const corners = optical ? {
+      ...(presentation.radius === 18 ? { radius: 26 } : {}),
+      ...(presentation.headerRadius === 22 ? { headerRadius: 40 } : {}),
+    } : {};
+    current = {
+      ...current,
+      visualBackup: current.visualBackup || {
+        cardUiConfig: current.cardUiConfig || {}, filterUiConfig: current.filterUiConfig || {},
+        columnControlsUiConfig: current.columnControlsUiConfig || {}, presentation: current.presentation || {},
+      },
+      presentation: { ...presentation, ...current.presentation, ...corners, layout: 'glass-grid', styleVersion: EDITORIAL_STYLE_VERSION, backgroundImage },
+      cardUiConfig: { ...card, ...(presentation.styleVersion < 3 ? { imageFit: 'contain' } : {}), ...(optical && oldCardRadius ? { cardRadiusPx: 26 } : {}) },
+    };
   }
   // Adopt the approved typographic heading once; keep the uploaded artwork available
   // and allow subsequent explicit changes from the editor to remain authoritative.

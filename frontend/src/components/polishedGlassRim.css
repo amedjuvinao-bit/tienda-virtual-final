@@ -2,12 +2,26 @@
   --pg-light:var(--ch-light,#fff);
   --pg-edge:var(--catalog-accent,#984d62);
   --pg-depth:color-mix(in srgb,var(--pg-edge) 55%,transparent);
+  --pg-contrast:var(--ch-text,var(--catalog-ink,#562633));
   /* The reflection keeps a white core even when the saved tint is dark. */
   --pg-highlight:color-mix(in srgb,#fff 88%,var(--pg-light));
   position:absolute; inset:0; display:block; border-radius:inherit;
   pointer-events:none; z-index:4;
 }
 .polished-glass-rim svg { position:relative; display:block; overflow:hidden; border-radius:inherit; opacity:var(--pg-opacity,1); }
+.polished-glass-rim__depth,.polished-glass-rim__shine {
+  position:absolute; inset:0; border-radius:inherit;
+  mask-size:100% 100%; mask-repeat:no-repeat;
+  -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat;
+}
+.polished-glass-rim__depth {
+  background:color-mix(in srgb,var(--pg-depth) 60%,var(--pg-contrast));
+  opacity:var(--pg-opacity,1);
+}
+.polished-glass-rim__shine {
+  background:var(--pg-highlight);
+  opacity:calc(var(--pg-opacity,1) * var(--pg-shine,1));
+}
 .polished-glass-rim__refraction {
   position:absolute; inset:0; padding:var(--pg-width); border-radius:inherit;
   opacity:var(--pg-opacity,1);

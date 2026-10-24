@@ -36,6 +36,6 @@ export default function CatalogLiquidGlass({ presentation }) {
   }, [presentation.motion]);
 
   return <div ref={layer} className="catalog-liquid" data-empty={presentation.headerEdgeWidth === 0} data-layers={presentation.headerLayers} aria-hidden="true">
-    <PolishedGlassRim radius={presentation.headerRadius} width={12 + presentation.headerEdgeWidth * 2} reflection={Math.sqrt(presentation.headerReflection)}/>
+    <PolishedGlassRim radius={presentation.headerRadius} width={16 + presentation.headerEdgeWidth * 2} reflection={Math.sqrt(presentation.headerReflection)}/>
   </div>;
 }
