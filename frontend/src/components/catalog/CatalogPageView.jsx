@@ -392,7 +392,11 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                 className={`cpv-sidebar ${
                   sidebarVisible ? "visible" : "hidden-side"
                 }`}
-                style={{ position: "relative" }}
+                style={{
+                  "--catalog-filter-top": page?.useHeader === false
+                    ? "12px"
+                    : "calc(var(--site-header-height, 92px) + 12px)",
+                }}
               >
                 {sidebarVisible && (
                   <>
@@ -406,22 +410,24 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                       <ChevronLeft size={16} />
                     </button>
 
-                    {!editorial && <div className="cpv-sidebar-title">
-                      <SlidersHorizontal size={18} />
-                      Filtros
-                    </div>}
+                    <div className="cpv-sidebar-scroll">
+                      {!editorial && <div className="cpv-sidebar-title">
+                        <SlidersHorizontal size={18} />
+                        Filtros
+                      </div>}
 
-                    <FilterSidebar
-                      selectedCategories={selectedCategories}
-                      onCategoryChange={setSelectedCategories}
-                      selectedColors={selectedColors}
-                      onColorChange={setSelectedColors}
-                      priceRange={priceRange}
-                      onPriceChange={setPriceRange}
-                      onClearFilters={clearFilters}
-                      filterUiConfig={safeConfig.filterUiConfig}
-                      catalogConfig={safeConfig}
-                    />
+                      <FilterSidebar
+                        selectedCategories={selectedCategories}
+                        onCategoryChange={setSelectedCategories}
+                        selectedColors={selectedColors}
+                        onColorChange={setSelectedColors}
+                        priceRange={priceRange}
+                        onPriceChange={setPriceRange}
+                        onClearFilters={clearFilters}
+                        filterUiConfig={safeConfig.filterUiConfig}
+                        catalogConfig={safeConfig}
+                      />
+                    </div>
                   </>
                 )}
               </aside>

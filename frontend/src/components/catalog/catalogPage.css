@@ -69,6 +69,9 @@
 }
 
 .cpv-sidebar {
+  position: sticky;
+  top: var(--catalog-filter-top, 104px);
+  --catalog-sidebar-padding: 18px;
   flex-shrink: 0;
   align-self: flex-start;
   background: rgba(255, 255, 255, 0.88);
@@ -104,6 +107,16 @@
   pointer-events: none;
   transform: translateX(-10px);
 }
+
+/* Keep the glass rim and close button stationary while long filters remain usable. */
+.cpv-sidebar-scroll {
+  max-height: calc(100vh - var(--catalog-filter-top, 104px) - 14px - 2 * var(--catalog-sidebar-padding));
+  max-height: calc(100dvh - var(--catalog-filter-top, 104px) - 14px - 2 * var(--catalog-sidebar-padding));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--catalog-accent, #984d62) 35%, transparent) transparent;
+}
+.cpv-sidebar-scroll .catalog-filters { position: static; }
 
 @media (max-width: 767px) {
   .cpv-sidebar {

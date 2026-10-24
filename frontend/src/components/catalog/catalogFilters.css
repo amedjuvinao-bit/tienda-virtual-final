@@ -1,5 +1,5 @@
 /* Shared glass filter: public catalog, live editor and mobile drawer. */
-.cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible { width:248px; padding:16px 14px; }
+.cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible { width:248px; padding:16px 14px; --catalog-sidebar-padding:16px; }
 .cpv-page[data-layout="glass-grid"] .cpv-collapse-btn { width:28px; height:28px; top:16px; right:16px; color:var(--catalog-ink); border:1px solid color-mix(in srgb,var(--ch-light,#fff) 55%,transparent); background:color-mix(in srgb,var(--catalog-glass-color) 16%,transparent); box-shadow:inset 0 1px 0 #ffffff60; backdrop-filter:blur(6px); }
 .cpv-page[data-layout="glass-grid"] .cpv-collapse-btn:active { transform:scale(.86); }
 .catalog-filters[data-presentation="glass-grid"] { display:flex; flex-direction:column; container-type:inline-size; color:var(--cf-ink); font-size:var(--cf-text-size); line-height:1.45; }
@@ -60,7 +60,7 @@
 .catalog-filters[data-presentation="glass-grid"] :is(button,input):focus-visible { outline:2px solid var(--cf-accent); outline-offset:2px; }
 .catalog-filters[data-presentation="glass-grid"] .catalog-filter-section > button:focus-visible { outline-offset:-3px; }
 .catalog-filters[data-presentation="glass-grid"] .catalog-filter-prices > div:focus-within { outline:1px solid var(--cf-accent); }
-@media(max-width:1099px) and (min-width:768px) { .cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible { width:234px; padding:14px 12px; } }
+@media(max-width:1099px) and (min-width:768px) { .cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible { width:234px; padding:14px 12px; --catalog-sidebar-padding:14px; } }
 @media(max-width:767px) {
   .cpv-page[data-layout="glass-grid"] .cpv-drawer .catalog-filter-intro { display:none; }
   .cpv-page[data-layout="glass-grid"] .cpv-drawer .catalog-filter-intro:has(.catalog-filter-active) { display:block; }
