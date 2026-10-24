@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { readCatalogQuery, writeCatalogQuery } from "./catalogQuery";
 
 export default function useCatalogQuery(config, width) {
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const state = useMemo(
     () => readCatalogQuery(params, config, width),
     [params, config, width],
@@ -14,9 +15,13 @@ export default function useCatalogQuery(config, width) {
         const previous = readCatalogQuery(current, config, width);
         const changes = typeof patch === "function" ? patch(previous) : patch;
         return writeCatalogQuery(current, { ...previous, page: 1, ...changes });
-      }, options);
+      }, {
+        ...options,
+        preventScrollReset: true,
+        state: { ...location.state, preserveStorefrontScroll: true },
+      });
     },
-    [setParams, config, width],
+    [setParams, config, width, location.state],
   );
   return {
     state,

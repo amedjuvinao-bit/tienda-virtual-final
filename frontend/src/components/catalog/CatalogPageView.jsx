@@ -1,5 +1,5 @@
 // src/components/catalog/CatalogPageView.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
 import CatalogEditorialCard from "./CatalogEditorialCard";
@@ -91,6 +91,11 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
     error: productsError,
     retry,
   } = useCatalogProducts(safeConfig, query, setCatalogPage);
+  const contentRef = useRef(null);
+  const settledHeight = useRef(0);
+  useLayoutEffect(() => {
+    if (!productsLoading) settledHeight.current = contentRef.current?.getBoundingClientRect().height || 0;
+  }, [productsLoading, filteredProducts, cols, viewportWidth]);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [hoveredColButton, setHoveredColButton] = useState(null);
@@ -410,7 +415,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                       <ChevronLeft size={16} />
                     </button>
 
-                    <div className="cpv-sidebar-scroll">
+                    <div className="cpv-sidebar-body">
                       {!editorial && <div className="cpv-sidebar-title">
                         <SlidersHorizontal size={18} />
                         Filtros
@@ -433,7 +438,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
               </aside>
             )}
 
-            <main className="cpv-content">
+            <main ref={contentRef} className="cpv-content" style={{ minHeight: productsLoading && settledHeight.current ? `${settledHeight.current}px` : undefined }}>
               {!editorial && <CatalogIntro config={safeConfig} page={page}/>}
 
               {!editorial && commandBar}
@@ -516,7 +521,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
             </main>
           </div>
 
-          {(!editorial || !safeConfig.showToolbar) && safeConfig.showFilters && safeConfig.showFilterFab && (
+          {(isMobile || !editorial || !safeConfig.showToolbar) && safeConfig.showFilters && safeConfig.showFilterFab && (
             <button
               className="cpv-fab"
               onClick={() =>
@@ -525,7 +530,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                   : setSidebarVisible((v) => !v)
               }
               title="Mostrar/ocultar filtros"
-              aria-label="Mostrar/ocultar filtros"
+              aria-label={isMobile ? "Abrir filtros" : "Mostrar/ocultar filtros"}
             >
               <Filter className="h-5 w-5" />
               <span style={{ display: isMobile ? "none" : undefined }}>

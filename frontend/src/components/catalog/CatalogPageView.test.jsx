@@ -10,6 +10,7 @@ import {
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import CatalogPageView from "./CatalogPageView";
 import api from "../../lib/api";
+import StorefrontScrollRestoration from "../StorefrontScrollRestoration";
 const { addToCart, toggleFavorite } = vi.hoisted(() => ({
   addToCart: vi.fn(),
   toggleFavorite: vi.fn(),
@@ -312,4 +313,46 @@ it('permite reescribir precios sin limitar cada dígito y recupera el formato al
   fireEvent.blur(max);
   await waitFor(()=>expect(max).toHaveValue('180.000'));
   expect(screen.getByLabelText('Precio máximo del rango')).toHaveAttribute('aria-valuenow','180000');
+});
+
+
+it('conserva el scroll al cambiar el precio y la altura del catálogo durante una petición lenta', async () => {
+  window.sessionStorage.clear();
+  const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const rect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    const measured = rect.call(this);
+    return this.classList.contains('cpv-content') ? {...measured, height:2400} : measured;
+  });
+  let finish;
+  fetch.mockResolvedValueOnce(response(result())).mockImplementationOnce(() => new Promise(resolve => {finish=resolve;}));
+  render(<MemoryRouter initialEntries={['/pagina/catalogo']}><StorefrontScrollRestoration/><Shell config={{}}/></MemoryRouter>);
+  await screen.findByText('Libro especial');
+  scroll.mockClear();
+  fireEvent.change(screen.getByLabelText('Precio máximo', {exact:true}), {target:{value:'300000'}});
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  expect(scroll).not.toHaveBeenCalled();
+  expect(document.querySelector('.cpv-content').style.minHeight).toBe('2400px');
+  finish(response(result()));
+  await screen.findByText('Libro especial');
+  expect(document.querySelector('.cpv-content').style.minHeight).toBe('');
+  expect(scroll).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', {name:'Rojo', exact:true}));
+  await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('colors=rojo'));
+  expect(scroll).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('link', {name:'Ver Libro especial', exact:true}));
+  await waitFor(() => expect(scroll).toHaveBeenCalledWith({top:0,behavior:'instant'}));
+});
+
+it('mantiene un acceso flotante al filtro en móvil aunque los controles del encabezado estén activados', async () => {
+  vi.stubGlobal('innerWidth', 390);
+  const view=mount({showToolbar:true,showFilterFab:true});
+  const open=await screen.findByRole('button',{name:'Abrir filtros',exact:true});
+  fireEvent.click(open);
+  expect(screen.getByRole('dialog',{name:'Filtros'})).toBeInTheDocument();
+  fireEvent.keyDown(document,{key:'Escape'});
+  expect(screen.queryByRole('dialog',{name:'Filtros'})).not.toBeInTheDocument();
+  view.unmount();
+  mount({showFilterFab:false});
+  expect(screen.queryByRole('button',{name:'Abrir filtros',exact:true})).not.toBeInTheDocument();
 });

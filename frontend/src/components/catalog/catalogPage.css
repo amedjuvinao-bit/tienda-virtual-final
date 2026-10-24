@@ -108,15 +108,38 @@
   transform: translateX(-10px);
 }
 
-/* Keep the glass rim and close button stationary while long filters remain usable. */
-.cpv-sidebar-scroll {
+/* The frame stays still; only the category and color lists can scroll. */
+.cpv-sidebar-body {
   max-height: calc(100vh - var(--catalog-filter-top, 104px) - 14px - 2 * var(--catalog-sidebar-padding));
   max-height: calc(100dvh - var(--catalog-filter-top, 104px) - 14px - 2 * var(--catalog-sidebar-padding));
+  overflow: clip;
+}
+.cpv-sidebar-body .catalog-filters {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  row-gap: min(var(--cf-section-gap, 12px), 2dvh) !important;
+}
+.cpv-sidebar-body .catalog-filter-intro,
+.cpv-sidebar-body [data-filter-section="price"],
+.cpv-sidebar-body [data-filter-section][data-open="false"] { flex-shrink: 0; }
+.cpv-sidebar-body :is([data-filter-section="categories"], [data-filter-section="colors"])[data-open="true"] {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.cpv-sidebar-body .catalog-filter-section > button { flex-shrink: 0; }
+.cpv-sidebar-body :is([data-filter-section="categories"], [data-filter-section="colors"]) .catalog-filter-content {
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--catalog-accent, #984d62) 35%, transparent) transparent;
 }
-.cpv-sidebar-scroll .catalog-filters { position: static; }
+.cpv-sidebar-body .catalog-filters[data-presentation] .catalog-filter-categories,
+.cpv-sidebar-body .catalog-filters[data-presentation] .catalog-filter-colors { max-height: none; overflow: visible; }
+.cpv-sidebar-body .catalog-filters > :not([hidden]) { margin-top: 0; }
 
 @media (max-width: 767px) {
   .cpv-sidebar {

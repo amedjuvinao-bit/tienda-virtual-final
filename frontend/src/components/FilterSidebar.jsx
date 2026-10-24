@@ -153,6 +153,7 @@ function getSectionAnimationClass(animation) {
 
 function FilterSection({
   title,
+  section,
   icon = null,
   isOpen,
   onToggle,
@@ -164,6 +165,8 @@ function FilterSection({
   const contentId = useId();
   return (
     <div
+      data-filter-section={section}
+      data-open={isOpen}
       className={`catalog-filter-section overflow-hidden ${getShadowClass(ui.shadowStyle)}`}
       style={{
         borderRadius: `${isMobile ? Math.max(ui.sectionRadiusPx - 2, 16) : ui.sectionRadiusPx}px`,
@@ -393,6 +396,7 @@ export default function FilterSidebar({
       className={`catalog-filters ${isGlass ? "" : "space-y-4 sm:space-y-5"} ${ui.stickyHeader ? "md:sticky md:top-24" : ""}`}
       style={{
         '--catalog-filter-bg': ui.panelBg,
+        '--cf-section-gap': `${ui.sectionGapPx}px`,
         '--cf-ink': ui.chipTextColor,
         '--cf-title': ui.panelTitleColor,
         '--cf-muted': ui.panelSubtitleColor,
@@ -493,6 +497,7 @@ export default function FilterSidebar({
 
       <FilterSection
         title="Categorías"
+        section="categories"
         icon={<Search className="h-4 w-4" />}
         isOpen={openCats}
         onToggle={() => refreshOnOpen(setOpenCats, openCats)}
@@ -617,6 +622,7 @@ export default function FilterSidebar({
 
       <FilterSection
         title="Color"
+        section="colors"
         icon={<Palette className="h-4 w-4" />}
         isOpen={openColors}
         onToggle={() => refreshOnOpen(setOpenColors, openColors)}
@@ -679,6 +685,7 @@ export default function FilterSidebar({
 
       <FilterSection
         title="Precio"
+        section="price"
         icon={<BadgeDollarSign className="h-4 w-4" />}
         isOpen={openPrice}
         onToggle={() => setOpenPrice(!openPrice)}
