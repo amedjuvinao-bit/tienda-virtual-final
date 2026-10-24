@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
 import { useFavorites } from '../context/FavoritesContext';
+import { buildSafeCardUiConfig } from './catalog/catalogConfig';
+import { normalizeToCss } from './catalog/catalogColors';
 
 function clampInt(value, min, max, fallback) {
   const n = Number.parseInt(value, 10);
@@ -62,7 +64,11 @@ export function buildCatalogCartIntent(product = {}) {
   const variants = (Array.isArray(product.variants) ? product.variants : [])
     .filter((variant) => variant?.active !== false);
 
-  if (variants.length > 1) {
+  const tracked = product.inventoryTracked === true;
+  const available = variants.length ? variants.some(v => Number(v.availableStock || 0) > 0) : Number(product.availableStock || 0) > 0;
+  if (product.active === false || (tracked && !available)) return { requiresSelection: false, payload: null, unavailable: true };
+  const legacyOptions = !variants.length && ((product.sizes || []).length || (product.colors || []).length);
+  if (variants.length > 1 || legacyOptions) {
     return { requiresSelection: true, payload: null };
   }
 
@@ -85,75 +91,6 @@ export function buildCatalogCartIntent(product = {}) {
       quantity: 1,
       price: Number(variant?.price ?? product.price ?? 0) || 0,
     },
-  };
-}
-
-function buildSafeCardUiConfig(raw) {
-  const cfg = raw && typeof raw === 'object' ? raw : {};
-
-  return {
-    cardBg: typeof cfg.cardBg === 'string' ? cfg.cardBg : '#ffffff',
-    cardBorderColor:
-      typeof cfg.cardBorderColor === 'string' ? cfg.cardBorderColor : '#ecdcb6',
-    cardBorderWidthPx: clampInt(cfg.cardBorderWidthPx, 0, 6, 1),
-    cardRadiusPx: clampInt(cfg.cardRadiusPx, 8, 40, 28),
-    cardPaddingPx: clampInt(cfg.cardPaddingPx, 0, 40, 12),
-
-    imageBg: typeof cfg.imageBg === 'string' ? cfg.imageBg : '#faf8f3',
-    imageRadiusPx: clampInt(cfg.imageRadiusPx, 0, 40, 24),
-    imageFit:
-      cfg.imageFit === 'contain' || cfg.imageFit === 'cover'
-        ? cfg.imageFit
-        : 'cover',
-
-    titleColor: typeof cfg.titleColor === 'string' ? cfg.titleColor : '#2f3440',
-    priceColor: typeof cfg.priceColor === 'string' ? cfg.priceColor : '#e54497',
-    oldPriceColor:
-      typeof cfg.oldPriceColor === 'string' ? cfg.oldPriceColor : '#9ca3af',
-    metaColor: typeof cfg.metaColor === 'string' ? cfg.metaColor : '#6b7280',
-
-    titleFontFamily:
-      typeof cfg.titleFontFamily === 'string' ? cfg.titleFontFamily : '',
-    priceFontFamily:
-      typeof cfg.priceFontFamily === 'string' ? cfg.priceFontFamily : '',
-    metaFontFamily:
-      typeof cfg.metaFontFamily === 'string' ? cfg.metaFontFamily : '',
-
-    favoriteButtonBg:
-      typeof cfg.favoriteButtonBg === 'string' ? cfg.favoriteButtonBg : '#ffffff',
-    cartButtonBg:
-      typeof cfg.cartButtonBg === 'string' ? cfg.cartButtonBg : '#ffffff',
-    favoriteButtonOpacity: clampNumber(cfg.favoriteButtonOpacity, 0, 1, 1),
-    cartButtonOpacity: clampNumber(cfg.cartButtonOpacity, 0, 1, 1),
-
-    actionButtonBorderColor:
-      typeof cfg.actionButtonBorderColor === 'string'
-        ? cfg.actionButtonBorderColor
-        : '#ffffff',
-    actionButtonBorderWidthPx: clampInt(cfg.actionButtonBorderWidthPx, 0, 4, 1),
-
-    favoriteIconColor:
-      typeof cfg.favoriteIconColor === 'string' ? cfg.favoriteIconColor : '#d946ef',
-    favoriteActiveColor:
-      typeof cfg.favoriteActiveColor === 'string'
-        ? cfg.favoriteActiveColor
-        : '#D4AF37',
-    cartIconColor:
-      typeof cfg.cartIconColor === 'string' ? cfg.cartIconColor : '#D4AF37',
-
-    favoriteIconName:
-      cfg.favoriteIconName === 'heart' ||
-      cfg.favoriteIconName === 'sparkles' ||
-      cfg.favoriteIconName === 'star'
-        ? cfg.favoriteIconName
-        : 'star',
-
-    cartIconName:
-      cfg.cartIconName === 'shopping-bag' ||
-      cfg.cartIconName === 'bag-heart' ||
-      cfg.cartIconName === 'shopping-cart'
-        ? cfg.cartIconName
-        : 'shopping-cart',
   };
 }
 
@@ -304,7 +241,7 @@ export default function ProductCard({
     () => buildCatalogCartIntent(product),
     [product]
   );
-  const cartActionLabel = cartIntent.requiresSelection
+  const cartActionLabel = cartIntent.unavailable ? 'Agotado' : cartIntent.requiresSelection
     ? 'Seleccionar opciones'
     : 'Agregar al carrito';
 
@@ -329,15 +266,17 @@ export default function ProductCard({
   }, [cover, images]);
 
   const cardStyle = {
+    "--product-card-bg": safeCardUi.cardBg,
     backgroundColor: safeCardUi.cardBg,
+    boxShadow: !safeCardUi.showShadow || safeCardUi.cardShadowStyle === 'none' ? 'none' : ({ soft: '0 4px 16px rgba(40,30,40,.06)', medium: '0 10px 25px rgba(40,30,40,.1)', strong: '0 16px 38px rgba(40,30,40,.16)' })[safeCardUi.cardShadowStyle],
     borderColor: safeCardUi.cardBorderColor,
-    borderWidth: `${safeCardUi.cardBorderWidthPx}px`,
+    borderWidth: `${safeCardUi.showBorder ? safeCardUi.cardBorderWidthPx : 0}px`,
     borderRadius: `${safeCardUi.cardRadiusPx}px`,
     padding: `${safeCardUi.cardPaddingPx}px`,
   };
 
   const imageStyle = {
-    backgroundColor: safeCardUi.imageBg,
+    backgroundColor: safeCardUi.showImageBg ? safeCardUi.imageBg : 'transparent',
     borderRadius: `${safeCardUi.imageRadiusPx}px`,
   };
 
@@ -395,6 +334,7 @@ export default function ProductCard({
     e.preventDefault();
     e.stopPropagation();
 
+    if (cartIntent.unavailable) return;
     if (cartIntent.requiresSelection) {
       navigate(linkTo);
       return;
@@ -409,9 +349,9 @@ export default function ProductCard({
   };
 
   return (
-    <div className="w-full">
+    <div className="product-card w-full">
       <div
-        className={`group border bg-white transition hover:shadow-lg ${
+        className={`product-card__surface group border bg-white transition hover:shadow-lg ${
           isList ? 'overflow-hidden rounded-[28px]' : 'rounded-[28px]'
         }`}
         style={cardStyle}
@@ -419,19 +359,19 @@ export default function ProductCard({
         <div
           className={
             isList
-              ? 'flex flex-col md:flex-row md:items-start md:gap-8'
-              : ''
+              ? 'product-card__body flex flex-col md:flex-row md:items-start md:gap-8'
+              : 'product-card__body'
           }
         >
           <div
-            className={`relative overflow-hidden border border-[#eeddb8] ${
+            className={`product-card__media relative overflow-hidden border border-[#eeddb8] ${
               isList ? 'w-full md:w-[290px] md:min-w-[290px] md:max-w-[290px]' : ''
             }`}
             style={imageStyle}
           >
             <Link to={linkTo}>
               <div
-                className={`overflow-hidden ${
+                className={`product-card__image overflow-hidden ${
                   isList ? 'aspect-[4/5] md:h-[340px] md:aspect-auto' : 'aspect-[4/5]'
                 }`}
                 style={imageStyle}
@@ -443,6 +383,8 @@ export default function ProductCard({
                     className="h-full w-full transition-transform duration-500 group-hover:scale-[1.035]"
                     style={{ objectFit: safeCardUi.imageFit }}
                     loading="lazy"
+                    decoding="async"
+                    onError={event => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = 'true'; event.currentTarget.src = '/placeholder.png'; } }}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
@@ -458,9 +400,9 @@ export default function ProductCard({
               </span>
             )}
 
-            {active === false && (
+            {(active === false || cartIntent.unavailable) && (
               <span className="absolute left-2 top-2 rounded-full bg-gray-700/85 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
-                Inactivo
+                {active === false ? 'Inactivo' : 'Agotado'}
               </span>
             )}
 
@@ -476,6 +418,7 @@ export default function ProductCard({
                     className="flex h-8 w-8 items-center justify-center rounded-full border transition duration-200 hover:scale-[1.05] hover:shadow-sm"
                     style={favoriteButtonStyle}
                     aria-label="Favorito"
+                    aria-pressed={isFavoriteActive}
                   >
                     {renderFavoriteIcon(
                       safeCardUi.favoriteIconName,
@@ -498,6 +441,7 @@ export default function ProductCard({
                 >
                   <button
                     onClick={handleAddToCart}
+                    disabled={cartIntent.unavailable}
                     className="flex h-8 w-8 items-center justify-center rounded-full border transition duration-200 hover:scale-[1.05] hover:shadow-sm"
                     style={cartButtonStyle}
                     aria-label={cartActionLabel}
@@ -516,25 +460,25 @@ export default function ProductCard({
           </div>
 
           <div
-            className={`min-w-0 text-left ${
+            className={`product-card__details min-w-0 text-left ${
               isList
                 ? 'flex flex-1 flex-col px-1 pt-4 pb-1 md:pt-4 md:pr-6 md:pb-4'
                 : 'px-1 pt-2 pb-1'
             }`}
           >
             <h3
-              className={`font-semibold leading-[1.2] ${
+              className={`product-card__title font-semibold leading-[1.2] ${
                 isList
                   ? 'max-w-[520px] text-[18px] sm:text-[20px] md:text-[22px]'
                   : 'line-clamp-2 text-[16px] sm:text-[18px] md:text-[20px]'
               }`}
               style={titleStyle}
             >
-              {title}
+              <Link to={linkTo}>{title}</Link>
             </h3>
 
             {visibleColors.length > 0 && (
-              <div className={`${isList ? 'mt-3' : 'mt-1'} flex items-center gap-1.5`}>
+              <div className={`product-card__options ${isList ? 'mt-3' : 'mt-1'} flex items-center gap-1.5`}>
                 {!isList && (
                   <span
                     className="text-[9px] font-semibold uppercase tracking-[0.14em]"
@@ -550,7 +494,7 @@ export default function ProductCard({
                       key={`${c.value}-${i}`}
                       title={prettyColor(c.value)}
                       className={`${isList ? 'h-5 w-5' : 'h-3 w-3'} rounded-full border border-gray-300`}
-                      style={{ backgroundColor: c.value }}
+                      style={{ backgroundColor: normalizeToCss(c.value) || "#f1edf3" }}
                     />
                   ))}
                 </div>
@@ -578,18 +522,18 @@ export default function ProductCard({
               <span
                 className={
                   isList
-                    ? 'text-[24px] font-semibold md:text-[26px]'
-                    : 'text-[15px] font-semibold sm:text-[16px]'
+                    ? 'product-card__price text-[24px] font-semibold md:text-[26px]'
+                    : 'product-card__price text-[15px] font-semibold sm:text-[16px]'
                 }
                 style={priceStyle}
               >
-                ${Number(price).toLocaleString()}
+                ${Number(cartIntent.payload?.price ?? price).toLocaleString('es-CO')}
               </span>
             </div>
 
             {description ? (
               <p
-                className={`opacity-85 ${
+                className={`product-card__description opacity-85 ${
                   isList
                     ? 'mt-3 max-w-[520px] text-[13px] leading-6 md:text-[14px]'
                     : 'mt-1 text-[10px] leading-4 sm:text-[11px]'
@@ -612,6 +556,7 @@ export default function ProductCard({
                     className="flex h-9 w-9 items-center justify-center rounded-full border transition duration-200 hover:scale-[1.04] hover:shadow-sm"
                     style={favoriteButtonStyle}
                     aria-label="Favorito"
+                    aria-pressed={isFavoriteActive}
                   >
                     {renderFavoriteIcon(
                       safeCardUi.favoriteIconName,
@@ -634,6 +579,7 @@ export default function ProductCard({
                 >
                   <button
                     onClick={handleAddToCart}
+                    disabled={cartIntent.unavailable}
                     className="flex h-9 w-9 items-center justify-center rounded-full border transition duration-200 hover:scale-[1.04] hover:shadow-sm"
                     style={cartButtonStyle}
                     aria-label={cartActionLabel}

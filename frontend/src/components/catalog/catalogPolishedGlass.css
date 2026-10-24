@@ -1,0 +1,152 @@
+/* Smooth glass: relief stays on the measured perimeter, with a clean face. */
+.cpv-page[data-layout="glass-grid"] {
+  --catalog-specular:color-mix(in srgb,#fff 88%,var(--ch-light));
+  --catalog-reflection:color-mix(in srgb,var(--catalog-specular) calc(var(--ch-reflection-opacity) * 100%),transparent);
+}
+.cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
+  --catalog-face-radius:var(--ch-radius);
+  --catalog-face-blur:calc(var(--ch-blur) * .3);
+  background:linear-gradient(150deg,color-mix(in srgb,var(--ch-fill) 35%,transparent),transparent 40%,color-mix(in srgb,var(--ch-fill) 15%,transparent));
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  box-shadow:0 8px 18px -10px var(--ch-shadow);
+}
+.cpv-page[data-layout="glass-grid"] .cpv-sidebar.visible {
+  --catalog-face-radius:var(--catalog-radius);
+  --catalog-rim-gutter:0px;
+  isolation:isolate; border-color:transparent;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--catalog-specular) 14%,transparent),transparent 45%),color-mix(in srgb,var(--catalog-glass-color) 8%,transparent);
+  box-shadow:0 12px 24px -18px var(--ch-shadow);
+}
+.cpv-page[data-layout="glass-grid"] .cpv-sidebar > .polished-glass-rim { --pg-opacity:var(--ch-material-opacity); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard {
+  padding:0;
+  border-color:transparent;
+  background:none;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+  box-shadow:var(--ecard-shadow),inset 0 2px 3px color-mix(in srgb,var(--catalog-specular) 80%,transparent),inset 0 -4px 6px color-mix(in srgb,var(--look-accent) 18%,transparent);
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard > .polished-glass-rim { --pg-edge:var(--ecard-border); --pg-opacity:var(--catalog-rim-opacity); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] {
+  /* The photo meets the perimeter; spacing belongs to the information area. */
+  --catalog-rim-gutter:var(--ecard-border-width);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+  border-width:0;
+  padding:0;
+  box-shadow:var(--ecard-shadow);
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="optical"] .catalog-ecard__photo {
+  border-radius:0;
+  background:color-mix(in srgb,var(--ecard-image-bg) calc(var(--catalog-glass-fill) * .15),transparent);
+}
+/* Frost only the inset face: a filter on the parent would prevent the rim
+   from sampling and bending the continuous background behind the card. */
+.cpv-page[data-layout="glass-grid"] :where(.cpv-hero-glass,.cpv-sidebar.visible)::before {
+  content:""; position:absolute; inset:var(--catalog-rim-gutter,14px);
+  z-index:-1; pointer-events:none;
+  border-radius:max(0px,calc(var(--catalog-face-radius,var(--ecard-radius)) - var(--catalog-rim-gutter,14px)));
+  backdrop-filter:blur(var(--catalog-face-blur,calc(var(--catalog-blur) * .3)));
+  -webkit-backdrop-filter:blur(var(--catalog-face-blur,calc(var(--catalog-blur) * .3)));
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard .catalog-ecard__photo { border-radius:0; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="fine"] { border-color:var(--ecard-border); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard[data-rim="none"] { box-shadow:var(--ecard-shadow); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard__footer {
+  flex:1; align-items:flex-start;
+  padding:calc(12px + var(--ecard-padding)) calc(14px + var(--ecard-padding));
+  background:none;
+  border-top:1px solid var(--catalog-reflection);
+  box-shadow:inset 0 1px 2px var(--catalog-reflection),inset 0 -2px 4px color-mix(in srgb,var(--look-accent) 12%,transparent);
+  backdrop-filter:blur(calc(var(--catalog-blur) * .25)) saturate(1.15);
+  -webkit-backdrop-filter:blur(calc(var(--catalog-blur) * .25)) saturate(1.15);
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard { display:flex; flex-direction:column; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard__photo { flex:none; }
+/* Bare action icons: keep a comfortable hit area without painting a box. */
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button {
+  width:44px; height:44px; border:0; border-radius:50%; background:none; box-shadow:none;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button::after { content:none; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button>svg:not(.catalog-ecard__bag-heart):not(.catalog-ecard__cart-check) {
+  width:23px; height:23px; stroke-width:1.8;
+  filter:drop-shadow(0 1px 1px var(--catalog-specular)) drop-shadow(0 2px 2px color-mix(in srgb,var(--catalog-ink) 32%,transparent));
+}
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button:disabled { opacity:.65; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard__bag-heart { right:8px; bottom:9px; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard button[aria-pressed="true"]>svg { stroke-width:2.2; }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard__cart[aria-pressed="true"]>svg:first-child { fill:color-mix(in srgb,currentColor 24%,transparent); }
+.cpv-page[data-layout="glass-grid"] .catalog-ecard .catalog-ecard__cart-check {
+  position:absolute; right:2px; bottom:3px; width:12px; height:12px; stroke-width:3;
+  filter:drop-shadow(0 1px 1px var(--catalog-specular));
+}
+@keyframes catalog-action-pop-a {
+  0% { transform:scale(1) rotate(0); }
+  30% { transform:scale(.72) rotate(-14deg); }
+  65% { transform:scale(1.4) rotate(9deg); }
+  100% { transform:scale(1) rotate(0); }
+}
+@keyframes catalog-action-pop-b {
+  0% { transform:scale(1) rotate(0); }
+  30% { transform:scale(.72) rotate(-14deg); }
+  65% { transform:scale(1.4) rotate(9deg); }
+  100% { transform:scale(1) rotate(0); }
+}
+@media(prefers-reduced-motion:no-preference) {
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button[data-pulse="a"]>svg:first-child { animation:catalog-action-pop-a .55s cubic-bezier(.22,.8,.3,1); }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button[data-pulse="b"]>svg:first-child { animation:catalog-action-pop-b .55s cubic-bezier(.22,.8,.3,1); }
+}
+@media(prefers-reduced-motion:no-preference) {
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button>svg { transition:scale .2s ease; }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button:hover:not(:disabled)>svg { scale:1.12; }
+}
+@media(max-width:767px) {
+  .cpv-page[data-layout="glass-grid"] .catalog-ecard__footer { padding:calc(10px + var(--ecard-padding)) calc(9px + var(--ecard-padding)); }
+}
+.cpv-page[data-layout="glass-grid"] .cpv-commandbar :is(.cpv-discovery form,.cpv-discovery select,.cpv-inline-filter,.cpv-col-btn,.cpv-filter-chip) {
+  border:1px solid color-mix(in srgb,var(--ch-edge) 50%,var(--catalog-specular)); outline:none;
+  background:linear-gradient(170deg,color-mix(in srgb,var(--catalog-specular) 38%,transparent),transparent 22%,transparent 72%,color-mix(in srgb,var(--catalog-specular) 20%,transparent)),color-mix(in srgb,var(--catalog-control-bg,var(--ch-badge-tint)) 30%,transparent);
+  box-shadow:inset 0 2px 2px var(--catalog-reflection),inset 1px 0 2px color-mix(in srgb,var(--catalog-specular) 65%,transparent),inset 0 -3px 3px var(--ch-contrast),0 2px 2px color-mix(in srgb,var(--catalog-specular) 70%,transparent),0 5px 10px -5px var(--ch-shadow);
+}
+.cpv-page[data-layout="glass-grid"] .cpv-commandbar .cpv-col-btn.active {
+  box-shadow:inset 0 2px 3px var(--catalog-reflection),inset 0 -3px 3px var(--ch-contrast),0 3px 7px var(--ch-shadow);
+}
+.footer-ed[data-glass="polished"] {
+  padding-bottom:max(16px,var(--fe-padding-bottom));
+  --pg-light:var(--fe-edge); --pg-edge:var(--fe-tint);
+  --pg-contrast:var(--fe-ink);
+  --pg-depth:color-mix(in srgb,var(--fe-ink) 35%,transparent);
+  --pg-opacity:var(--fe-art-alpha);
+}
+.cpv-page[data-background="continuity"] > .cpv-footer .footer-ed[data-glass="polished"] {
+  border:0;
+  box-shadow:0 calc(var(--fe-depth) * .5) var(--fe-depth) calc(var(--fe-depth) * -.4) color-mix(in srgb,var(--fe-ink) 20%,transparent);
+}
+.cpv-page[data-background="continuity"] > .cpv-footer .footer-ed[data-glass="polished"],
+.cpv-footer .footer-ed[data-glass="polished"] .footer-ed__glass {
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+.cpv-footer .footer-ed[data-glass="polished"] > .footer-ed__inner::before {
+  content:""; position:absolute; inset:12px; z-index:-1; pointer-events:none;
+  border-radius:calc(var(--fe-radius) - 4px);
+  backdrop-filter:blur(calc(var(--fe-blur) * .3));
+  -webkit-backdrop-filter:blur(calc(var(--fe-blur) * .3));
+}
+.cpv-footer .footer-ed[data-glass="polished"]::before,
+.cpv-footer .footer-ed[data-glass="polished"]::after,
+.footer-ed[data-glass="polished"] .footer-ed__glass::before,
+.footer-ed[data-glass="polished"] .footer-ed__glass::after { display:none; }
+.footer-ed[data-glass="polished"] > .polished-glass-rim,
+.footer-ed[data-glass="polished"] .footer-ed__glass > .polished-glass-rim {
+  --pg-light:var(--fe-edge); --pg-edge:var(--fe-tint);
+  --pg-depth:color-mix(in srgb,var(--fe-ink) 35%,transparent);
+  --pg-opacity:var(--fe-art-alpha);
+}
+.footer-ed[data-glass="polished"] .footer-ed__glass {
+  border:0;
+  box-shadow:0 calc(var(--fe-depth) * .5) var(--fe-depth) calc(var(--fe-depth) * -.4) color-mix(in srgb,var(--fe-ink) 20%,transparent);
+}
+@container footer-editorial (max-width:700px) {
+  .footer-ed[data-glass="polished"] { padding-bottom:max(16px,min(var(--fe-padding-bottom),24px)); }
+}

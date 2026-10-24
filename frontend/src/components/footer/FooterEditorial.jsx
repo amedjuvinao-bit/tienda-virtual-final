@@ -6,8 +6,9 @@ import FooterNavigation from './FooterNavigation';
 import FooterSocials from './FooterSocials';
 import './footerEditorial.css';
 import { footerClickFeedback } from './footerClickFeedback';
+import PolishedGlassRim from '../PolishedGlassRim';
 
-export default function FooterEditorial({ theme, store, preview=false }) {
+export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
   const [failedLogo,setFailedLogo]=useState('');
   const signatureId='footer-signature-'+useId().replace(/:/g,'');
@@ -33,11 +34,12 @@ export default function FooterEditorial({ theme, store, preview=false }) {
     const view=root.current?.ownerDocument.defaultView;
     view?.scrollTo({top:0,behavior:view.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   }
-  return <div className="footer-ed-viewport"><footer ref={root} onClickCapture={footerClickFeedback} className="footer-ed" aria-label="Pie de página" style={style} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
+  return <div className="footer-ed-viewport"><footer ref={root} onClickCapture={footerClickFeedback} className="footer-ed" aria-label="Pie de página" style={style} data-glass={polishedGlass ? 'polished' : undefined} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
+    {polishedGlass && <PolishedGlassRim radius={c.radius} width={Math.min(6,c.depth / 4)}/>}
     <div className="footer-ed__inner">
       {c.newsletterEnabled && <div className="footer-ed__top">
         <header className="footer-ed__invitation">{c.headline && <h2>{c.headline}</h2>}{c.description && <p>{c.description}</p>}</header>
-        <FooterNewsletter config={c} footer={footer} preview={preview}/>
+        <FooterNewsletter config={c} footer={footer} preview={preview} polishedGlass={polishedGlass}/>
       </div>}
       <div className="footer-ed__body">
         {c.brandEnabled && (showLogo || c.brandName || c.brandTagline) && <div className="footer-ed__brand">

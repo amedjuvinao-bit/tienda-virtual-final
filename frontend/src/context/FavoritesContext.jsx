@@ -13,7 +13,7 @@ import {
   getFavoriteAccess,
 } from '../utils/favoriteAccess';
 
-const FavoritesContext = createContext();
+export const FavoritesContext = createContext();
 
 function clean(value) {
   return String(value || '').trim();

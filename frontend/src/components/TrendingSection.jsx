@@ -6,8 +6,7 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
 import { normalizeTrendingPresentation, trendingPresentationVars } from "./trendingPresentation";
-import boutiqueBackdrop from "../assets/trending-vitrine-boutique.webp";
-import runwayBackdrop from "../assets/trending-runway-mobile.webp";
+import { trendingSceneImage } from "./trendingBackdrop";
 import TrendingMobileRunway from "./TrendingMobileRunway";
 import "./trendingFloatingGlass.css";
 
@@ -106,9 +105,7 @@ export default function TrendingSection({ theme, previewProducts }) {
   const mobileRunway = floatingGlass && isMobile;
   const floatingTextStyle = (existing, color, fontSize) => floatingGlass ? { ...existing, color, ...(fontSize ? { fontSize } : {}) } : existing;
   const mobileSolidBackground = mobileRunway && presentation.mobileBackgroundMode === "color";
-  const mobileCustomBackground = mobileRunway && presentation.mobileBackgroundMode === "custom" && presentation.mobileBackgroundImage;
-  const sceneImage = mobileSolidBackground ? "" : mobileCustomBackground || (presentation.backdropMode === "custom" ? presentation.backgroundImage
-    : presentation.backdropMode === "boutique" ? (mobileRunway ? runwayBackdrop : boutiqueBackdrop) : "");
+  const sceneImage = trendingSceneImage(presentation, mobileRunway);
   const floatingSectionStyle = floatingGlass ? {
     ...trendingPresentationVars(presentation),
     ...(mobileSolidBackground ? { "--trending-background": presentation.mobileBackgroundColor } : {}),

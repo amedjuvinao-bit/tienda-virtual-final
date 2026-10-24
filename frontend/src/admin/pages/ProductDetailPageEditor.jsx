@@ -1,18 +1,22 @@
 import { adminFetch } from '../../lib/api';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import PageLoadState from "./workspace/PageLoadState";
+import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
+import SectionCard from "./workspace/EditorSection";
+import usePageDraft from "./workspace/usePageDraft";
 import { API_BASE_URL } from "../../config/apiBaseUrl";
 
 const API_BASE = API_BASE_URL;
 
 const EDITOR_TABS = [
-  { id: "general", label: "General" },
-  { id: "layout", label: "Estructura" },
-  { id: "gallery", label: "Galería" },
-  { id: "info", label: "Información" },
-  { id: "style", label: "Estilo" },
-  { id: "reviews", label: "Reseñas" },
-  { id: "extra", label: "Bloques extra" },
+  { id: "gallery", label: "Galería", group: "content" },
+  { id: "info", label: "Información y compra", group: "content" },
+  { id: "extra", label: "Bloques de apoyo", group: "content" },
+  { id: "layout", label: "Distribución", group: "design" },
+  { id: "style", label: "Colores y tipografía", group: "design" },
+  { id: "reviews", label: "Reseñas", group: "options" },
+  { id: "general", label: "Datos y título", group: "settings" },
 ];
 
 const SHADOW_OPTIONS = [
@@ -38,8 +42,8 @@ const TITLE_MODE_OPTIONS = [
 ];
 
 const IMAGE_FIT_OPTIONS = [
-  { value: "cover", label: "Cubrir (cover)" },
-  { value: "contain", label: "Contener (contain)" },
+  { value: "cover", label: "Cubrir el espacio" },
+  { value: "contain", label: "Mostrar imagen completa" },
 ];
 
 const ANIMATION_OPTIONS = [
@@ -51,7 +55,7 @@ const ANIMATION_OPTIONS = [
 ];
 
 const THUMB_HOVER_OPTIONS = [
-  { value: "none", label: "Sin hover especial" },
+  { value: "none", label: "Sin efecto al pasar el cursor" },
   { value: "scale", label: "Escalar miniatura" },
   { value: "lift", label: "Elevar miniatura" },
   { value: "glow", label: "Brillo miniatura" },
@@ -202,26 +206,6 @@ const TabButton = ({ active, onClick, children }) => (
   </button>
 );
 
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
-
-function SectionCard({ title, text, children, className = "" }) {
-  return (
-    <section
-      className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 md:p-5 ${className}`}
-    >
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {text ? <p className="mt-1 text-sm text-gray-500">{text}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function IconUploadField({
   label,
@@ -260,7 +244,7 @@ function IconUploadField({
           onClick={onPick}
           className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
         >
-          Escoger imagen
+          Elegir imagen
         </button>
 
         <button
@@ -269,7 +253,7 @@ function IconUploadField({
           disabled={uploading || disabledUpload}
           className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-50"
         >
-          {uploading ? "Subiendo..." : "Subir a Cloudinary"}
+          {uploading ? "Subiendo..." : "Cargar imagen"}
         </button>
       </div>
 
@@ -683,10 +667,13 @@ export default function ProductDetailPageEditor() {
 
   const [page, setPage] = useState(null);
   const [form, setForm] = useState(null);
+  const draft = usePageDraft(form);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const loadSequence = useRef(0);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("gallery");
 
   const [titleImageFile, setTitleImageFile] = useState(null);
   const [titleImagePreview, setTitleImagePreview] = useState("");
@@ -715,12 +702,15 @@ export default function ProductDetailPageEditor() {
   }, [form?.slug, page?.slug]);
 
   const fetchPage = async () => {
+    const sequence = ++loadSequence.current;
     try {
       setLoading(true);
       setNotFound(false);
+      setLoadError("");
 
       const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
+      if (sequence !== loadSequence.current) return;
       if (res.status === 404) {
         setPage(null);
         setForm(null);
@@ -733,10 +723,11 @@ export default function ProductDetailPageEditor() {
       }
 
       const data = await res.json();
+      if (sequence !== loadSequence.current) return;
       const safeConfig = buildSafeProductDetailConfig(data?.productDetailConfig);
 
       setPage(data);
-      setForm({
+      const loadedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "product-detail",
@@ -744,7 +735,9 @@ export default function ProductDetailPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         productDetailConfig: safeConfig,
-      });
+      };
+      setForm(loadedForm);
+      draft.initialize(loadedForm);
       setTitleImagePreview(String(safeConfig?.titleImage || ""));
       setTitleImageFile(null);
 
@@ -760,17 +753,20 @@ export default function ProductDetailPageEditor() {
       setBenefit3IconFile(null);
       setReviewFormBgImageFile(null);
     } catch (error) {
+      if (sequence !== loadSequence.current) return;
+      setLoadError(error.message || "Error de conexión");
       console.error("Error cargando página detalle:", error);
       setPage(null);
       setForm(null);
       setNotFound(true);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (id) fetchPage();
+    return () => { loadSequence.current++; };
   }, [id]);
 
   const updateRoot = (patch) => {
@@ -800,18 +796,7 @@ export default function ProductDetailPageEditor() {
     }));
   };
 
-  const handleNameChange = (value) => {
-    setForm((prev) => {
-      const currentSlug = String(prev?.slug || "").trim();
-      const autoSlug = slugify(value);
-
-      return {
-        ...prev,
-        name: value,
-        slug: currentSlug ? currentSlug : autoSlug,
-      };
-    });
-  };
+  const handleNameChange = (value) => setForm(previous => ({ ...previous, name: value }));
 
   const handlePickTitleImage = () => {
     titleImageInputRef.current?.click();
@@ -828,7 +813,7 @@ export default function ProductDetailPageEditor() {
 
   const handleUploadTitleImage = async () => {
     if (!titleImageFile) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -857,10 +842,10 @@ export default function ProductDetailPageEditor() {
         titleImageInputRef.current.value = "";
       }
 
-      alert("Imagen subida correctamente ✅");
+      draft.inform("Imagen subida correctamente ✅");
     } catch (error) {
       console.error("Error subiendo imagen de título:", error);
-      alert(error.message || "No se pudo subir la imagen a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir la imagen a Cloudinary.");
     } finally {
       setUploadingTitleImage(false);
     }
@@ -903,7 +888,7 @@ export default function ProductDetailPageEditor() {
         : benefit3IconFile;
 
     if (!file) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -953,10 +938,10 @@ export default function ProductDetailPageEditor() {
         }
       }
 
-      alert("Ícono subido correctamente ✅");
+      draft.inform("Ícono subido correctamente ✅");
     } catch (error) {
       console.error("Error subiendo ícono del beneficio:", error);
-      alert(error.message || "No se pudo subir el ícono a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir el ícono a Cloudinary.");
     } finally {
       if (index === 1) setUploadingBenefit1Icon(false);
       if (index === 2) setUploadingBenefit2Icon(false);
@@ -979,7 +964,7 @@ export default function ProductDetailPageEditor() {
 
   const handleUploadReviewFormBgImage = async () => {
     if (!reviewFormBgImageFile) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -1008,10 +993,10 @@ export default function ProductDetailPageEditor() {
         reviewFormBgImageInputRef.current.value = "";
       }
 
-      alert("Fondo del formulario subido correctamente ✅");
+      draft.inform("Fondo del formulario subido correctamente ✅");
     } catch (error) {
       console.error("Error subiendo fondo del formulario de reseñas:", error);
-      alert(error.message || "No se pudo subir la imagen a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir la imagen a Cloudinary.");
     } finally {
       setUploadingReviewFormBgImage(false);
     }
@@ -1024,12 +1009,12 @@ export default function ProductDetailPageEditor() {
     const slug = slugify(form.slug || form.name);
 
     if (!name) {
-      alert("El nombre de la página es obligatorio.");
+      draft.notify("El nombre de la página es obligatorio.");
       return;
     }
 
     if (!slug) {
-      alert("El slug de la página es obligatorio.");
+      draft.notify("Escribe una dirección válida para la página.");
       return;
     }
 
@@ -1059,8 +1044,12 @@ export default function ProductDetailPageEditor() {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
 
+      if (JSON.stringify(buildSafeProductDetailConfig(data?.productDetailConfig)) !== JSON.stringify(payload.productDetailConfig)) {
+        throw new Error("El servidor no conservó todos los ajustes. Tus cambios siguen en el editor; vuelve a intentarlo.");
+      }
+
       setPage(data);
-      setForm({
+      const savedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "product-detail",
@@ -1068,7 +1057,9 @@ export default function ProductDetailPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         productDetailConfig: buildSafeProductDetailConfig(data?.productDetailConfig),
-      });
+      };
+      setForm(savedForm);
+      draft.markSaved(savedForm);
 
       setBenefit1IconPreview(String(data?.productDetailConfig?.benefit1Icon || ""));
       setBenefit2IconPreview(String(data?.productDetailConfig?.benefit2Icon || ""));
@@ -1077,29 +1068,17 @@ export default function ProductDetailPageEditor() {
         String(data?.productDetailConfig?.style?.reviewFormBgImage || "")
       );
 
-      alert("Página detalle guardada correctamente ✅");
     } catch (error) {
       console.error("Error guardando página detalle:", error);
-      alert(error.message || "No se pudo guardar la página detalle.");
+      draft.notify(error.message || "No se pudo guardar la página detalle.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleOpenPreview = () => {
-    if (!previewUrl) {
-      alert("La página todavía no tiene un slug válido para vista previa.");
-      return;
-    }
-    window.open(previewUrl, "_blank", "noopener,noreferrer");
-  };
 
-  if (loading) {
-    return <div className="p-6 text-gray-500">Cargando página detalle...</div>;
-  }
-
-  if (notFound || !page || !form) {
-    return <div className="p-6 text-red-500">Página detalle no encontrada</div>;
+  if (loading || notFound || !page || !form) {
+    return <PageLoadState loading={loading} error={loadError} onRetry={fetchPage} onBack={() => navigate("/admin/paginas")}/>;
   }
 
   if (String(page?.pageType || "").toLowerCase() !== "product-detail") {
@@ -1118,66 +1097,19 @@ export default function ProductDetailPageEditor() {
   }
 
   return (
-    <div className="min-w-0 space-y-6 p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/paginas")}
-            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
-          >
-            ← Volver
-          </button>
-
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Editor de página detalle de producto
-            </h1>
-            <p className="text-sm text-gray-500">
-              Configura estructura y estilo de un molde para la vista detalle.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleOpenPreview}
-            className="inline-flex items-center gap-2 rounded-xl border border-pink-300 bg-pink-50 px-4 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100"
-          >
-            Vista previa
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-60"
-          >
-            {saving ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
-      </div>
-
-      <InfoCard
-        title="Molde detalle de producto"
-        text="Desde aquí controlas galería, información, botones, estilos, bloques de beneficios, acordeones y ahora también el bloque de reseñas."
-      />
-
-      <div className="rounded-3xl border border-pink-100 bg-gradient-to-br from-white to-pink-50/60 p-3 md:p-4">
-        <div className="flex flex-wrap gap-2">
-          {EDITOR_TABS.map((tab) => (
-            <TabButton
-              key={tab.id}
-              active={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </TabButton>
-          ))}
-        </div>
-      </div>
-
+    <PageEditorWorkspace
+      form={form}
+      tabs={EDITOR_TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onBack={() => draft.leave(() => navigate("/admin/paginas"))}
+      onSave={handleSave}
+      saving={saving}
+      uploading={uploadingTitleImage || uploadingBenefit1Icon || uploadingBenefit2Icon || uploadingBenefit3Icon || uploadingReviewFormBgImage}
+      draft={draft}
+      pageTypeLabel="Detalle del producto"
+    >
+      <fieldset disabled={saving} className="pages-editor-fields">
       {activeTab === "general" && (
         <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
           <SectionCard
@@ -1193,7 +1125,7 @@ export default function ProductDetailPageEditor() {
             />
 
             <Input
-              label="Slug / ruta"
+              label="Dirección de la página"
               value={form.slug}
               onChange={(e) => updateRoot({ slug: slugify(e.target.value) })}
               placeholder="Ej: detalle-principal"
@@ -1206,13 +1138,13 @@ export default function ProductDetailPageEditor() {
             />
 
             <Toggle
-              label="Usar header"
+              label="Mostrar encabezado"
               checked={form.useHeader}
               onChange={(value) => updateRoot({ useHeader: value })}
             />
 
             <Toggle
-              label="Usar footer"
+              label="Mostrar pie de página"
               checked={form.useFooter}
               onChange={(value) => updateRoot({ useFooter: value })}
             />
@@ -1255,7 +1187,7 @@ export default function ProductDetailPageEditor() {
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <Input
-                  label="URL imagen de título"
+                  label="Enlace de la imagen del título"
                   value={form.productDetailConfig.titleImage}
                   onChange={(e) =>
                     updateDetailConfig({ titleImage: e.target.value })
@@ -1264,7 +1196,7 @@ export default function ProductDetailPageEditor() {
                 />
 
                 <Input
-                  label="Alt imagen de título"
+                  label="Descripción de la imagen"
                   value={form.productDetailConfig.titleImageAlt}
                   onChange={(e) =>
                     updateDetailConfig({ titleImageAlt: e.target.value })
@@ -1286,7 +1218,7 @@ export default function ProductDetailPageEditor() {
                     onClick={handlePickTitleImage}
                     className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
                   >
-                    Escoger imagen
+                    Elegir imagen
                   </button>
 
                   <button
@@ -1295,7 +1227,7 @@ export default function ProductDetailPageEditor() {
                     disabled={uploadingTitleImage || !titleImageFile}
                     className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-50"
                   >
-                    {uploadingTitleImage ? "Subiendo..." : "Subir a Cloudinary"}
+                    {uploadingTitleImage ? "Subiendo..." : "Cargar imagen"}
                   </button>
                 </div>
               </div>
@@ -1554,7 +1486,7 @@ export default function ProductDetailPageEditor() {
               </Select>
 
               <Toggle
-                label="Zoom hover en imagen principal"
+                label="Ampliar imagen al pasar el cursor"
                 checked={form.productDetailConfig.imageHoverZoom}
                 onChange={(value) =>
                   updateDetailConfig({ imageHoverZoom: value })
@@ -1695,7 +1627,7 @@ export default function ProductDetailPageEditor() {
         <div className="space-y-6">
           <SectionCard
             title="Estilo general"
-            text="Colores, bordes, radios, tamaños y sombras del molde detalle."
+            text="Personaliza los colores, textos y acabados de la ficha del producto."
           >
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -2697,6 +2629,7 @@ export default function ProductDetailPageEditor() {
           </SectionCard>
         </div>
       )}
-    </div>
+      </fieldset>
+    </PageEditorWorkspace>
   );
 }

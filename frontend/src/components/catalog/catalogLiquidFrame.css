@@ -1,0 +1,15 @@
+/* A measured smooth rim; its unfilled center reveals the page canvas. */
+.catalog-liquid {
+  position:absolute; inset:0; z-index:0; border-radius:inherit;
+  pointer-events:none;
+}
+.catalog-liquid[data-empty="true"] { display:none; }
+.catalog-liquid>.polished-glass-rim {
+  --pg-light:var(--ch-light);
+  --pg-edge:var(--ch-edge);
+  --pg-depth:color-mix(in srgb,var(--ch-depth-color) calc(var(--ch-depth-strength) * 100%),transparent);
+  --pg-opacity:var(--ch-material-opacity);
+  --pg-relief:var(--ch-depth-strength);
+}
+.catalog-liquid[data-layers="false"] .polished-glass-rim__depth { display:none; }
+.catalog-liquid .polished-glass-rim__glint { cx:var(--ch-pointer-x,22%); }

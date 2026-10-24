@@ -175,7 +175,7 @@ function itemsShallowEqual(a, b) {
   return true;
 }
 
-const CartContext = createContext();
+export const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(readStoredCart);

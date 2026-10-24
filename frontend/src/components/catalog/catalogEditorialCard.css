@@ -1,0 +1,46 @@
+@font-face { font-family:'Catalog Editorial'; src:url('/fonts/bodoni-moda-latin-400-normal.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+.catalog-ecard { position:relative; isolation:isolate; height:100%; min-width:0; padding:var(--ecard-padding); overflow:hidden; border:var(--ecard-border-width) solid var(--ecard-border); border-radius:var(--ecard-radius); background:color-mix(in srgb,var(--ecard-bg) var(--catalog-glass-fill),transparent); box-shadow:var(--ecard-shadow); backdrop-filter:blur(var(--catalog-blur)); -webkit-backdrop-filter:blur(var(--catalog-blur)); }
+.catalog-ecard__photo { position:relative; min-width:0; overflow:hidden; border-radius:var(--ecard-image-radius); background:var(--ecard-image-bg); }
+.catalog-ecard__photo-link { display:block; aspect-ratio:4/3; overflow:hidden; }
+.catalog-ecard__photo img { display:block; width:100%; height:100%; object-fit:var(--ecard-image-fit); object-position:var(--ecard-image-position); }
+.catalog-ecard__footer { position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; min-height:82px; }
+.catalog-ecard__info { flex:1; min-width:0; }
+.catalog-ecard h3 { margin:0; font-family:var(--ecard-title-font); font-weight:400; font-size:var(--catalog-card-title); line-height:1.25; color:var(--ecard-title); overflow-wrap:anywhere; }
+.catalog-ecard h3 a { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; text-decoration:none; color:inherit; }
+.catalog-ecard__prices { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; margin-top:5px; color:var(--ecard-price); font:400 var(--catalog-card-price)/1.35 var(--ecard-price-font); font-variant-numeric:tabular-nums; }
+.catalog-ecard__prices del { font-size:11px; }
+.catalog-ecard__actions { display:flex; align-items:center; gap:8px; flex:none; align-self:center; }
+.catalog-ecard button { position:relative; display:inline-grid; place-items:center; width:34px; height:34px; flex:none; padding:0; border:var(--ecard-action-border-width) solid var(--ecard-action-border); border-radius:50%; cursor:pointer; box-shadow:inset 0 1px 0 #ffffffb3,0 3px 10px #5626330a; }
+.catalog-ecard__favorite { background:color-mix(in srgb,var(--ecard-favorite-bg) var(--ecard-favorite-fill),transparent); }
+.catalog-ecard__photo>.catalog-ecard__favorite { position:absolute; top:12px; right:12px; }
+.catalog-ecard__cart { background:color-mix(in srgb,var(--ecard-cart-bg) var(--ecard-cart-fill),transparent); }
+.catalog-ecard button:disabled { opacity:.42; cursor:not-allowed; }
+.catalog-ecard button svg { flex:none; }
+.catalog-ecard__bag-heart { position:absolute; right:6px; bottom:6px; }
+.catalog-ecard__colors { display:flex; gap:5px; margin-top:7px; }
+.catalog-ecard__colors span { width:9px; height:9px; border-radius:50%; border:1px solid #56263325; }
+.catalog-ecard__info p { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:6px; font-size:11px; color:var(--ecard-meta); }
+.catalog-ecard__photo-count { display:flex; align-items:center; gap:4px; margin-top:7px; color:var(--ecard-meta); font-size:10px; }
+.catalog-ecard__availability { position:absolute; z-index:2; top:14px; left:12px; padding:5px 9px; border-radius:999px; background:var(--catalog-ink); color:white; font-size:9px; letter-spacing:.1em; text-transform:uppercase; }
+@media(max-width:767px) {
+  .catalog-ecard__photo-link { aspect-ratio:4/5; }
+  .catalog-ecard__footer { gap:6px; padding:11px 9px; min-height:76px; }
+  .catalog-ecard h3 { font-size:min(var(--catalog-card-title),15px); }
+  .catalog-ecard__prices { font-size:min(var(--catalog-card-price),13px); }
+  .catalog-ecard button { width:32px; height:32px; }
+  .catalog-ecard__photo>.catalog-ecard__favorite { top:9px; right:9px; }
+}
+@media(prefers-reduced-motion:no-preference) {
+  .cpv-page:not([data-motion="none"]) .catalog-ecard { transition:translate .35s cubic-bezier(.22,1,.36,1),box-shadow .35s ease; }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard:hover { translate:0 -3px; }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard__photo img { transition:scale .65s cubic-bezier(.22,1,.36,1); }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard:hover .catalog-ecard__photo img { scale:1.025; }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button { transition:translate .2s ease,scale .2s ease; }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button:hover:not(:disabled) { translate:0 -2px; }
+  .cpv-page:not([data-motion="none"]) .catalog-ecard button:active:not(:disabled) { scale:.9; }
+}
+.catalog-ecard { --ecard-border-width:1px; }
+.catalog-ecard[data-rim="none"] { border-width:0; }
+.catalog-ecard>.look-glass-rim { position:absolute; inset:0; z-index:4; display:block; pointer-events:none; border-radius:inherit; opacity:var(--catalog-rim-opacity); }
+.catalog-ecard>.look-glass-rim svg { display:block; overflow:hidden; border-radius:inherit; }
+.catalog-ecard__photo-link { aspect-ratio:var(--catalog-image-ratio,1 / 1); }
