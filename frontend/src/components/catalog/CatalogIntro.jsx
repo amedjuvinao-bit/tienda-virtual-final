@@ -53,9 +53,9 @@ export default function CatalogIntro({ config: safeConfig, page, children }) {
       {glass ? (
         <div className="cpv-hero-identity">
           <div className="cpv-hero-copy">{heading}</div>
-          {safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
         </div>
       ) : <div className="cpv-hero-top">{heading}</div>}
+      {glass && safeConfig.presentation.headerIcon !== 'none' && <CatalogGlassBags />}
       {glass && children}
     </section>
   </>;

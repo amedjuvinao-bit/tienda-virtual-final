@@ -34,17 +34,18 @@
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass { padding:min(var(--ch-padding),16px); gap:6px; }
   .cpv-glass-bags { width:calc(var(--ch-icon-size) * .35); }
 }
-/* Keep the heading and its decoration together instead of reserving a wide empty row. */
-.cpv-hero-identity { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:0; }
+/* The bags stay at the outside edge; controls use the space beside the heading. */
+.cpv-hero-identity { position:relative; z-index:1; min-width:0; }
 .cpv-hero-copy { display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:0; }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass {
-  display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:center;
+  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px 20px; align-items:center;
 }
 .cpv-hero-identity .cpv-hero-badge { max-width:100%; overflow-wrap:anywhere; }
 .cpv-hero-identity .cpv-title-wrap { min-width:0; }
-.cpv-hero-identity .cpv-glass-bags { width:calc(var(--ch-icon-size) * .5); max-width:28%; }
+.cpv-hero-glass>.cpv-glass-bags { position:relative; z-index:1; justify-self:end; }
+.cpv-page[data-layout="glass-grid"] .cpv-hero-glass:not(:has(>.cpv-glass-bags)) { grid-template-columns:minmax(0,1fr); }
 .cpv-page[data-layout="glass-grid"] .cpv-hero-glass>.cpv-commandbar {
-  position:relative; z-index:1; min-width:0;
+  position:relative; z-index:1; min-width:0; grid-column:1/-1;
   display:grid; grid-template-columns:minmax(160px,1fr) auto auto auto;
   align-items:center; gap:10px 12px; margin:0; padding:0;
   border:0; border-radius:0;
@@ -88,18 +89,28 @@
 .cpv-hero-glass .cpv-commandbar .cpv-tooltip { z-index:3; background:var(--catalog-ink); }
 .cpv-hero-glass .cpv-commandbar .cpv-discovery button { width:26px; height:26px; flex-shrink:0; align-items:center; justify-content:center; border-radius:50%; color:var(--catalog-ink); background:var(--ch-fill); box-shadow:inset 0 1px 2px var(--ch-reflection); }
 .cpv-hero-glass .cpv-commandbar .cpv-discovery option { background:var(--ch-badge-tint); color:var(--catalog-ink); }
-@media(min-width:1100px) {
-  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass:has(>.cpv-commandbar) {
-    grid-template-columns:minmax(0,.85fr) minmax(0,2fr); column-gap:32px;
-  }
-  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass>.cpv-commandbar {
-    display:flex; flex-wrap:wrap; gap:10px 12px;
-  }
-  .cpv-hero-glass .cpv-commandbar .cpv-discovery form { flex:1 0 100%; }
-  .cpv-hero-glass .cpv-commandbar .cpv-col-controls { margin-left:auto; }
-  .cpv-hero-glass .cpv-commandbar .cpv-active-filters { flex-basis:100%; }
+@media(min-width:768px) {
+  .cpv-hero-glass:has(>.cpv-commandbar)>.cpv-glass-bags { width:calc(var(--ch-icon-size) * .75); }
 }
-@media(max-width:1099px) {
+@media(min-width:1000px) {
+  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass:has(>.cpv-commandbar) {
+    grid-template-columns:minmax(180px,.9fr) minmax(0,2fr) auto;
+    grid-template-areas:"identity search icon" "sort filters views"; gap:14px 24px;
+  }
+  .cpv-hero-glass:has(>.cpv-commandbar)>.cpv-hero-identity { grid-area:identity; }
+  .cpv-hero-glass:has(>.cpv-commandbar)>.cpv-glass-bags { grid-area:icon; }
+  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass>.cpv-commandbar { display:contents; }
+  .cpv-hero-glass .cpv-commandbar :is(form,label,.cpv-toolbar-left,.cpv-col-controls,.cpv-active-filters) { position:relative; z-index:1; }
+  .cpv-hero-glass .cpv-commandbar .cpv-discovery form { grid-area:search; width:100%; }
+  .cpv-hero-glass .cpv-commandbar .cpv-discovery label { grid-area:sort; }
+  .cpv-hero-glass .cpv-commandbar .cpv-toolbar-left { grid-area:filters; }
+  .cpv-hero-glass .cpv-commandbar .cpv-col-controls { grid-area:views; justify-self:end; }
+  .cpv-hero-glass .cpv-commandbar .cpv-active-filters { grid-column:1/-1; grid-row:3; }
+  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass:has(>.cpv-commandbar):not(:has(.cpv-discovery form))>.cpv-hero-identity { grid-column:1/3; }
+  .cpv-page[data-layout="glass-grid"] .cpv-hero-glass:has(>.cpv-commandbar):not(:has(>.cpv-glass-bags)) .cpv-discovery form { grid-column:2/4; }
+  .cpv-hero-glass:not(:has(.cpv-discovery label)) .cpv-commandbar .cpv-toolbar-left { grid-column:1/3; }
+}
+@media(max-width:999px) {
   .cpv-page[data-layout="glass-grid"] .cpv-hero-glass>.cpv-commandbar { grid-template-columns:minmax(0,1fr) auto; }
   .cpv-hero-glass .cpv-commandbar .cpv-col-controls { justify-self:end; }
 }
