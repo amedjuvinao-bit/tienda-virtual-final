@@ -25,6 +25,7 @@ export default function ProductDetailGallery({
     <div
       className="pd-frame-gallery"
       data-thumbnails={position}
+      data-image-fit={config.imageFit}
       style={{
         "--pd-thumb-width": `${config.thumbWidthPx}px`,
         "--pd-thumb-height": `${config.thumbHeightPx}px`,
@@ -32,6 +33,10 @@ export default function ProductDetailGallery({
         "--pd-thumb-radius": `${style.thumbRadiusPx}px`,
         "--pd-thumb-edge": style.thumbBorderColor,
         "--pd-thumb-active": style.selectedThumbBorderColor,
+        "--pd-photo-clearance":
+          config.showThumbnails && images.length > 1 && position === "overlay"
+            ? "calc(var(--pd-thumb-visible-height, var(--pd-thumb-height)) + 24px)"
+            : "0px",
         "--pd-image-height": `${config.mainImageMaxHeightPx}px`,
         "--pd-image-width": `${config.mainImageMaxWidthPx}px`,
         ...animationStyle,

@@ -49,3 +49,24 @@ it("aplica la composición aprobada una vez y conserva después la personalizaci
   });
   expect(buildSafeProductDetailConfig(edited)).toEqual(edited);
 });
+it("migra las fotos antiguas a imagen completa sin volver a imponerlo después de guardar", () => {
+  const raw = {
+    presentation: { glassOpacity: 0.22 },
+    imageFit: "cover",
+    imageHoverZoom: true,
+    style: { primaryTextColor: "#203040" },
+  };
+  const original = JSON.stringify(raw);
+  const migrated = buildSafeProductDetailConfig(raw);
+  expect(migrated.imageFit).toBe("contain");
+  expect(migrated.imageHoverZoom).toBe(false);
+  expect(migrated.style.primaryTextColor).toBe("#203040");
+  expect(JSON.stringify(raw)).toBe(original);
+  expect(
+    buildSafeProductDetailConfig({
+      ...migrated,
+      imageFit: "cover",
+      imageHoverZoom: true,
+    }),
+  ).toMatchObject({ imageFit: "cover", imageHoverZoom: true });
+});

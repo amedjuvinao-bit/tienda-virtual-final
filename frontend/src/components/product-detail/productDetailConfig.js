@@ -163,7 +163,7 @@ export function buildSafeProductDetailConfig(raw) {
   // Existing detail pages receive the chosen composition once. Subsequent edits
   // are normalized without reapplying its palette or resetting saved controls.
   const cfg = source.presentation
-    ? source
+    ? { ...source }
     : applyContinuousProductDetailPreset(source);
   if (!source.presentation) {
     if (source.style?.borderWidthPx != null)
@@ -179,10 +179,16 @@ export function buildSafeProductDetailConfig(raw) {
     }
   }
 
+  // Adopt the uncropped gallery once, including existing continuous layouts.
+  // A later explicit choice in the editor remains authoritative.
+  if (source.presentation?.mediaVersion !== 1) {
+    cfg.imageFit = "contain";
+    cfg.imageHoverZoom = false;
+  }
   const imageFit =
     cfg.imageFit === "contain" || cfg.imageFit === "cover"
       ? cfg.imageFit
-      : "cover";
+      : "contain";
 
   const imageAnimation = [
     "none",

@@ -10,6 +10,7 @@ const text = (value, fallback = "") =>
 export function buildProductDetailPresentation(raw) {
   const value = raw && typeof raw === "object" ? raw : {};
   return {
+    mediaVersion: 1,
     backgroundMode: value.backgroundMode === "custom" ? "custom" : "continuity",
     backgroundImage: text(value.backgroundImage),
     mobileBackgroundImage: text(value.mobileBackgroundImage),
@@ -34,6 +35,7 @@ export function buildProductDetailPresentation(raw) {
     showRelated: value.showRelated !== false,
     relatedTitle: text(value.relatedTitle, "Productos relacionados"),
     relatedCount: Math.round(number(value.relatedCount, 2, 6, 5)),
+    relatedLimit: Math.round(number(value.relatedLimit, 6, 24, 12)),
   };
 }
 
@@ -43,6 +45,8 @@ export function applyContinuousProductDetailPreset(config = {}) {
     ...config,
     presentation: buildProductDetailPresentation(config.presentation),
     thumbnailPosition: "overlay",
+    imageFit: "contain",
+    imageHoverZoom: false,
     mainImageMaxWidthPx: 1000,
     mainImageMaxHeightPx: 650,
     thumbWidthPx: 88,

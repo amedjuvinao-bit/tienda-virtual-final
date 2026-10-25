@@ -168,12 +168,13 @@ export default function ProductDetailAppearanceControls({ config, onChange }) {
       </EditorSection>
       <EditorSection
         title="Productos relacionados"
-        text="Se muestran productos publicados de la misma categoría. Si no hay resultados, el bloque se oculta."
+        text="El carrusel prioriza la misma categoría y se completa con otras opciones del catálogo. Se oculta si no hay otros productos publicados."
       >
         <div className="grid gap-4 sm:grid-cols-2">
           {toggle("showRelated", "Mostrar productos relacionados")}
           {text("relatedTitle", "Título de productos relacionados")}
-          {number("relatedCount", "Cantidad de productos relacionados", 2, 6)}
+          {number("relatedCount", "Tarjetas visibles en escritorio", 2, 6)}
+          {number("relatedLimit", "Total de productos del carrusel", 6, 24)}
         </div>
       </EditorSection>
     </div>
