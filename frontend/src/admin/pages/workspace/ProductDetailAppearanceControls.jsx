@@ -174,6 +174,18 @@ export default function ProductDetailAppearanceControls({ config, onChange }) {
           {toggle("showRelated", "Mostrar productos relacionados")}
           {text("relatedTitle", "Título de productos relacionados")}
           {number("relatedCount", "Tarjetas visibles en escritorio", 2, 6)}
+          <Field label="Tarjetas visibles en móvil">
+            <select
+              className={inputClass}
+              value={presentation.relatedMobileCount}
+              onChange={(event) =>
+                update({ relatedMobileCount: Number(event.target.value) })
+              }
+            >
+              <option value={1}>1 tarjeta</option>
+              <option value={2}>2 tarjetas</option>
+            </select>
+          </Field>
           {number("relatedLimit", "Total de productos del carrusel", 6, 24)}
         </div>
       </EditorSection>

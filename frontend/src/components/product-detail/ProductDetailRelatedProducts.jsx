@@ -46,7 +46,7 @@ export default function ProductDetailRelatedProducts({ product, config }) {
       observer?.disconnect();
       window.removeEventListener("resize", updatePosition);
     };
-  }, [rows, presentation.relatedCount]);
+  }, [rows, presentation.relatedCount, presentation.relatedMobileCount]);
   const move = (direction) => {
     const node = track.current;
     if (!node) return;
@@ -96,7 +96,10 @@ export default function ProductDetailRelatedProducts({ product, config }) {
       data-layout="glass-grid"
       data-motion="subtle"
       aria-roledescription="carrusel"
-      style={{ "--pd-related-count": presentation.relatedCount }}
+      style={{
+        "--pd-related-count": presentation.relatedCount,
+        "--pd-related-mobile-count": presentation.relatedMobileCount,
+      }}
       aria-label={presentation.relatedTitle}
     >
       <header>

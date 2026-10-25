@@ -18,6 +18,7 @@ import useProductDetailBackdrop from "./useProductDetailBackdrop";
 import "./productDetailContinuous.css";
 import "../catalog/catalogFooterGlass.css";
 import "./productDetail.css";
+import { productDetailFontFamily } from "./productDetailTypography";
 import { buildSafeProductDetailConfig } from "./productDetailConfig";
 import FooterSection from "../FooterSection";
 import WhatsAppButton from "../WhatsAppButton";
@@ -110,9 +111,16 @@ function getFavoriteIconComponent(iconName) {
   return Star;
 }
 
+function BagHeartIcon(props) {
+  return (
+    <ShoppingBag {...props}>
+      <Heart x="7" y="10" width="10" height="10" strokeWidth="2.5" />
+    </ShoppingBag>
+  );
+}
 function getCartIconComponent(iconName) {
   if (iconName === "shopping-bag") return ShoppingBag;
-  if (iconName === "bag-heart") return ShoppingBag;
+  if (iconName === "bag-heart") return BagHeartIcon;
   return ShoppingCart;
 }
 
@@ -1085,6 +1093,8 @@ export default function ProductDetailView({
     </div>
   ) : null;
   const variables = {
+    "--pd-title-font": productDetailFontFamily(styleCfg.titleFontFamily),
+    "--pd-price-font": productDetailFontFamily(styleCfg.priceFontFamily),
     "--pd-page-width": `${presentation.maxWidth}px`,
     "--pd-gallery-percent": `${presentation.galleryPercent}%`,
     "--pd-glass-color": cardBg,

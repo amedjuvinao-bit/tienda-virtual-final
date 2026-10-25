@@ -210,14 +210,14 @@
   border-radius: 0 calc(var(--pd-radius) - 9px) calc(var(--pd-radius) - 9px) 0;
 }
 .pd-continuous .pd-product-title {
-  font-family: "Catalog Editorial", Georgia, serif;
+  font-family: var(--pd-title-font, "Catalog Editorial", Georgia, serif);
   font-weight: 400;
   line-height: 1.15;
   overflow-wrap: anywhere;
   margin: 0;
 }
 .pd-continuous .pd-price-main {
-  font-family: "Catalog Editorial", Georgia, serif;
+  font-family: var(--pd-price-font, "Catalog Editorial", Georgia, serif);
   font-weight: 400;
 }
 .pd-rating-summary {
@@ -819,7 +819,7 @@
     --pd-thumb-visible-height: min(var(--pd-thumb-height), 54px);
   }
   .pd-related {
-    --pd-related-visible: 2;
+    --pd-related-visible: var(--pd-related-mobile-count, 2);
     --pd-related-gap: 10px;
   }
   .pd-related-controls {

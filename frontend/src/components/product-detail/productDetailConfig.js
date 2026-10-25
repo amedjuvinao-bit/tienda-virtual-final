@@ -1,3 +1,4 @@
+import { normalizeProductDetailFont } from "./productDetailTypography";
 import {
   buildProductDetailPresentation,
   applyContinuousProductDetailPreset,
@@ -43,6 +44,8 @@ export function buildSafeStyleConfig(raw) {
       cfg.shadowStyle === "strong"
         ? cfg.shadowStyle
         : "soft",
+    titleFontFamily: normalizeProductDetailFont(cfg.titleFontFamily),
+    priceFontFamily: normalizeProductDetailFont(cfg.priceFontFamily),
     titleSizePx: clampInt(cfg.titleSizePx, 20, 52, 32),
     priceSizePx: clampInt(cfg.priceSizePx, 20, 48, 30),
     buttonRadiusPx: clampInt(cfg.buttonRadiusPx, 8, 40, 40),

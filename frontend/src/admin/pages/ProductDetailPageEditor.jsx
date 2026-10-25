@@ -4,6 +4,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import PageLoadState from "./workspace/PageLoadState";
 import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
 import SectionCard from "./workspace/EditorSection";
+import {
+  Input, Textarea, Select, Toggle, ColorInput, RangeInput,
+} from './workspace/ProductDetailEditorFields';
+import ProductDetailPurchaseControls from './workspace/ProductDetailPurchaseControls';
+import ProductDetailTypographyControls from './workspace/ProductDetailTypographyControls';
 import ProductDetailAppearanceControls from "./workspace/ProductDetailAppearanceControls";
 import usePageDraft from "./workspace/usePageDraft";
 import {buildSafeStyleConfig, buildSafeProductDetailConfig} from "../../components/product-detail/productDetailConfig";
@@ -17,7 +22,8 @@ const EDITOR_TABS = [
   { id: "extra", label: "Bloques de apoyo", group: "content" },
   { id: "presentation", label: "Fondo y cristal", group: "design" },
   { id: "layout", label: "Distribución", group: "design" },
-  { id: "style", label: "Colores y tipografía", group: "design" },
+  { id: "style", label: "Colores y botones", group: "design" },
+  { id: "typography", label: "Tipografía", group: "design" },
   { id: "reviews", label: "Reseñas", group: "options" },
   { id: "general", label: "Datos y título", group: "settings" },
 ];
@@ -87,113 +93,6 @@ const REVIEW_STAR_STYLE_OPTIONS = [
   { value: "fill", label: "Relleno" },
   { value: "outline", label: "Contorno" },
 ];
-
-const FAVORITE_ICON_OPTIONS = [
-  { value: "star", label: "Estrella" },
-  { value: "heart", label: "Corazón" },
-  { value: "sparkles", label: "Destello" },
-];
-
-const CART_ICON_OPTIONS = [
-  { value: "shopping-cart", label: "Carrito clásico" },
-  { value: "shopping-bag", label: "Bolsa" },
-  { value: "bag-heart", label: "Bolsa con corazón" },
-];
-
-const Input = ({ label, ...rest }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <input
-      className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-      {...rest}
-    />
-  </label>
-);
-
-const Textarea = ({ label, ...rest }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <textarea
-      className="min-h-[110px] w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-      {...rest}
-    />
-  </label>
-);
-
-const Select = ({ label, children, ...rest }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <select
-      className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-      {...rest}
-    >
-      {children}
-    </select>
-  </label>
-);
-
-const Toggle = ({ label, checked, onChange }) => (
-  <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-    <span className="text-sm text-gray-700">{label}</span>
-    <input
-      type="checkbox"
-      checked={!!checked}
-      onChange={(e) => onChange(e.target.checked)}
-      className="h-4 w-4 shrink-0 accent-pink-600"
-    />
-  </label>
-);
-
-const ColorInput = ({ label, value, onChange }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
-      <input
-        type="color"
-        value={isHexColor(value) ? value : "#ec4899"}
-        onChange={onChange}
-        className="h-10 w-12 cursor-pointer rounded border border-gray-200 bg-white"
-      />
-      <input
-        type="text"
-        value={value || ""}
-        onChange={onChange}
-        className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none"
-        placeholder="#ec4899"
-      />
-    </div>
-  </label>
-);
-
-const RangeInput = ({
-  label,
-  value,
-  onChange,
-  min = 0,
-  max = 1,
-  step = 0.05,
-}) => (
-  <label className="block min-w-0">
-    <div className="mb-1 flex items-center justify-between gap-3">
-      <span className="block text-sm font-medium text-gray-700">{label}</span>
-      <span className="text-xs font-medium text-pink-700">
-        {Number(value || 0).toFixed(2)}
-      </span>
-    </div>
-
-    <div className="rounded-xl border border-gray-300 bg-white px-3 py-3">
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={onChange}
-        className="w-full accent-pink-600"
-      />
-    </div>
-  </label>
-);
 
 const TabButton = ({ active, onClick, children }) => (
   <button
@@ -300,10 +199,6 @@ function clampFloat(value, min, max, fallback) {
   const n = Number.parseFloat(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, n));
-}
-
-function isHexColor(value) {
-  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
 }
 
 export default function ProductDetailPageEditor() {
@@ -1163,116 +1058,10 @@ export default function ProductDetailPageEditor() {
       )}
 
       {activeTab === "info" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            title="Información de compra"
-            text="Controla qué se muestra al lado de la galería."
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              <Toggle
-                label="Mostrar botón favorito"
-                checked={form.productDetailConfig.showFavoriteButton}
-                onChange={(value) =>
-                  updateDetailConfig({ showFavoriteButton: value })
-                }
-              />
-              <Toggle
-                label="Mostrar precio"
-                checked={form.productDetailConfig.showPrice}
-                onChange={(value) => updateDetailConfig({ showPrice: value })}
-              />
-              <Toggle
-                label="Mostrar precio original"
-                checked={form.productDetailConfig.showOriginalPrice}
-                onChange={(value) =>
-                  updateDetailConfig({ showOriginalPrice: value })
-                }
-              />
-              <Toggle
-                label="Mostrar tamaños"
-                checked={form.productDetailConfig.showSizes}
-                onChange={(value) => updateDetailConfig({ showSizes: value })}
-              />
-              <Toggle
-                label="Mostrar colores"
-                checked={form.productDetailConfig.showColors}
-                onChange={(value) => updateDetailConfig({ showColors: value })}
-              />
-              <Toggle
-                label="Mostrar cantidad"
-                checked={form.productDetailConfig.showQuantity}
-                onChange={(value) => updateDetailConfig({ showQuantity: value })}
-              />
-
-              <Toggle
-                label="Mostrar bloque de recogida"
-                checked={form.productDetailConfig.showPickupBlock}
-                onChange={(value) =>
-                  updateDetailConfig({ showPickupBlock: value })
-                }
-              />
-            </div>
-
-            <Select
-              label="Animación de entrada del contenido"
-              value={form.productDetailConfig.contentAnimation}
-              onChange={(e) =>
-                updateDetailConfig({ contentAnimation: e.target.value })
-              }
-            >
-              {ANIMATION_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select
-                label="Ícono de favorito"
-                value={form.productDetailConfig.favoriteIconName}
-                onChange={(e) =>
-                  updateDetailConfig({ favoriteIconName: e.target.value })
-                }
-              >
-                {FAVORITE_ICON_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Bloque de recogida"
-            text="Textos debajo del botón de compra."
-          >
-            <Input
-              label="Título recogida"
-              value={form.productDetailConfig.pickupTitle}
-              onChange={(e) =>
-                updateDetailConfig({ pickupTitle: e.target.value })
-              }
-            />
-
-            <Input
-              label="Texto secundario"
-              value={form.productDetailConfig.pickupText}
-              onChange={(e) =>
-                updateDetailConfig({ pickupText: e.target.value })
-              }
-            />
-
-            <Input
-              label="Texto del link"
-              value={form.productDetailConfig.pickupLinkText}
-              onChange={(e) =>
-                updateDetailConfig({ pickupLinkText: e.target.value })
-              }
-            />
-          </SectionCard>
-        </div>
+        <ProductDetailPurchaseControls config={form.productDetailConfig} onChange={updateDetailConfig}/>
+      )}
+      {activeTab === "typography" && (
+        <ProductDetailTypographyControls style={form.productDetailConfig.style} onChange={updateStyleConfig}/>
       )}
 
       {activeTab === "style" && (
@@ -1336,7 +1125,7 @@ export default function ProductDetailPageEditor() {
 
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-sm font-semibold text-gray-800">
-                  Tamaños y bordes
+                  Marcos y profundidad
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1367,48 +1156,11 @@ export default function ProductDetailPageEditor() {
                     }
                   />
 
-                  <Input
-                    label="Tamaño título (px)"
-                    type="number"
-                    min="20"
-                    max="52"
-                    value={form.productDetailConfig.style.titleSizePx}
-                    onChange={(e) =>
-                      updateStyleConfig({
-                        titleSizePx: clampInt(e.target.value, 20, 52, 32),
-                      })
-                    }
-                  />
 
-                  <Input
-                    label="Tamaño precio (px)"
-                    type="number"
-                    min="20"
-                    max="48"
-                    value={form.productDetailConfig.style.priceSizePx}
-                    onChange={(e) =>
-                      updateStyleConfig({
-                        priceSizePx: clampInt(e.target.value, 20, 48, 30),
-                      })
-                    }
-                  />
 
-                  <Input
-                    label="Radio botón carrito"
-                    type="number"
-                    min="8"
-                    max="40"
-                    value={
-                      form.productDetailConfig.style.buttonRadiusPx === 999
-                        ? 40
-                        : form.productDetailConfig.style.buttonRadiusPx
-                    }
-                    onChange={(e) =>
-                      updateStyleConfig({
-                        buttonRadiusPx: clampInt(e.target.value, 8, 40, 40),
-                      })
-                    }
-                  />
+
+
+
 
                   <Select
                     label="Tipo de sombra"

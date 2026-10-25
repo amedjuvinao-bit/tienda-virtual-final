@@ -35,6 +35,7 @@ export function buildProductDetailPresentation(raw) {
     showRelated: value.showRelated !== false,
     relatedTitle: text(value.relatedTitle, "Productos relacionados"),
     relatedCount: Math.round(number(value.relatedCount, 2, 6, 5)),
+    relatedMobileCount: Math.round(number(value.relatedMobileCount, 1, 2, 2)),
     relatedLimit: Math.round(number(value.relatedLimit, 6, 24, 12)),
   };
 }
@@ -68,6 +69,8 @@ export function applyContinuousProductDetailPreset(config = {}) {
       borderColor: "#fff4ed",
       radiusPx: 32,
       borderWidthPx: 1.25,
+      titleFontFamily: "editorial",
+      priceFontFamily: "editorial",
       titleSizePx: 36,
       priceSizePx: 34,
       thumbBorderColor: "#fff1e8",

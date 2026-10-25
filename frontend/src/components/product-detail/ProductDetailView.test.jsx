@@ -212,3 +212,43 @@ it("usa muestras visuales para colores con nombre y respeta la selección canón
   fireEvent.click(screen.getByRole("button", { name: "Color: Negro" }));
   expect(change).toHaveBeenCalledWith("color", "negro");
 });
+it("aplica las fuentes configuradas, el icono de compra y su visibilidad", async () => {
+  const { buildSafeProductDetailConfig } = await import(
+    "./productDetailConfig"
+  );
+  const saved = buildSafeProductDetailConfig(config);
+  const custom = {
+    ...saved,
+    addToCartText: "Solicitar",
+    addToCartIconName: "bag-heart",
+    style: {
+      ...saved.style,
+      titleFontFamily: "arial",
+      priceFontFamily: "georgia",
+    },
+  };
+  const view = render(<ProductDetailView {...props} config={custom} />);
+  expect(
+    view.container
+      .querySelector(".pd-storefront")
+      .style.getPropertyValue("--pd-title-font"),
+  ).toBe("Arial, sans-serif");
+  expect(
+    view.container
+      .querySelector(".pd-storefront")
+      .style.getPropertyValue("--pd-price-font"),
+  ).toBe("Georgia, serif");
+  expect(
+    screen
+      .getByRole("button", { name: "Solicitar" })
+      .querySelector(".lucide-heart"),
+  ).not.toBeNull();
+  view.rerender(
+    <ProductDetailView
+      {...props}
+      config={{ ...custom, showAddToCart: false }}
+    />,
+  );
+  expect(screen.queryByRole("button", { name: "Solicitar" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Favorito" })).toBeInTheDocument();
+});
