@@ -26,6 +26,9 @@ export function buildCartPresentation(raw = {}) {
         ? value.mobileBackgroundImage
         : "",
     glassOpacity: number(value.glassOpacity, 0, 0.8, 0.14),
+    checkoutGlassOpacity: number(value.checkoutGlassOpacity, 0, 0.8, 0.2),
+    checkoutGlassBlur: number(value.checkoutGlassBlur, 0, 24, 8),
+    checkoutUseThemeText: value.checkoutUseThemeText !== false,
     glassBlur: number(value.glassBlur, 0, 24, 4),
     borderWidth: number(value.borderWidth, 0, 4, 1.25),
     reflection: number(value.reflection, 0, 1, 0.85),

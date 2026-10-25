@@ -178,6 +178,56 @@ export default function CartAppearanceControls({
             ))}
           </div>
         </EditorSection>
+        <EditorSection
+          title="Cristal del botón de finalizar compra"
+          text="La transparencia y el desenfoque dejan ver el fondo a través del botón."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Opacidad del vidrio del botón"
+              type="number"
+              min={0}
+              max={0.8}
+              step={0.01}
+              value={config.presentation.checkoutGlassOpacity}
+              onChange={(event) =>
+                patch(
+                  "presentation",
+                  "checkoutGlassOpacity",
+                  event.target.value === "" ? "" : Number(event.target.value),
+                )
+              }
+            />
+            <Input
+              label="Desenfoque del vidrio del botón"
+              type="number"
+              min={0}
+              max={24}
+              step={1}
+              value={config.presentation.checkoutGlassBlur}
+              onChange={(event) =>
+                patch(
+                  "presentation",
+                  "checkoutGlassBlur",
+                  event.target.value === "" ? "" : Number(event.target.value),
+                )
+              }
+            />
+          </div>
+          <div className="mt-4">
+            <Toggle
+              label="Usar el color de texto del tema en el botón"
+              checked={config.presentation.checkoutUseThemeText}
+              onChange={(value) =>
+                patch("presentation", "checkoutUseThemeText", value)
+              }
+            />
+            <p className="mt-2 text-xs">
+              Desactiva esta opción para usar el color de texto elegido en los
+              ajustes de compra o del carrito lateral.
+            </p>
+          </div>
+        </EditorSection>
       </>
     );
   let groups;

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, ShoppingBag, RefreshCw } from "lucide-react";
+import { ArrowLeft, ShoppingBag, RefreshCw } from "lucide-react";
 import Header from "../Header";
 import FooterSection from "../FooterSection";
 import WhatsAppButton from "../WhatsAppButton";
-import PolishedGlassRim from "../PolishedGlassRim";
+import CartCheckoutButton from "./CartCheckoutButton";
 import useStorefrontBackdrop from "../useStorefrontBackdrop";
 import { buildSafeCartPageConfig } from "./cartPageConfig";
 import { canCheckout, cartSubtotal, money } from "./cartModel";
@@ -41,13 +41,6 @@ export default function CartPageView({
       : s.checkoutButtonStyle === "rounded"
         ? s.checkoutButtonRadiusPx
         : 8;
-  const rim = () => (
-    <PolishedGlassRim
-      radius={buttonRadius}
-      width={config.presentation.borderWidth}
-      reflection={config.presentation.reflection}
-    />
-  );
   const ready = !busy && !cartState.syncError && canCheckout(cart);
   return (
     <div
@@ -195,37 +188,15 @@ export default function CartPageView({
                   {config.showShippingMessage && (
                     <p>{config.shippingMessageText}</p>
                   )}
-                  {config.showCheckoutButton &&
-                    (ready ? (
-                      <Link
-                        className="cart-checkout"
-                        to="/checkout"
-                        style={{
-                          background: s.checkoutButtonBg,
-                          color: s.checkoutButtonTextColor,
-                          borderRadius: buttonRadius,
-                        }}
-                      >
-                        {config.checkoutButtonText}
-                        <ArrowRight size={17} />
-                        {rim()}
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        className="cart-checkout"
-                        disabled
-                        style={{
-                          background: s.checkoutButtonBg,
-                          color: s.checkoutButtonTextColor,
-                          borderRadius: buttonRadius,
-                        }}
-                      >
-                        {config.checkoutButtonText}
-                        <ArrowRight size={17} />
-                        {rim()}
-                      </button>
-                    ))}
+                  {config.showCheckoutButton && (
+                    <CartCheckoutButton
+                      config={config}
+                      tint={s.checkoutButtonBg}
+                      textColor={s.checkoutButtonTextColor}
+                      radius={buttonRadius}
+                      disabled={!ready}
+                    />
+                  )}
                   {!busy && !canCheckout(cart) && (
                     <p role="status">
                       Revisa los productos no disponibles antes de continuar.

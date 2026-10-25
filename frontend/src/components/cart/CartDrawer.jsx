@@ -1,11 +1,12 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ShoppingBag, ArrowRight, RefreshCw } from "lucide-react";
+import { X, ShoppingBag, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buildSafeCartPageConfig } from "./cartPageConfig";
 import { cartVariables } from "./CartMaterial";
 import { canCheckout, cartSubtotal, money } from "./cartModel";
 import CartItems from "./CartItems";
+import CartCheckoutButton from "./CartCheckoutButton";
 import PolishedGlassRim from "../PolishedGlassRim";
 import "./cartPage.css";
 import "./cartDrawer.css";
@@ -237,41 +238,16 @@ export default function CartDrawer({
               </strong>
             </div>
           )}
-          {config.showCheckoutButton &&
-            (canCheckout(cart) && !busy && !cartState.syncError ? (
-              <Link
-                to="/checkout"
-                onClick={onClose}
-                className="cart-checkout"
-                style={{
-                  background: m.checkoutBg,
-                  color: m.checkoutText,
-                  borderRadius: m.buttonRadiusPx,
-                }}
-              >
-                {config.checkoutButtonText}
-                <ArrowRight size={16} />
-                <PolishedGlassRim
-                  radius={m.buttonRadiusPx}
-                  width={config.presentation.borderWidth}
-                  reflection={config.presentation.reflection}
-                />
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="cart-checkout"
-                disabled
-                style={{
-                  background: m.checkoutBg,
-                  color: m.checkoutText,
-                  borderRadius: m.buttonRadiusPx,
-                }}
-              >
-                {config.checkoutButtonText}
-                <ArrowRight size={16} />
-              </button>
-            ))}
+          {config.showCheckoutButton && (
+            <CartCheckoutButton
+              config={config}
+              tint={m.checkoutBg}
+              textColor={m.checkoutText}
+              radius={m.buttonRadiusPx}
+              disabled={!canCheckout(cart) || busy || cartState.syncError}
+              onClick={onClose}
+            />
+          )}
           <Link
             to="/carrito"
             onClick={onClose}
