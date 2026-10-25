@@ -7,12 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import api from "../lib/api";
 import ProductDetail from "./ProductDetail";
 
-const { addToCartMock } = vi.hoisted(() => ({
+const { addToCartMock, route } = vi.hoisted(() => ({
+  route: {id:"demo-smartphone"},
   addToCartMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", () => ({
-  useParams: () => ({ id: "demo-smartphone" }),
+  useParams: () => route,
 }));
 
 vi.mock("../lib/api", () => ({
@@ -48,7 +49,7 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
     onAddToCart,
     inventoryTracked,
     selectedAvailableStock,
-    isVariantOptionAvailable,
+    isVariantOptionAvailable, quantity, setQuantity, purchaseUnavailable,config,reviewName,setReviewName,reviewComment,setReviewComment,onSubmitReview,reviewSuccess,
   }) => (
     <div>
       <img
@@ -63,6 +64,16 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
       <span data-testid="variant-connectivity">
         {selectedAttributes?.conectividad}
       </span>
+      <span data-testid="title">{product.title}</span>
+      <span data-testid="quantity">{quantity}</span>
+      <span data-testid="unavailable">{String(purchaseUnavailable)}</span>
+      <span data-testid="config">{JSON.stringify(config)}</span>
+      <span data-testid="reviews">{product.reviews?.length||0}</span>
+      <span data-testid="review-success">{reviewSuccess}</span>
+      <input aria-label="Nombre reseña" value={reviewName} onChange={event=>setReviewName(event.target.value)}/>
+      <input aria-label="Comentario reseña" value={reviewComment} onChange={event=>setReviewComment(event.target.value)}/>
+      <button onClick={onSubmitReview}>Enviar reseña</button>
+      <button onClick={()=>setQuantity(5)}>Cantidad cinco</button>
       <span data-testid="variant-stock">{String(selectedAvailableStock)}</span>
       <span data-testid="gold-available">
         {String(isVariantOptionAvailable?.("color", "Dorado"))}
@@ -136,6 +147,9 @@ const DEMO_PRODUCT = {
   ],
 };
 
+beforeEach(()=>{route.id='demo-smartphone';addToCartMock.mockClear();api.get.mockReset();api.post.mockReset();});
+afterEach(()=>cleanup());
+
 describe("ProductDetail con variantes", () => {
   afterEach(() => {
     cleanup();
@@ -143,6 +157,8 @@ describe("ProductDetail con variantes", () => {
 
   beforeEach(() => {
     addToCartMock.mockClear();
+    route.id="demo-smartphone";
+    api.post.mockReset();
     api.get.mockImplementation(async (url) => {
       if (url === "/api/pages") {
         return { data: [] };
@@ -287,4 +303,67 @@ describe("ProductDetail con variantes", () => {
       expect(screen.getByTestId("gold-available")).toHaveTextContent("true");
     });
   });
+});
+
+
+it('hereda el precio del producto cuando la variante no define otro y respeta un precio cero explícito',async()=>{
+  api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{...DEMO_PRODUCT,variants:[{...DEMO_PRODUCT.variants[0],price:null},{...DEMO_PRODUCT.variants[1],price:0}]}}));
+  render(<ProductDetail/>);
+  await waitFor(()=>expect(screen.getByTestId('variant-price')).toHaveTextContent('1899000'));
+  fireEvent.click(screen.getByRole('button',{name:'Elegir dorado'}));
+  await waitFor(()=>expect(screen.getByTestId('variant-price')).toHaveTextContent(/^0$/));
+  fireEvent.click(screen.getByTestId('add-variant'));
+  expect(addToCartMock).toHaveBeenCalledWith(expect.objectContaining({price:0,unitPrice:0}));
+});
+it('ajusta la cantidad al stock de la variante nueva antes de enviarla al carrito',async()=>{
+  api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{...DEMO_PRODUCT,inventoryTracked:true,variants:DEMO_PRODUCT.variants.map((variant,index)=>({...variant,availableStock:index?2:6}))}}));
+  render(<ProductDetail/>);await screen.findByTestId('quantity');
+  fireEvent.click(screen.getByRole('button',{name:'Cantidad cinco'}));
+  expect(screen.getByTestId('quantity')).toHaveTextContent('5');
+  fireEvent.click(screen.getByRole('button',{name:'Elegir 12 GB RAM'}));
+  expect(screen.getByTestId('quantity')).toHaveTextContent('2');
+  fireEvent.click(screen.getByTestId('add-variant'));
+  expect(addToCartMock).toHaveBeenCalledWith(expect.objectContaining({quantity:2,price:2249000}));
+});
+it('permite comprar un producto simple con stock y bloquea productos sin variantes activas',async()=>{
+  api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{_id:'simple',title:'Servicio',price:100000,inventoryTracked:true,availableStock:3,variants:[]}}));
+  const view=render(<ProductDetail/>);await screen.findByTestId('quantity');
+  fireEvent.click(screen.getByRole('button',{name:'Cantidad cinco'}));fireEvent.click(screen.getByTestId('add-variant'));
+  expect(addToCartMock).toHaveBeenCalledWith(expect.objectContaining({quantity:3,price:100000}));view.unmount();addToCartMock.mockClear();
+  api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{...DEMO_PRODUCT,variants:DEMO_PRODUCT.variants.map(variant=>({...variant,active:false}))}}));
+  render(<ProductDetail/>);await screen.findByTestId('unavailable');
+  expect(screen.getByTestId('unavailable')).toHaveTextContent('true');fireEvent.click(screen.getByTestId('add-variant'));expect(addToCartMock).not.toHaveBeenCalled();
+});
+it('ignora una respuesta atrasada después de abrir otro producto',async()=>{
+  let complete;api.get.mockImplementation(url=>url==='/api/pages'?Promise.resolve({data:[]}):url.includes('nuevo')?Promise.resolve({data:{...DEMO_PRODUCT,_id:'nuevo',title:'Producto nuevo'}}):new Promise(resolve=>{complete=resolve;}));
+  const view=render(<ProductDetail/>);route.id='nuevo';view.rerender(<ProductDetail/>);
+  await waitFor(()=>expect(screen.getByTestId('title')).toHaveTextContent('Producto nuevo'));
+  complete({data:{...DEMO_PRODUCT,title:'Respuesta antigua'}});
+  await waitFor(()=>expect(screen.getByTestId('title')).toHaveTextContent('Producto nuevo'));
+});
+it('espera la configuración guardada y respeta el encabezado y pie desactivados',async()=>{
+  let complete;api.get.mockImplementation(url=>url==='/api/pages'?new Promise(resolve=>{complete=resolve;}):Promise.resolve({data:DEMO_PRODUCT}));
+  render(<ProductDetail/>);expect(screen.getByRole('status')).toHaveTextContent('Cargando producto');expect(screen.queryByTestId('title')).not.toBeInTheDocument();
+  complete({data:[{pageType:'product-detail',enabled:true,useHeader:false,useFooter:false,productDetailConfig:{subtitle:'Guardado'}}]});
+  await screen.findByTestId('config');expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({showHeader:false,showFooter:false,subtitle:'Guardado'});
+});
+it('distingue un fallo de conexión y permite reintentar',async()=>{
+  let fail=true;api.get.mockImplementation(async url=>{if(url==='/api/pages')return {data:[]};if(fail)throw {response:{status:503}};return {data:DEMO_PRODUCT};});
+  render(<ProductDetail/>);await screen.findByRole('alert');fail=false;fireEvent.click(screen.getByRole('button',{name:'Reintentar'}));await screen.findByTestId('title');
+});
+it('evita reseñas duplicadas y no las mezcla si cambia el producto mientras se envían',async()=>{
+  let complete;api.post.mockReturnValue(new Promise(resolve=>{complete=resolve;}));
+  api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{...DEMO_PRODUCT,_id:url.includes('nuevo')?'nuevo':DEMO_PRODUCT._id,reviews:[]}}));
+  const view=render(<ProductDetail/>);await screen.findByTestId('title');
+  fireEvent.change(screen.getByLabelText('Nombre reseña'),{target:{value:'Ana'}});fireEvent.change(screen.getByLabelText('Comentario reseña'),{target:{value:'Comentario'}});
+  fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));expect(api.post).toHaveBeenCalledTimes(1);
+  route.id='nuevo';view.rerender(<ProductDetail/>);await screen.findByTestId('reviews');complete({data:{reviews:[{name:'Ana',comment:'Comentario'}]}});
+  await waitFor(()=>expect(screen.getByTestId('reviews')).toHaveTextContent(/^0$/));expect(screen.getByTestId('review-success')).toBeEmptyDOMElement();
+});
+
+
+it('envía el valor visual real de un color guardado como objeto',async()=>{
+ api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{_id:'color-object',title:'Producto',price:50000,sizes:['M'],colors:[{name:'Verde personalizado',hex:'#33aa77'}],variants:[]}}));
+ render(<ProductDetail/>);await screen.findByTestId('variant-color');fireEvent.click(screen.getByTestId('add-variant'));
+ expect(addToCartMock).toHaveBeenCalledWith(expect.objectContaining({color:'Verde personalizado',colorValue:'#33aa77'}));
 });

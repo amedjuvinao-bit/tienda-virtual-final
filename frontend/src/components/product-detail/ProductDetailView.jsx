@@ -1,5 +1,7 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useId } from "react";
 import Header from "../Header";
+import "./productDetail.css";
+import {buildSafeProductDetailConfig} from "./productDetailConfig";
 import FooterSection from "../FooterSection";
 import WhatsAppButton from "../WhatsAppButton";
 import {
@@ -11,6 +13,8 @@ import {
   Leaf,
   Truck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Flame,
   ThumbsUp,
   Package,
@@ -78,7 +82,7 @@ function getAnimationStyle(type, durationMs) {
     case "zoom-in":
       return { animation: `pdZoomIn ${safeDuration}ms ease both` };
     default:
-      return {};
+      return {animation:"none"};
   }
 }
 
@@ -135,618 +139,13 @@ function ReviewRatingIcon({
   );
 }
 
+function BenefitIcon({source,fallback}) {
+  const [failed,setFailed]=useState('');
+  return source&&source!==failed?<img src={source} alt="" style={{width:24,height:24,objectFit:'contain'}} onError={()=>setFailed(source)}/>:fallback;
+}
+
 /* ─── Estilos globales de diseño (layout + micro-interacciones) ─── */
-const PD_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Mulish:wght@300;400;500;600;700&display=swap');
 
-  @keyframes pdFadeUp    { from { opacity:0; transform:translateY(24px); }  to { opacity:1; transform:translateY(0); } }
-  @keyframes pdFadeRight { from { opacity:0; transform:translateX(-24px); } to { opacity:1; transform:translateX(0); } }
-  @keyframes pdFadeLeft  { from { opacity:0; transform:translateX(24px); }  to { opacity:1; transform:translateX(0); } }
-  @keyframes pdZoomIn    { from { opacity:0; transform:scale(0.96); }        to { opacity:1; transform:scale(1); } }
-  @keyframes pdSlideIn   { from { opacity:0; transform:translateY(16px); }  to { opacity:1; transform:translateY(0); } }
-
-  .pd-page { font-family: 'Mulish', sans-serif; -webkit-font-smoothing: antialiased; }
-  .pd-page * { box-sizing: border-box; }
-
-  .pd-breadcrumb {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    letter-spacing: 0.02em;
-    margin-bottom: 28px;
-    animation: pdSlideIn 300ms ease both;
-  }
-
-  @media (max-width: 767px) {
-    .pd-breadcrumb {
-      font-size: 11px;
-      margin-bottom: 18px;
-    }
-  }
-
-  .pd-breadcrumb-sep { opacity: 0.4; margin: 0 2px; }
-
-  .pd-layout {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 32px;
-    align-items: start;
-  }
-
-  @media (max-width: 1023px) {
-    .pd-layout {
-      gap: 20px;
-    }
-  }
-
-  @media (max-width: 767px) {
-    .pd-layout {
-      gap: 16px;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .pd-layout {
-      grid-template-columns: minmax(320px, var(--pd-gallery-col, 460px)) minmax(420px, 560px);
-      gap: 26px;
-      justify-content: center;
-      align-items: start;
-      width: fit-content;
-      max-width: 100%;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .pd-layout.gallery-right {
-      grid-template-columns: minmax(420px, 560px) minmax(320px, var(--pd-gallery-col, 460px));
-    }
-  }
-
-  @media (min-width: 1280px) {
-    .pd-layout {
-      gap: 30px;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .pd-gallery-sticky { position: sticky; top: 100px; }
-  }
-
-  .pd-main-img-wrap {
-    overflow: hidden;
-    width: 100%;
-    position: relative;
-    animation: pdSlideIn 350ms ease both;
-  }
-
-  @media (max-width: 1023px) {
-    .pd-main-img-wrap {
-      margin-left: auto;
-      margin-right: auto;
-    }
-  }
-
-  .pd-main-img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    transition: transform 0.5s cubic-bezier(.25,.46,.45,.94);
-  }
-
-  .pd-main-img-wrap:hover .pd-main-img-zoom { transform: scale(1.04); }
-
-  .pd-discount-badge {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    z-index: 4;
-    padding: 4px 10px;
-    border-radius: 50px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #fff;
-    pointer-events: none;
-  }
-
-  @media (max-width: 767px) {
-    .pd-discount-badge {
-      top: 10px;
-      left: 10px;
-      font-size: 10px;
-      padding: 4px 8px;
-    }
-  }
-
-  .pd-thumbs-left {
-    display: none;
-    flex-direction: column;
-  }
-
-  @media (min-width: 1024px) {
-    .pd-thumbs-left { display: flex; }
-  }
-
-  .pd-thumbs-bottom {
-    display: none;
-    flex-wrap: wrap;
-    padding-top: 12px;
-  }
-
-  @media (min-width: 1024px) {
-    .pd-thumbs-bottom { display: flex; }
-  }
-
-  .pd-thumbs-mobile {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    margin-top: 14px;
-    scrollbar-width: none;
-  }
-
-  .pd-thumbs-mobile::-webkit-scrollbar { display: none; }
-
-  @media (max-width: 1023px) {
-    .pd-thumbs-mobile {
-      width: 100%;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-      overflow-x: visible;
-      margin-top: 12px;
-      padding-bottom: 0;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .pd-thumbs-mobile { display: none; }
-  }
-
-  .pd-thumb-btn {
-    overflow: hidden;
-    flex-shrink: 0;
-    background: #fff;
-    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-    cursor: pointer;
-    border: none;
-    padding: 0;
-  }
-
-  .pd-thumb-btn:hover { transform: translateY(-2px); }
-
-  .pd-content {
-    animation: pdSlideIn 400ms 80ms ease both;
-    width: 100%;
-    max-width: none;
-  }
-
-  .pd-divider {
-    height: 1px;
-    width: 100%;
-    margin: 24px 0;
-    opacity: 0.15;
-  }
-
-  @media (max-width: 767px) {
-    .pd-divider {
-      margin: 18px 0;
-    }
-  }
-
-  .pd-product-title {
-    font-family: 'Playfair Display', serif;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-  }
-
-  .pd-price-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 16px;
-  }
-
-  @media (max-width: 767px) {
-    .pd-price-row {
-      gap: 8px;
-      margin-top: 12px;
-    }
-  }
-
-  .pd-price-original {
-    font-size: 15px;
-    text-decoration: line-through;
-    opacity: 0.45;
-  }
-
-  @media (max-width: 767px) {
-    .pd-price-original {
-      font-size: 13px;
-    }
-  }
-
-  .pd-price-main {
-    font-family: 'Playfair Display', serif;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    line-height: 1;
-  }
-
-  .pd-section-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-    display: block;
-  }
-
-  @media (max-width: 767px) {
-    .pd-section-label {
-      font-size: 10px;
-      margin-bottom: 10px;
-    }
-  }
-
-  .pd-size-btn {
-    min-width: 44px;
-    height: 40px;
-    padding: 0 14px;
-    font-size: 13px;
-    font-weight: 600;
-    border: 1.5px solid;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    letter-spacing: 0.02em;
-    font-family: 'Mulish', sans-serif;
-  }
-
-  @media (max-width: 767px) {
-    .pd-size-btn {
-      min-width: 40px;
-      height: 36px;
-      padding: 0 12px;
-      font-size: 12px;
-    }
-  }
-
-  .pd-size-btn:hover:not(.active) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
-  .pd-size-btn:active { transform: scale(0.96); }
-
-  .pd-color-dot {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 2px solid;
-    cursor: pointer;
-    transition: transform 0.18s, box-shadow 0.18s;
-    padding: 0;
-  }
-
-  @media (max-width: 767px) {
-    .pd-color-dot {
-      width: 28px;
-      height: 28px;
-    }
-  }
-
-  .pd-color-dot:hover { transform: scale(1.15); }
-  .pd-color-dot.active { transform: scale(1.1); }
-
-  .pd-color-chip {
-    padding: 7px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border: 1.5px solid;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    font-family: 'Mulish', sans-serif;
-  }
-
-  @media (max-width: 767px) {
-    .pd-color-chip {
-      padding: 6px 12px;
-      font-size: 12px;
-    }
-  }
-
-  .pd-color-chip:hover:not(.active) { transform: translateY(-1px); }
-
-  .pd-qty-wrap {
-    display: inline-grid;
-    grid-template-columns: 40px 44px 40px;
-    overflow: hidden;
-  }
-
-  @media (max-width: 767px) {
-    .pd-qty-wrap {
-      grid-template-columns: 38px 44px 38px;
-      width: fit-content;
-    }
-  }
-
-  .pd-qty-btn {
-    height: 44px;
-    font-size: 18px;
-    font-weight: 300;
-    border: none;
-    cursor: pointer;
-    transition: background 0.15s;
-    font-family: 'Mulish', sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  @media (max-width: 767px) {
-    .pd-qty-btn {
-      height: 40px;
-      font-size: 16px;
-    }
-  }
-
-  .pd-qty-btn:hover { filter: brightness(0.94); }
-
-  .pd-qty-val {
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-  }
-
-  @media (max-width: 767px) {
-    .pd-qty-val {
-      height: 40px;
-      font-size: 13px;
-    }
-  }
-
-  .pd-add-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    font-weight: 700;
-    font-family: 'Mulish', sans-serif;
-    letter-spacing: 0.04em;
-    font-size: 14px;
-    border: none;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
-    text-transform: uppercase;
-  }
-
-  @media (max-width: 767px) {
-    .pd-add-btn {
-      width: 100%;
-      font-size: 12px;
-      gap: 8px;
-    }
-  }
-
-  .pd-add-btn:hover  { transform: translateY(-2px); }
-  .pd-add-btn:active { transform: scale(0.97); opacity: 0.92; }
-
-  .pd-qty-cta {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  @media (min-width: 480px) {
-    .pd-qty-cta {
-      flex-direction: row;
-      align-items: center;
-    }
-    .pd-add-btn { flex: 1; }
-  }
-
-  @media (max-width: 767px) {
-    .pd-qty-cta {
-      gap: 12px;
-    }
-  }
-
-  .pd-pickup {
-    border-radius: 16px;
-    padding: 16px 18px;
-    margin-top: 24px;
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-  }
-
-  @media (max-width: 767px) {
-    .pd-pickup {
-      padding: 14px;
-      gap: 12px;
-      margin-top: 20px;
-    }
-  }
-
-  .pd-pickup-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 18px;
-  }
-
-  @media (max-width: 767px) {
-    .pd-pickup-icon {
-      width: 32px;
-      height: 32px;
-    }
-  }
-
-  .pd-benefits {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 28px;
-  }
-
-  @media (max-width: 767px) {
-    .pd-benefits {
-      grid-template-columns: 1fr;
-      gap: 8px;
-      margin-top: 20px;
-    }
-  }
-
-  .pd-benefit-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 8px;
-    padding: 14px 10px;
-    border-radius: 14px;
-    transition: transform 0.2s, box-shadow 0.2s;
-    cursor: default;
-  }
-
-  .pd-benefit-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(31,23,42,0.08); }
-
-  .pd-benefit-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  @media (max-width: 767px) {
-    .pd-benefit-card {
-      flex-direction: row;
-      text-align: left;
-      padding: 12px 14px;
-      justify-content: flex-start;
-    }
-  }
-
-  .pd-accordion {
-    overflow: hidden;
-    transition: box-shadow 0.2s;
-  }
-
-  .pd-accordion-btn {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 16px 20px;
-    text-align: left;
-    border: none;
-    cursor: pointer;
-    background: transparent;
-    font-family: 'Mulish', sans-serif;
-    transition: background 0.15s;
-  }
-
-  @media (max-width: 767px) {
-    .pd-accordion-btn {
-      padding: 14px 16px;
-      gap: 12px;
-    }
-  }
-
-  .pd-accordion-btn:hover { filter: brightness(0.98); }
-
-  .pd-accordion-chevron {
-    transition: transform 0.3s ease;
-    flex-shrink: 0;
-  }
-
-  .pd-accordion-chevron.open { transform: rotate(180deg); }
-
-  .pd-accordion-body {
-    padding: 0 20px 20px;
-    font-size: 14px;
-    line-height: 1.8;
-    white-space: pre-line;
-    animation: pdSlideIn 200ms ease both;
-  }
-
-  @media (max-width: 767px) {
-    .pd-accordion-body {
-      padding: 0 16px 16px;
-      font-size: 13px;
-      line-height: 1.7;
-    }
-  }
-
-  .pd-reviews-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  @media (min-width: 1024px) {
-    .pd-reviews-grid.two-col {
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-    }
-  }
-
-  .pd-reviews-list::-webkit-scrollbar { width: 4px; }
-  .pd-reviews-list::-webkit-scrollbar-track { background: transparent; }
-  .pd-reviews-list::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
-
-  .pd-input {
-    width: 100%;
-    padding: 11px 14px;
-    outline: none;
-    font-family: 'Mulish', sans-serif;
-    transition: border-color 0.18s, box-shadow 0.18s;
-  }
-
-  .pd-input:focus { box-shadow: 0 0 0 3px rgba(236,72,153,0.12); }
-
-  .pd-fav-btn {
-    flex-shrink: 0;
-    border-radius: 50%;
-    padding: 10px;
-    border: 1.5px solid;
-    background: #fff;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  @media (max-width: 767px) {
-    .pd-fav-btn {
-      padding: 8px;
-    }
-  }
-
-  .pd-fav-btn:hover { transform: scale(1.1); }
-  .pd-fav-btn:active { transform: scale(0.94); }
-
-  .pd-section-gap { margin-top: 28px; }
-
-  @media (min-width: 768px) {
-    .pd-section-gap { margin-top: 36px; }
-  }
-
-  @media (max-width: 767px) {
-    .pd-section-gap { margin-top: 20px; }
-  }
-`;
 
 /* ─── Componente principal ─── */
 export default function ProductDetailView({
@@ -764,6 +163,7 @@ export default function ProductDetailView({
   selectedAttributes = {},
   onVariantAttributeChange,
   isVariantOptionAvailable = () => true,
+  purchaseUnavailable = false,
   inventoryTracked = false,
   selectedAvailableStock = null,
   quantity,
@@ -779,7 +179,9 @@ export default function ProductDetailView({
   reviewSuccess,
   onSubmitReview,
 }) {
-  const cfg = config || {};
+  const cfg = useMemo(()=>config?buildSafeProductDetailConfig(config):{},[config]);
+  const reviewId=useId();
+  const cannotPurchase=purchaseUnavailable||(inventoryTracked&&selectedAvailableStock<=0);
 
   /* ── Imágenes (sin cambios) ── */
   const images = useMemo(() => {
@@ -812,12 +214,14 @@ export default function ProductDetailView({
   }, [product]);
 
   const [mainImage, setMainImage] = useState(images[0] || "");
+  const [failedTitleImage,setFailedTitleImage]=useState('');
   const [openAccordion1, setOpenAccordion1] = useState(false);
   const [openAccordion2, setOpenAccordion2] = useState(false);
 
   useEffect(() => {
-    setMainImage(images[0] || "");
-  }, [images, product?.selectedVariantKey]);
+    setMainImage(current=>images.includes(current)?current:images[0]||'');
+  }, [images]);
+  useEffect(()=>{setMainImage(images[0]||'');},[product?._id,product?.selectedVariantKey]);
 
   const displayedMainImage =
     mainImage && images.includes(mainImage)
@@ -854,6 +258,7 @@ export default function ProductDetailView({
   const visibleTitle = cfg.titleOverride?.trim() || product?.title || "Producto";
   const visiblePrice = product?.price ?? 0;
   const visibleOriginalPrice =
+    cfg.showOriginalPrice !== false &&
     product?.originalPrice != null &&
     Number(product.originalPrice) > Number(product.price)
       ? Number(product.originalPrice)
@@ -866,6 +271,7 @@ export default function ProductDetailView({
   const accent1 = styleCfg.accentColor || "#ec4899";
   const accent2 = styleCfg.accentColor2 || "#d4af37";
   const borderColor = styleCfg.borderColor || "#f2d7e6";
+  const borderWidthPx=Number.isFinite(Number(styleCfg.borderWidthPx))?Number(styleCfg.borderWidthPx):1.5;
   const radius = Number(styleCfg.radiusPx) > 0 ? Number(styleCfg.radiusPx) : 18;
   const buttonRadius =
     Number(styleCfg.buttonRadiusPx) > 0 ? Number(styleCfg.buttonRadiusPx) : 14;
@@ -995,14 +401,17 @@ export default function ProductDetailView({
   const benefitItems = [
     {
       icon: <Heart className="w-5 h-5" />,
+      image: cfg.benefit1Icon,
       title: cfg.benefit1Title || "Hecho con amor",
     },
     {
       icon: <Leaf className="w-5 h-5" />,
+      image: cfg.benefit2Icon,
       title: cfg.benefit2Title || "Materiales hipoalergénicos",
     },
     {
       icon: <Truck className="w-5 h-5" />,
+      image: cfg.benefit3Icon,
       title: cfg.benefit3Title || "Envíos a toda Colombia",
     },
   ];
@@ -1219,7 +628,7 @@ export default function ProductDetailView({
       style={{
         backgroundColor: cardBg,
         borderRadius: radius,
-        border: `1.5px solid ${borderColor}`,
+        border: `${borderWidthPx}px solid ${borderColor}`,
         boxShadow: "0 14px 40px rgba(31,23,42,0.09)",
         maxWidth: `${mainImageMaxWidthPx}px`,
         maxHeight: `${mainImageMaxHeightPx}px`,
@@ -1239,7 +648,7 @@ export default function ProductDetailView({
       )}
 
       <img
-        src={displayedMainImage}
+        src={displayedMainImage||"/placeholder.png"}
         alt={visibleTitle}
         className={`pd-main-img ${imageHoverZoom ? "pd-main-img-zoom" : ""}`}
         style={{
@@ -1247,6 +656,9 @@ export default function ProductDetailView({
           maxHeight: `${mainImageMaxHeightPx}px`,
         }}
       />
+      {cfg.showArrows!==false&&images.length>1&&<div style={{position:'absolute',right:12,bottom:12,display:'flex',gap:8}}>
+        {[[-1,'Ver imagen anterior',ChevronLeft],[1,'Ver imagen siguiente',ChevronRight]].map(([step,label,Icon])=><button key={label} type="button" aria-label={label} onClick={()=>setMainImage(images[(Math.max(0,images.indexOf(displayedMainImage))+step+images.length)%images.length])} style={{width:34,height:34,borderRadius:buttonRadius,background:cardBg,color:textPrimary,border:`1px solid ${borderColor}`,display:'grid',placeItems:'center'}}><Icon size={18}/></button>)}
+      </div>}
     </div>
   );
 
@@ -1301,9 +713,8 @@ export default function ProductDetailView({
 
   return (
     <>
-      <style>{PD_STYLES}</style>
 
-      {withChrome && <Header />}
+      {withChrome && cfg.showHeader !== false && <Header />}
 
       <main
         className="pd-page min-h-screen"
@@ -1422,7 +833,8 @@ export default function ProductDetailView({
                     minWidth: 0,
                   }}
                 >
-                  {visibleTitle}
+                  {cfg.titleMode==='image'&&cfg.titleImage&&failedTitleImage!==cfg.titleImage?
+                    <img src={cfg.titleImage} alt={cfg.titleImageAlt||visibleTitle} style={{maxWidth:'100%',maxHeight:100,objectFit:'contain'}} onError={()=>setFailedTitleImage(cfg.titleImage)}/>:visibleTitle}
                 </h1>
 
                 {showFavorite && (
@@ -1431,6 +843,7 @@ export default function ProductDetailView({
                     onClick={onToggleFavorite}
                     className="pd-fav-btn"
                     aria-label="Favorito"
+                    aria-pressed={!!isFavorite}
                     style={{
                       borderColor: favoriteBorderColor,
                       borderWidth: `${favoriteBorderWidthPx}px`,
@@ -1460,6 +873,8 @@ export default function ProductDetailView({
                   </button>
                 )}
               </div>
+
+              {cfg.subtitle&&<p className="pd-product-subtitle" style={{color:textSecondary,marginTop:10}}>{cfg.subtitle}</p>}
 
               {showPrice && (
                 <div className="pd-price-row">
@@ -1716,13 +1131,15 @@ export default function ProductDetailView({
                       className="pd-qty-wrap"
                       style={{
                         borderRadius: 10,
-                        border: `1.5px solid ${borderColor}`,
+                        border: `${borderWidthPx}px solid ${borderColor}`,
                         backgroundColor: "#ffffff",
                         boxShadow: "inset 0 1px 3px rgba(0,0,0,0.04)",
                       }}
                     >
                       <button
                         type="button"
+                        aria-label="Disminuir cantidad"
+                        disabled={quantity<=1}
                         onClick={() => setQuantity((q) => (q > 1 ? q - 1 : 1))}
                         className="pd-qty-btn"
                         style={{
@@ -1737,9 +1154,10 @@ export default function ProductDetailView({
                       </div>
                       <button
                         type="button"
+                        aria-label="Aumentar cantidad"
                         onClick={() => setQuantity((q) => q + 1)}
                         disabled={
-                          inventoryTracked &&
+                          cannotPurchase || inventoryTracked &&
                           quantity >= Number(selectedAvailableStock || 0)
                         }
                         className="pd-qty-btn"
@@ -1756,7 +1174,7 @@ export default function ProductDetailView({
                       <button
                         type="button"
                         onClick={onAddToCart}
-                        disabled={inventoryTracked && selectedAvailableStock <= 0}
+                        disabled={cannotPurchase}
                         className="pd-add-btn"
                         style={{
                           height: 48,
@@ -1767,15 +1185,15 @@ export default function ProductDetailView({
                           boxShadow: `0 12px 28px ${hexToRgba(addToCartBorderColor, 0.28)}`,
                           color: addToCartTextColor,
                           border: `${addToCartBorderWidthPx}px solid ${addToCartBorderColor}`,
-                          opacity: inventoryTracked && selectedAvailableStock <= 0 ? 0.55 : 1,
-                          cursor: inventoryTracked && selectedAvailableStock <= 0 ? "not-allowed" : "pointer",
+                          opacity: cannotPurchase ? 0.55 : 1,
+                          cursor: cannotPurchase ? "not-allowed" : "pointer",
                         }}
                       >
                         <AddToCartIcon
                           style={{ width: 18, height: 18, color: addToCartIconColor }}
                         />
-                        {inventoryTracked && selectedAvailableStock <= 0
-                          ? "Agotado"
+                        {cannotPurchase
+                          ? inventoryTracked ? "Agotado" : "No disponible"
                           : cfg.addToCartText || "Añadir al carrito"}
                       </button>
                     )}
@@ -1942,7 +1360,7 @@ export default function ProductDetailView({
                           color: accent1,
                         }}
                       >
-                        {item.icon}
+                        <BenefitIcon source={item.image} fallback={item.icon}/>
                       </div>
                       <p
                         style={{
@@ -1991,7 +1409,7 @@ export default function ProductDetailView({
                   className={`pd-accordion ${shadowClass}`}
                   style={{
                     borderRadius: radius,
-                    border: `1.5px solid ${borderColor}`,
+                    border: `${borderWidthPx}px solid ${borderColor}`,
                     backgroundColor: "#ffffff",
                     boxShadow: "0 4px 16px rgba(31,23,42,0.05)",
                   }}
@@ -2037,7 +1455,7 @@ export default function ProductDetailView({
               style={{
                 marginTop: 48,
                 borderRadius: radius,
-                border: `1.5px solid ${borderColor}`,
+                border: `${borderWidthPx}px solid ${borderColor}`,
                 backgroundColor: cardBg,
                 padding: 24,
               }}
@@ -2231,6 +1649,8 @@ export default function ProductDetailView({
                             {reviewNameLabel}
                           </label>
                           <input
+                            id={`${reviewId}-name`}
+                            aria-label={reviewNameLabel}
                             type="text"
                             value={reviewName}
                             onChange={(e) => setReviewName(e.target.value)}
@@ -2317,6 +1737,8 @@ export default function ProductDetailView({
                             {reviewCommentLabel}
                           </label>
                           <textarea
+                            id={`${reviewId}-comment`}
+                            aria-label={reviewCommentLabel}
                             value={reviewComment}
                             onChange={(e) => setReviewComment(e.target.value)}
                             placeholder={reviewCommentPlaceholder}
@@ -2533,7 +1955,7 @@ export default function ProductDetailView({
         </div>
       </main>
 
-      {withChrome && <FooterSection />}
+      {withChrome && cfg.showFooter !== false && <FooterSection />}
       {withChrome && <WhatsAppButton />}
     </>
   );

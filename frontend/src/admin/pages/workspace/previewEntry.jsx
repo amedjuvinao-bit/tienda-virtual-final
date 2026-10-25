@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import CatalogPageView from "../../../components/catalog/CatalogPageView";
 import ProductDetailView from "../../../components/product-detail/ProductDetailView";
+import useProductDetailSelection from "../../../components/product-detail/useProductDetailSelection";
 import Header from "../../../components/Header";
 import FooterSection from "../../../components/FooterSection";
 import { CartContext } from "../../../context/CartContext";
@@ -38,9 +39,6 @@ const exampleProduct = {
 function DetailPreview({ draft }) {
   const [products, setProducts] = useState([]),
     [productId, setProductId] = useState("");
-  const [size, setSize] = useState(""),
-    [color, setColor] = useState(""),
-    [quantity, setQuantity] = useState(1);
   useEffect(() => {
     const controller = new AbortController();
     fetch(`${API_BASE_URL}/api/products?limit=12&status=published`, {
@@ -60,8 +58,6 @@ function DetailPreview({ draft }) {
   const [selected, setSelected] = useState(null);
   useEffect(() => {
     setSelected(null);
-    setSize("");
-    setColor("");
     if (!product._id || product._id === "preview") return;
     const controller = new AbortController();
     fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(product._id)}`, {
@@ -69,11 +65,12 @@ function DetailPreview({ draft }) {
     })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        if (data) setSelected(data.product || data);
+        if (data && !controller.signal.aborted) setSelected(data.product || data);
       })
       .catch(() => {});
     return () => controller.abort();
   }, [product._id]);
+  const selection=useProductDetailSelection(selected||product);
   return (
     <>
       <label
@@ -106,18 +103,25 @@ function DetailPreview({ draft }) {
         </select>
       </label>
       <ProductDetailView
-        product={selected || product}
+        product={selection.variantAwareProduct}
         config={draft.productDetailConfig}
         withChrome={false}
         isFavorite={false}
         onToggleFavorite={noop}
         onAddToCart={noop}
-        selectedSize={size}
-        setSelectedSize={setSize}
-        selectedColor={color}
-        setSelectedColor={setColor}
-        quantity={quantity}
-        setQuantity={setQuantity}
+        selectedSize={selection.selectedSize}
+        setSelectedSize={selection.handleSizeChange}
+        selectedColor={selection.selectedColor}
+        setSelectedColor={selection.handleColorChange}
+        variantAxes={selection.publicProduct?.variantAxes||[]}
+        selectedAttributes={selection.selectedAttributes}
+        onVariantAttributeChange={selection.handleVariantAttributeChange}
+        isVariantOptionAvailable={selection.isVariantOptionAvailable}
+        inventoryTracked={selection.inventoryTracked}
+        selectedAvailableStock={selection.selectedAvailableStock}
+        purchaseUnavailable={selection.purchaseUnavailable}
+        quantity={selection.quantity}
+        setQuantity={selection.setQuantity}
         reviewName=""
         setReviewName={noop}
         reviewComment=""
