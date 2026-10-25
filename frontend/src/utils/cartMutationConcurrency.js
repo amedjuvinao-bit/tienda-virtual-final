@@ -46,10 +46,20 @@ export function applyCartOperation(items, operation = {}) {
     const index = current.findIndex(
       (item) => cartItemIdentity(item) === incomingIdentity
     );
-    if (index < 0) return [...current, { ...incoming, quantity: amount }];
+    if (index < 0)
+      return [
+        ...current,
+        {
+          ...incoming,
+          quantity: amount,
+          ...(incoming.qty !== undefined ? { qty: amount } : {}),
+        },
+      ];
+    const quantity = Math.max(1, quantityOf(current[index]) + amount);
     current[index] = {
       ...current[index],
-      quantity: Math.max(1, quantityOf(current[index]) + amount),
+      quantity,
+      ...(current[index].qty !== undefined ? { qty: quantity } : {}),
     };
     return current;
   }
@@ -58,9 +68,11 @@ export function applyCartOperation(items, operation = {}) {
     const delta = type === 'increase' ? 1 : -1;
     return current.map((item) => {
       if (cartItemIdentity(item) !== identity) return item;
+      const quantity = Math.max(1, quantityOf(item) + delta);
       return {
         ...item,
-        quantity: Math.max(1, quantityOf(item) + delta),
+        quantity,
+        ...(item.qty !== undefined ? { qty: quantity } : {}),
       };
     });
   }

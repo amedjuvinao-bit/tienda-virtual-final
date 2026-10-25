@@ -31,6 +31,9 @@ import {
   storeCartSnapshot,
 } from '../utils/cartSnapshotStorage';
 
+import { createCartTabSync, withCartBootstrapLock } from '../utils/cartTabSync';
+import { readSharedCart } from '../utils/cartSharedAccess';
+
 function clean(value) {
   return String(value || '').trim();
 }
@@ -220,6 +223,50 @@ export function CartProvider({ children }) {
   const coordinatorRef = useRef(null);
   const recoveryClaimRef = useRef(false);
   const refreshingRef = useRef(null);
+  const tabSyncRef = useRef(null);
+  const refreshAgainRef = useRef(false);
+
+  const getTabSync = () => {
+    tabSyncRef.current ||= createCartTabSync({
+      getAccess: getCartAccess,
+      onChange: () => {
+        if (refreshingRef.current) refreshAgainRef.current = true;
+        else void syncCart();
+      },
+    });
+    return tabSyncRef.current;
+  };
+
+  const prepareSharedCart = async () => {
+    const candidate = await getTabSync().resolve();
+    const own = getCartAccess();
+    if (
+      !candidate ||
+      (candidate.sessionId === own?.sessionId && candidate.token === own.token)
+    )
+      return;
+    let snapshot;
+    try {
+      snapshot = await readSharedCart({
+        api,
+        access: candidate,
+        previousItems: authoritativeRef.current.items,
+        previousSessionId: own?.sessionId,
+        toBackendItem,
+        normalizeItem: fromBackendItem,
+      });
+    } catch (cause) {
+      setSyncError(true);
+      // A failed peer capability says nothing about this tab's current cart.
+      throw new Error('No se pudo sincronizar el carrito compartido.', {
+        cause,
+      });
+    }
+    if (!storeCartAccess(candidate.sessionId, candidate.token))
+      throw new Error('CART_SHARED_ACCESS_STORAGE_FAILED');
+    adoptSnapshot(snapshot);
+    getTabSync().publishChange();
+  };
 
   const adoptSnapshot = (value, { updateUi = true } = {}) => {
     const snapshot = normalizeCartSnapshot(value);
@@ -255,6 +302,7 @@ export function CartProvider({ children }) {
           cart: data?.cart || { items },
           version: data?.version || data?.cart?.updatedAt,
         });
+        getTabSync().publishAccess({ sessionId, token });
         return { sessionId, token, version: snapshot.version };
       })
       .finally(() => {
@@ -290,22 +338,27 @@ export function CartProvider({ children }) {
   };
 
   const ensureCartReady = async (items) => {
+    await prepareSharedCart();
     const existing = getCartAccess();
     if (existing) {
       if (!authoritativeRef.current.version) await loadRemoteCart(existing);
       return { ...existing, version: authoritativeRef.current.version };
     }
-    // The public validator canonicalizes only the browser's own saved selection.
-    // Commit new credentials and items only after successful server creation.
-    const { access, adjustments } = await createValidatedCart(
-      Array.isArray(items) ? items : cartRef.current.map(toBackendItem)
-    );
-    if (adjustments.length) {
-      toast.info(
-        'Actualizamos los precios y la disponibilidad de tu carrito guardado.'
+    return withCartBootstrapLock(async () => {
+      // Another tab may have created the cart while this one waited for the lock.
+      await prepareSharedCart();
+      const shared = getCartAccess();
+      if (shared)
+        return { ...shared, version: authoritativeRef.current.version };
+      const { access, adjustments } = await createValidatedCart(
+        Array.isArray(items) ? items : cartRef.current.map(toBackendItem)
       );
-    }
-    return access;
+      if (adjustments.length)
+        toast.info(
+          'Actualizamos los precios y la disponibilidad de tu carrito guardado.'
+        );
+      return access;
+    });
   };
 
   const renewCartAccess = async () => {
@@ -322,6 +375,7 @@ export function CartProvider({ children }) {
       throw new Error('CART_ACCESS_REFRESH_INVALID');
     }
     setApiSessionId(sessionId);
+    getTabSync().publishAccess({ sessionId, token });
     const version = clean(data?.version);
     authoritativeRef.current = {
       ...authoritativeRef.current,
@@ -379,6 +433,9 @@ export function CartProvider({ children }) {
     },
     write: writeCartVersion,
     reload: async () => {
+      await prepareSharedCart();
+      if (!getCartAccess() && !authoritativeRef.current.items.length)
+        return { items: [], version: '' };
       const access =
         getCartAccess() ||
         (await ensureCartReady(
@@ -393,7 +450,18 @@ export function CartProvider({ children }) {
       );
       return response.data || {};
     },
-    adopt: (snapshot) => adoptSnapshot(snapshot),
+    adopt: (snapshot, metadata = {}) => {
+      const adopted = adoptSnapshot(snapshot);
+      if (metadata.operation?.type === 'refresh') getTabSync().publishReady();
+      if (
+        metadata.operation?.type !== 'refresh' &&
+        !metadata.rejected &&
+        !metadata.reloaded &&
+        !metadata.terminalConflict
+      )
+        getTabSync().publishChange();
+      return adopted;
+    },
     onTerminalConflict: () => {
       const message =
         'El carrito volvió a cambiar. Conservamos la versión más reciente.';
@@ -455,6 +523,14 @@ export function CartProvider({ children }) {
       .finally(() => setPendingOperations((value) => Math.max(0, value - 1)));
   };
 
+  useEffect(() => {
+    getTabSync();
+    return () => {
+      tabSyncRef.current?.close();
+      tabSyncRef.current = null;
+    };
+  }, []);
+
   // Asegura que el header X-Session-Id esté siempre presente
   useEffect(() => {
     try {
@@ -485,6 +561,7 @@ export function CartProvider({ children }) {
           cart: data?.cart,
           version: data?.version || data?.cart?.version,
         });
+        getTabSync().publishAccess({ sessionId, token });
         toast.success('Tu carrito fue recuperado de forma segura.');
       })
       .catch(() => {
@@ -499,8 +576,6 @@ export function CartProvider({ children }) {
   // Refreshes share the mutation queue and one in-flight request.
   const syncCart = () => {
     if (refreshingRef.current) return refreshingRef.current;
-    if (!getCartAccess() && !authoritativeRef.current.items.length)
-      return Promise.resolve(true);
     setLoading(true);
     const request = coordinatorRef.current
       .enqueue({ type: 'refresh' })
@@ -518,6 +593,10 @@ export function CartProvider({ children }) {
       .finally(() => {
         refreshingRef.current = null;
         setLoading(false);
+        if (refreshAgainRef.current) {
+          refreshAgainRef.current = false;
+          void syncCart();
+        }
       });
     refreshingRef.current = request;
     return request;
@@ -525,11 +604,7 @@ export function CartProvider({ children }) {
 
   useEffect(() => {
     const refresh = () => {
-      if (
-        !recoveryClaimRef.current &&
-        (getCartAccess() || authoritativeRef.current.items.length) &&
-        !readCartRecoveryFragment()
-      )
+      if (!recoveryClaimRef.current && !readCartRecoveryFragment())
         void syncCart();
     };
     refresh();
