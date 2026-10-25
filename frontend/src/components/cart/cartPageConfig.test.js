@@ -33,3 +33,13 @@ it("conserva extensiones, brillo cero y grosores decimales sin aceptar rutas ext
   expect(config.continueShoppingPath).toBe("/#categorias");
   expect(safePath("/\\externo.test", "/")).toBe("/");
 });
+it("conserva un color independiente para las divisiones del carrito lateral", () => {
+  expect(
+    buildSafeCartPageConfig({ style: { cardBorderColor: "#abcdef" } }).modal
+      .separatorColor,
+  ).toBe("#abcdef");
+  expect(
+    buildSafeCartPageConfig({ modal: { separatorColor: "#123456" } }).modal
+      .separatorColor,
+  ).toBe("#123456");
+});

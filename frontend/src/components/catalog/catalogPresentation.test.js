@@ -72,3 +72,23 @@ it('reutiliza el fondo de las secciones y el fondo móvil de Inicio cuando el co
   const look={sections:[{id:'look',config:{editorialBackgroundImage:'/shared-look.webp'}}]};
   expect(catalogContinuityBackdrop(look).image).toBe('/shared-look.webp');
 });
+
+it('busca el primer fondo visible de Inicio aunque una sección anterior no tenga imagen', async () => {
+  const { catalogContinuityBackdrop } = await import('./catalogBackdrop');
+  const theme = { sections: [
+    { id: 'tendencia', config: { products: [{productId:'p1'}], presentation: { mode:'floatingGlass', backdropMode:'color' } } },
+    { id: 'look', enabled: false },
+    { id: 'complementos', style: { sectionBackgroundMode:'color' } },
+    { id: 'instagram', config: { posts:[{image:'/post.webp'}], journalBackgroundMode:'custom', journalBackgroundImage:'/desktop-home.webp', journalMobileBackgroundImage:'/mobile-home.webp' } },
+  ] };
+  expect(catalogContinuityBackdrop(theme).image).toBe('/desktop-home.webp');
+  expect(catalogContinuityBackdrop(theme,true).image).toBe('/mobile-home.webp');
+  expect(catalogContinuityBackdrop({...theme, global:{sectionMotion:{journey:{backgroundImage:'/explicit-home.webp'}}}},true).image).toBe('/explicit-home.webp');
+});
+
+
+it('no inventa una imagen si todas las secciones con fondo están desactivadas', async () => {
+  const { catalogContinuityBackdrop } = await import('./catalogBackdrop');
+  const sections = ['tendencia','look','complementos','categorias','instagram','tiktok','informacion'].map(id=>({id,enabled:false}));
+  expect(catalogContinuityBackdrop({colors:{background:'#123456'},sections},true)).toEqual({color:'#123456',image:''});
+});

@@ -480,3 +480,26 @@
 :is(.cart-storefront, .cart-drawer) .cart-checkout:disabled {
   opacity: 0.65;
 }
+
+/* A viewport layer keeps the continuous artwork at the same scale while the
+   mobile cart grows. Mobile browsers do not reliably support fixed backgrounds. */
+@media (max-width: 767px) {
+  .cart-storefront {
+    isolation: isolate;
+    background-size: 0 0;
+    background-repeat: no-repeat;
+    background-attachment: scroll;
+  }
+  .cart-storefront::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: inherit;
+    background-image: inherit;
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+  }
+}

@@ -132,6 +132,7 @@ export default function CartDrawer({
         tabIndex={-1}
         style={{
           ...cartVariables(itemsConfig),
+          "--drawer-separator": m.separatorColor,
           "--drawer-item-radius": `${m.itemRadiusPx}px`,
           "--drawer-width": `${m.widthPx}px`,
           "--drawer-padding": `${m.panelPaddingPx}px`,

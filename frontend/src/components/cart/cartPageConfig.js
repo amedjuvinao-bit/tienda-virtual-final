@@ -149,6 +149,10 @@ export function buildSafeCartPageConfig(raw) {
       panelBg:
         typeof cfg?.modal?.panelBg === "string" ? cfg.modal.panelBg : "#efb9b7",
       panelOpacity: clampInt(cfg?.modal?.panelOpacity, 0, 100, 100),
+      separatorColor: text(
+        cfg?.modal?.separatorColor,
+        cfg?.style?.cardBorderColor || "#fff4ed",
+      ),
       textColor:
         typeof cfg?.modal?.textColor === "string"
           ? cfg.modal.textColor

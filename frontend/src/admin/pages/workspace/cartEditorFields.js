@@ -569,6 +569,14 @@ export const cartEditorFields = [
     group: "drawer",
   },
   {
+    key: "separatorColor",
+    scope: "modal",
+    label: "Color de las líneas divisorias",
+    type: "color",
+    section: "Panel lateral",
+    group: "drawer",
+  },
+  {
     key: "closeIconColor",
     scope: "modal",
     label: "Color ícono cerrar",
