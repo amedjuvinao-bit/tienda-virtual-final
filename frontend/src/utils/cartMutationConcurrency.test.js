@@ -252,7 +252,7 @@ describe('concurrencia del carrito', () => {
     );
   });
 
-  it('descarta de forma controlada un carrito que ya no existe en el servidor', async () => {
+  it('delega la recuperación de acceso sin asumir que el carrito fue eliminado', async () => {
     const missing = new Error('missing cart');
     missing.response = {
       status: 404,

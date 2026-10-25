@@ -11,7 +11,6 @@ import { toast } from 'react-toastify';
 import api, { setSessionId as setApiSessionId } from '../lib/api';
 import {
   buildCartAccessHeaders,
-  clearCartAccess,
   getCartAccess,
   storeCartAccess,
 } from '../utils/cartAccess';
@@ -27,6 +26,10 @@ import {
   clearCartRecoveryFragment,
   readCartRecoveryFragment,
 } from '../utils/cartRecoveryAccess';
+import {
+  readCartSnapshot,
+  storeCartSnapshot,
+} from '../utils/cartSnapshotStorage';
 
 function clean(value) {
   return String(value || '').trim();
@@ -160,6 +163,9 @@ function calcSummary(items) {
 
 function readStoredCart() {
   try {
+    const access = getCartAccess();
+    const saved = readCartSnapshot(access?.sessionId);
+    if (saved) return saved;
     const stored = JSON.parse(localStorage.getItem('cart') || '[]');
     return Array.isArray(stored)
       ? stored.filter((item) => item && item._id)
@@ -222,6 +228,7 @@ export function CartProvider({ children }) {
       .filter((item) => item._id);
     const normalized = { items: local, version: snapshot.version };
     authoritativeRef.current = normalized;
+    storeCartSnapshot(getCartAccess()?.sessionId, local);
     setSyncError(false);
     if (updateUi) {
       cartRef.current = local;
@@ -269,31 +276,31 @@ export function CartProvider({ children }) {
     return adoptSnapshot(response.data || {});
   };
 
-  const ensureCartReady = async (items) => {
-    const existing = getCartAccess();
-    if (existing) {
-      if (!authoritativeRef.current.version) await loadRemoteCart(existing);
-      return { ...existing, version: authoritativeRef.current.version };
-    }
-    clearCartAccess();
-    const createPayload = Array.isArray(items)
-      ? { items }
-      : { items: cart.map(toBackendItem) };
-    if (!createPayload.items.length) return createRemoteCart([]);
-    // A locally restored cart may contain products that have since changed.
-    // Canonicalize it before creating a new secure session so invalid old rows
-    // cannot prevent the customer from removing them or continuing to shop.
-    const { data } = await api.post('/api/cart/validate', {
-      items: createPayload.items,
-      mode: 'soft',
-    });
+  const createValidatedCart = async (items) => {
+    const { data } = items.length
+      ? await api.post('/api/cart/validate', { items, mode: 'soft' })
+      : { data: { items: [], adjustments: [] } };
     if (!Array.isArray(data?.items))
       throw new Error('No se pudo validar el carrito guardado.');
     const restored = data.items.filter(
       (item) => Number(item.qty ?? item.quantity) > 0
     );
     const access = await createRemoteCart(restored);
-    if (data?.adjustments?.length) {
+    return { access, adjustments: data.adjustments || [] };
+  };
+
+  const ensureCartReady = async (items) => {
+    const existing = getCartAccess();
+    if (existing) {
+      if (!authoritativeRef.current.version) await loadRemoteCart(existing);
+      return { ...existing, version: authoritativeRef.current.version };
+    }
+    // The public validator canonicalizes only the browser's own saved selection.
+    // Commit new credentials and items only after successful server creation.
+    const { access, adjustments } = await createValidatedCart(
+      Array.isArray(items) ? items : cartRef.current.map(toBackendItem)
+    );
+    if (adjustments.length) {
       toast.info(
         'Actualizamos los precios y la disponibilidad de tu carrito guardado.'
       );
@@ -339,21 +346,30 @@ export function CartProvider({ children }) {
   };
 
   const recoverMissingCart = async (operation) => {
-    clearCartAccess();
-    setApiSessionId('');
-    adoptSnapshot({ items: [], version: '' });
-
-    if (operation?.type === 'add' && operation.item) {
-      await createRemoteCart([toBackendItem(operation.item)]);
+    // A privacy-preserving 404 means missing OR unauthorized. It is never proof
+    // that the customer's selection should be erased. Rebuild a new capability
+    // from the last confirmed local items, without reading the inaccessible cart.
+    const previous = authoritativeRef.current;
+    const desired = applyCartOperation(previous.items, operation);
+    try {
+      const { adjustments } = await createValidatedCart(
+        desired.map(toBackendItem)
+      );
+      const message = adjustments.length
+        ? 'Recuperamos tu carrito y actualizamos los precios y la disponibilidad de los productos.'
+        : 'Recuperamos tu carrito conservando tus productos.';
+      setCartMessage(message);
+      toast.info(message, { toastId: 'cart-recovered' });
+      return { ...authoritativeRef.current, recoveredMissingCart: true };
+    } catch (error) {
+      adoptSnapshot(previous);
+      setSyncError(true);
+      const message =
+        'No pudimos recuperar el acceso al carrito. Conservamos tus productos; vuelve a intentarlo.';
+      setCartMessage(message);
+      toast.error(message, { toastId: 'cart-recovery-failed' });
+      throw error;
     }
-
-    const message = 'El carrito anterior ya no existía. Iniciamos uno nuevo.';
-    setCartMessage(message);
-    toast.info(message, { toastId: 'cart-recreated' });
-    return {
-      ...authoritativeRef.current,
-      recoveredMissingCart: true,
-    };
   };
 
   coordinatorRef.current ||= createCartMutationCoordinator({

@@ -414,8 +414,8 @@ async function main() {
     assert(!routeSource.includes("console.log(req.body"));
     assert(!routeSource.includes("console.error(req.body"));
     assert(!routeSource.includes("console.log(req.headers"));
-    assert(frontendAccessSource.includes("sessionStorage.setItem(CART_ACCESS_TOKEN_KEY"));
-    assert(!frontendAccessSource.includes('localStorage.setItem(CART_ACCESS_TOKEN_KEY'));
+    assert.match(frontendAccessSource, /sessionStorage\.setItem\(\s*CART_ACCESS_KEY/);
+    assert.doesNotMatch(frontendAccessSource, /localStorage\.setItem\(\s*CART_ACCESS_KEY/);
     assert(frontendAccessSource.includes('preserveSessionId'));
   });
 

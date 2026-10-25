@@ -199,6 +199,7 @@ export function createCartMutationCoordinator({
       adopt(written, { operation, retried: false });
       return { ...written, retried: false };
     } catch (error) {
+      if (isCartAccessNotFound(error)) throw error;
       if (!isCartWriteConflict(error)) {
         const invalidIdentities = invalidItemIdentities(error);
         const targetIdentity = operationIdentity(operation);
@@ -262,6 +263,7 @@ export function createCartMutationCoordinator({
       adopt(written, { operation, retried: true });
       return { ...written, retried: true };
     } catch (error) {
+      if (isCartAccessNotFound(error)) throw error;
       if (!isCartWriteConflict(error)) {
         adopt(reloaded, { operation, rejected: true, reloaded: true });
         onRejected?.(error, reloaded, operation);

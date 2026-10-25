@@ -1,6 +1,7 @@
 // src/lib/api.js
 import axios from 'axios';
 import { API_BASE_URL } from '../config/apiBaseUrl';
+import { getSessionId } from '../utils/getSessionId';
 
 const API_BASE = API_BASE_URL;
 
@@ -106,7 +107,7 @@ export function postIdempotent(url, data, idempotencyKey, config = {}) {
 /* ============ Interceptors ============ */
 api.interceptors.request.use((config) => {
   try {
-    const sessionId = localStorage.getItem(SESSION_ID_KEY);
+    const sessionId = getSessionId();
     const headerNames = Object.keys(config.headers || {}).map((key) =>
       String(key).toLowerCase()
     );
