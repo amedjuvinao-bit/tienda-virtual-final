@@ -828,3 +828,121 @@
     gap: 12px;
   }
 }
+
+/* Desktop density: keep the purchase controls together and the full photo visible. */
+@media (min-width: 1024px) {
+  .pd-storefront[data-chrome="true"] {
+    --pd-desktop-header-height: var(--storefront-header-height, 100px);
+  }
+  .pd-scene {
+    padding-bottom: 40px;
+  }
+  .pd-storefront[data-chrome="true"] .pd-scene {
+    padding-top: calc(var(--storefront-header-height, 100px) + 16px);
+  }
+  .pd-continuous .pd-breadcrumb {
+    margin-bottom: 12px;
+  }
+  .pd-frame-gallery {
+    --pd-desktop-gallery-height: min(
+      var(--pd-image-height),
+      clamp(
+        380px,
+        calc(100svh - var(--pd-desktop-header-height, 0px) - 132px),
+        580px
+      )
+    );
+    --pd-desktop-photo-height: var(--pd-desktop-gallery-height);
+    max-height: var(--pd-desktop-gallery-height);
+  }
+  .pd-frame-gallery[data-thumbnails="bottom"]:has(.pd-frame-thumbnails) {
+    --pd-desktop-photo-height: max(
+      260px,
+      calc(var(--pd-desktop-gallery-height) - var(--pd-thumb-height) - 16px)
+    );
+  }
+  .pd-frame-gallery .pd-main-img-wrap,
+  .pd-frame-gallery[data-thumbnails="overlay"] .pd-main-img-wrap {
+    height: var(--pd-desktop-photo-height);
+    min-height: 0;
+    max-height: var(--pd-desktop-photo-height);
+  }
+  .pd-product-frame .pd-content {
+    container: pd-purchase / inline-size;
+    padding: 16px clamp(18px, 2vw, 28px);
+  }
+  .pd-continuous .pd-price-row,
+  .pd-rating-summary {
+    margin-top: 8px;
+  }
+  .pd-short-description {
+    margin-top: 8px;
+  }
+  .pd-continuous .pd-divider {
+    margin: 12px 0;
+  }
+  .pd-variant-grid {
+    gap: 10px 16px;
+  }
+  .pd-continuous .pd-section-label {
+    margin-bottom: 6px;
+  }
+  .pd-continuous :is(.pd-size-btn, .pd-color-chip) {
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+  .pd-continuous .pd-color-dot {
+    width: 32px;
+    height: 32px;
+  }
+  .pd-purchase-row {
+    margin-top: 14px;
+  }
+  .pd-purchase-actions {
+    margin-top: 12px;
+    gap: 8px;
+  }
+  .pd-continuous .pd-pickup {
+    padding-block: 10px;
+    margin-top: 10px;
+    gap: 10px;
+  }
+  .pd-continuous .pd-pickup-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .pd-continuous .pd-benefits {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .pd-frame-information {
+    margin-top: 6px;
+  }
+  .pd-information-tabs button {
+    padding-block: 11px;
+  }
+  .pd-information-panel {
+    padding-block: 12px;
+  }
+  .pd-related {
+    margin-top: 24px;
+  }
+  @container pd-purchase (min-width: 440px) {
+    .pd-purchase-row:has(.pd-quantity-block) {
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .pd-purchase-row:has(.pd-quantity-block) .pd-quantity-line {
+      gap: 5px;
+    }
+    .pd-purchase-row:has(.pd-quantity-block) .pd-stock {
+      flex-basis: 100%;
+    }
+    .pd-purchase-row:has(.pd-quantity-block) .pd-purchase-actions {
+      margin-top: 20px;
+    }
+  }
+}
