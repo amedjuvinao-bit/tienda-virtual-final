@@ -27,6 +27,7 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url, options) => {
+      if(options?.method === "POST" && url.includes("/api/uploads"))return {ok:true,json:async()=>({url:"https://example.test/scene.webp"})};
       if (options?.method === "PUT") {
         lastPayload = JSON.parse(options.body);
         return {
@@ -151,9 +152,8 @@ describe.each(["catalog", "detail"])("editor de %s", (kind) => {
     mount(kind);
     await screen.findByRole("heading", { name: "Mi página" });
     if (kind === "catalog") {
-      await user.click(
-        screen.getByRole("button", { name: "Título y presentación" }),
-      );
+      await user.click(screen.getByRole("button",{name:"Diseño",exact:true}));
+      await user.click(screen.getByRole("button",{name:"Encabezado",exact:true}));
       await user.clear(screen.getByLabelText("Título del catálogo"));
       await user.type(
         screen.getByLabelText("Título del catálogo"),
@@ -215,22 +215,28 @@ it("guarda descubrimiento, filtros, tarjetas y columnas del catálogo con el mis
   mount('catalog');
   await screen.findByRole('heading', { name: 'Mi página' });
   await user.click(screen.getByRole('button', { name: 'Diseño', exact: true }));
+  await user.selectOptions(screen.getByLabelText('Origen del fondo'),'custom');
+  await user.upload(screen.getByLabelText('Subir imagen de fondo'),new File(['image'],'scene.webp',{type:'image/webp'}));
+  await waitFor(()=>expect(JSON.parse(screen.getByTestId('live-draft').textContent).catalogConfig.presentation.backgroundImage).toBe('https://example.test/scene.webp'));
+  await user.click(screen.getByRole('button',{name:'Distribución',exact:true}));
+  await user.click(screen.getByRole('tab',{name:'Herramientas',exact:true}));
   await user.click(screen.getByLabelText('Mostrar búsqueda de productos'));
-  await user.selectOptions(screen.getByLabelText('Orden inicial'), 'price');
-  await user.selectOptions(screen.getByLabelText('Borde de las tarjetas'), 'fine');
-  fireEvent.change(screen.getByLabelText('Tamaño del título de catálogo (px)'), { target: { value: '38' } });
-  fireEvent.change(screen.getByLabelText('Dirección de la imagen de fondo'), { target: { value: 'https://example.test/scene.webp' } });
-  await user.selectOptions(screen.getByLabelText('Movimiento de la escena'), 'none');
-  expect(JSON.parse(screen.getByTestId('live-draft').textContent).catalogConfig.presentation).toMatchObject({ rimStyle: 'fine', titleSize: 38, motion: 'none', backgroundImage: 'https://example.test/scene.webp' });
-  await user.click(screen.getByRole('button', { name: 'Estilo del filtro', exact: true }));
-  await user.click(screen.getByRole('button', { name: 'Estilo profesional del filtro', exact: true }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Fondo del panel', exact: true }), { target: { value: '#123456' } });
-  await user.click(screen.getByRole('button', { name: 'Tarjetas de producto', exact: true }));
-  await user.click(screen.getByRole('button', { name: 'Estilo editable de cards', exact: true }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Fondo de card', exact: true }), { target: { value: '#654321' } });
-  await user.click(screen.getByRole('button', { name: 'Opciones', exact: true }));
-  await user.click(screen.getByRole('button', { name: 'Botones de columnas', exact: true }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Fondo botón normal', exact: true }), { target: { value: '#abcdef' } });
+  await user.selectOptions(screen.getByLabelText('Orden inicial'),'price');
+  await user.click(screen.getByRole('button',{name:'Tarjetas de producto',exact:true}));
+  await user.click(screen.getByRole('tab',{name:'Cristal y bordes',exact:true}));
+  await user.selectOptions(screen.getByLabelText('Borde de las tarjetas'),'fine');
+  fireEvent.change(screen.getByRole('textbox',{name:'Tinte de la tarjeta',exact:true}),{target:{value:'#654321'}});
+  await user.click(screen.getByRole('button',{name:'Encabezado',exact:true}));
+  await user.click(screen.getByRole('tab',{name:'Tipografía',exact:true}));
+  fireEvent.change(screen.getByLabelText('Tamaño del título de catálogo (px)'),{target:{value:'38'}});
+  await user.click(screen.getByRole('button',{name:'Animaciones',exact:true}));
+  await user.selectOptions(screen.getByLabelText('Movimiento de la escena'),'none');
+  await user.click(screen.getByRole('button',{name:'Filtros',exact:true}));
+  await user.click(screen.getByRole('tab',{name:'Colores',exact:true}));
+  fireEvent.change(screen.getByRole('textbox',{name:'Fondo del panel',exact:true}),{target:{value:'#123456'}});
+  await user.click(screen.getByRole('button',{name:'Distribución',exact:true}));
+  await user.click(screen.getByRole('tab',{name:'Botones de vista',exact:true}));
+  fireEvent.change(screen.getByRole('textbox',{name:'Fondo botón normal',exact:true}),{target:{value:'#abcdef'}});
   await user.click(screen.getByRole('button', { name: 'Guardar cambios', exact: true }));
   await screen.findByText('Cambios guardados. La página pública ya usa esta configuración.');
   expect(lastPayload.catalogConfig).toMatchObject({ presentation: { rimStyle: 'fine', titleSize: 38, motion: 'none', backgroundImage: 'https://example.test/scene.webp' }, showSearch: false, defaultSort: 'price', filterUiConfig: { panelBg: '#123456' }, cardUiConfig: { cardBg: '#654321' }, columnControlsUiConfig: { buttonBgColor: '#abcdef' } });

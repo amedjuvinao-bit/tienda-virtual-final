@@ -635,13 +635,7 @@ export default function NotFoundPageEditor() {
                     </div>
                   ) : (
                     <div className="mt-4 grid gap-4">
-                      <Field label="URL imagen del título">
-                        <TextInput
-                          value={config.titleImage}
-                          onChange={(e) => setConfigValue("titleImage", e.target.value)}
-                          placeholder="https://..."
-                        />
-                      </Field>
+                      {(config.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => setConfigValue("titleImage", "")}>Quitar imagen</button>}
 
                       <div className="flex flex-wrap gap-3">
                         <input
@@ -723,13 +717,7 @@ export default function NotFoundPageEditor() {
                   <h2 className="mb-4 text-lg font-semibold text-gray-900">Imagen decorativa</h2>
 
                   <div className="grid gap-4">
-                    <Field label="URL de imagen">
-                      <TextInput
-                        value={config.imageUrl}
-                        onChange={(e) => setConfigValue("imageUrl", e.target.value)}
-                        placeholder="https://..."
-                      />
-                    </Field>
+                    {(config.imageUrl) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => setConfigValue("imageUrl", "")}>Quitar imagen</button>}
 
                     <Field label="Texto alternativo de imagen">
                       <TextInput

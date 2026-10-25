@@ -24,12 +24,13 @@ it('sube un fondo sin sobrescribir ajustes editados durante la subida y permite 
   await user.click(screen.getByRole('tab', {name:'Texto', exact:true}));
   fireEvent.change(screen.getByLabelText('Tamaño del título de catálogo (px)'), { target: { value: '52' } });
   complete({ ok: true, json: async () => ({ url: 'https://example.test/fondo.webp' }) });
-  await waitFor(() => expect(screen.getByLabelText('Dirección de la imagen de fondo')).toHaveValue('https://example.test/fondo.webp'));
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('config').textContent).backgroundImage).toBe('https://example.test/fondo.webp'));
+  expect(screen.queryByLabelText('Dirección de la imagen de fondo')).toBeNull();
   expect(JSON.parse(screen.getByTestId('config').textContent).titleSize).toBe(52);
   expect(adminFetch.mock.calls[0][1].body.get('file').name).toBe('fondo.webp');
   await user.click(screen.getByRole('tab', {name:'Fondo', exact:true}));
   await user.click(screen.getByRole('button', { name: 'Quitar imagen de fondo' }));
-  expect(screen.getByLabelText('Dirección de la imagen de fondo')).toHaveValue('');
+  expect(screen.queryByAltText('Imagen de fondo actual')).toBeNull();
 });
 
 it('permite cambiar los colores, materiales y adorno del encabezado desde el panel', () => {
@@ -78,11 +79,13 @@ it('usa Inicio por defecto y conserva la imagen propia al cambiar de origen del 
   render(<Editor/>);
   await user.click(screen.getByRole('tab',{name:'Fondo',exact:true}));
   expect(screen.getByLabelText('Origen del fondo')).toHaveValue('continuity');
-  expect(screen.getByLabelText('Dirección de la imagen de fondo')).not.toBeVisible();
+  expect(screen.queryByLabelText('Dirección de la imagen de fondo')).toBeNull();
   await user.selectOptions(screen.getByLabelText('Origen del fondo'),'custom');
-  fireEvent.change(screen.getByLabelText('Dirección de la imagen de fondo'),{target:{value:'/saved-background.webp'}});
+  adminFetch.mockResolvedValueOnce({ok:true,json:async()=>({url:'/saved-background.webp'})});
+  await user.upload(screen.getByLabelText('Subir imagen de fondo'),new File(['image'],'saved.webp',{type:'image/webp'}));
+  await waitFor(()=>expect(screen.getByAltText('Imagen de fondo actual')).toHaveAttribute('src','/saved-background.webp'));
   await user.selectOptions(screen.getByLabelText('Origen del fondo'),'continuity');
   expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({backgroundMode:'continuity',backgroundImage:'/saved-background.webp'});
   await user.selectOptions(screen.getByLabelText('Origen del fondo'),'custom');
-  expect(screen.getByLabelText('Dirección de la imagen de fondo')).toHaveValue('/saved-background.webp');
+  expect(screen.getByAltText('Imagen de fondo actual')).toHaveAttribute('src','/saved-background.webp');
 });

@@ -636,11 +636,7 @@ export default function FavoritesPageEditor() {
 
           <SectionCard title="Título y rejilla de productos">
             <Field label="Imagen del título">
-              <TextInput
-                value={config.content.titleImage}
-                onChange={(e) => setContent("titleImage", e.target.value)}
-                placeholder="/PaginaFavorito/TituloFavorito.png"
-              />
+              {(config.content.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => setContent("titleImage", "")}>Quitar imagen</button>}
               <div className="mt-2 flex gap-2">
                 <input
                   ref={(el) => {

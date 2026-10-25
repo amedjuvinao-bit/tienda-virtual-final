@@ -135,11 +135,7 @@ export default function TendenciaEditor({
           {/* titleImage */}
           <Field label="Imagen de título" hint="config.titleImage">
             <div className="flex gap-2">
-              <Input
-                value={cfg.titleImage || ""}
-                onChange={(e) => patchSelectedConfig?.({ ...cfg, titleImage: e.target.value })}
-                placeholder="https://... o /EnTendencia.png"
-              />
+
               <label className="cursor-pointer shrink-0">
                 <input
                   type="file"
@@ -184,11 +180,7 @@ export default function TendenciaEditor({
           {/* watermarkImage */}
           <Field label="Marca de agua" hint="config.watermarkImage">
             <div className="flex gap-2">
-              <Input
-                value={cfg.watermarkImage || ""}
-                onChange={(e) => patchSelectedConfig?.({ ...cfg, watermarkImage: e.target.value })}
-                placeholder="https://... o /icons/ROSA.png"
-              />
+
               <label className="cursor-pointer shrink-0">
                 <input
                   type="file"

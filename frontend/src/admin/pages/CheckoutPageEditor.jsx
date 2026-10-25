@@ -850,14 +850,7 @@ export default function CheckoutPageEditor() {
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <Input
-                  label="URL imagen del título"
-                  value={form.checkoutPageConfig.titleImage}
-                  onChange={(e) =>
-                    updateCheckoutConfig({ titleImage: e.target.value })
-                  }
-                  placeholder="https://..."
-                />
+                {(form.checkoutPageConfig.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateCheckoutConfig({ titleImage: "" })}>Quitar imagen</button>}
 
                 <Input
                   label="Alt imagen del título"
@@ -1165,14 +1158,7 @@ export default function CheckoutPageEditor() {
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <Input
-                  label="URL imagen métodos de pago"
-                  value={form.checkoutPageConfig.paymentMethodsImage}
-                  onChange={(e) =>
-                    updateCheckoutConfig({ paymentMethodsImage: e.target.value })
-                  }
-                  placeholder="https://..."
-                />
+                {(form.checkoutPageConfig.paymentMethodsImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateCheckoutConfig({ paymentMethodsImage: "" })}>Quitar imagen</button>}
 
                 <input
                   ref={paymentMethodsImageInputRef}

@@ -135,7 +135,7 @@ export default function CatalogPresentationControls({ value, onChange, fieldKeys
         <input id={`${id}-${key}`} type="number" value={value[key]} min={type[0]} max={type[1]} step={type[2]} onChange={event=>patch(key,event.target.value===''?'':Number(event.target.value))}/>}
     </div>)}</div>
     {showBackgroundImage && <><fieldset hidden={value.backgroundMode !== 'custom'} className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
-      <label className="block text-sm text-gray-700">Dirección de la imagen de fondo<input className={fieldClass} value={value.backgroundImage} onChange={event => patch('backgroundImage', event.target.value)} placeholder="https://… o /imagen.webp"/></label>
+      {value.backgroundImage && <img src={value.backgroundImage} alt="Imagen de fondo actual" className="max-h-32 max-w-full rounded-xl object-contain"/>}
       <label className="block text-sm text-gray-700">Subir imagen de fondo<input className={`${fieldClass} mt-1`} type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={uploading} onChange={upload}/></label>
       <button type="button" className="rounded-xl border px-3 py-2 text-sm" disabled={uploading || !value.backgroundImage} onClick={() => patch('backgroundImage', '')}>Quitar imagen de fondo</button>
       {(uploading || message) && <p className="text-sm" role="status">{uploading ? 'Subiendo imagen…' : message}</p>}
@@ -165,7 +165,7 @@ export default function CatalogPresentationControls({ value, onChange, fieldKeys
     </div>)}
     {topic === 'background' && value.backgroundMode !== 'custom' && <p className="text-sm text-gray-600">El catálogo utiliza el fondo continuo de Inicio y se actualiza cuando cambias ese fondo en Apariencia.</p>}
     <fieldset hidden={topic !== 'background' || value.backgroundMode !== 'custom'} className="space-y-3"><legend className="mb-2 text-sm font-semibold text-gray-800">Imagen de fondo</legend>
-      <label className="block text-sm text-gray-700">Dirección de la imagen de fondo<input className={fieldClass} value={value.backgroundImage} onChange={event => patch('backgroundImage', event.target.value)} placeholder="https://… o /imagen.webp"/></label>
+      {value.backgroundImage && <img src={value.backgroundImage} alt="Imagen de fondo actual" className="max-h-32 max-w-full rounded-xl object-contain"/>}
       <label className="block text-sm text-gray-700">Subir imagen de fondo<input className={`${fieldClass} mt-1`} type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={uploading} onChange={upload}/></label>
       <button type="button" className="rounded-xl border px-3 py-2 text-sm" disabled={uploading || !value.backgroundImage} onClick={() => patch('backgroundImage', '')}>Quitar imagen de fondo</button>
       {(uploading || message) && <p className="text-sm" role="status">{uploading ? 'Subiendo imagen…' : message}</p>}

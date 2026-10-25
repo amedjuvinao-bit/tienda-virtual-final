@@ -18,7 +18,13 @@ function Editor() {
       <EditorSections>
         <ProductDetailAppearanceControls
           config={config}
-          onChange={(next) => setConfig(buildSafeProductDetailConfig(next))}
+          onChange={(change) =>
+            setConfig((current) =>
+              buildSafeProductDetailConfig(
+                typeof change === "function" ? change(current) : change,
+              ),
+            )
+          }
         />
       </EditorSections>
       <output data-testid="draft">{JSON.stringify(config)}</output>
@@ -29,9 +35,6 @@ it("conserva fondo, grosor decimal, reflejo cero y textos al cambiar de categor√
   render(<Editor />);
   fireEvent.change(screen.getByLabelText("Origen del fondo"), {
     target: { value: "custom" },
-  });
-  fireEvent.change(screen.getByLabelText("Imagen de fondo (enlace)"), {
-    target: { value: "/fondo-propio.webp" },
   });
   fireEvent.click(
     screen.getByRole("button", { name: "Textura y borde del cristal" }),
@@ -51,7 +54,7 @@ it("conserva fondo, grosor decimal, reflejo cero y textos al cambiar de categor√
   const config = JSON.parse(screen.getByTestId("draft").textContent);
   expect(config.presentation).toMatchObject({
     backgroundMode: "custom",
-    backgroundImage: "/fondo-propio.webp",
+
     reflection: 0,
     descriptionLabel: "Caracter√≠sticas",
   });

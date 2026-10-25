@@ -1,4 +1,5 @@
 import React from "react";
+import AdminImageUploadField from "../../media/AdminImageUploadField";
 import EditorSection from "./EditorSection";
 import { applyContinuousProductDetailPreset } from "../../../components/product-detail/productDetailPresentation";
 const Field = ({ label, children }) => {
@@ -14,12 +15,22 @@ const Field = ({ label, children }) => {
 };
 const inputClass =
   "w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800";
-export default function ProductDetailAppearanceControls({ config, onChange }) {
+export default function ProductDetailAppearanceControls({
+  config,
+  onChange,
+  onUploadingChange,
+}) {
   const presentation = config.presentation;
   const update = (patch) =>
-    onChange({ ...config, presentation: { ...presentation, ...patch } });
+    onChange((current) => ({
+      ...current,
+      presentation: { ...current.presentation, ...patch },
+    }));
   const style = (patch) =>
-    onChange({ ...config, style: { ...config.style, ...patch } });
+    onChange((current) => ({
+      ...current,
+      style: { ...current.style, ...patch },
+    }));
   const number = (key, label, min, max, step = 1) => (
     <Field label={label}>
       <input
@@ -66,7 +77,9 @@ export default function ProductDetailAppearanceControls({ config, onChange }) {
           <button
             type="button"
             className="pages-button"
-            onClick={() => onChange(applyContinuousProductDetailPreset(config))}
+            onClick={() =>
+              onChange((current) => applyContinuousProductDetailPreset(current))
+            }
           >
             Aplicar diseño aprobado
           </button>
@@ -83,8 +96,20 @@ export default function ProductDetailAppearanceControls({ config, onChange }) {
         </Field>
         {presentation.backgroundMode === "custom" && (
           <div className="mt-4 grid gap-4">
-            {text("backgroundImage", "Imagen de fondo (enlace)")}
-            {text("mobileBackgroundImage", "Imagen de fondo móvil (opcional)")}
+            <AdminImageUploadField
+              label="Imagen de fondo"
+              value={presentation.backgroundImage}
+              onChange={(url) => update({ backgroundImage: url })}
+              onBusyChange={(busy) => onUploadingChange?.("background", busy)}
+            />
+            <AdminImageUploadField
+              label="Imagen de fondo móvil (opcional)"
+              value={presentation.mobileBackgroundImage}
+              onChange={(url) => update({ mobileBackgroundImage: url })}
+              onBusyChange={(busy) =>
+                onUploadingChange?.("mobile-background", busy)
+              }
+            />
             <Field label="Color de fondo">
               <input
                 className={inputClass}

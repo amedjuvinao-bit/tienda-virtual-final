@@ -976,12 +976,7 @@ export default function CatalogPageEditor() {
           {form.catalogConfig.titleMode === "image" && (
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <Input
-                label="Enlace de la imagen del título"
-                value={form.catalogConfig.titleImage}
-                onChange={(e) => updateCatalogConfig({ titleImage: e.target.value })}
-                placeholder="https://... o /ruta/imagen.png"
-              />
+              {(form.catalogConfig.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateCatalogConfig({ titleImage: "" })}>Quitar imagen</button>}
 
               <Input
                 label="Descripción de la imagen"

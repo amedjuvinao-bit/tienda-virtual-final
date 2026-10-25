@@ -825,14 +825,7 @@ export default function ThanksPageEditor() {
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <Input
-                  label="URL imagen del título"
-                  value={form.thanksPageConfig.titleImage}
-                  onChange={(e) =>
-                    updateThanksConfig({ titleImage: e.target.value })
-                  }
-                  placeholder="https://..."
-                />
+                {(form.thanksPageConfig.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateThanksConfig({ titleImage: "" })}>Quitar imagen</button>}
 
                 <Input
                   label="Alt imagen del título"
@@ -1122,14 +1115,7 @@ export default function ThanksPageEditor() {
 
                   <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
                     <div className="space-y-4">
-                      <Input
-                        label="URL imagen"
-                        value={slide.image}
-                        onChange={(e) =>
-                          updateSlide(slide.id, { image: e.target.value })
-                        }
-                        placeholder="https://..."
-                      />
+                      {(slide.image) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateSlide(slide.id, { image: "" })}>Quitar imagen</button>}
 
                       <Input
                         label="Alt imagen"

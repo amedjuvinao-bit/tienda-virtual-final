@@ -1,6 +1,7 @@
 // src/admin/FormularioProducto.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import AdminImageUploadField from './media/AdminImageUploadField';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import ColorBarPicker from '../components/ColorBarPicker.jsx';
@@ -602,6 +603,7 @@ export default function FormularioProducto() {
   const [imagenes, setImagenes] = useState([]);
   const [activo, setActivo] = useState(true);
   const [cargando, setCargando] = useState(false);
+  const [uploadingSeoImage, setUploadingSeoImage] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState(() => new Set());
   const [stepAttempted, setStepAttempted] = useState(() => new Set());
@@ -1675,7 +1677,7 @@ export default function FormularioProducto() {
 
   const guardarProducto = async (event) => {
     event.preventDefault();
-    if (cargando) return;
+    if (cargando || uploadingSeoImage) return;
 
     if (!sku) return toast.error('SKU es obligatorio. Elige una categoría.');
     if (!titulo.trim()) return toast.error('El título es obligatorio');
@@ -3085,7 +3087,7 @@ export default function FormularioProducto() {
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">{seoKeywords.map((keyword) => <span key={keyword} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={pillStyle}>{keyword}<button type="button" aria-label={`Quitar palabra clave ${keyword}`} onClick={() => setSeoKeywords((previous) => previous.filter((item) => item !== keyword))}>×</button></span>)}</div>
               </div>
-              <div><FieldLabel>Imagen social</FieldLabel><input value={seoImage} onChange={(e) => setSeoImage(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la portada del producto" /></div>
+              <div><AdminImageUploadField label="Imagen social" disabled={cargando} value={seoImage} onChange={setSeoImage} onBusyChange={setUploadingSeoImage}/><p className="mt-2 text-xs">Si no cargas otra imagen, se utiliza la portada del producto.</p></div>
               <div><FieldLabel>URL canónica</FieldLabel><input type="url" value={canonicalUrl} onChange={(e) => setCanonicalUrl(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la URL actual" /></div>
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
                 <input type="checkbox" checked={seoNoIndex} onChange={(e) => setSeoNoIndex(e.target.checked)} style={{ accentColor: 'var(--admin-primary)' }} />
@@ -3279,7 +3281,7 @@ export default function FormularioProducto() {
               ) : (
                 <button
                   type="submit"
-                  disabled={cargando || formInvalid}
+                  disabled={cargando || uploadingSeoImage || formInvalid}
                   className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                   style={actionButtonStyle()}
                 >

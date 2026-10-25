@@ -111,10 +111,10 @@ describe('LoginAdminSection', () => {
     render(<LoginAdminSection />);
     await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
 
-    expect(screen.queryByText('Imagen publicada')).not.toBeInTheDocument();
+    expect(screen.queryByText('Imagen de fondo')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
     await user.click(screen.getByRole('button', { name: 'Imagen personalizada' }));
-    expect(screen.getByText('Imagen publicada')).toBeInTheDocument();
+    expect(screen.getByText('Imagen de fondo')).toBeInTheDocument();
     expect(screen.getByText('Subir imagen')).toBeInTheDocument();
   });
 
@@ -133,7 +133,10 @@ describe('LoginAdminSection', () => {
     await user.selectOptions(screen.getByLabelText('Tema visual'), 'smokeGlass');
     await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
     await user.click(screen.getByRole('button', { name: 'Imagen personalizada' }));
-    await user.type(screen.getByPlaceholderText('https://...'), 'https://cdn.example.com/perla.webp');
+    uploadAdminLoginBackground.mockResolvedValueOnce('https://cdn.example.com/perla.webp');
+    const fileInput=document.querySelector('.login-settings-upload input[type=file]');
+    await user.upload(fileInput,new File(['image'],'perla.webp',{type:'image/webp'}));
+    await screen.findByText('Imagen cargada en calidad original. Guarda para aplicarla al login.');
     fireEvent.change(screen.getByRole('slider', { name: 'Transparencia del contenedor' }), { target: { value: '0.8' } });
     await user.click(screen.getByRole('button', { name: 'Guardar diseño' }));
 

@@ -126,12 +126,7 @@ function IconUploadField({
 
   return (
     <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-      <Input
-        label={label}
-        value={value || ""}
-        onChange={onUrlChange}
-        placeholder="https://... o sube una imagen"
-      />
+      <strong>{label}</strong>{(value || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => onUrlChange({ target: { value: "" } })}>Quitar imagen</button>}
 
       <input
         ref={inputRef}
@@ -219,6 +214,7 @@ export default function ProductDetailPageEditor() {
   const [loadError, setLoadError] = useState("");
   const loadSequence = useRef(0);
   const [saving, setSaving] = useState(false);
+  const [extraImageUploads, setExtraImageUploads] = useState({});
   const [activeTab, setActiveTab] = useState("gallery");
 
   const [titleImageFile, setTitleImageFile] = useState(null);
@@ -651,7 +647,7 @@ export default function ProductDetailPageEditor() {
       onBack={() => draft.leave(() => navigate("/admin/paginas"))}
       onSave={handleSave}
       saving={saving}
-      uploading={uploadingTitleImage || uploadingBenefit1Icon || uploadingBenefit2Icon || uploadingBenefit3Icon || uploadingReviewFormBgImage}
+      uploading={uploadingTitleImage || uploadingBenefit1Icon || uploadingBenefit2Icon || uploadingBenefit3Icon || uploadingReviewFormBgImage || Object.values(extraImageUploads).some(Boolean)}
       draft={draft}
       pageTypeLabel="Detalle del producto"
     >
@@ -732,14 +728,7 @@ export default function ProductDetailPageEditor() {
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <Input
-                  label="Enlace de la imagen del título"
-                  value={form.productDetailConfig.titleImage}
-                  onChange={(e) =>
-                    updateDetailConfig({ titleImage: e.target.value })
-                  }
-                  placeholder="https://..."
-                />
+                {(form.productDetailConfig.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateDetailConfig({ titleImage: "" })}>Quitar imagen</button>}
 
                 <Input
                   label="Descripción de la imagen"
@@ -802,7 +791,7 @@ export default function ProductDetailPageEditor() {
         </div>
       )}
 
-      {activeTab === "presentation" && <ProductDetailAppearanceControls config={form.productDetailConfig} onChange={value => updateRoot({ productDetailConfig: buildSafeProductDetailConfig(value) })}/>}
+      {activeTab === "presentation" && <ProductDetailAppearanceControls config={form.productDetailConfig} onChange={change => setForm(previous => ({...previous,productDetailConfig:buildSafeProductDetailConfig(typeof change === "function" ? change(previous.productDetailConfig) : change)}))} onUploadingChange={(key,busy) => setExtraImageUploads(previous => ({...previous,[key]:busy}))}/>}
       {activeTab === "layout" && (
         <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
           <SectionCard
