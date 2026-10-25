@@ -40,6 +40,7 @@ export default function CheckoutFormActions({ state, derived, onPlaceOrder }) {
           onClick={onPlaceOrder}
           disabled={
             state.isPlacing ||
+            state.cartLoading ||
             !derived.currentCart ||
             derived.currentCart.length === 0 ||
             derived.itemCount === 0 ||

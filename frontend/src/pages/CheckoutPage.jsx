@@ -18,6 +18,7 @@ export default function CheckoutPage() {
     renewCartAccess,
     syncCart,
     validateCart,
+    loading: cartLoading,
   } = useCart();
 
   useCheckoutConfiguration(state);
@@ -42,7 +43,7 @@ export default function CheckoutPage() {
 
   return (
     <CheckoutPageView
-      state={state}
+      state={{ ...state, cartLoading }}
       derived={derived}
       actions={{ ...quoteActions, ...submissionActions }}
     />
