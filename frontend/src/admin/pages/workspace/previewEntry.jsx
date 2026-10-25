@@ -104,8 +104,9 @@ function DetailPreview({ draft }) {
       </label>
       <ProductDetailView
         product={selection.variantAwareProduct}
-        config={draft.productDetailConfig}
-        withChrome={false}
+        config={{...draft.productDetailConfig, showHeader:draft.useHeader !== false && draft.productDetailConfig?.showHeader !== false, showFooter:draft.useFooter !== false && draft.productDetailConfig?.showFooter !== false}}
+        withChrome
+        preview
         isFavorite={false}
         onToggleFavorite={noop}
         onAddToCart={noop}
@@ -218,7 +219,7 @@ function Preview() {
                 }
               }}
             >
-              {draft.useHeader !== false && <Header />}
+              {draft.pageType === "catalog" && draft.useHeader !== false && <Header />}
               {draft.pageType === "catalog" ? (
                 <CatalogPageView
                   page={draft}
@@ -229,7 +230,7 @@ function Preview() {
               ) : (
                 <DetailPreview draft={draft} />
               )}
-              {draft.pageType !== "catalog" && draft.useFooter !== false && <FooterSection theme={settings?.theme} store={settings?.store} />}
+
             </div>
           </FavoritesContext.Provider>
         </CartContext.Provider>

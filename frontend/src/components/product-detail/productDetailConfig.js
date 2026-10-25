@@ -1,3 +1,8 @@
+import {
+  buildProductDetailPresentation,
+  applyContinuousProductDetailPreset,
+} from "./productDetailPresentation";
+
 function clampInt(value, min, max, fallback) {
   const n = Number.parseInt(value, 10);
   if (!Number.isFinite(n)) return fallback;
@@ -30,7 +35,7 @@ export function buildSafeStyleConfig(raw) {
     borderColor:
       typeof cfg.borderColor === "string" ? cfg.borderColor : "#e5e7eb",
     radiusPx: clampInt(cfg.radiusPx, 8, 40, 18),
-    borderWidthPx: clampInt(cfg.borderWidthPx, 1, 4, 1),
+    borderWidthPx: clampFloat(cfg.borderWidthPx, 0, 4, 1.25),
     shadowStyle:
       cfg.shadowStyle === "none" ||
       cfg.shadowStyle === "soft" ||
@@ -154,7 +159,25 @@ export function buildSafeStyleConfig(raw) {
 }
 
 export function buildSafeProductDetailConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
+  const source = raw && typeof raw === "object" ? raw : {};
+  // Existing detail pages receive the chosen composition once. Subsequent edits
+  // are normalized without reapplying its palette or resetting saved controls.
+  const cfg = source.presentation
+    ? source
+    : applyContinuousProductDetailPreset(source);
+  if (!source.presentation) {
+    if (source.style?.borderWidthPx != null)
+      cfg.style.borderWidthPx = source.style.borderWidthPx;
+    for (const key of [
+      "favoriteButtonOpacity",
+      "addToCartButtonOpacity",
+      "reviewBgOpacity",
+      "addToCartBorderWidthPx",
+      "reviewBorderRadius",
+    ]) {
+      if (source.style?.[key] === 0) cfg.style[key] = 0;
+    }
+  }
 
   const imageFit =
     cfg.imageFit === "contain" || cfg.imageFit === "cover"
@@ -188,9 +211,11 @@ export function buildSafeProductDetailConfig(raw) {
     : "none";
 
   const thumbnailPosition =
-    cfg.thumbnailPosition === "bottom" || cfg.thumbnailPosition === "left"
+    cfg.thumbnailPosition === "overlay" ||
+    cfg.thumbnailPosition === "bottom" ||
+    cfg.thumbnailPosition === "left"
       ? cfg.thumbnailPosition
-      : "left";
+      : "overlay";
 
   const reviewSectionAnimation = [
     "none",
@@ -213,6 +238,7 @@ export function buildSafeProductDetailConfig(raw) {
     : "fill";
 
   return {
+    presentation: buildProductDetailPresentation(cfg.presentation),
     titleMode:
       cfg.titleMode === "image" || cfg.titleMode === "text"
         ? cfg.titleMode

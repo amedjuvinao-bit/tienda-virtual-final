@@ -1,7 +1,15 @@
 import React from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render as testingRender,
+  screen,
+} from "@testing-library/react";
 import ProductDetailView from "./ProductDetailView";
+import { MemoryRouter } from "react-router-dom";
+const render = (ui) => testingRender(ui, { wrapper: MemoryRouter });
+vi.mock("./ProductDetailRelatedProducts", () => ({ default: () => null }));
 vi.mock("../Header", () => ({
   default: () => <div>Encabezado de tienda</div>,
 }));
@@ -133,4 +141,74 @@ it("bloquea la compra y comunica el estado del favorito", () => {
   expect(
     screen.getByRole("button", { name: "Disminuir cantidad" }),
   ).toBeDisabled();
+});
+it("mantiene la compra al ocultar cantidad y coloca favorito junto al carrito", () => {
+  const add = vi.fn();
+  const view = render(
+    <ProductDetailView
+      {...props}
+      onAddToCart={add}
+      config={{ ...config, showQuantity: false }}
+    />,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Aumentar cantidad" }),
+  ).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Añadir al carrito" }));
+  expect(add).toHaveBeenCalledOnce();
+  expect(
+    view.container.querySelector(".pd-purchase-actions .pd-fav-btn"),
+  ).not.toBeNull();
+});
+it("organiza descripción, entrega y reseñas en pestañas accesibles sin perder el formulario", () => {
+  render(
+    <ProductDetailView
+      {...props}
+      product={{ ...product, description: "Descripción real del producto" }}
+      config={{
+        ...config,
+        showReviewsSection: true,
+        showReviewForm: true,
+        showAccordionBlock: true,
+        accordionText1: "Entrega en el plazo acordado",
+      }}
+    />,
+  );
+  expect(screen.getByRole("tabpanel")).toHaveTextContent(
+    "Descripción real del producto",
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "Entrega" }));
+  expect(screen.getByRole("tabpanel")).toHaveTextContent(
+    "Entrega en el plazo acordado",
+  );
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Entrega" }), {
+    key: "ArrowRight",
+  });
+  expect(screen.getByRole("tab", { name: "Reseñas" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "Publicar reseña" })).toBeVisible();
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Reseñas" }), {
+    key: "Home",
+  });
+  expect(screen.getByRole("tab", { name: "Descripción" })).toHaveFocus();
+});
+it("usa muestras visuales para colores con nombre y respeta la selección canónica", () => {
+  const change = vi.fn();
+  render(
+    <ProductDetailView
+      {...props}
+      variantAxes={[
+        { key: "color", label: "Color", values: ["negro", "azul"] },
+      ]}
+      selectedAttributes={{ color: "azul" }}
+      onVariantAttributeChange={change}
+    />,
+  );
+  const blue = screen.getByRole("button", { name: "Color: Azul" });
+  expect(blue).toHaveAttribute("aria-pressed", "true");
+  expect(blue).toHaveClass("pd-color-dot");
+  fireEvent.click(screen.getByRole("button", { name: "Color: Negro" }));
+  expect(change).toHaveBeenCalledWith("color", "negro");
 });

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import PageLoadState from "./workspace/PageLoadState";
 import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
 import SectionCard from "./workspace/EditorSection";
+import ProductDetailAppearanceControls from "./workspace/ProductDetailAppearanceControls";
 import usePageDraft from "./workspace/usePageDraft";
 import {buildSafeStyleConfig, buildSafeProductDetailConfig} from "../../components/product-detail/productDetailConfig";
 import { API_BASE_URL } from "../../config/apiBaseUrl";
@@ -14,6 +15,7 @@ const EDITOR_TABS = [
   { id: "gallery", label: "Galería", group: "content" },
   { id: "info", label: "Información y compra", group: "content" },
   { id: "extra", label: "Bloques de apoyo", group: "content" },
+  { id: "presentation", label: "Fondo y cristal", group: "design" },
   { id: "layout", label: "Distribución", group: "design" },
   { id: "style", label: "Colores y tipografía", group: "design" },
   { id: "reviews", label: "Reseñas", group: "options" },
@@ -33,6 +35,7 @@ const GALLERY_POSITION_OPTIONS = [
 ];
 
 const THUMBNAIL_POSITION_OPTIONS = [
+  { value: "overlay", label: "Sobre la imagen (diseño aprobado)" },
   { value: "left", label: "Miniaturas a la izquierda" },
   { value: "bottom", label: "Miniaturas abajo" },
 ];
@@ -904,6 +907,7 @@ export default function ProductDetailPageEditor() {
         </div>
       )}
 
+      {activeTab === "presentation" && <ProductDetailAppearanceControls config={form.productDetailConfig} onChange={value => updateRoot({ productDetailConfig: buildSafeProductDetailConfig(value) })}/>}
       {activeTab === "layout" && (
         <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
           <SectionCard
@@ -1352,12 +1356,13 @@ export default function ProductDetailPageEditor() {
                   <Input
                     label="Ancho borde (px)"
                     type="number"
-                    min="1"
+                    min="0"
+                    step="0.25"
                     max="4"
                     value={form.productDetailConfig.style.borderWidthPx}
                     onChange={(e) =>
                       updateStyleConfig({
-                        borderWidthPx: clampInt(e.target.value, 1, 4, 1),
+                        borderWidthPx: clampFloat(e.target.value, 0, 4, 1.25),
                       })
                     }
                   />
