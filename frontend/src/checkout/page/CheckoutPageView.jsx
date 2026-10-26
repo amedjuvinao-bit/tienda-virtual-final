@@ -1,166 +1,210 @@
-import React from 'react';
-import FooterSection from '../../components/FooterSection';
-import Header from '../../components/Header';
-import ModalContacto from '../../components/ModalContacto';
-import ModalEnvio from '../../components/ModalEnvio';
-import ModalPrivacidad from '../../components/ModalPrivacidad';
-import ModalReembolso from '../../components/ModalReembolso';
-import ModalTerminos from '../../components/ModalTerminos';
-import WhatsAppButton from '../../components/WhatsAppButton';
-import CheckoutContactSection from './CheckoutContactSection';
-import CheckoutDeliverySection from './CheckoutDeliverySection';
-import CheckoutFormActions from './CheckoutFormActions';
-import CheckoutOrderSummary from './CheckoutOrderSummary';
-import CheckoutPaymentSection from './CheckoutPaymentSection';
-import { GLOBAL_STYLES } from './checkoutPageStyles';
-
-function CheckoutProgress() {
-  return (
-    <div className="co-step-indicator" style={{ justifyContent: 'center' }}>
-      <div className="co-step done">
-        <div className="co-step-num">
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <span>Carrito</span>
-      </div>
-      <div className="co-step-sep" />
-      <div className="co-step active">
-        <div className="co-step-num">2</div>
-        <span>Datos</span>
-      </div>
-      <div className="co-step-sep" />
-      <div className="co-step">
-        <div className="co-step-num">3</div>
-        <span>Confirmación</span>
-      </div>
-    </div>
-  );
-}
-
-function CheckoutHeading({ checkoutConfig }) {
-  return (
-    <>
-      {checkoutConfig.showBreadcrumb && (
-        <div className="co-breadcrumb" style={{ color: checkoutConfig.style.breadcrumbTextColor }}>
-          <a href="/" style={{ color: checkoutConfig.style.breadcrumbLinkColor, fontWeight: 500 }}>
-            {checkoutConfig.breadcrumbHomeText}
-          </a>
-          <span style={{ color: '#d1d5db' }}>›</span>
-          <span>{checkoutConfig.breadcrumbCurrentText}</span>
-        </div>
-      )}
-
-      <div style={{ marginBottom: '28px', textAlign: 'center' }}>
-        {checkoutConfig.titleMode === 'image' && checkoutConfig.titleImage ? (
-          <img
-            src={checkoutConfig.titleImage}
-            alt={checkoutConfig.titleImageAlt || 'Checkout'}
-            style={{
-              height: `${checkoutConfig.style.titleImageHeightPx}px`,
-              objectFit: 'contain',
-              margin: '0 auto',
-              display: 'block',
-            }}
-          />
-        ) : (
-          <h1
-            style={{
-              fontFamily: "'DM Serif Display', serif",
-              fontSize: `${checkoutConfig.style.titleFontSizePx}px`,
-              fontWeight: 400,
-              color: checkoutConfig.style.titleTextColor,
-              margin: 0,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            {checkoutConfig.titleText}
-          </h1>
-        )}
-      </div>
-
-      <CheckoutProgress />
-    </>
-  );
-}
-
+import React, { useContext, useEffect } from "react";
+import { StorefrontSettingsContext } from "../../context/StorefrontSettingsContext";
+import StorefrontLoadingScreen from "../../components/StorefrontLoadingScreen";
+import useStorefrontBackdrop from "../../components/useStorefrontBackdrop";
+import { rememberPageLoadingAppearance } from "../../theme/storefrontLoadingAppearance";
+import { cartVariables } from "../../components/cart/CartMaterial";
+import { CheckoutMaterialContext, checkoutMaterial } from "./CheckoutMaterial";
+import CheckoutHeading from "./CheckoutHeading";
+import "../../components/cart/cartPage.css";
+import "./checkoutPage.css";
+import StorefrontFooter from "../../components/StorefrontFooter";
+import Header from "../../components/Header";
+import ModalContacto from "../../components/ModalContacto";
+import ModalEnvio from "../../components/ModalEnvio";
+import ModalPrivacidad from "../../components/ModalPrivacidad";
+import ModalReembolso from "../../components/ModalReembolso";
+import ModalTerminos from "../../components/ModalTerminos";
+import WhatsAppButton from "../../components/WhatsAppButton";
+import CheckoutContactSection from "./CheckoutContactSection";
+import CheckoutDeliverySection from "./CheckoutDeliverySection";
+import CheckoutFormActions from "./CheckoutFormActions";
+import CheckoutOrderSummary from "./CheckoutOrderSummary";
+import CheckoutPaymentSection from "./CheckoutPaymentSection";
 function CheckoutModals({ state }) {
   return (
     <>
-      {state.showModal && <ModalReembolso visible={true} onClose={() => state.setShowModal(false)} />}
-      <ModalEnvio visible={state.showEnvioModal} onClose={() => state.setShowEnvioModal(false)} />
-      <ModalPrivacidad visible={state.showPrivacidadModal} onClose={() => state.setShowPrivacidadModal(false)} />
-      <ModalTerminos visible={state.showTerminosModal} onClose={() => state.setShowTerminosModal(false)} />
-      <ModalContacto visible={state.showContactoModal} onClose={() => state.setShowContactoModal(false)} />
+      {state.showModal && (
+        <ModalReembolso
+          visible={true}
+          onClose={() => state.setShowModal(false)}
+        />
+      )}
+      <ModalEnvio
+        visible={state.showEnvioModal}
+        onClose={() => state.setShowEnvioModal(false)}
+      />
+      <ModalPrivacidad
+        visible={state.showPrivacidadModal}
+        onClose={() => state.setShowPrivacidadModal(false)}
+      />
+      <ModalTerminos
+        visible={state.showTerminosModal}
+        onClose={() => state.setShowTerminosModal(false)}
+      />
+      <ModalContacto
+        visible={state.showContactoModal}
+        onClose={() => state.setShowContactoModal(false)}
+      />
     </>
   );
 }
 
-export default function CheckoutPageView({ state, derived, actions }) {
-  const { checkoutConfig } = state;
-
+export default function CheckoutPageView({
+  state,
+  derived,
+  actions,
+  preview = false,
+}) {
+  const { checkoutConfig: config } = state;
+  const settings = useContext(StorefrontSettingsContext);
+  const backdrop = useStorefrontBackdrop(
+    config.presentation,
+    config.style.pageBg,
+  );
+  const retry = () => state.setConfigurationAttempt((value) => value + 1);
+  useEffect(() => {
+    if (state.checkoutPageData && !preview)
+      rememberPageLoadingAppearance(
+        "/checkout",
+        settings?.theme,
+        config.presentation,
+        config.style.pageBg,
+      );
+  }, [state.checkoutPageData, settings?.theme, config, preview]);
+  if (state.checkoutConfigLoading)
+    return (
+      <StorefrontLoadingScreen
+        message="Cargando finalización de compra"
+        presentation={state.checkoutPageData ? config.presentation : undefined}
+        pageBg={state.checkoutPageData ? config.style.pageBg : undefined}
+      />
+    );
   return (
-    <>
-      <style>{GLOBAL_STYLES}</style>
-
-      <div className="co-page" style={derived.cssVars}>
-        {checkoutConfig.showHeader && <Header />}
-
-        {state.errors.length > 0 && (
-          <div
-            style={{
-              maxWidth: `${checkoutConfig.style.contentMaxWidthPx}px`,
-              margin: '0 auto',
-              padding: '0 16px',
-            }}
-          >
-            <div className="co-error-banner" style={{ marginTop: '88px', marginBottom: '0' }}>
-              <strong>Por favor corrige los siguientes puntos:</strong>
-              <ul>
-                {state.errors.map((message, index) => <li key={index}>{message}</li>)}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        <div
+    <CheckoutMaterialContext.Provider value={config}>
+      <div
+        className="cart-storefront co-page"
+        data-chrome={config.showHeader}
+        style={{
+          ...derived.cssVars,
+          ...cartVariables(checkoutMaterial(config)),
+          backgroundColor: backdrop.color,
+          backgroundImage: backdrop.image
+            ? `url(${JSON.stringify(backdrop.image)})`
+            : "none",
+          "--co-input-alpha": `${config.presentation.glassOpacity * 100}%`,
+          "--co-button-alpha": `${config.presentation.checkoutGlassOpacity * 100}%`,
+          "--co-button-blur": `${config.presentation.checkoutGlassBlur}px`,
+          "--co-line": config.style.lineColor,
+          "--co-label": config.style.labelTextColor,
+          "--co-placeholder": config.style.inputPlaceholderColor,
+          "--co-button-bg": config.style.confirmButtonBg,
+          "--co-button-ink": config.style.confirmButtonTextColor,
+          "--co-button-radius":
+            config.style.confirmButtonStyle === "pill"
+              ? "999px"
+              : config.style.confirmButtonStyle === "square"
+                ? "8px"
+                : `${config.style.confirmButtonRadiusPx}px`,
+          "--co-input-radius":
+            config.style.inputStyle === "pill"
+              ? "999px"
+              : config.style.inputStyle === "square"
+                ? "4px"
+                : `${config.style.inputRadiusPx}px`,
+        }}
+      >
+        {config.showHeader && <Header />}
+        <main
+          className="cart-scene co-scene"
           style={{
-            maxWidth: `${checkoutConfig.style.contentMaxWidthPx}px`,
-            margin: '0 auto',
-            padding: `${state.errors.length > 0 ? 20 : Math.max(checkoutConfig.style.contentTopPaddingPx, 88)}px 16px 40px`,
+            maxWidth: config.style.contentMaxWidthPx,
+            "--cart-top": `${config.style.contentTopPaddingPx}px`,
           }}
         >
-          <CheckoutHeading checkoutConfig={checkoutConfig} />
-
-          <div className="co-layout">
-            <div className="co-form-col">
-              <CheckoutContactSection state={state} />
-              <CheckoutDeliverySection state={state} derived={derived} />
-              <CheckoutPaymentSection
-                state={state}
-                derived={derived}
-                onPreviewStoreCredit={actions.handlePreviewStoreCredit}
-              />
-              <CheckoutFormActions
-                state={state}
-                derived={derived}
-                onPlaceOrder={actions.handlePlaceOrder}
-              />
+          <CheckoutHeading config={config} />
+          {(state.checkoutConfigError || state.configurationError) && (
+            <div className="cart-notice" role="alert">
+              <span>
+                {state.configurationError || state.checkoutConfigError}
+              </span>
+              <button type="button" onClick={retry}>
+                Reintentar configuración
+              </button>
             </div>
-
+          )}
+          {state.errors.length > 0 && (
+            <div className="co-error-banner" role="alert" tabIndex={-1}>
+              <strong>Revisa estos datos para continuar:</strong>
+              <ul>
+                {state.errors.map((message, index) => (
+                  <li key={index}>{message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {state.geographyError && (
+            <div className="cart-notice" role="alert">
+              <span>{state.geographyError}</span>
+              <button
+                type="button"
+                onClick={() => state.setGeographyAttempt((value) => value + 1)}
+              >
+                Reintentar ubicación
+              </button>
+            </div>
+          )}
+          {state.quoteError && (
+            <div className="cart-notice" role="alert">
+              <span>{state.quoteError}</span>
+              <button
+                type="button"
+                disabled={state.quoteLoading}
+                onClick={actions.retryCheckoutQuote}
+              >
+                Reintentar total
+              </button>
+            </div>
+          )}
+          {!derived.currentCart?.length && !state.cartLoading && (
+            <div className="cart-notice" role="status">
+              Tu carrito está vacío. <a href="/carrito">Volver al carrito</a>
+            </div>
+          )}
+          <div className="co-layout" data-summary={config.showOrderSummary}>
+            <div className="co-form-col">
+              <fieldset disabled={state.isPlacing} className="co-fields">
+                <CheckoutContactSection state={state} />
+                <CheckoutDeliverySection state={state} derived={derived} />
+                <CheckoutPaymentSection
+                  state={state}
+                  derived={derived}
+                  onPreviewStoreCredit={actions.handlePreviewStoreCredit}
+                />
+                <CheckoutFormActions
+                  state={state}
+                  derived={derived}
+                  onPlaceOrder={actions.handlePlaceOrder}
+                />
+              </fieldset>
+            </div>
             <CheckoutOrderSummary
               state={state}
               derived={derived}
               onApplyCoupon={actions.handleApplyCoupon}
             />
           </div>
-        </div>
-
-        <CheckoutModals state={state} />
-        {checkoutConfig.showFooter && <FooterSection />}
-        {checkoutConfig.showWhatsAppButton && <WhatsAppButton />}
+        </main>
+        {!preview && <CheckoutModals state={state} />}
+        {config.showFooter && (
+          <StorefrontFooter
+            theme={backdrop.settings?.theme}
+            store={backdrop.settings?.store}
+            preview={preview}
+          />
+        )}
+        {config.showWhatsAppButton && <WhatsAppButton />}
       </div>
-    </>
+    </CheckoutMaterialContext.Provider>
   );
 }

@@ -1,3 +1,4 @@
+import { checkoutQuoteKey } from './checkoutQuoteModel';
 import { useEffect, useMemo } from 'react';
 import { calculateStoreCreditApplication } from '../storeCreditCheckout';
 import {
@@ -41,6 +42,7 @@ export default function useCheckoutDerived({ state, cart }) {
     storeCreditPreview,
     useStoreCredit,
     setDeliveryType,
+    setSameAddress,
   } = state;
 
   const currentCart = cartView ?? cart;
@@ -84,6 +86,14 @@ export default function useCheckoutDerived({ state, cart }) {
     }
   }, [cartRequiresShipping, deliveryType, setDeliveryType]);
 
+  useEffect(() => {
+    if ((!cartRequiresShipping || deliveryType !== 'envio') && sameAddress)
+      setSameAddress(false);
+  }, [cartRequiresShipping, deliveryType, sameAddress, setSameAddress]);
+  useEffect(() => {
+    state.setCartView(null);
+    state.setServerSummary(null);
+  }, [cart, state.setCartView, state.setServerSummary]);
   const cssVars = useMemo(
     () => ({
       '--co-accent': checkoutConfig.style.accentColor,
@@ -169,7 +179,9 @@ export default function useCheckoutDerived({ state, cart }) {
     customerCityCode,
   ]);
 
-  const quotePricing = checkoutQuote?.pricing || null;
+  const quoteKey = checkoutQuoteKey(state, { currentCart, selectedCountry });
+  const quotePricing =
+    checkoutQuote?._checkoutKey === quoteKey ? checkoutQuote.pricing : null;
   const quotedSubtotal = Number(quotePricing?.subtotal ?? subtotal);
   const productDiscount = Number(quotePricing?.productDiscount || 0);
   const shippingDiscount = Number(quotePricing?.shippingDiscount || 0);
@@ -211,7 +223,13 @@ export default function useCheckoutDerived({ state, cart }) {
       shippingConfig?.estimatedTime ||
       'Tiempo no configurado'
     );
-  }, [cartRequiresShipping, deliveryType, finalShipping, matchedZone, shippingConfig]);
+  }, [
+    cartRequiresShipping,
+    deliveryType,
+    finalShipping,
+    matchedZone,
+    shippingConfig,
+  ]);
   const shippingLabel = useMemo(() => {
     if (!cartRequiresShipping) return 'Entrega digital o coordinación';
     if (deliveryType === 'retiro') return 'Retiro en tienda';
@@ -227,11 +245,20 @@ export default function useCheckoutDerived({ state, cart }) {
   const paymentBlockTitle = useMemo(() => {
     if (!paymentsConfig.active) return 'Pagos temporalmente desactivados';
     return paymentsConfig.checkoutLabel || paymentProviderMeta.label;
-  }, [paymentsConfig.active, paymentsConfig.checkoutLabel, paymentProviderMeta.label]);
+  }, [
+    paymentsConfig.active,
+    paymentsConfig.checkoutLabel,
+    paymentProviderMeta.label,
+  ]);
   const paymentBlockMessage = useMemo(() => {
     if (!paymentsConfig.active) {
       return 'La tienda no tiene un método de pago activo en este momento. Contacta al comercio para continuar la compra.';
     }
+    if (
+      paymentsConfig.provider &&
+      !['wompi', 'payu', 'manual'].includes(paymentsConfig.provider)
+    )
+      return 'Este método de pago aún no está disponible en la tienda.';
     if (!paymentsConfig.provider) {
       return 'La tienda aún no tiene una pasarela de pago configurada correctamente.';
     }
@@ -248,22 +275,30 @@ export default function useCheckoutDerived({ state, cart }) {
   const paymentEnvironmentLabel =
     paymentsConfig.mode === 'production' ? 'Producción' : 'Pruebas';
   const paymentCanProceed =
-    paymentsConfig.active !== false && Boolean(paymentsConfig.provider);
+    !state.configurationError &&
+    !state.paymentsConfigLoading &&
+    paymentsConfig.active !== false &&
+    ['wompi', 'payu', 'manual'].includes(paymentsConfig.provider);
 
   const resolvedDianCustomer = useMemo(() => {
     const emailFromContact = String(customerEmailOrPhone || '').includes('@')
       ? String(customerEmailOrPhone || '').trim()
       : '';
-    const countryCode = String(selectedCountry?.code || '').trim().toUpperCase();
+    const countryCode = String(selectedCountry?.code || '')
+      .trim()
+      .toUpperCase();
     const selectedDepartment = regions.find(
       (region) =>
-        String(region?.code || '').trim() === String(selectedRegion || '').trim()
+        String(region?.code || '').trim() ===
+        String(selectedRegion || '').trim()
     );
     return {
       ...dianCustomer,
       personType: dianCustomer.personType || 'natural',
       documentType: dianCustomer.documentType || 'CC',
-      documentNumber: String(dianCustomer.documentNumber || customerId || '').trim(),
+      documentNumber: String(
+        dianCustomer.documentNumber || customerId || ''
+      ).trim(),
       firstName: dianCustomer.firstName || customerName,
       lastName: dianCustomer.lastName || customerLastname,
       email: dianCustomer.email || emailFromContact,
@@ -303,10 +338,16 @@ export default function useCheckoutDerived({ state, cart }) {
   ]);
 
   let disableReason = '';
-  if (!paymentCanProceed) disableReason = 'No hay un método de pago activo o configurado.';
-  else if (!currentCart || currentCart.length === 0 || itemCount === 0) disableReason = 'El carrito está vacío.';
-  else if (quoteLoading) disableReason = 'Verificando IVA, descuentos y total...';
-  else if (!quotePricing) disableReason = 'No se pudo verificar el total final.';
+  if (state.geographyError) disableReason = state.geographyError;
+  else if (state.quoteError) disableReason = state.quoteError;
+  else if (!paymentCanProceed)
+    disableReason = 'No hay un método de pago activo o configurado.';
+  else if (!currentCart || currentCart.length === 0 || itemCount === 0)
+    disableReason = 'El carrito está vacío.';
+  else if (quoteLoading)
+    disableReason = 'Verificando IVA, descuentos y total...';
+  else if (!quotePricing)
+    disableReason = 'No se pudo verificar el total final.';
   else if (subtotal <= 0) disableReason = 'El subtotal debe ser mayor a 0.';
   else if (total <= 0) disableReason = 'El total debe ser mayor a 0.';
 
@@ -325,6 +366,9 @@ export default function useCheckoutDerived({ state, cart }) {
     productDiscount,
     shippingDiscount,
     finalShipping,
+    shippingBeforeDiscount: Number(
+      quotePricing?.originalShipping ?? finalShipping + shippingDiscount
+    ),
     taxAmount,
     taxPercent,
     total,

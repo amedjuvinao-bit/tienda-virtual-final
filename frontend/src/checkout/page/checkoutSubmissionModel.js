@@ -27,6 +27,7 @@ export function validateCheckoutState({ state, derived }) {
     total,
   } = derived;
   const errors = [];
+  if (state.geographyError) errors.push(state.geographyError);
   const isBlank = (value) => !value || String(value).trim() === '';
 
   if (!paymentCanProceed) {
@@ -101,7 +102,8 @@ export function formatCartAdjustments(currentCart, adjustments = []) {
     );
     const toQuantity = Number(adjustment?.finalQty ?? 0);
     const note = adjustment?.note ? String(adjustment.note) : '';
-    if (toQuantity === 0) messages.push(`Sin stock para "${name}" (eliminado).`);
+    if (toQuantity === 0)
+      messages.push(`Sin stock para "${name}" (eliminado).`);
     else if (toQuantity < fromQuantity) {
       messages.push(
         `Stock limitado para "${name}": ${fromQuantity} → ${toQuantity}.`

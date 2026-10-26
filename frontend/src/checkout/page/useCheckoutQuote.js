@@ -1,25 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../../lib/api';
 import { buildCartAccessHeaders } from '../../utils/cartAccess';
-import { getSessionId } from '../../utils/getSessionId';
-import {
-  EMPTY_STORE_CREDIT_PREVIEW,
-  getItemQuantity,
-} from './checkoutPageModel';
+import { checkoutQuoteKey, checkoutQuotePayload } from './checkoutQuoteModel';
+import { EMPTY_STORE_CREDIT_PREVIEW } from './checkoutPageModel';
 
 export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
   const {
     appliedCoupon,
-    customerCity,
-    customerCityCode,
-    customerCountry,
     customerEmailOrPhone,
     customerId,
     customerPhone,
-    deliveryType,
     discountCode,
     paymentsConfig,
-    selectedRegion,
     setAppliedCoupon,
     setCheckoutQuote,
     setCouponError,
@@ -29,68 +21,31 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
     setStoreCreditAmount,
     setStoreCreditPreview,
     setUseStoreCredit,
-    storeCreditAmount,
-    useStoreCredit,
   } = state;
-  const { currentCart, selectedCountry, total } = derived;
+  const { currentCart, total } = derived;
+  const key = checkoutQuoteKey(state, derived);
+  const [attempt, setAttempt] = useState(0);
+  const creditRequest = useRef({ version: 0, controller: null });
 
   useEffect(() => {
+    creditRequest.current.version++;
+    creditRequest.current.controller?.abort();
     setStoreCreditPreview({ ...EMPTY_STORE_CREDIT_PREVIEW });
     setUseStoreCredit(false);
     setStoreCreditAmount('');
+    return () => {
+      creditRequest.current.version++;
+      creditRequest.current.controller?.abort();
+    };
   }, [
     customerEmailOrPhone,
     customerId,
     customerPhone,
+    paymentsConfig.currency,
     setStoreCreditAmount,
     setStoreCreditPreview,
     setUseStoreCredit,
   ]);
-
-  const buildQuoteRequestPayload = (couponCode = '') => ({
-    sessionId: getSessionId(),
-    items: (currentCart || []).map((item) => ({
-      productId: String(
-        item.productId || item._id || item.id || item?.product?._id || ''
-      ),
-      title: item.title || item?.product?.title || '',
-      image: item.image || item?.product?.image || '',
-      color: item.color || '',
-      size: item.size || '',
-      variantId: item.variantId || item.variantKey || '',
-      variantKey: item.variantKey || item.variantId || '',
-      variantLabel: item.variantLabel || '',
-      variantAttributes: Array.isArray(item.variantAttributes)
-        ? item.variantAttributes
-        : [],
-      quantity: getItemQuantity(item),
-      price: Number(item.price ?? item?.product?.price ?? 0),
-      productType: item.productType || item?.product?.productType || 'physical',
-      requiresShipping:
-        item.requiresShipping ?? item?.product?.requiresShipping ?? true,
-      fulfillment: item.fulfillment || item?.product?.fulfillment || null,
-    })),
-    customer: {
-      deliveryType,
-      country: customerCountry,
-      countryCode: selectedCountry?.code || '',
-      department: selectedRegion,
-      departmentCode: selectedRegion,
-      city: customerCity,
-      cityCode: customerCityCode,
-      municipalityCode: customerCityCode,
-      email: String(customerEmailOrPhone || '').includes('@')
-        ? String(customerEmailOrPhone || '').trim()
-        : '',
-      emailOrPhone: customerEmailOrPhone,
-      id: customerId,
-      documentNumber: customerId,
-    },
-    customerDocument: customerId,
-    channel: 'web',
-    couponCode,
-    storeCreditAmount: useStoreCredit ? Number(storeCreditAmount || 0) : 0,
-  });
 
   const handleApplyCoupon = () => {
     const code = String(discountCode || '')
@@ -109,6 +64,10 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
   };
 
   const handlePreviewStoreCredit = async () => {
+    creditRequest.current.controller?.abort();
+    const version = ++creditRequest.current.version;
+    const controller = new AbortController();
+    creditRequest.current.controller = controller;
     const documentNumber = String(customerId || '').replace(/\D/g, '');
     const contact = String(customerEmailOrPhone || '').trim();
     const phone = String(customerPhone || '').trim();
@@ -134,6 +93,11 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
 
     try {
       const cartAccess = await ensureCartReady();
+      if (
+        version !== creditRequest.current.version ||
+        controller.signal.aborted
+      )
+        return;
       const { data } = await api.post(
         `/api/cart/${encodeURIComponent(cartAccess.sessionId)}/store-credit/preview`,
         {
@@ -142,8 +106,16 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
           phone,
           currency: paymentsConfig.currency || 'COP',
         },
-        { headers: buildCartAccessHeaders(cartAccess) }
+        {
+          headers: buildCartAccessHeaders(cartAccess),
+          signal: controller.signal,
+        }
       );
+      if (
+        version !== creditRequest.current.version ||
+        controller.signal.aborted
+      )
+        return;
       const balance = Math.max(0, Number(data?.balance || 0));
       if (data?.eligible !== true || balance <= 0 || !data?.accessToken) {
         setStoreCreditPreview({
@@ -167,6 +139,11 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
       setStoreCreditAmount(String(initialAmount));
       setUseStoreCredit(true);
     } catch (error) {
+      if (
+        version !== creditRequest.current.version ||
+        controller.signal.aborted
+      )
+        return;
       setStoreCreditPreview({
         ...EMPTY_STORE_CREDIT_PREVIEW,
         status: 'error',
@@ -179,66 +156,59 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
   };
 
   useEffect(() => {
-    if (!Array.isArray(currentCart) || currentCart.length === 0) {
-      setCheckoutQuote(null);
+    const controller = new AbortController();
+    setCheckoutQuote(null);
+    state.setQuoteError('');
+    if (!Array.isArray(currentCart) || !currentCart.length) {
       setQuoteLoading(false);
-      return undefined;
+      return () => controller.abort();
     }
-    let cancelled = false;
+    setQuoteLoading(true);
     const couponCode = appliedCoupon?.code || '';
     const timer = window.setTimeout(async () => {
       try {
-        setQuoteLoading(true);
         const { data } = await api.post(
           '/api/orders/quote',
-          buildQuoteRequestPayload(couponCode)
+          checkoutQuotePayload(state, derived, couponCode),
+          { signal: controller.signal }
         );
-        if (cancelled) return;
-        setCheckoutQuote(data || null);
-        if (couponCode && data?.coupon) {
+        if (controller.signal.aborted) return;
+        if (!data?.pricing || !Number.isFinite(Number(data.pricing.total)))
+          throw new Error('INVALID_QUOTE');
+        setCheckoutQuote({ ...data, _checkoutKey: key });
+        if (couponCode && data.coupon) {
           setCouponError('');
           setAppliedCoupon(data.coupon);
           setDiscountCode(data.coupon.code || couponCode);
           setCouponMessage(
             data.coupon.message || 'Cupón aplicado correctamente.'
           );
-        } else if (!couponCode) {
-          setCouponMessage('');
-        }
+        } else if (!couponCode) setCouponMessage('');
       } catch (error) {
-        if (cancelled) return;
-        const response = error?.response?.data || {};
-        if (response.pricing) setCheckoutQuote({ pricing: response.pricing });
-        if (couponCode) {
+        if (controller.signal.aborted) return;
+        setCheckoutQuote(null);
+        state.setQuoteError(
+          'No pudimos verificar el total. Revisa tu conexión y vuelve a intentarlo.'
+        );
+        if (couponCode && error?.response?.status === 400) {
           setAppliedCoupon(null);
           setCouponMessage('');
           setCouponError(
-            response.message ||
-              error?.userMessage ||
-              'No se pudo aplicar el cupón.'
+            error.response.data?.message || 'No se pudo aplicar el cupón.'
           );
         }
       } finally {
-        if (!cancelled) setQuoteLoading(false);
+        if (!controller.signal.aborted) setQuoteLoading(false);
       }
     }, 250);
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
-  }, [
-    currentCart,
-    deliveryType,
-    customerCountry,
-    selectedCountry?.code,
-    selectedRegion,
-    customerCity,
-    customerCityCode,
-    customerEmailOrPhone,
-    appliedCoupon?.code,
-    useStoreCredit,
-    storeCreditAmount,
-  ]);
-
-  return { handleApplyCoupon, handlePreviewStoreCredit };
+  }, [key, attempt]);
+  return {
+    handleApplyCoupon,
+    handlePreviewStoreCredit,
+    retryCheckoutQuote: () => setAttempt((value) => value + 1),
+  };
 }

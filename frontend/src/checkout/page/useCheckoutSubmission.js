@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { setSessionId as setApiSessionId } from '../../lib/api';
 import { redirectToPayU } from '../../lib/payuRedirect';
@@ -51,7 +52,8 @@ export default function useCheckoutSubmission({
     navigate,
   });
 
-  const handlePlaceOrder = async () => {
+  const pending = useRef(false);
+  const placeOrder = async () => {
     if (state.isPlacing) return;
     state.setIsPlacing(true);
     state.setErrors([]);
@@ -80,11 +82,7 @@ export default function useCheckoutSubmission({
       cartSnapshotFingerprint = String(
         validation?.orderSnapshotFingerprint || ''
       ).trim();
-      if (
-        !validation?.ok ||
-        !cartVersion ||
-        !cartSnapshotFingerprint
-      ) {
+      if (!validation?.ok || !cartVersion || !cartSnapshotFingerprint) {
         throw new Error('CART_VALIDATION_FAILED');
       }
 
@@ -122,9 +120,7 @@ export default function useCheckoutSubmission({
       }
       if (filteredFromServer.length) state.setCartView(filteredFromServer);
       if (serverSummary ?? validation?.summary) {
-        state.setServerSummary(
-          serverSummary ?? validation?.summary ?? null
-        );
+        state.setServerSummary(serverSummary ?? validation?.summary ?? null);
       }
     } catch {
       state.setErrors([
@@ -141,16 +137,14 @@ export default function useCheckoutSubmission({
     } catch {
       // La autorización explícita del carrito sigue viajando en el request.
     }
-    const finalItems = buildValidatedOrderItems(
-      serverItems,
-      validation?.items
-    );
-    const finalSummary = serverSummary ?? validation?.summary ?? {
-      subtotal: finalItems.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      ),
-    };
+    const finalItems = buildValidatedOrderItems(serverItems, validation?.items);
+    const finalSummary = serverSummary ??
+      validation?.summary ?? {
+        subtotal: finalItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        ),
+      };
     const order = buildOrderDraft({
       state,
       derived,
@@ -232,9 +226,7 @@ export default function useCheckoutSubmission({
       const createdTotal = Number(
         response.data?.total ?? createdPricing.total ?? order.total
       );
-      const createdAmountDue = Number(
-        response.data?.amountDue ?? createdTotal
-      );
+      const createdAmountDue = Number(response.data?.amountDue ?? createdTotal);
       const createdStoreCredit = response.data?.storeCredit || {
         applied: false,
         amount: 0,
@@ -409,5 +401,14 @@ export default function useCheckoutSubmission({
     }
   };
 
+  const handlePlaceOrder = async () => {
+    if (pending.current || state.isPlacing || state.cartLoading) return;
+    pending.current = true;
+    try {
+      await placeOrder();
+    } finally {
+      pending.current = false;
+    }
+  };
   return { handlePlaceOrder };
 }
