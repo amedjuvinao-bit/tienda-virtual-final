@@ -14,6 +14,7 @@ const { addToCartMock, route } = vi.hoisted(() => ({
 
 vi.mock("react-router-dom", () => ({
   useParams: () => route,
+  useLocation: () => ({ pathname: `/producto/${route.id}` }),
 }));
 
 vi.mock("../lib/api", () => ({
@@ -343,7 +344,7 @@ it('ignora una respuesta atrasada después de abrir otro producto',async()=>{
 });
 it('espera la configuración guardada y respeta el encabezado y pie desactivados',async()=>{
   let complete;api.get.mockImplementation(url=>url==='/api/pages'?new Promise(resolve=>{complete=resolve;}):Promise.resolve({data:DEMO_PRODUCT}));
-  render(<ProductDetail/>);expect(screen.getByRole('status')).toHaveTextContent('Cargando producto');expect(screen.queryByTestId('title')).not.toBeInTheDocument();
+  render(<ProductDetail/>);expect(screen.getByLabelText('Cargando producto')).toHaveAttribute('aria-busy','true');expect(screen.getByRole('status',{name:'Cargando tienda'})).toBeInTheDocument();expect(screen.queryByTestId('title')).not.toBeInTheDocument();
   complete({data:[{pageType:'product-detail',enabled:true,useHeader:false,useFooter:false,productDetailConfig:{subtitle:'Guardado'}}]});
   await screen.findByTestId('config');expect(JSON.parse(screen.getByTestId('config').textContent)).toMatchObject({showHeader:false,showFooter:false,subtitle:'Guardado'});
 });

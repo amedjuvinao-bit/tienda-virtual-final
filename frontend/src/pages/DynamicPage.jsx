@@ -1,4 +1,6 @@
 // frontend/src/pages/DynamicPage.jsx
+import StorefrontLoadingScreen from "../components/StorefrontLoadingScreen";
+import { rememberPageLoadingAppearance } from "../theme/storefrontLoadingAppearance";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import Header from "../components/Header";
@@ -338,8 +340,19 @@ export default function DynamicPage({ theme }) {
     }
   };
 
+  useEffect(() => {
+    if (!loading && page && !notFound) {
+      rememberPageLoadingAppearance(
+        `/pagina/${slug}`,
+        theme,
+        page.catalogConfig?.presentation,
+        page.catalogConfig?.presentation?.backgroundColor,
+      );
+    }
+  }, [loading, page, notFound, slug, theme]);
+
   if (loading) {
-    return <div className="p-6">Cargando página…</div>;
+    return <StorefrontLoadingScreen theme={theme} />;
   }
 
   if (notFound || !page || page.enabled === false) {

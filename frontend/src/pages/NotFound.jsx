@@ -1,4 +1,5 @@
 // src/pages/NotFound.jsx
+import StorefrontLoadingScreen from "../components/StorefrontLoadingScreen";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE_URL } from "../config/apiBaseUrl";
@@ -41,13 +42,7 @@ export default function NotFound() {
     loadNotFound();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white text-neutral-500 text-sm tracking-wide">
-        Cargando...
-      </div>
-    );
-  }
+  if (loading) return <StorefrontLoadingScreen />;
 
   return (
     <div

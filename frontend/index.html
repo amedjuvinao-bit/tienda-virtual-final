@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
+      if (!location.pathname.startsWith('/admin')) {
+        document.documentElement.dataset.storefrontBoot = 'true';
+        try {
+          const appearance = JSON.parse(localStorage.getItem('storefront_loading_appearance') || 'null');
+          const key = /^\/(producto|p)\//.test(location.pathname) ? 'product-detail' : location.pathname;
+          const page = appearance?.pages?.[key];
+          const source = page?.mode === 'custom' ? page : appearance?.home;
+          const backdrop = source?.[matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop'];
+          if (typeof backdrop?.color === 'string' && CSS.supports('color', backdrop.color)) document.documentElement.style.setProperty('--storefront-boot-color', backdrop.color);
+          if (typeof backdrop?.image === 'string' && /^(https?:\/\/|\/(?!\/))[^\s"'<>\\]*$/i.test(backdrop.image)) document.documentElement.style.setProperty('--storefront-boot-image', `url(${JSON.stringify(backdrop.image)})`);
+        } catch { /* On a first visit the current public settings will supply the appearance. */ }
+      }
       if (location.pathname.startsWith('/admin')) {
         document.documentElement.dataset.adminEntry = 'true';
         document.documentElement.dataset.adminContext = location.pathname.startsWith('/admin/login') ? 'login' : 'admin';
@@ -48,6 +60,7 @@
       }
     </script>
     <style>
+      html[data-storefront-boot="true"] body { margin: 0; min-height: 100vh; background-color: var(--storefront-boot-color, Canvas); background-image: var(--storefront-boot-image, none); background-size: cover; background-position: center top; background-attachment: fixed; }
       .admin-preload { display: none; }
       html[data-admin-entry="true"] .admin-preload { position: relative; box-sizing: border-box; display: grid; min-height: 100dvh; place-items: center; overflow: hidden; color: var(--rb-loader-panel-color, #506477); font-family: system-ui, sans-serif; }
       html[data-admin-context="login"] .admin-preload { color: var(--rb-loader-login-color, #506477); }

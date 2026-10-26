@@ -1,5 +1,6 @@
 // src/components/catalog/CatalogPageView.jsx
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useStorefrontPending } from '../storefrontLoadingContext';
 import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
 import CatalogEditorialCard from "./CatalogEditorialCard";
@@ -91,6 +92,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
     error: productsError,
     retry,
   } = useCatalogProducts(safeConfig, query, setCatalogPage);
+  useStorefrontPending(productsLoading);
   const contentRef = useRef(null);
   const settledHeight = useRef(0);
   useLayoutEffect(() => {
@@ -451,7 +453,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
               >
                 {productsLoading ? (
                   <div className="cpv-empty">
-                    <p role="status">Cargando productos…</p>
+                    <p role="status" className="sr-only">Cargando productos…</p>
                   </div>
                 ) : productsError ? (
                   <div className="cpv-empty" role="alert">

@@ -3,7 +3,7 @@ import { StorefrontSettingsContext } from "../context/StorefrontSettingsContext"
 import { catalogContinuityBackdrop } from "./catalog/catalogBackdrop";
 import { catalogImageUrl } from "./catalog/catalogPresentation";
 
-export default function useStorefrontBackdrop(presentation, pageBg) {
+export default function useStorefrontBackdrop(presentation, pageBg, theme) {
   const settings = useContext(StorefrontSettingsContext);
   const [mobile, setMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 768,
@@ -18,7 +18,7 @@ export default function useStorefrontBackdrop(presentation, pageBg) {
   }, []);
   const backdrop =
     presentation.backgroundMode === "continuity"
-      ? catalogContinuityBackdrop(settings?.theme, mobile)
+      ? catalogContinuityBackdrop(theme || settings?.theme, mobile)
       : null;
   const custom =
     mobile && presentation.mobileBackgroundImage

@@ -1,0 +1,10 @@
+.storefront-loading-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  font-family: var(--font-base, system-ui, sans-serif);
+}

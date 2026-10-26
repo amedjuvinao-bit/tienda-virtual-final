@@ -11,7 +11,8 @@ import {
 import { fetchSiteSettings } from './theme/siteSettingsApi';
 import { applyTheme } from './theme/applyTheme';
 import { normalizeGlobalConfig } from './admin/appearance/general/generalHelpers';
-import GlobalPageLoader from './components/GlobalPageLoader';
+import StorefrontLoadingScreen, { StorefrontLoadingBoundary } from './components/StorefrontLoadingScreen';
+import { rememberStorefrontLoadingAppearance } from './theme/storefrontLoadingAppearance';
 import RouteLoaderEffect from './components/RouteLoaderEffect';
 import AppToastContainer from './components/AppToastContainer';
 import BackupMaintenanceNotice from './components/BackupMaintenanceNotice';
@@ -169,6 +170,7 @@ export default function App() {
         };
         setThemeFromServer(normalizedTheme);
         applyTheme(normalizedTheme);
+        rememberStorefrontLoadingAppearance(normalizedTheme);
       }
       succeeded = true;
       adminConnectionErrorLogged.current = false;
@@ -184,8 +186,7 @@ export default function App() {
         setLoadingPage(false);
         if (succeeded || !window.location.pathname.startsWith('/admin')) setThemeReady(true);
       };
-      if (window.location.pathname.startsWith('/admin')) finish();
-      else setTimeout(finish, 400);
+      finish();
     }
     return succeeded;
   };
@@ -246,13 +247,13 @@ export default function App() {
             <StorefrontActionFeedback />
             <BackupMaintenanceNotice adminPanelReady={themeReady} />
             <AppConfirmProvider>
-              <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
+              <StorefrontLoadingBoundary config={themeFromServer?.global?.loader} loading={!themeReady || loadingPage}>
+              <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : <StorefrontLoadingScreen />}>
                 <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
-                <GlobalFloatingButtons theme={themeFromServer} />
-                {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
+                {themeReady && <GlobalFloatingButtons theme={themeFromServer} />}
 
                 <AdminLogoutGate>
-                {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
+                {!themeReady ? window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <StorefrontLoadingScreen /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
                   <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />
@@ -326,6 +327,7 @@ export default function App() {
 
                 <AppToastContainer />
               </Suspense>
+              </StorefrontLoadingBoundary>
             </AppConfirmProvider>
           </BrowserRouter>
           </StorefrontSettingsContext.Provider>

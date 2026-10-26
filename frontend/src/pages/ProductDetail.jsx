@@ -14,6 +14,10 @@ import {
 import useProductDetailSelection from "../components/product-detail/useProductDetailSelection";
 import { buildSafeProductDetailConfig } from "../components/product-detail/productDetailConfig";
 
+import StorefrontLoadingScreen from "../components/StorefrontLoadingScreen";
+import { StorefrontSettingsContext } from "../context/StorefrontSettingsContext";
+import { rememberPageLoadingAppearance } from "../theme/storefrontLoadingAppearance";
+
 export default function ProductDetail() {
   const { id, slug } = useParams();
 
@@ -270,11 +274,24 @@ export default function ProductDetail() {
     }
   };
 
+  const settings = React.useContext(StorefrontSettingsContext);
+  useEffect(() => {
+    if (!loading && !configLoading && product)
+      rememberPageLoadingAppearance(
+        `/producto/${id || slug}`,
+        settings?.theme,
+        config?.presentation,
+        config?.style?.pageBg,
+      );
+  }, [loading, configLoading, product, id, slug, settings?.theme, config]);
+
   if (loading || configLoading) {
     return (
-      <div className="p-10 text-center" role="status">
-        Cargando producto...
-      </div>
+      <StorefrontLoadingScreen
+        message="Cargando producto"
+        presentation={config?.presentation}
+        pageBg={config?.style?.pageBg}
+      />
     );
   }
 

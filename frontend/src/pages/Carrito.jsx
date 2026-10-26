@@ -1,3 +1,4 @@
+import StorefrontLoadingScreen from "../components/StorefrontLoadingScreen";
 import React, { useEffect, useRef } from "react";
 import { useCart } from "../context/CartContext";
 import CartPageView from "../components/cart/CartPageView";
@@ -10,6 +11,7 @@ export default function CartPage() {
     void sync.current?.();
   }, []);
   const { page, loading, error } = useCartPageConfiguration();
+  if (loading) return <StorefrontLoadingScreen message="Cargando carrito" />;
   return (
     <CartPageView
       page={page || {}}
