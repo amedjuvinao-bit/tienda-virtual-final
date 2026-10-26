@@ -2,24 +2,28 @@ import { journeyScene } from './decorativeJourneyScenes';
 import { journeyArtworkLayout, applyJourneyArtworkLayout } from './decorativeJourneyArtwork';
 import { cinematicOrnament, cinematicBeat, advanceCinematicCamera } from './decorativeJourneyCinema';
 
+function inheritedJourneyBackground(container, view) {
+  const previousShared = container.dataset.journeyShared;
+  delete container.dataset.journeyShared;
+  let image = 'none';
+  try {
+    const nodes = container.querySelectorAll('.trending-section--floating-glass,.look-editorial,.complementos-look-section,.categories-fan__background,.ig-journal,.tk-stage,.info-glass,.footer-ed,.story-preview__content');
+    for (const node of nodes) {
+      const candidates = [view.getComputedStyle(node).backgroundImage];
+      if (!/jsdom/i.test(view.navigator.userAgent)) candidates.unshift(view.getComputedStyle(node,'::before').backgroundImage);
+      image = candidates.find(value => value && value.includes('url(')) || 'none';
+      if (image !== 'none') break;
+    }
+  } finally {
+    if (previousShared !== undefined) container.dataset.journeyShared = previousShared;
+  }
+  return image;
+}
+
 export function mountDecorativeJourney(container,config,{scroller=null,mobileOverride}={}){
   const view=container.ownerDocument.defaultView,doc=container.ownerDocument,world=container.querySelector('[data-journey-world]');
   if(!world)return ()=>{};
   const c=config.journey,reduce=view.matchMedia?.('(prefers-reduced-motion: reduce)'),mobile=view.matchMedia?.('(max-width:767px)');
-  // Capture the store's existing artwork before shared-surface CSS hides local layers.
-  // No business-specific image or colour is introduced by the journey.
-  const backgroundNodes=[...container.querySelectorAll('.trending-section--floating-glass,.look-editorial,.complementos-look-section,.categories-fan__background,.ig-journal,.tk-stage,.info-glass,.footer-ed,.story-preview__content')];
-  const previousShared=container.dataset.journeyShared;
-  delete container.dataset.journeyShared;
-  let inheritedBackground='none';
-  for(const node of backgroundNodes){
-    const candidates=[view.getComputedStyle(node).backgroundImage];
-    if(!/jsdom/i.test(view.navigator.userAgent))candidates.unshift(view.getComputedStyle(node,'::before').backgroundImage);
-    const image=candidates.find(value=>value && value.includes('url('));
-    if(image){inheritedBackground=image;break;}
-  }
-  if(previousShared!==undefined)container.dataset.journeyShared=previousShared;
-  if(!c.backgroundImage)container.style.setProperty('--journey-shared-image',inheritedBackground);
   const target=scroller || view,pieces=[...world.querySelectorAll('[data-journey-piece]')];
   const cameras=pieces.map(()=>({position:null,velocity:0}));
   const stem=world.querySelector('[data-journey-stem]'),trace=world.querySelector('[data-journey-trace]');
@@ -45,6 +49,9 @@ export function mountDecorativeJourney(container,config,{scroller=null,mobileOve
   }
   function paint(){
     frame=0;if(disposed)return;
+    // Responsive sections can change their artwork after mount. Read their
+    // current DOM on resize/content changes rather than retaining the desktop URL.
+    if(dirty && !c.backgroundImage) container.style.setProperty('--journey-shared-image',inheritedJourneyBackground(container,view));
     const enabled=config.enabled && config.experience==='journey' && !(compact() && config.mobileMode==='off');
     const active=enabled && Boolean(c.image || c.secondaryImage || c.stemVisible);
     container.dataset.journeyActive=String(active);container.dataset.journeyShared=String(enabled && c.unifyBackground);if(!active)return;

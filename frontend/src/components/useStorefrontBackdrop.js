@@ -6,7 +6,7 @@ import { catalogImageUrl } from "./catalog/catalogPresentation";
 export default function useStorefrontBackdrop(presentation, pageBg, theme) {
   const settings = useContext(StorefrontSettingsContext);
   const [mobile, setMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 768,
+    () => typeof window !== "undefined" && (window.matchMedia?.("(max-width: 767px)")?.matches ?? window.innerWidth < 768),
   );
   useEffect(() => {
     const query = window.matchMedia?.("(max-width: 767px)");

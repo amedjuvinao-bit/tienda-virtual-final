@@ -87,9 +87,13 @@ function sectionImage(theme, id, section, mobile) {
 // sections without an image. Resolve responsive assets before choosing a fallback.
 export function catalogContinuityBackdrop(theme, mobile = false) {
   if (!theme) return null;
-  const journey = normalizeStoryConfig(theme.global?.sectionMotion).journey;
+  const story = normalizeStoryConfig(theme.global?.sectionMotion);
+  const journey = story.journey;
   const entries = Array.isArray(theme.sections) ? theme.sections : [];
-  let image = catalogImageUrl(journey.backgroundImage);
+  // Home disables its shared journey canvas when mobile choreography is off.
+  // A saved desktop journey image must not hide the active mobile section art.
+  const sharedOnDevice = !mobile || (story.enabled && story.experience === 'journey' && story.mobileMode !== 'off');
+  let image = sharedOnDevice ? catalogImageUrl(journey.backgroundImage) : '';
   if (!image) {
     for (const id of storySectionOrder(entries)) {
       if (!isStorefrontSectionVisible(theme, id)) continue;

@@ -92,3 +92,13 @@ it('no inventa una imagen si todas las secciones con fondo están desactivadas',
   const sections = ['tendencia','look','complementos','categorias','instagram','tiktok','informacion'].map(id=>({id,enabled:false}));
   expect(catalogContinuityBackdrop({colors:{background:'#123456'},sections},true)).toEqual({color:'#123456',image:''});
 });
+
+it('hereda el fondo móvil activo cuando el recorrido compartido está apagado en ese dispositivo', async () => {
+  const { catalogContinuityBackdrop } = await import('./catalogBackdrop');
+  const section={id:'tendencia',config:{products:[{productId:'p1'}],presentation:{mode:'floatingGlass',backdropMode:'custom',backgroundImage:'https://res.cloudinary.com/demo/image/upload/home-desktop.webp',mobileBackgroundMode:'custom',mobileBackgroundImage:'https://res.cloudinary.com/demo/image/upload/home-mobile.webp'}}};
+  const theme={sections:[section],global:{sectionMotion:{mobileMode:'off',journey:{unifyBackground:true,backgroundImage:'/journey-desktop.webp'}}}};
+  expect(catalogContinuityBackdrop(theme).image).toBe('/journey-desktop.webp');
+  expect(catalogContinuityBackdrop(theme,true).image).toContain('/home-mobile.webp');
+  expect(catalogContinuityBackdrop({...theme,global:{sectionMotion:{enabled:false,journey:theme.global.sectionMotion.journey}}},true).image).toContain('/home-mobile.webp');
+  expect(catalogContinuityBackdrop({...theme,global:{sectionMotion:{experience:'entrances',journey:theme.global.sectionMotion.journey}}},true).image).toContain('/home-mobile.webp');
+});
