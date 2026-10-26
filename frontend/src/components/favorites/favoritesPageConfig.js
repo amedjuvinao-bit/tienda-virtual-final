@@ -101,7 +101,13 @@ export function buildSafeFavoritesPageConfig(raw = {}) {
         : "soft",
       gridGapPx: number(style.gridGapPx, 8, 80, 22),
       imageRatio: number(style.imageRatio, 0.55, 1.5, 0.8),
-      imageFit: style.imageFit === "cover" ? "cover" : "contain",
+      // Earlier saved defaults used contain. Fill the card unless the user
+      // explicitly chooses the full-image alternative in the current editor.
+      imageFitConfigured: style.imageFitConfigured === true,
+      imageFit:
+        style.imageFitConfigured === true && style.imageFit === "contain"
+          ? "contain"
+          : "cover",
       cardTitleSizePx: number(style.cardTitleSizePx, 12, 28, 17),
     },
   };

@@ -1,6 +1,17 @@
 import { expect, it } from "vitest";
 import { buildSafeFavoritesPageConfig } from "./favoritesPageConfig";
 import { favoriteEditorSections } from "../../admin/pages/workspace/favoriteEditorFields";
+it("llena la imagen incluso con el antiguo ajuste guardado y permite elegir otro ajuste desde el editor", () => {
+  expect(buildSafeFavoritesPageConfig({}).style.imageFit).toBe("cover");
+  expect(
+    buildSafeFavoritesPageConfig({ style: { imageFit: "contain" } }).style
+      .imageFit,
+  ).toBe("cover");
+  const explicit = buildSafeFavoritesPageConfig({
+    style: { imageFit: "contain", imageFitConfigured: true },
+  });
+  expect(buildSafeFavoritesPageConfig(explicit).style.imageFit).toBe("contain");
+});
 it("mantiene todos los controles en un solo contrato y conserva extensiones", () => {
   const config = buildSafeFavoritesPageConfig({
     extra: true,

@@ -37,6 +37,9 @@ export default function FavoritesAppearanceControls({
               [scope]: {
                 ...current.favoritesPageConfig[scope],
                 [key]: value,
+                ...(scope === "style" && key === "imageFit"
+                  ? { imageFitConfigured: true }
+                  : {}),
                 ...(key === "titleImage" && value
                   ? { titleMode: "image" }
                   : {}),

@@ -174,8 +174,8 @@ export const favoriteEditorSections = {
         ),
         style("imageFit", "Ajuste de la imagen", "select", {
           options: [
-            ["contain", "Imagen completa"],
-            ["cover", "Cubrir la superficie"],
+            ["cover", "Llenar de borde a borde"],
+            ["contain", "Imagen completa con márgenes"],
           ],
         }),
         number("style", "cardTitleSizePx", "Tamaño del nombre (px)", 12, 28),
