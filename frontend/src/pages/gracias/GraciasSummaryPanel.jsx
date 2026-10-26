@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import {
+  ArrowRight,
+  Headphones,
+  Clock3,
+  Check,
+  CircleAlert,
+  ChevronDown,
+  RefreshCw,
+} from "lucide-react";
 import { CartGlass } from "../../components/cart/CartMaterial";
-import ConfettiDots from "./ConfettiDots";
+import PolishedGlassRim from "../../components/PolishedGlassRim";
 import GraciasSummaryRows from "./GraciasSummaryRows";
 import ThanksStatusIcon from "./ThanksStatusIcon";
 import ThanksGlassButton from "./ThanksGlassButton";
+import ThanksOrderFacts from "./ThanksOrderFacts";
+import ThanksNextSteps from "./ThanksNextSteps";
 export default function GraciasSummaryPanel({
   config,
   material,
@@ -17,59 +27,71 @@ export default function GraciasSummaryPanel({
 }) {
   const style = config.style,
     [failedTitle, setFailedTitle] = useState("");
+  const heading =
+    model.verified &&
+    !model.verificationLoading &&
+    ["approved", "pending"].includes(model.paymentStatus)
+      ? config.titleText
+      : model.dynamicTitleText;
   const showImage =
     config.titleMode === "image" &&
     config.titleImage &&
-    failedTitle !== config.titleImage &&
-    !model.hasPaymentResult;
+    failedTitle !== config.titleImage;
+  const refresh =
+    model.verified &&
+    !model.verificationLoading &&
+    ["pending", "unknown"].includes(model.paymentStatus);
+  const BadgeIcon = model.paymentMeta.showSuccessCheck
+    ? Check
+    : ["rejected", "expired", "error"].includes(model.paymentStatus)
+      ? CircleAlert
+      : Clock3;
+  const hasDetails =
+    config.showOrderDetails &&
+    model.hasOrderInfo &&
+    (config.showPaymentStatus ||
+      (config.showCustomerName && model.customerName) ||
+      (config.showSubtotal && model.subtotal > 0) ||
+      (config.showShipping && model.hasOrderDetails) ||
+      model.storeCreditAmount > 0);
   return (
     <CartGlass
       config={material}
-      className="gp-panel"
+      className="gp-panel gp-central-panel"
       style={{ minHeight: style.panelMinHeightPx }}
     >
-      {model.verified && model.paymentMeta.showSuccessCheck && (
-        <ConfettiDots
-          accent={style.accentColor}
-          accent2={style.panelBorderColor}
-        />
-      )}
-      <div className="gp-panel-content">
-        {model.hasPaymentResult && (
-          <div
-            className="gp-status-badge"
-            role="status"
-            style={{
-              color: model.paymentMeta.badgeText,
-              backgroundColor: `color-mix(in srgb, ${model.paymentMeta.badgeBg} 45%, transparent)`,
-            }}
-          >
-            {model.paymentMeta.badge}
-          </div>
-        )}
+      <div className="gp-medallion">
         <ThanksStatusIcon
           meta={model.paymentMeta}
           status={model.paymentStatus}
           loading={model.verificationLoading}
-          accent={style.accentColor}
+          accent={style.iconColor}
         />
+        <PolishedGlassRim
+          radius={999}
+          width={config.presentation.borderWidth}
+          reflection={config.presentation.reflection}
+        />
+      </div>
+      <div className="gp-panel-content">
         <h1 className="gp-title">
           {showImage ? (
             <img
               src={config.titleImage}
-              alt={config.titleImageAlt || config.titleText}
+              alt={config.titleImageAlt || heading}
               style={{ maxHeight: style.titleImageHeightPx }}
               onError={() => setFailedTitle(config.titleImage)}
             />
           ) : (
-            <>
-              {model.dynamicTitleText}
-              {model.verified && config.showCustomerName && model.customerName
-                ? `, ${model.customerName}`
-                : ""}
-            </>
+            heading
           )}
         </h1>
+        {model.hasPaymentResult && (
+          <div className="gp-status-badge" role="status">
+            <BadgeIcon size={14} aria-hidden="true" />
+            {model.paymentMeta.badge}
+          </div>
+        )}
         <p className="gp-message">
           {model.hasPaymentResult || model.hasOrderInfo
             ? model.dynamicMainMessage
@@ -102,36 +124,50 @@ export default function GraciasSummaryPanel({
         )}
         {model.hasOrderInfo && (
           <>
-            <h2 className="gp-summary-title">{model.summaryTitle}</h2>
-            <GraciasSummaryRows config={config} model={model} />
+            <h2 className="sr-only">{model.summaryTitle}</h2>
+            <ThanksOrderFacts config={config} model={model} />
           </>
         )}
+        <ThanksNextSteps config={config} model={model} />
         <div className="gp-actions">
-          {model.verified &&
-            !model.verificationLoading &&
-            ["pending", "unknown"].includes(model.paymentStatus) && (
-              <ThanksGlassButton
-                config={config}
-                secondary
-                onClick={retryVerification}
-              >
-                Actualizar estado
-              </ThanksGlassButton>
-            )}
-          {returnAccessEnabled && (
-            <ThanksGlassButton
-              config={config}
-              secondary
-              onClick={openReturnsPortal}
-            >
-              {config.returnsButtonText}
+          {refresh && (
+            <ThanksGlassButton config={config} onClick={retryVerification}>
+              <RefreshCw size={17} aria-hidden="true" />
+              {config.refreshButtonText}
+              <ArrowRight size={17} aria-hidden="true" />
             </ThanksGlassButton>
           )}
           {config.showContinueButton && (
-            <ThanksGlassButton config={config} onClick={continueShopping}>
+            <ThanksGlassButton
+              config={config}
+              secondary={refresh}
+              onClick={continueShopping}
+            >
               <span>{config.continueButtonText}</span>
-              <ArrowRight size={17} aria-hidden="true" />
+              {!refresh && <ArrowRight size={17} aria-hidden="true" />}
             </ThanksGlassButton>
+          )}
+        </div>
+        <div className="gp-support-actions">
+          {hasDetails && (
+            <details className="gp-order-details">
+              <summary>
+                {config.detailsToggleText}
+                <ChevronDown size={14} aria-hidden="true" />
+              </summary>
+              <GraciasSummaryRows config={config} model={model} detailsOnly />
+            </details>
+          )}
+          {returnAccessEnabled && (
+            <button
+              type="button"
+              className="gp-returns-link"
+              onClick={openReturnsPortal}
+            >
+              <Headphones size={17} aria-hidden="true" />
+              {config.returnsButtonText}
+              <ArrowRight size={14} aria-hidden="true" />
+            </button>
           )}
         </div>
         {config.showHelpText && (

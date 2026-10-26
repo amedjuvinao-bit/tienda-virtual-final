@@ -8,7 +8,7 @@ function Row({ children, style, total = false }) {
   );
 }
 
-export default function GraciasSummaryRows({ config, model }) {
+export default function GraciasSummaryRows({ config, model, detailsOnly = false }) {
   const style = config.style;
   const rowStyle = {
     borderBottomColor: style.panelBorderColor,
@@ -20,7 +20,7 @@ export default function GraciasSummaryRows({ config, model }) {
       className="gp-summary-rows"
       style={{ borderColor: style.panelBorderColor }}
     >
-      {config.showOrderNumber && (
+      {!detailsOnly && config.showOrderNumber && (
         <Row
           style={{
             ...rowStyle,
@@ -54,7 +54,7 @@ export default function GraciasSummaryRows({ config, model }) {
           <span className="gp-summary-row-value">{model.customerName}</span>
         </Row>
       )}
-      {config.showItemCount && model.itemCount > 0 && (
+      {!detailsOnly && config.showItemCount && model.itemCount > 0 && (
         <Row style={rowStyle}>
           <span className="gp-summary-row-label">{config.itemCountLabel}</span>
           <span className="gp-summary-row-value">
@@ -94,7 +94,7 @@ export default function GraciasSummaryRows({ config, model }) {
           </span>
         </Row>
       )}
-      {config.showTotal && model.total > 0 && (
+      {!detailsOnly && config.showTotal && (
         <Row
           total
           style={{

@@ -121,6 +121,9 @@ it("respeta visibilidad y recupera imágenes rotas", () => {
       titleMode: "image",
       titleImage: "/title.png",
       titleText: "Título recuperado",
+      entryTitleText: "Título recuperado",
+      designVersion: 2,
+      showVisualPanel: true,
       showWhatsAppButton: false,
       slider: {
         slides: [
@@ -144,4 +147,47 @@ it("respeta visibilidad y recupera imágenes rotas", () => {
   expect(
     screen.getByRole("button", { name: "Imagen siguiente" }),
   ).toBeInTheDocument();
+});
+
+it("centra el resumen pendiente sin declarar preparación ni entrega completadas", () => {
+  const { retry } = setup(
+    {},
+    { order: { ...order, itemCount: 3, paymentStatus: "pending" } },
+  );
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    "Gracias por tu pedido",
+  );
+  expect(screen.getByText("Pago pendiente")).toBeInTheDocument();
+  expect(document.querySelector(".gp-visual")).not.toBeInTheDocument();
+  expect(document.querySelectorAll(".gp-order-fact")).toHaveLength(3);
+  expect(document.querySelectorAll('[data-stage="future"]')).toHaveLength(2);
+  expect(
+    document.querySelector('[data-stage="confirmed"]'),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Actualizar estado" }));
+  expect(retry).toHaveBeenCalledOnce();
+});
+it("conserva un total protegido de cero y permite desplegar el desglose", () => {
+  setup({}, { order: { ...order, total: 0, subtotal: 12000 } });
+  expect(
+    document.querySelector(".gp-order-fact:last-child dd").textContent,
+  ).toMatch(/\$\s*0(?:,00)?$/);
+  expect(screen.getByText("Ver detalle del pedido")).toBeInTheDocument();
+  expect(
+    document.querySelector('[data-stage="confirmed"]'),
+  ).toBeInTheDocument();
+  expect(document.querySelectorAll('[data-stage="future"]')).toHaveLength(2);
+});
+it("respeta la visibilidad de los próximos pasos y de los datos compactos", () => {
+  setup(
+    {
+      showNextSteps: false,
+      showOrderNumber: false,
+      showItemCount: false,
+      showTotal: false,
+    },
+    { order },
+  );
+  expect(document.querySelector(".gp-next-steps")).not.toBeInTheDocument();
+  expect(document.querySelector(".gp-order-facts")).not.toBeInTheDocument();
 });

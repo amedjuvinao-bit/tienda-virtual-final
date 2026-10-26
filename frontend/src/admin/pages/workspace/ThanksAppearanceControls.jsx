@@ -135,9 +135,13 @@ export default function ThanksAppearanceControls({
           text={
             topic === "settings"
               ? "La ruta siempre permite consultar el resultado protegido del pedido. Al desactivar el diseño personalizado se usa la presentación básica. Los mensajes del estado del pago dependen del resultado validado por el servidor."
-              : topic === "content"
-                ? "Los estados de pago y sus títulos se validan con el servidor. El mensaje de pedido recibido se usa cuando el pago está aprobado; el mensaje sin pedido no confirma una compra."
-                : undefined
+              : topic === "steps"
+                ? "Solo la confirmación del pago refleja el estado verificado. Preparación y entrega explican las etapas siguientes; no se marcan como realizadas sin información del servidor."
+                : topic === "gallery"
+                  ? "La composición central no necesita imágenes. Puedes activar una galería adicional debajo; las imágenes guardadas se conservan."
+                  : topic === "content"
+                    ? "El título principal aparece con pagos pendientes o aprobados; la etiqueta del estado siempre procede de la verificación del servidor. El mensaje de pedido recibido se usa con el pago aprobado. Una visita sin pedido tiene su propio título y mensaje."
+                    : undefined
           }
         >
           <div className="grid gap-4 sm:grid-cols-2">{fields.map(render)}</div>

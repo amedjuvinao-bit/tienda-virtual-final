@@ -8,7 +8,7 @@ import {
 } from "../../../pages/gracias/thanksPageViewModel";
 const noop = () => {};
 export default function ThanksPreview({ draft }) {
-  const [status, setStatus] = useState("paid"),
+  const [status, setStatus] = useState("pending"),
     [currentSlide, setCurrentSlide] = useState(0),
     [paused, setPaused] = useState(true);
   const config = useMemo(
@@ -29,6 +29,7 @@ export default function ThanksPreview({ draft }) {
           total: 100000,
           paymentProvider: "wompi",
           paymentStatus: status,
+          returnAccess: { enabled: true },
         };
   const model = buildThanksPageViewModel({
     thanksConfig: config,
@@ -68,6 +69,7 @@ export default function ThanksPreview({ draft }) {
         page={draft}
         thanksConfig={config}
         viewModel={model}
+        thanksOrderData={order}
         slides={buildThanksPageSlides(config)}
         currentSlide={currentSlide}
         setCurrentSlide={setCurrentSlide}

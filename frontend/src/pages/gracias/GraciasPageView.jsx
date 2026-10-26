@@ -9,6 +9,7 @@ import GraciasSummaryPanel from "./GraciasSummaryPanel";
 import GraciasVisualPanel from "./GraciasVisualPanel";
 import "../../components/cart/cartPage.css";
 import "./graciasPage.css";
+import "./thanksCentral.css";
 export default function GraciasPageView(controller) {
   const {
     thanksConfig: config,
@@ -32,6 +33,7 @@ export default function GraciasPageView(controller) {
   return (
     <div
       className="cart-storefront gp-page"
+      data-design="central"
       data-chrome={header}
       style={{
         ...cartVariables(material),
@@ -41,12 +43,21 @@ export default function GraciasPageView(controller) {
           ? `url(${JSON.stringify(backdrop.image)})`
           : "none",
         "--gp-title-color": style.titleTextColor,
+        "--gp-heading-font": style.headingFontFamily === "theme" ? "var(--font-headings, Georgia, serif)" : style.headingFontFamily === "body" ? "var(--font-body, system-ui, sans-serif)" : '"Thanks Editorial", Georgia, serif',
         "--gp-title-size": `${style.titleFontSizePx}px`,
         "--gp-button-tint": style.buttonBg,
         "--gp-button-ink": style.buttonTextColor,
+        "--gp-secondary-tint": style.secondaryButtonBg,
+        "--gp-secondary-ink": style.secondaryButtonTextColor,
         "--gp-button-alpha": `${config.presentation.checkoutGlassOpacity * 100}%`,
         "--gp-button-blur": `${config.presentation.checkoutGlassBlur}px`,
         "--gp-button-radius": `${controller.presentationStyle.buttonRadius}px`,
+        "--gp-line": style.lineColor,
+        "--gp-status-bg": style.statusBadgeBg,
+        "--gp-status-ink": style.statusBadgeTextColor,
+        "--gp-icon": style.iconColor,
+        "--gp-medallion": `${style.medallionSizePx}px`,
+        "--gp-step-icon": `${style.stepIconSizePx}px`,
         "--gp-panel-width": `${style.panelWidthPx}px`,
       }}
     >

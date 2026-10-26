@@ -153,3 +153,24 @@ it("mantiene el borrador si el servidor omite los cambios", async () => {
     "Tu thanks editado",
   );
 });
+
+it("guarda textos de los próximos pasos y colores propios del diseño central", async () => {
+  const user = userEvent.setup();
+  mount();
+  await screen.findByLabelText("Texto del título");
+  await user.click(
+    screen.getByRole("button", { name: "Próximos pasos", exact: true }),
+  );
+  const field = screen.getByLabelText("Título de preparación");
+  await user.clear(field);
+  await user.type(field, "Prepararemos tu selección");
+  await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await waitFor(() =>
+    expect(stored.thanksPageConfig.preparationStepTitle).toBe(
+      "Prepararemos tu selección",
+    ),
+  );
+  expect(stored.thanksPageConfig.designVersion).toBe(2);
+  expect(stored.thanksPageConfig.showVisualPanel).toBe(false);
+  expect(stored.thanksPageConfig.style.panelBg).toBe("#ab6789");
+});

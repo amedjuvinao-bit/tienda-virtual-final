@@ -111,7 +111,7 @@ export function buildThanksPageViewModel({
       : !verified
         ? {
             badge: "",
-            title: thanksConfig.titleText,
+            title: thanksConfig.entryTitleText,
             message: thanksConfig.entryMessage,
             showSuccessCheck: false,
             badgeText: thanksConfig.style.accentColor,
@@ -145,7 +145,7 @@ export function buildThanksPageViewModel({
     paymentMeta,
     dynamicTitleText: hasPaymentResult
       ? paymentMeta.title
-      : thanksConfig.titleText,
+      : thanksConfig.entryTitleText,
     dynamicMainMessage:
       verified && !verificationLoading && fallbackStatus === "approved"
         ? thanksConfig.mainMessage
@@ -157,7 +157,7 @@ export function buildThanksPageViewModel({
     totalLabel:
       fallbackStatus === "approved"
         ? thanksConfig.totalLabel
-        : "Valor intentado:",
+        : thanksConfig.pendingTotalLabel,
     paymentStatusLabel:
       provider === "payu"
         ? "Estado de PayU:"

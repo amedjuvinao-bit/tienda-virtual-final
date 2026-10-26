@@ -21,7 +21,7 @@ export default function ThanksStatusIcon({ meta, status, loading, accent }) {
   return (
     <div
       className={`gp-check-wrap${loading ? " gp-check-wrap--loading" : ""}`}
-      style={{ color: meta.neutral ? accent : meta.badgeText }}
+      style={{ color: accent || meta.badgeText }}
       aria-hidden="true"
     >
       <Icon size={32} strokeWidth={1.4} />

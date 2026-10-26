@@ -4,6 +4,7 @@ import { buildSafeThanksPageConfig } from "../../pages/gracias/thanksPageConfig"
 const tabs = [
   { id: "content", label: "Título y mensajes", group: "content" },
   { id: "summary", label: "Resumen y acciones", group: "content" },
+  { id: "steps", label: "Próximos pasos", group: "content" },
   { id: "gallery", label: "Galería visual", group: "content" },
   { id: "background", label: "Fondo y cristal", group: "design" },
   { id: "colors", label: "Colores", group: "design" },

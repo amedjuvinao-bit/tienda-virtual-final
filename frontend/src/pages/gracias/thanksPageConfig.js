@@ -13,7 +13,27 @@ function clampInt(value, min, max, fallback) {
 }
 
 export function buildSafeThanksPageConfig(raw) {
-  const config = object(raw);
+  const original = object(raw);
+  // Adopt the approved central composition once, preserving uploaded slides and custom colors.
+  const legacy = original.designVersion !== 2;
+  const oldStyle = object(original.style);
+  const migratedStyle = { ...oldStyle };
+  if (legacy) {
+    const defaults = {
+      titleTextColor: ["#db2777", "#74243e"],
+      textPrimaryColor: ["#111827", "#652d42"],
+      textSecondaryColor: ["#4b5563", "#875a68"],
+      accentColor: ["#ec4899", "#a52c53"],
+      buttonBg: ["#ec4899", "#a52c53"],
+      buttonTextColor: ["#652d42", "#fff6f5"],
+      titleFontSizePx: [28, 48],
+      panelWidthPx: [540, 1000],
+      panelPaddingPx: [24, 40],
+    };
+    for (const [key, [previous, next]] of Object.entries(defaults))
+      if (migratedStyle[key] === previous) migratedStyle[key] = next;
+  }
+  const config = { ...original, style: migratedStyle };
   const material = buildSafeCartPageConfig({
     presentation: config.presentation,
   });
@@ -52,21 +72,68 @@ export function buildSafeThanksPageConfig(raw) {
 
   return {
     ...config,
-    presentation: { ...object(config.presentation), ...material.presentation },
+    designVersion: 2,
+    showNextSteps: config.showNextSteps !== false,
+    showOrderDetails: config.showOrderDetails !== false,
+    refreshButtonText: text(config.refreshButtonText, "Actualizar estado"),
+    detailsToggleText: text(config.detailsToggleText, "Ver detalle del pedido"),
+    nextStepsTitle: text(config.nextStepsTitle, "¿Qué sigue?"),
+    paymentStepTitle: text(config.paymentStepTitle, "Confirmación del pago"),
+    pendingStepText: text(
+      config.pendingStepText,
+      "Estamos esperando la confirmación de tu pago.",
+    ),
+    approvedStepText: text(
+      config.approvedStepText,
+      "El pago de tu pedido fue confirmado.",
+    ),
+    attentionStepText: text(
+      config.attentionStepText,
+      "El pago requiere atención antes de continuar.",
+    ),
+    preparationStepTitle: text(
+      config.preparationStepTitle,
+      "Preparación del pedido",
+    ),
+    preparationStepText: text(
+      config.preparationStepText,
+      "Te avisaremos cuando comencemos a prepararlo.",
+    ),
+    deliveryStepTitle: text(config.deliveryStepTitle, "Entrega"),
+    deliveryStepText: text(
+      config.deliveryStepText,
+      "Te compartiremos las novedades de la entrega.",
+    ),
+    entryTitleText: text(config.entryTitleText, "Consulta tu pedido"),
+    pendingTotalLabel: text(config.pendingTotalLabel, "Total del pedido"),
+    itemSingularText: text(config.itemSingularText, "producto"),
+    itemPluralText: text(config.itemPluralText, "productos"),
+    presentation: {
+      ...object(config.presentation),
+      ...material.presentation,
+      borderWidth:
+        legacy && material.presentation.borderWidth === 1.25
+          ? 2.75
+          : material.presentation.borderWidth,
+      checkoutGlassOpacity:
+        legacy && material.presentation.checkoutGlassOpacity === 0.2
+          ? 0.8
+          : material.presentation.checkoutGlassOpacity,
+    },
     continueButtonLink: safePath(config.continueButtonLink, "/"),
     entryMessage: text(
       config.entryMessage,
       "Puedes consultar el resultado de tu pedido al finalizar la compra o continuar explorando nuestros productos.",
     ),
-    returnsButtonText: text(
-      config.returnsButtonText,
-      "Gestionar cambios o devoluciones",
-    ),
+    returnsButtonText: text(config.returnsButtonText, "Cambios y devoluciones"),
     showPaymentStatus: config.showPaymentStatus !== false,
     titleMode: ["text", "image"].includes(config.titleMode)
       ? config.titleMode
       : "text",
-    titleText: text(config.titleText, "¡Gracias por tu compra!"),
+    titleText:
+      legacy && config.titleText === "¡Gracias por tu compra!"
+        ? "Gracias por tu pedido"
+        : text(config.titleText, "Gracias por tu pedido"),
     titleImage: catalogImageUrl(config.titleImage),
     titleImageAlt: text(config.titleImageAlt, "Agradecimiento"),
     showHeader: config.showHeader !== false,
@@ -80,7 +147,7 @@ export function buildSafeThanksPageConfig(raw) {
     showTotal: config.showTotal !== false,
     showContinueButton: config.showContinueButton !== false,
     showHelpText: config.showHelpText !== false,
-    showVisualPanel: config.showVisualPanel !== false,
+    showVisualPanel: legacy ? false : config.showVisualPanel === true,
     mainMessage: text(
       config.mainMessage,
       "Hemos recibido tu pedido correctamente. Te enviaremos un mensaje cuando esté en camino.",
@@ -117,17 +184,28 @@ function buildStyle(raw) {
     typeof value === "string" ? value : fallback;
   return {
     ...style,
+    lineColor: color(style.lineColor, "#c68899"),
+    statusBadgeBg: color(style.statusBadgeBg, "#f7bfd2"),
+    statusBadgeTextColor: color(style.statusBadgeTextColor, "#9a214e"),
+    iconColor: color(style.iconColor, "#a52c53"),
+    medallionSizePx: clampInt(style.medallionSizePx, 56, 120, 88),
+    stepIconSizePx: clampInt(style.stepIconSizePx, 36, 80, 62),
     pageBg: color(style.pageBg, "#f7e7e5"),
     contentMaxWidthPx: clampInt(style.contentMaxWidthPx, 900, 1800, 1200),
     contentTopPaddingPx: clampInt(style.contentTopPaddingPx, 0, 240, 28),
-    titleTextColor: color(style.titleTextColor, "#db2777"),
-    titleFontSizePx: clampInt(style.titleFontSizePx, 18, 72, 28),
+    headingFontFamily: ["editorial", "theme", "body"].includes(
+      style.headingFontFamily,
+    )
+      ? style.headingFontFamily
+      : "editorial",
+    titleTextColor: color(style.titleTextColor, "#74243e"),
+    titleFontSizePx: clampInt(style.titleFontSizePx, 18, 72, 48),
     titleImageHeightPx: clampInt(style.titleImageHeightPx, 24, 220, 72),
     panelBg: color(style.panelBg, "#efb9b7"),
     panelBorderColor: color(style.panelBorderColor, "#fff4ed"),
     panelRadiusPx: clampInt(style.panelRadiusPx, 0, 40, 24),
-    panelPaddingPx: clampInt(style.panelPaddingPx, 8, 48, 24),
-    panelWidthPx: clampInt(style.panelWidthPx, 280, 900, 540),
+    panelPaddingPx: clampInt(style.panelPaddingPx, 8, 64, 40),
+    panelWidthPx: clampInt(style.panelWidthPx, 280, 1200, 1000),
     panelMinHeightPx: clampInt(style.panelMinHeightPx, 0, 900, 0),
     visualBorderColor: color(style.visualBorderColor, "#fff4ed"),
     visualRadiusPx: clampInt(style.visualRadiusPx, 0, 40, 16),
@@ -137,11 +215,13 @@ function buildStyle(raw) {
     badgeTextColor: color(style.badgeTextColor, "#db2777"),
     captionBg: color(style.captionBg, "#ffffffcc"),
     captionTextColor: color(style.captionTextColor, "#374151"),
-    textPrimaryColor: color(style.textPrimaryColor, "#111827"),
-    textSecondaryColor: color(style.textSecondaryColor, "#4b5563"),
-    accentColor: color(style.accentColor, "#ec4899"),
-    buttonBg: color(style.buttonBg, "#ec4899"),
-    buttonTextColor: color(style.buttonTextColor, "#652d42"),
+    textPrimaryColor: color(style.textPrimaryColor, "#652d42"),
+    textSecondaryColor: color(style.textSecondaryColor, "#875a68"),
+    accentColor: color(style.accentColor, "#a52c53"),
+    secondaryButtonBg: color(style.secondaryButtonBg, "#f4bdcf"),
+    secondaryButtonTextColor: color(style.secondaryButtonTextColor, "#922048"),
+    buttonBg: color(style.buttonBg, "#a52c53"),
+    buttonTextColor: color(style.buttonTextColor, "#fff6f5"),
     buttonRadiusPx: clampInt(style.buttonRadiusPx, 0, 40, 24),
     buttonStyle: ["pill", "rounded", "square"].includes(style.buttonStyle)
       ? style.buttonStyle

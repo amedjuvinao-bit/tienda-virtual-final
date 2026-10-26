@@ -22,6 +22,7 @@ export const thanksEditorSections = {
           ["image", "Imagen"],
         ]),
         f("titleText", "Texto del título"),
+        f("entryTitleText", "Título al entrar sin un pedido"),
         f("titleImage", "Imagen del título", "image"),
         f("titleImageAlt", "Descripción de la imagen del título"),
       ],
@@ -46,6 +47,10 @@ export const thanksEditorSections = {
         f("subtotalLabel", "Etiqueta del subtotal"),
         f("shippingLabel", "Etiqueta del envío"),
         f("totalLabel", "Etiqueta del total aprobado"),
+        f("pendingTotalLabel", "Etiqueta del total pendiente"),
+        f("itemSingularText", "Producto en singular"),
+        f("itemPluralText", "Producto en plural"),
+        f("detailsToggleText", "Enlace para desplegar el detalle"),
       ],
     ],
     [
@@ -53,7 +58,37 @@ export const thanksEditorSections = {
       [
         f("continueButtonText", "Texto del botón principal"),
         f("continueButtonLink", "Destino del botón principal"),
+        f("refreshButtonText", "Texto del botón para actualizar estado"),
         f("returnsButtonText", "Texto del botón de cambios y devoluciones"),
+      ],
+    ],
+  ],
+  steps: [
+    [
+      "Pasos informativos del pedido",
+      [
+        t("showNextSteps", "Mostrar próximos pasos"),
+        f("nextStepsTitle", "Título de los próximos pasos"),
+        f("paymentStepTitle", "Título de confirmación del pago"),
+        f(
+          "pendingStepText",
+          "Mensaje mientras se confirma el pago",
+          "textarea",
+        ),
+        f(
+          "approvedStepText",
+          "Mensaje cuando el pago está aprobado",
+          "textarea",
+        ),
+        f(
+          "attentionStepText",
+          "Mensaje si el pago requiere atención",
+          "textarea",
+        ),
+        f("preparationStepTitle", "Título de preparación"),
+        f("preparationStepText", "Descripción de preparación", "textarea"),
+        f("deliveryStepTitle", "Título de entrega"),
+        f("deliveryStepText", "Descripción de entrega", "textarea"),
       ],
     ],
   ],
@@ -61,7 +96,7 @@ export const thanksEditorSections = {
     [
       "Reproducción",
       [
-        t("showVisualPanel", "Mostrar panel visual"),
+        t("showVisualPanel", "Mostrar galería debajo del resumen"),
         t("enabled", "Activar galería", "slider"),
         t("autoplay", "Reproducir automáticamente", "slider"),
         {
@@ -134,6 +169,10 @@ export const thanksEditorSections = {
         c("textSecondaryColor", "Texto secundario"),
         c("titleTextColor", "Color del título"),
         c("accentColor", "Color de acento"),
+        c("lineColor", "Separadores y líneas de los pasos"),
+        c("iconColor", "Iconos del resumen y símbolo superior"),
+        c("statusBadgeBg", "Tinte del estado del pago"),
+        c("statusBadgeTextColor", "Texto del estado del pago"),
       ],
     ],
     [
@@ -141,6 +180,8 @@ export const thanksEditorSections = {
       [
         c("buttonBg", "Tinte del botón"),
         c("buttonTextColor", "Texto e icono del botón"),
+        c("secondaryButtonBg", "Tinte del botón secundario"),
+        c("secondaryButtonTextColor", "Texto del botón secundario"),
         c("badgeBg", "Fondo de la etiqueta visual"),
         c("badgeTextColor", "Texto de la etiqueta visual"),
         c("captionBg", "Fondo de la descripción visual"),
@@ -154,6 +195,16 @@ export const thanksEditorSections = {
       dimensions([
         n("contentMaxWidthPx", "Ancho máximo del contenido (px)", 900, 1800),
         n("contentTopPaddingPx", "Espacio superior (px)", 0, 240),
+        s(
+          "headingFontFamily",
+          "Tipografía de títulos",
+          [
+            ["editorial", "Editorial elegante"],
+            ["theme", "Tipografía global de títulos"],
+            ["body", "Tipografía de lectura"],
+          ],
+          "style",
+        ),
         n("titleFontSizePx", "Tamaño del título (px)", 18, 72),
         n(
           "titleImageHeightPx",
@@ -161,10 +212,12 @@ export const thanksEditorSections = {
           24,
           220,
         ),
-        n("panelWidthPx", "Ancho máximo del resumen (px)", 280, 900),
+        n("panelWidthPx", "Ancho máximo del resumen (px)", 280, 1200),
+        n("medallionSizePx", "Diámetro del símbolo superior (px)", 56, 120),
+        n("stepIconSizePx", "Diámetro de iconos de los pasos (px)", 36, 80),
         n("panelMinHeightPx", "Alto mínimo del resumen (px)", 0, 900),
         n("panelRadiusPx", "Radio del resumen (px)", 0, 40),
-        n("panelPaddingPx", "Espacio interior del resumen (px)", 8, 48),
+        n("panelPaddingPx", "Espacio interior del resumen (px)", 8, 64),
       ]),
     ],
     [
@@ -215,7 +268,7 @@ export const thanksEditorSections = {
         t("showWhatsAppButton", "Mostrar WhatsApp"),
         t("showHelpText", "Mostrar texto de ayuda"),
         t("showContinueButton", "Mostrar botón principal"),
-        t("showVisualPanel", "Mostrar panel visual"),
+        t("showVisualPanel", "Mostrar galería debajo del resumen"),
       ],
     ],
     [
@@ -228,6 +281,8 @@ export const thanksEditorSections = {
         t("showSubtotal", "Mostrar subtotal"),
         t("showShipping", "Mostrar envío"),
         t("showTotal", "Mostrar total"),
+        t("showOrderDetails", "Permitir desplegar el detalle"),
+        t("showNextSteps", "Mostrar próximos pasos"),
       ],
     ],
   ],
