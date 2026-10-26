@@ -8,16 +8,16 @@ import './footerEditorial.css';
 import { footerClickFeedback } from './footerClickFeedback';
 import PolishedGlassRim from '../PolishedGlassRim';
 
-export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false }) {
+export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false, inheritBackground=false }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
   const [failedLogo,setFailedLogo]=useState('');
   const signatureId='footer-signature-'+useId().replace(/:/g,'');
   if(footer.enabled===false && !preview)return null;
   const columns=footerColumns(footer).filter(col=>c[col.id+'Enabled']);
   const logo=resolveFooterLogo(footer,theme), showLogo=c.brandMode!=='text' && logo && failedLogo!==logo;
-  const image=c.backgroundMode==='satin'?'/footer/editorial-satin-v2.webp':c.backgroundMode==='image'?c.backgroundImage:'';
+  const image=inheritBackground?'':c.backgroundMode==='satin'?'/footer/editorial-satin-v2.webp':c.backgroundMode==='image'?c.backgroundImage:'';
   const style={
-    backgroundColor:c.backgroundMode==='inherit'?'transparent':c.backgroundColor,
+    backgroundColor:inheritBackground || c.backgroundMode==='inherit'?'transparent':c.backgroundColor,
     backgroundImage:image?'url('+JSON.stringify(image)+')':'none',
     backgroundPosition:c.backgroundX+'% '+c.backgroundY+'%',
     backgroundSize:c.backgroundZoom===100?'cover':c.backgroundZoom+'% auto',

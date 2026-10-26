@@ -4,7 +4,7 @@ La ruta comodín de React muestra `NotFound` cuando una dirección pública no c
 
 ## Presentación y recuperación
 
-`NotFoundPageView` comparte el material `CartGlass`, el borde pulido y el fondo continuo de Carrito y Favoritos. El título, mensaje, ilustración, código, enlaces, medidas, colores y elementos visibles utilizan un único normalizador: `buildSafeNotFoundPageConfig`. El fondo puede continuar Inicio o usar imágenes propias de escritorio y móvil; el fondo móvil utiliza la misma capa fija que el carrito.
+`NotFoundPageView` comparte el material `CartGlass`, el borde pulido y el fondo continuo de Carrito y Favoritos. El título, mensaje, ilustración, código, enlaces, medidas, colores y elementos visibles utilizan un único normalizador: `buildSafeNotFoundPageConfig`. El pie utiliza `StorefrontFooter`: conserva su marco de cristal y hereda el fondo de esta página, sin superponer la imagen propia del footer. El fondo puede continuar Inicio o usar imágenes propias de escritorio y móvil; el fondo móvil utiliza la misma capa fija que el carrito.
 
 Los ajustes `useHeader`, `useFooter`, `showHeader`, `showFooter`, ilustración, título con imagen y visibilidad se respetan tanto en la página pública como en la vista previa. La ausencia o fallo de una imagen nunca deja una columna vacía. Un título con imagen fallida recupera su texto y una ilustración fallida recupera el código si está habilitado.
 

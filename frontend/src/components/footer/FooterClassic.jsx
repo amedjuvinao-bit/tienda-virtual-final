@@ -196,7 +196,7 @@ function FooterAccordionSection({
   );
 }
 
-export default function FooterSection({ theme }) {
+export default function FooterSection({ theme, inheritBackground = false }) {
   const footer = useMemo(() => buildFooterConfig(theme), [theme]);
 
   const column1Links = sanitizeLinks(footer.column1Links);
@@ -234,7 +234,7 @@ export default function FooterSection({ theme }) {
     <footer
       className="relative mt-16 overflow-hidden rounded-[28px] sm:rounded-[32px]"
       style={{
-        backgroundColor: footer.bgColor,
+        backgroundColor: inheritBackground ? "transparent" : footer.bgColor,
         color: footer.textColor,
         "--footer-height": `${footer.footerHeightPx}px`,
       }}
@@ -438,7 +438,7 @@ export default function FooterSection({ theme }) {
         <div
           className="mt-auto px-4 py-4 text-center text-xs leading-6 sm:px-6 sm:text-sm md:px-8"
           style={{
-            backgroundColor: footer.bottomBarBg,
+            backgroundColor: inheritBackground ? "transparent" : footer.bottomBarBg,
             color: footer.bottomBarTextColor,
           }}
         >

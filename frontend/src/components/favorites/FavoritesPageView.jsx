@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Search, RefreshCw, ArrowRight } from "lucide-react";
 import Header from "../Header";
-import FooterSection from "../FooterSection";
+import StorefrontFooter from "../StorefrontFooter";
 import WhatsAppButton from "../WhatsAppButton";
 import useStorefrontBackdrop from "../useStorefrontBackdrop";
 import { cartVariables, CartGlass } from "../cart/CartMaterial";
@@ -264,13 +264,11 @@ export default function FavoritesPageView({
         )}
       </main>
       {page.useFooter !== false && c.showFooter && (
-        <div className="cart-footer">
-          <FooterSection
-            theme={settings?.theme}
-            store={settings?.store}
-            polishedGlass
-          />
-        </div>
+        <StorefrontFooter
+          theme={settings?.theme}
+          store={settings?.store}
+          preview={preview}
+        />
       )}
       {c.showWhatsapp && <WhatsAppButton />}
     </div>

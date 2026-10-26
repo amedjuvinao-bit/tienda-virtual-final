@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Compass, RefreshCw } from "lucide-react";
 import Header from "../Header";
-import FooterSection from "../FooterSection";
+import StorefrontFooter from "../StorefrontFooter";
 import WhatsAppButton from "../WhatsAppButton";
 import PolishedGlassRim from "../PolishedGlassRim";
 import useStorefrontBackdrop from "../useStorefrontBackdrop";
@@ -171,13 +171,11 @@ export default function NotFoundPageView({
         )}
       </main>
       {page.useFooter !== false && config.showFooter && (
-        <div className="cart-footer">
-          <FooterSection
-            theme={backdrop.settings?.theme}
-            store={backdrop.settings?.store}
-            polishedGlass
-          />
-        </div>
+        <StorefrontFooter
+          theme={backdrop.settings?.theme}
+          store={backdrop.settings?.store}
+          preview={preview}
+        />
       )}
       {config.showWhatsapp && <WhatsAppButton />}
     </div>
