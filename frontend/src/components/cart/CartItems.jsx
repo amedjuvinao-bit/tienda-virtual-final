@@ -89,6 +89,7 @@ export default function CartItems({
                   style={{
                     borderColor: style.quantityBorderColor,
                     color: style.quantityTextColor,
+                    "--cart-qty-icon": style.quantityIconColor,
                     borderRadius: style.quantityRadiusPx,
                   }}
                 >

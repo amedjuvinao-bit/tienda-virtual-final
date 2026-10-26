@@ -236,6 +236,7 @@ export default function CartAppearanceControls({
       "Fondo del modal",
       "Panel lateral",
       "Elementos internos",
+      "Selector de cantidad",
       "Imágenes y tamaños",
     ].map((section) => [
       section,
@@ -262,9 +263,15 @@ export default function CartAppearanceControls({
         ),
       ],
       [
-        "Compra y cantidades",
+        "Selector de cantidad",
         cartEditorFields.filter(
-          (f) => f.group === topic && /quantity|checkout|subtotal/i.test(f.key),
+          (f) => f.group === topic && /^quantity/.test(f.key),
+        ),
+      ],
+      [
+        "Compra y subtotal",
+        cartEditorFields.filter(
+          (f) => f.group === topic && /checkout|subtotal/i.test(f.key),
         ),
       ],
       [

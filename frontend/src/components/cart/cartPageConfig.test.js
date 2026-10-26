@@ -43,3 +43,22 @@ it("conserva un color independiente para las divisiones del carrito lateral", ()
       .separatorColor,
   ).toBe("#123456");
 });
+it("migra los colores anteriores sin vincular los ajustes independientes de cantidad", () => {
+  const config = buildSafeCartPageConfig({
+    style: { cardBg: "#abcabc", quantityTextColor: "#123456" },
+    modal: { quantityButtonTextColor: "#654321" },
+  });
+  expect(config.style.quantityButtonBg).toBe("#abcabc");
+  expect(config.style.quantityIconColor).toBe("#123456");
+  expect(config.modal.quantityBorderColor).toBe("#654321");
+  expect(config.modal.quantityIconColor).toBe("#654321");
+  const changed = buildSafeCartPageConfig({
+    ...config,
+    style: { ...config.style, cardBg: "#ffffff", quantityTextColor: "#ff0000" },
+    modal: { ...config.modal, quantityButtonTextColor: "#ff0000" },
+  });
+  expect(changed.style.quantityButtonBg).toBe("#abcabc");
+  expect(changed.style.quantityIconColor).toBe("#123456");
+  expect(changed.modal.quantityBorderColor).toBe("#654321");
+  expect(changed.modal.quantityIconColor).toBe("#654321");
+});

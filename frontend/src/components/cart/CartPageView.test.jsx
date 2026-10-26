@@ -26,6 +26,37 @@ const item = {
 };
 const mount = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>);
 afterEach(() => cleanup());
+it.each(["page", "drawer"])(
+  "separa borde, número, signos y fondo de cantidad en %s",
+  (mode) => {
+    const colors = {
+      quantityButtonBg: "#ead1df",
+      quantityBorderColor: "#d4af37",
+      quantityIconColor: "#ff6699",
+    };
+    const page = {
+      cartPageConfig: {
+        style: { ...colors, quantityTextColor: "#cc3366" },
+        modal: { ...colors, quantityButtonTextColor: "#cc3366" },
+      },
+    };
+    const { container } = mount(
+      mode === "drawer" ? (
+        <CartDrawer isOpen preview page={page} cartState={{ cart: [item] }} />
+      ) : (
+        <CartPageView page={page} cartState={{ cart: [item] }} />
+      ),
+    );
+    const selector = container.querySelector(".cart-quantity");
+    expect(selector).toHaveStyle({ borderColor: "#d4af37", color: "#cc3366" });
+    expect(selector.style.getPropertyValue("--cart-qty-icon")).toBe("#ff6699");
+    expect(
+      container
+        .querySelector(mode === "drawer" ? ".cart-drawer" : ".cart-storefront")
+        .style.getPropertyValue("--cart-qty-bg"),
+    ).toBe("#ead1df");
+  },
+);
 it("respeta visibilidad del encabezado y pie y usa la misma variante para las acciones", () => {
   const increaseQuantity = vi.fn();
   mount(

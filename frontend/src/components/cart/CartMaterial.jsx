@@ -18,7 +18,7 @@ export function cartVariables(config) {
     "--cart-blur": `${p.glassBlur}px`,
     "--cart-alpha": `${p.glassOpacity * 100}%`,
     "--cart-label": s.tableHeaderTextColor,
-    "--cart-qty-bg": s.quantityButtonBg || s.cardBg,
+    "--cart-qty-bg": s.quantityButtonBg,
     "--cart-line": s.tableLineColor,
     "--cart-image-w": `${s.imageWidthPx}px`,
     "--cart-image-h": `${s.imageHeightPx}px`,

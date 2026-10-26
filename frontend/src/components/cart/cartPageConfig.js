@@ -194,6 +194,14 @@ export function buildSafeCartPageConfig(raw) {
         typeof cfg?.modal?.quantityButtonTextColor === "string"
           ? cfg.modal.quantityButtonTextColor
           : "#b3315c",
+      quantityBorderColor: text(
+        cfg?.modal?.quantityBorderColor,
+        cfg?.modal?.quantityButtonTextColor || "#b3315c",
+      ),
+      quantityIconColor: text(
+        cfg?.modal?.quantityIconColor,
+        cfg?.modal?.quantityButtonTextColor || "#b3315c",
+      ),
       removeLinkColor:
         typeof cfg?.modal?.removeLinkColor === "string"
           ? cfg.modal.removeLinkColor
@@ -310,6 +318,14 @@ export function buildSafeCartPageConfig(raw) {
         typeof cfg?.style?.quantityTextColor === "string"
           ? cfg.style.quantityTextColor
           : "#b3315c",
+      quantityButtonBg: text(
+        cfg?.style?.quantityButtonBg,
+        cfg?.style?.cardBg || "#efb9b7",
+      ),
+      quantityIconColor: text(
+        cfg?.style?.quantityIconColor,
+        cfg?.style?.quantityTextColor || "#b3315c",
+      ),
       quantityRadiusPx: clampInt(cfg?.style?.quantityRadiusPx, 0, 30, 8),
 
       checkoutButtonBg:

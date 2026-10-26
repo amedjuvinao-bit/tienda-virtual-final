@@ -108,7 +108,8 @@ export default function CartDrawer({
       imageHeightPx: m.productImageHeightPx,
       quantityRadiusPx: m.buttonRadiusPx,
       quantityTextColor: m.quantityButtonTextColor,
-      quantityBorderColor: m.quantityButtonTextColor,
+      quantityBorderColor: m.quantityBorderColor,
+      quantityIconColor: m.quantityIconColor,
     },
   };
   const content = (
