@@ -34,6 +34,7 @@ import { StorefrontSettingsContext } from './context/StorefrontSettingsContext';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
+const InformationPageEditor = lazy(() => import("./admin/pages/InformationPageEditor"));
 const ReturnsPageEditor = lazy(() => import('./admin/pages/ReturnsPageEditor'));
 const SearchPageEditor = lazy(() => import('./admin/pages/SearchPageEditor'));
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
@@ -257,6 +258,8 @@ export default function App() {
                 <AdminLogoutGate>
                 {!themeReady ? window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <StorefrontLoadingScreen /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
+                  <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
+                  <Route path="/nuestra-historia" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-historia" />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
                   <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
@@ -320,6 +323,7 @@ export default function App() {
                     <Route path="checkout-page/:id" element={protectAdminContent(<CheckoutPageEditor />)} />
                     <Route path="thanks-page/:id" element={protectAdminContent(<ThanksPageEditor />)} />
                     <Route path="favorites-page/:id" element={protectAdminContent(<FavoritesPageEditor />)} />
+                    <Route path="information-page/:id" element={protectAdminContent(<InformationPageEditor />)} />
                     <Route path="returns-page/:id" element={protectAdminContent(<ReturnsPageEditor />)} />
                     <Route path="search-page/:id" element={protectAdminContent(<SearchPageEditor />)} />
                     <Route path="notfound-page/:id" element={protectAdminContent(<NotFoundPageEditor />)} />

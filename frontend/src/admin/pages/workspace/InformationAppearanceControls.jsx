@@ -1,0 +1,91 @@
+import ServiceAppearanceControls from "./ServiceAppearanceControls";
+import InformationSectionsEditor from "./InformationSectionsEditor";
+import { serviceEditorSections } from "./serviceEditorFields";
+const f = (key, label, type = "text", extra = {}) => ({
+  key,
+  label,
+  type,
+  ...extra,
+});
+export default function InformationAppearanceControls(props) {
+  if (props.topic === "sections")
+    return <InformationSectionsEditor {...props} />;
+  const common = serviceEditorSections("returns-page");
+  const sections = {
+    ...common,
+    actions: [
+      [
+        "Navegación y llamada a la acción",
+        [
+          f("navigationTitle", "Título de la navegación"),
+          f("actionText", "Texto del botón"),
+          f("actionHref", "Destino del botón"),
+        ],
+      ],
+    ],
+    colors: common.colors.map(([title, fields]) => [
+      title,
+      fields.filter((field) => !field.key.startsWith("input")),
+    ]),
+    layout: [
+      ...common.layout,
+      [
+        "Lectura y navegación",
+        [
+          f("bodyFontSizePx", "Tamaño del texto (px)", "number", {
+            scope: "style",
+            min: 12,
+            max: 22,
+          }),
+          f(
+            "sectionTitleSizePx",
+            "Tamaño de títulos de sección (px)",
+            "number",
+            { scope: "style", min: 18, max: 56 },
+          ),
+          f("navigationWidthPx", "Ancho de navegación (px)", "number", {
+            scope: "style",
+            min: 180,
+            max: 360,
+          }),
+        ],
+      ],
+    ],
+    visibility: [
+      [
+        "Elementos visibles",
+        [
+          ...common.visibility[0][1],
+          f("showNavigation", "Mostrar navegación de secciones", "toggle"),
+        ],
+      ],
+    ],
+    settings: [
+      [
+        "Identidad y publicación",
+        [
+          f("name", "Nombre en el panel", "text", { scope: "form" }),
+          f(
+            "slug",
+            "Dirección de la página",
+            props.form.systemRole === "about" ? "readonly" : "text",
+            { scope: "form" },
+          ),
+          f("enabled", "Página activa", "toggle", { scope: "form" }),
+        ],
+      ],
+    ],
+  };
+  return (
+    <ServiceAppearanceControls
+      {...props}
+      configKey="informationPageConfig"
+      sections={sections}
+      settingsHelp={
+        props.form.systemRole === "about"
+          ? "Esta página está conectada con Nosotros y Nuestra historia. Puedes editar su nombre, contenido y diseño; su dirección se conserva para mantener los enlaces."
+          : "Los enlaces de esta página usan /pagina/ seguido de su dirección. Al cambiarla, actualiza los enlaces que la abren."
+      }
+    />
+  );
+}

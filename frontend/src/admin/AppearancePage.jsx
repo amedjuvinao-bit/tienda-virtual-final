@@ -1,3 +1,4 @@
+import { pagePublicPath, pageMeta } from "./pages/workspace/pageModel";
 import api, { adminFetch } from "../lib/api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -97,9 +98,9 @@ export default function AppearancePage() {
         { label: "Carrito", value: "/carrito" },
         { label: "Favoritos", value: "/favoritos" },
 
-        ...dynamicPages.map((page) => ({
+        ...dynamicPages.filter(page => !pageMeta(page).requiresOrder && page.pageType !== "product-detail" && page.enabled !== false).map((page) => ({
           label: `Página · ${page.name}`,
-          value: `/pagina/${page.slug}`,
+          value: pagePublicPath(page),
         })),
       ],
     }),

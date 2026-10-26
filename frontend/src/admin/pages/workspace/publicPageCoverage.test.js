@@ -8,6 +8,8 @@ it("toda ruta pública tiene una ubicación de configuración conocida", () => {
     .filter((path) => path.startsWith("/") && !path.startsWith("/admin"));
   const configured = {
     "/": "Apariencia",
+    "/nosotros": "Páginas",
+    "/nuestra-historia": "Páginas",
     "/pagina/:slug": "Páginas",
     "/lo-nuevo": "Apariencia",
     "/producto/:id": "product-detail",

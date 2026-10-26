@@ -10,10 +10,12 @@ const SYSTEM_THANKS_SLUG = "gracias";
 const SYSTEM_FAVORITES_SLUG = "favoritos";
 const SYSTEM_NOT_FOUND_SLUG = "not-found";
 const { SERVICE_PAGES, ensureServicePages } = require("../services/pages/servicePages");
+const { ABOUT_SLUG, ensureAboutPage } = require("../services/pages/aboutPage");
 
 function normalizePageType(value) {
   const safe = String(value || "").trim().toLowerCase();
   if (safe === "catalog") return "catalog";
+  if (safe === "information") return "information";
   if (safe === "product-detail") return "product-detail";
   if (safe === "cart-page") return "cart-page";
   if (safe === "checkout-page") return "checkout-page";
@@ -379,6 +381,7 @@ router.get("/", async (req, res) => {
     await ensureSystemFavoritesPage();
     await ensureSystemNotFoundPage();
     await ensureServicePages(Page);
+    await ensureAboutPage(Page);
     const pages = await Page.find().sort({ createdAt: -1 });
     res.json(pages);
   } catch (error) {
@@ -396,11 +399,13 @@ router.get("/:value", async (req, res) => {
     await ensureSystemFavoritesPage();
     await ensureSystemNotFoundPage();
     await ensureServicePages(Page);
+    await ensureAboutPage(Page);
 
     const rawValue = String(req.params.value || "").trim();
     const slug = rawValue.toLowerCase();
 
     let page = await Page.findOne({ slug });
+    if (!page && slug === "nuestra-historia") page = await Page.findOne({ slug: ABOUT_SLUG });
 
     if (!page && mongoose.Types.ObjectId.isValid(rawValue)) {
       page = await Page.findById(rawValue);
@@ -425,6 +430,11 @@ router.post("/", async (req, res) => {
     const name = String(body.name || "").trim();
     const slug = String(body.slug || "").trim().toLowerCase();
     const pageType = normalizePageType(body.pageType);
+    if (Object.prototype.hasOwnProperty.call(body, "informationPageConfig") &&
+      (!body.informationPageConfig || typeof body.informationPageConfig !== "object" || Array.isArray(body.informationPageConfig))) {
+      return res.status(400).json({ message: "La configuración informativa debe ser un objeto." });
+    }
+
 
     if (!name) {
       return res.status(400).json({ message: "El nombre es obligatorio" });
@@ -435,6 +445,7 @@ router.post("/", async (req, res) => {
     }
 
     if (
+      slug === ABOUT_SLUG ||
       slug === SYSTEM_CART_SLUG ||
       pageType === "cart-page" ||
       slug === SYSTEM_CHECKOUT_SLUG ||
@@ -453,6 +464,7 @@ router.post("/", async (req, res) => {
       });
     }
 
+    if (pageType === "information" && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return res.status(400).json({ message: "La dirección debe usar letras minúsculas, números y guiones." });
     const exists = await Page.findOne({ slug });
     if (exists) {
       return res.status(400).json({ message: "Ya existe una página con ese slug" });
@@ -466,6 +478,9 @@ router.post("/", async (req, res) => {
       useHeader: body.useHeader !== false,
       useFooter: body.useFooter !== false,
       blocks: Array.isArray(body.blocks) ? body.blocks : [],
+      informationPageConfig:
+        pageType === "information" && body.informationPageConfig && typeof body.informationPageConfig === "object" && !Array.isArray(body.informationPageConfig)
+          ? body.informationPageConfig : {},
       catalogConfig:
         pageType === "catalog" && typeof body.catalogConfig === "object"
           ? body.catalogConfig
@@ -513,6 +528,11 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ message: "ID de página inválido" });
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "informationPageConfig") &&
+      (!body.informationPageConfig || typeof body.informationPageConfig !== "object" || Array.isArray(body.informationPageConfig))) {
+      return res.status(400).json({ message: "La configuración informativa debe ser un objeto." });
+    }
+
     const existingPage = await Page.findById(id);
 
     if (!existingPage) {
@@ -530,11 +550,14 @@ router.put("/:id", async (req, res) => {
       String(existingPage.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG;
 
     const service = SERVICE_PAGES.find((page) => page.slug === existingPage.slug);
-    const requestedPageType = normalizePageType(body.pageType);
+    const requestedPageType = normalizePageType(body.pageType === undefined ? existingPage.pageType : body.pageType);
+    if (existingPage.slug !== ABOUT_SLUG && String(body.slug || "").trim().toLowerCase() === ABOUT_SLUG) {
+      return res.status(400).json({ message: "La dirección de Nosotros está reservada para su página." });
+    }
     if (!service && SERVICE_PAGES.some((page) => page.slug === String(body.slug || "").trim().toLowerCase() || page.pageType === requestedPageType)) {
       return res.status(400).json({ message: "No se puede convertir otra página en una página fija del sistema." });
     }
-    const finalPageType = service ? service.pageType : existingIsSystemCart
+    const finalPageType = existingPage.systemRole === "about" ? "information" : service ? service.pageType : existingIsSystemCart
       ? "cart-page"
       : existingIsSystemCheckout
       ? "checkout-page"
@@ -546,7 +569,7 @@ router.put("/:id", async (req, res) => {
       ? "notfound-page"
       : requestedPageType;
 
-    const finalSlug = service ? service.slug : existingIsSystemCart
+    const finalSlug = existingPage.systemRole === "about" ? ABOUT_SLUG : service ? service.slug : existingIsSystemCart
       ? SYSTEM_CART_SLUG
       : existingIsSystemCheckout
       ? SYSTEM_CHECKOUT_SLUG
@@ -614,12 +637,17 @@ router.put("/:id", async (req, res) => {
       ...(service ? { [service.configKey]:
         body[service.configKey] && typeof body[service.configKey] === "object" && !Array.isArray(body[service.configKey])
           ? body[service.configKey] : existingPage[service.configKey] || {} } : {}),
+      informationPageConfig: finalPageType === "information"
+        ? (body.informationPageConfig && typeof body.informationPageConfig === "object" && !Array.isArray(body.informationPageConfig)
+          ? body.informationPageConfig : existingPage.informationPageConfig || {})
+        : existingPage.informationPageConfig || {},
       notFoundPageConfig:
         finalPageType === "notfound-page" && typeof body.notFoundPageConfig === "object"
           ? body.notFoundPageConfig
           : {},
     };
 
+    if (finalPageType === "information" && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(finalSlug)) return res.status(400).json({ message: "La dirección debe usar letras minúsculas, números y guiones." });
     if (!dataToUpdate.name) {
       return res.status(400).json({ message: "El nombre es obligatorio" });
     }
@@ -669,6 +697,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     if (
+      page.systemRole === "about" ||
       String(page.slug || "").toLowerCase() === SYSTEM_CART_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_CHECKOUT_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_THANKS_SLUG ||

@@ -32,7 +32,9 @@ export default function PageEditorWorkspace({
   children,
   pageTypeLabel,
   scrollToFieldsOnTabChange = false,
+  lockNavigationDuringUpload = false,
 }) {
+  const navigationLocked = saving || (lockNavigationDuringUpload && uploading);
   const root = useRef(null),
     toolbar = useRef(null);
   useEffect(() => {
@@ -100,7 +102,7 @@ export default function PageEditorWorkspace({
     <div ref={root} className="pages-workspace" data-view={view}>
       <header ref={toolbar} className="pages-workspace__bar">
         <div>
-          <button className="pages-back" disabled={saving} onClick={onBack}>
+          <button className="pages-back" disabled={navigationLocked} onClick={onBack}>
             <ArrowLeft size={15} /> Páginas
           </button>
           <p className="pages-workspace__breadcrumb">
@@ -174,7 +176,7 @@ export default function PageEditorWorkspace({
                 <button
                   className="pages-workspace__group"
                   aria-expanded={group === id}
-                  disabled={saving}
+                  disabled={navigationLocked}
                   onClick={() => {
                     changeTab(items[0].id);
                     setView("edit");
@@ -189,7 +191,7 @@ export default function PageEditorWorkspace({
                       <button
                         key={tab.id}
                         aria-current={activeTab === tab.id ? "step" : undefined}
-                        disabled={saving}
+                        disabled={navigationLocked}
                         onClick={() => changeTab(tab.id)}
                       >
                         {tab.label}

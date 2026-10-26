@@ -10,10 +10,13 @@ export default function ServiceAppearanceControls({
   topic,
   saving,
   onUploadingChange,
+  configKey: customKey,
+  sections: customSections,
+  settingsHelp,
 }) {
-  const configKey = SERVICE_PAGE_DEFINITIONS[form.pageType].key;
+  const configKey = customKey || SERVICE_PAGE_DEFINITIONS[form.pageType].key;
   const config = form[configKey];
-  const sections = serviceEditorSections(form.pageType);
+  const sections = customSections || serviceEditorSections(form.pageType);
   const patch = (scope, key, value) =>
     onChange((current) => {
       if (scope === "form")
@@ -148,7 +151,7 @@ export default function ServiceAppearanceControls({
           title={title}
           text={
             topic === "settings"
-              ? "Desactivar el diseño personalizado recupera la apariencia predeterminada. La búsqueda y el acceso seguro a devoluciones siguen funcionando. Las políticas, estados y autorizaciones se gestionan en Pedidos."
+              ? settingsHelp || "Desactivar el diseño personalizado recupera la apariencia predeterminada. La búsqueda y el acceso seguro a devoluciones siguen funcionando. Las políticas, estados y autorizaciones se gestionan en Pedidos."
               : undefined
           }
         >

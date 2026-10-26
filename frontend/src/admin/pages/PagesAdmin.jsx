@@ -191,6 +191,7 @@ export default function PagesAdmin() {
               <option value="system">Del sistema</option>
               <option value="custom">Personalizables</option>
               <option value="catalog">Catálogos</option>
+              <option value="information">Informativas</option>
               <option value="product-detail">Detalle de producto</option>
             </select>
           </label>

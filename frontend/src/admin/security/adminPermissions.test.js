@@ -35,7 +35,7 @@ describe('acceso inicial de perfiles administrativos', () => {
   });
 });
 
-it.each(['returns-page', 'search-page'])('protege el editor %s con pages:update', editor => {
+it.each(['returns-page', 'search-page', 'information-page'])('protege el editor %s con pages:update', editor => {
   expect(canAccessAdminPath({role:'staff',permissions:['dashboard:view']}, `/admin/${editor}/123`)).toBe(false);
   expect(canAccessAdminPath({role:'staff',permissions:['pages:view']}, `/admin/${editor}/123`)).toBe(false);
   expect(canAccessAdminPath({role:'staff',permissions:['pages:update']}, `/admin/${editor}/123`)).toBe(true);

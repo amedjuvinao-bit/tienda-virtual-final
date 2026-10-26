@@ -1,8 +1,8 @@
 // frontend/src/pages/DynamicPage.jsx
 import StorefrontLoadingScreen from "../components/StorefrontLoadingScreen";
 import { rememberPageLoadingAppearance } from "../theme/storefrontLoadingAppearance";
-import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useMemo } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import Header from "../components/Header";
 import FooterSection from "../components/FooterSection";
 import CarouselBanner from "../components/CarouselBanner";
@@ -12,12 +12,13 @@ import ComplementosLook from "../components/ComplementosLook";
 import CategoriasSection from "../components/CategoriasSection";
 import InstagramSection from "../components/InstagramSection";
 import TiktokSection from "../components/TiktokSection";
-import { API_BASE_URL } from "../config/apiBaseUrl";
 import InformacionSection from "../components/InformacionSection";
 import CatalogPageView from "../components/catalog/CatalogPageView";
 import NotFound from "./NotFound";
+import useDynamicPage from "./useDynamicPage";
+import DynamicPageError from "./DynamicPageError";
+import InformationPageView from "../components/information-page/InformationPageView";
 
-const API_BASE = API_BASE_URL;
 
 const FALLBACK_INSTA_POSTS = [
   {
@@ -166,57 +167,11 @@ function getTiktokPostsFromBlock(rawConfig, config) {
   return [];
 }
 
-export default function DynamicPage({ theme }) {
-  const { slug } = useParams();
-  const [page, setPage] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadPage = async () => {
-      try {
-        setLoading(true);
-        setNotFound(false);
-
-        const res = await fetch(`${API_BASE}/api/pages/${slug}`);
-        if (res.status === 404) {
-          if (mounted) {
-            setPage(null);
-            setNotFound(true);
-          }
-          return;
-        }
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        if (mounted) {
-          setPage(data);
-        }
-      } catch (error) {
-        console.error("Error cargando página dinámica:", error);
-        if (mounted) {
-          setPage(null);
-          setNotFound(true);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadPage();
-
-    return () => {
-      mounted = false;
-    };
-  }, [slug]);
+export default function DynamicPage({ theme, fixedSlug }) {
+  const { slug: routeSlug } = useParams();
+  const slug = fixedSlug || routeSlug;
+  const { pathname } = useLocation();
+  const { page, loading, notFound, error, retry } = useDynamicPage(slug);
 
   const sortedBlocks = useMemo(() => {
     const list = Array.isArray(page?.blocks) ? page.blocks : [];
@@ -343,21 +298,25 @@ export default function DynamicPage({ theme }) {
   useEffect(() => {
     if (!loading && page && !notFound) {
       rememberPageLoadingAppearance(
-        `/pagina/${slug}`,
+        pathname,
         theme,
-        page.catalogConfig?.presentation,
-        page.catalogConfig?.presentation?.backgroundColor,
+        page.pageType === "information" ? page.informationPageConfig?.presentation : page.catalogConfig?.presentation,
+        page.pageType === "information" ? page.informationPageConfig?.style?.pageBg : page.catalogConfig?.presentation?.backgroundColor,
       );
     }
-  }, [loading, page, notFound, slug, theme]);
+  }, [loading, page, notFound, pathname, theme]);
 
   if (loading) {
     return <StorefrontLoadingScreen theme={theme} />;
   }
 
+  if (error) return <DynamicPageError theme={theme} error={error} retry={retry} />;
+
   if (notFound || !page || page.enabled === false) {
     return <NotFound />;
   }
+
+  if (page.pageType === "information") return <InformationPageView key={page._id || slug} page={page} theme={theme} />;
 
   if (String(page?.pageType || "custom").toLowerCase() === "catalog") {
     return (

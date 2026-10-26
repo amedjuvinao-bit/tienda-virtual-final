@@ -1,0 +1,30 @@
+import SystemPageEditor from "./workspace/SystemPageEditor";
+import InformationAppearanceControls from "./workspace/InformationAppearanceControls";
+import {
+  normalizeInformationPage,
+  validateInformationPage,
+} from "../../components/information-page/informationPageConfig";
+const tabs = [
+  { id: "content", label: "Título y presentación", group: "content" },
+  { id: "sections", label: "Secciones de contenido", group: "content" },
+  { id: "actions", label: "Navegación y botón", group: "content" },
+  { id: "background", label: "Fondo y cristal", group: "design" },
+  { id: "colors", label: "Colores", group: "design" },
+  { id: "layout", label: "Medidas y tipografía", group: "design" },
+  { id: "visibility", label: "Visibilidad", group: "options" },
+  { id: "settings", label: "Identidad y publicación", group: "settings" },
+];
+export default function InformationPageEditor() {
+  return (
+    <SystemPageEditor
+      pageType="information"
+      label="Página informativa"
+      normalizePage={normalizeInformationPage}
+      validatePage={validateInformationPage}
+      usePageName
+      lockNavigationDuringUpload
+      tabs={tabs}
+      Controls={InformationAppearanceControls}
+    />
+  );
+}

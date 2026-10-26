@@ -129,6 +129,7 @@ export default function PageCreateDialog({ onClose, onCreate }) {
             <div className="pages-create-types">
               {[
                 ["custom", FileText],
+                ["information", FileText],
                 ["catalog", ShoppingBag],
                 ["product-detail", LayoutTemplate],
               ].map(([type, Icon]) => (
@@ -156,7 +157,7 @@ export default function PageCreateDialog({ onClose, onCreate }) {
                 <input
                   autoComplete="off"
                   value={form.name}
-                  maxLength={160}
+                  maxLength={120}
                   onChange={(event) => {
                     const name = event.target.value;
                     patch({

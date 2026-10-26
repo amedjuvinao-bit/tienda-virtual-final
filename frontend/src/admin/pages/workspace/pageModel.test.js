@@ -40,3 +40,10 @@ describe("páginas: identidad y búsqueda", () => {
     );
   });
 });
+
+it("enruta páginas informativas y la identidad fija de Nosotros al editor correcto", () => {
+  const about = { _id: "a", slug: "nosotros", pageType: "information", systemRole: "about" };
+  expect(pageEditorPath(about)).toBe("/admin/information-page/a");
+  expect(pagePublicPath(about)).toBe("/nosotros");
+  expect(pagePublicPath({ pageType: "information", slug: "ayuda" })).toBe("/pagina/ayuda");
+});

@@ -1,4 +1,9 @@
 export const PAGE_TYPES = {
+  information: {
+    label: "Informativa",
+    description: "Presenta tu negocio, información de atención o preguntas frecuentes.",
+    path: "information-page",
+  },
   custom: {
     label: "Personalizada",
     description:
@@ -62,6 +67,9 @@ export const PAGE_TYPES = {
   },
 };
 export function pageMeta(page) {
+  if (page?.systemRole === "about") return {
+    ...PAGE_TYPES.information, system: true, slug: "nosotros", publicPath: "/nosotros",
+  };
   return (
     Object.values(PAGE_TYPES).find(
       (meta) =>

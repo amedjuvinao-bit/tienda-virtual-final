@@ -64,9 +64,12 @@ const PageSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
-      enum: ["custom", "catalog", "product-detail", "cart-page", "checkout-page", "thanks-page", "favorites-page", "notfound-page", "returns-page", "search-page"],
+      enum: ["custom", "catalog", "information", "product-detail", "cart-page", "checkout-page", "thanks-page", "favorites-page", "notfound-page", "returns-page", "search-page"],
       default: "custom",
     },
+
+    systemRole: { type: String, enum: ["", "about"], default: "" },
+    informationPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     enabled: {
       type: Boolean,

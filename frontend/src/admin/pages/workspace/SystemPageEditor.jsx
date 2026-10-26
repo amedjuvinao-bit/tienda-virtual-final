@@ -21,6 +21,9 @@ export default function SystemPageEditor({
   normalizePage,
   tabs,
   Controls,
+  validatePage,
+  usePageName = false,
+  lockNavigationDuringUpload = false,
   className = "system-page-editor",
 }) {
   const { id } = useParams(),
@@ -71,6 +74,11 @@ export default function SystemPageEditor({
   }, [id, pageType, normalizePage, retry, draft.initialize]);
   const save = async () => {
     if (!form || saving || uploading) return;
+    const validationError = validatePage?.(form);
+    if (validationError) {
+      draft.notify(validationError);
+      return;
+    }
     const payload = normalizePage(form),
       controller = new AbortController();
     saveRequest.current = controller;
@@ -115,7 +123,7 @@ export default function SystemPageEditor({
   return (
     <div className={className}>
       <PageEditorWorkspace
-        form={{ ...form, name: label }}
+        form={usePageName ? form : { ...form, name: label }}
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -125,6 +133,7 @@ export default function SystemPageEditor({
         uploading={uploading}
         draft={draft}
         pageTypeLabel={label}
+        lockNavigationDuringUpload={lockNavigationDuringUpload}
       >
         <fieldset disabled={saving} className="min-w-0">
           <Controls
