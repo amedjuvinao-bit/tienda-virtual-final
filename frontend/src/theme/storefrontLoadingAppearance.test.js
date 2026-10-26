@@ -86,3 +86,10 @@ it('pinta el fondo recordado en el HTML antes de que arranque React', () => {
   );
   page.window.close();
 });
+
+it('agrupa la apariencia de devoluciones sin guardar identificadores de compras', () => {
+  localStorage.clear();
+  rememberPageLoadingAppearance('/devoluciones/orden-privada', { colors: {background:'#eee'} }, {backgroundMode:'custom',mobileBackgroundImage:'/returns-phone.webp'}, '#123456');
+  expect(localStorage.getItem('storefront_loading_appearance')).not.toContain('orden-privada');
+  expect(rememberedLoadingBackdrop('/devoluciones/otra-orden',true).image).toBe('/returns-phone.webp');
+});

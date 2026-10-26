@@ -318,7 +318,8 @@
     "seed:demo-products": "node scripts/seedDemonstrationProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
     "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
-    "migrate:categories": "node scripts/migrate-categories.js"
+    "migrate:categories": "node scripts/migrate-categories.js",
+    "test:service-pages": "node scripts/testServicePagesContract.js"
   },
   "keywords": [],
   "author": "",

@@ -22,7 +22,7 @@ const loaderKeys = [
   'icon',
 ];
 const routeKey = (pathname) =>
-  /^\/(producto|p)\//.test(pathname) ? 'product-detail' : pathname;
+  /^\/(producto|p)\//.test(pathname) ? 'product-detail' : /^\/devoluciones\//.test(pathname) ? 'returns-page' : pathname;
 export function readLoadingAppearance() {
   try {
     const saved = JSON.parse(

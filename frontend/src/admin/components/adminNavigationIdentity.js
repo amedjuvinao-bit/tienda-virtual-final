@@ -6,6 +6,8 @@ const PAGE_EDITORS = new Set([
   "thanks-page",
   "favorites-page",
   "notfound-page",
+  "returns-page",
+  "search-page",
 ]);
 
 // Editor URLs belong to Pages in navigation; authorization still uses each route.

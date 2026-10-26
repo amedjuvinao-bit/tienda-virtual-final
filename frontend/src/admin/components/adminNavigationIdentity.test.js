@@ -10,6 +10,8 @@ describe("admin navigation identity", () => {
     "thanks-page",
     "favorites-page",
     "notfound-page",
+  "returns-page",
+  "search-page",
   ])("keeps %s editors under Pages", (editor) => {
     expect(
       isAdminNavigationActive(`/admin/${editor}/page-id`, "/admin/paginas"),

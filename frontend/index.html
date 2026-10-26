@@ -8,7 +8,7 @@
         document.documentElement.dataset.storefrontBoot = 'true';
         try {
           const appearance = JSON.parse(localStorage.getItem('storefront_loading_appearance') || 'null');
-          const key = /^\/(producto|p)\//.test(location.pathname) ? 'product-detail' : location.pathname;
+          const key = /^\/(producto|p)\//.test(location.pathname) ? 'product-detail' : /^\/devoluciones\//.test(location.pathname) ? 'returns-page' : location.pathname;
           const page = appearance?.pages?.[key];
           const source = page?.mode === 'custom' ? page : appearance?.home;
           const backdrop = source?.[matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop'];

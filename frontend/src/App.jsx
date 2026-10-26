@@ -34,6 +34,8 @@ import { StorefrontSettingsContext } from './context/StorefrontSettingsContext';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
+const ReturnsPageEditor = lazy(() => import('./admin/pages/ReturnsPageEditor'));
+const SearchPageEditor = lazy(() => import('./admin/pages/SearchPageEditor'));
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
 const FooterSection = lazy(() => import('./components/FooterSection'));
@@ -268,7 +270,7 @@ export default function App() {
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
                   <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />
-                  <Route path="/probe-site-settings" element={<ApiProbe />} />
+                  {import.meta.env.DEV && <Route path="/probe-site-settings" element={<ApiProbe />} />}
 
                   <Route
                     path="/admin"
@@ -318,6 +320,8 @@ export default function App() {
                     <Route path="checkout-page/:id" element={protectAdminContent(<CheckoutPageEditor />)} />
                     <Route path="thanks-page/:id" element={protectAdminContent(<ThanksPageEditor />)} />
                     <Route path="favorites-page/:id" element={protectAdminContent(<FavoritesPageEditor />)} />
+                    <Route path="returns-page/:id" element={protectAdminContent(<ReturnsPageEditor />)} />
+                    <Route path="search-page/:id" element={protectAdminContent(<SearchPageEditor />)} />
                     <Route path="notfound-page/:id" element={protectAdminContent(<NotFoundPageEditor />)} />
                   </Route>
 

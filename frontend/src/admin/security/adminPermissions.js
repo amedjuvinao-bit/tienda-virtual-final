@@ -33,6 +33,8 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'thanks-page': ['pages:update'],
   'favorites-page': ['pages:update'],
   'notfound-page': ['pages:update'],
+  'returns-page': ['pages:update'],
+  'search-page': ['pages:update'],
 
   configuracion: ['settings:view'],
   'configuracion/empresa': ['settings:store'],
@@ -222,6 +224,9 @@ export function getRequiredPermissionsForAdminPath(pathname) {
   if (path.startsWith('favorites-page/')) {
     return ADMIN_ROUTE_PERMISSIONS['favorites-page'];
   }
+
+  if (path.startsWith('returns-page/')) return ADMIN_ROUTE_PERMISSIONS['returns-page'];
+  if (path.startsWith('search-page/')) return ADMIN_ROUTE_PERMISSIONS['search-page'];
 
   if (path.startsWith('notfound-page/')) {
     return ADMIN_ROUTE_PERMISSIONS['notfound-page'];

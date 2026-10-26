@@ -140,6 +140,18 @@ export default function PagesAdmin() {
           </button>
         )}
       </header>
+      <div
+        className="pages-manager__summary"
+        aria-label="Configuración general del sitio"
+      >
+        <a className="pages-button" href="/admin/apariencia">
+          Inicio, encabezado y pie → Apariencia
+        </a>
+        <span>
+          Las demás páginas se configuran en el listado. Las devoluciones se
+          abren desde una compra.
+        </span>
+      </div>
       <div className="pages-manager__summary" aria-label="Resumen de páginas">
         <span>
           <strong>{pages.length}</strong> páginas
@@ -304,16 +316,26 @@ export default function PagesAdmin() {
                           <Pencil size={15} /> Editar
                         </button>
                       )}
-                      <a
-                        className="pages-icon-button"
-                        href={pagePublicPath(page)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Ver ${page.name}`}
-                        title="Ver página pública"
-                      >
-                        <ExternalLink size={17} />
-                      </a>
+                      {!meta.requiresOrder && (
+                        <a
+                          className="pages-icon-button"
+                          href={pagePublicPath(page)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Ver ${page.name}`}
+                          title="Ver página pública"
+                        >
+                          <ExternalLink size={17} />
+                        </a>
+                      )}
+                      {meta.requiresOrder && (
+                        <span
+                          title="Se abre desde el enlace seguro de una compra. Usa la vista previa del editor para revisar el diseño."
+                          className="pages-row__type"
+                        >
+                          Acceso desde una compra
+                        </span>
+                      )}
                       {!meta.system && can("pages:delete") && (
                         <button
                           className="pages-icon-button pages-danger"

@@ -9,6 +9,7 @@ const SYSTEM_CHECKOUT_SLUG = "checkout";
 const SYSTEM_THANKS_SLUG = "gracias";
 const SYSTEM_FAVORITES_SLUG = "favoritos";
 const SYSTEM_NOT_FOUND_SLUG = "not-found";
+const { SERVICE_PAGES, ensureServicePages } = require("../services/pages/servicePages");
 
 function normalizePageType(value) {
   const safe = String(value || "").trim().toLowerCase();
@@ -19,6 +20,7 @@ function normalizePageType(value) {
   if (safe === "thanks-page") return "thanks-page";
   if (safe === "favorites-page") return "favorites-page";
   if (safe === "notfound-page") return "notfound-page";
+  if (SERVICE_PAGES.some((page) => page.pageType === safe)) return safe;
   return "custom";
 }
 
@@ -376,6 +378,7 @@ router.get("/", async (req, res) => {
     await ensureSystemThanksPage();
     await ensureSystemFavoritesPage();
     await ensureSystemNotFoundPage();
+    await ensureServicePages(Page);
     const pages = await Page.find().sort({ createdAt: -1 });
     res.json(pages);
   } catch (error) {
@@ -392,6 +395,7 @@ router.get("/:value", async (req, res) => {
     await ensureSystemThanksPage();
     await ensureSystemFavoritesPage();
     await ensureSystemNotFoundPage();
+    await ensureServicePages(Page);
 
     const rawValue = String(req.params.value || "").trim();
     const slug = rawValue.toLowerCase();
@@ -440,11 +444,12 @@ router.post("/", async (req, res) => {
       slug === SYSTEM_FAVORITES_SLUG ||
       pageType === "favorites-page" ||
       slug === SYSTEM_NOT_FOUND_SLUG ||
-      pageType === "notfound-page"
+      pageType === "notfound-page" ||
+      SERVICE_PAGES.some((page) => page.slug === slug || page.pageType === pageType)
     ) {
       return res.status(400).json({
         message:
-          'Las páginas "Carrito", "Checkout", "Gracias", "Favoritos" y "Not Found" son fijas del sistema y no se pueden crear manualmente',
+          'Las páginas del sistema se crean automáticamente y no se pueden duplicar',
       });
     }
 
@@ -524,8 +529,12 @@ router.put("/:id", async (req, res) => {
     const existingIsSystemNotFound =
       String(existingPage.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG;
 
+    const service = SERVICE_PAGES.find((page) => page.slug === existingPage.slug);
     const requestedPageType = normalizePageType(body.pageType);
-    const finalPageType = existingIsSystemCart
+    if (!service && SERVICE_PAGES.some((page) => page.slug === String(body.slug || "").trim().toLowerCase() || page.pageType === requestedPageType)) {
+      return res.status(400).json({ message: "No se puede convertir otra página en una página fija del sistema." });
+    }
+    const finalPageType = service ? service.pageType : existingIsSystemCart
       ? "cart-page"
       : existingIsSystemCheckout
       ? "checkout-page"
@@ -537,7 +546,7 @@ router.put("/:id", async (req, res) => {
       ? "notfound-page"
       : requestedPageType;
 
-    const finalSlug = existingIsSystemCart
+    const finalSlug = service ? service.slug : existingIsSystemCart
       ? SYSTEM_CART_SLUG
       : existingIsSystemCheckout
       ? SYSTEM_CHECKOUT_SLUG
@@ -549,7 +558,7 @@ router.put("/:id", async (req, res) => {
       ? SYSTEM_NOT_FOUND_SLUG
       : String(body.slug || "").trim().toLowerCase();
 
-    const finalName = existingIsSystemCart
+    const finalName = service ? service.name : existingIsSystemCart
       ? "Carrito"
       : existingIsSystemCheckout
       ? "Checkout"
@@ -573,7 +582,7 @@ router.put("/:id", async (req, res) => {
         existingIsSystemCheckout ||
         existingIsSystemThanks ||
         existingIsSystemFavorites ||
-        existingIsSystemNotFound
+        existingIsSystemNotFound || service
           ? []
           : Array.isArray(body.blocks)
           ? body.blocks
@@ -602,6 +611,9 @@ router.put("/:id", async (req, res) => {
         finalPageType === "favorites-page" && typeof body.favoritesPageConfig === "object"
           ? body.favoritesPageConfig
           : {},
+      ...(service ? { [service.configKey]:
+        body[service.configKey] && typeof body[service.configKey] === "object" && !Array.isArray(body[service.configKey])
+          ? body[service.configKey] : existingPage[service.configKey] || {} } : {}),
       notFoundPageConfig:
         finalPageType === "notfound-page" && typeof body.notFoundPageConfig === "object"
           ? body.notFoundPageConfig
@@ -661,10 +673,11 @@ router.delete("/:id", async (req, res) => {
       String(page.slug || "").toLowerCase() === SYSTEM_CHECKOUT_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_THANKS_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_FAVORITES_SLUG ||
-      String(page.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG
+      String(page.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG ||
+      SERVICE_PAGES.some((definition) => definition.slug === page.slug || definition.pageType === page.pageType)
     ) {
       return res.status(400).json({
-        message: 'Las páginas "Carrito", "Checkout", "Gracias", "Favoritos" y "Not Found" son fijas del sistema y no se pueden eliminar',
+        message: 'Las páginas del sistema no se pueden eliminar',
       });
     }
 

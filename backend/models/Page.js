@@ -64,7 +64,7 @@ const PageSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
-      enum: ["custom", "catalog", "product-detail", "cart-page", "checkout-page", "thanks-page", "favorites-page", "notfound-page"],
+      enum: ["custom", "catalog", "product-detail", "cart-page", "checkout-page", "thanks-page", "favorites-page", "notfound-page", "returns-page", "search-page"],
       default: "custom",
     },
 
@@ -117,6 +117,9 @@ const PageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+
+    returnsPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
+    searchPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     notFoundPageConfig: {
       type: mongoose.Schema.Types.Mixed,

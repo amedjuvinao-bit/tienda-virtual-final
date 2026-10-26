@@ -40,6 +40,20 @@ export const PAGE_TYPES = {
     system: true,
     slug: "favoritos",
   },
+  "returns-page": {
+    label: "Cambios y devoluciones",
+    path: "returns-page",
+    system: true,
+    slug: "devoluciones",
+    publicPath: "/devoluciones/:orderId",
+    requiresOrder: true,
+  },
+  "search-page": {
+    label: "Búsqueda",
+    path: "search-page",
+    system: true,
+    slug: "buscar",
+  },
   "notfound-page": {
     label: "Página no encontrada",
     path: "notfound-page",
@@ -61,6 +75,7 @@ export function pageEditorPath(page) {
   return `/admin/${pageMeta(page).path}/${encodeURIComponent(page._id)}`;
 }
 export function pagePublicPath(page) {
+  if (pageMeta(page).publicPath) return pageMeta(page).publicPath;
   return `${pageMeta(page).system ? "/" : "/pagina/"}${encodeURIComponent(page.slug || "")}`;
 }
 export function slugify(value) {
