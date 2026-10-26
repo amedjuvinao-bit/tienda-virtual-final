@@ -15,10 +15,11 @@ const {
 const {
   buildFavoriteDetail,
   buildFavoritesCsv,
-  canonicalizeFavoriteItems,
   getAdminFavoriteSummary,
   listAdminFavorites,
 } = require('../services/favoriteOperationsService');
+
+const { favoriteRevision, writeFavoriteList } = require('../services/favoriteWriteService');
 
 const router = express.Router();
 
@@ -144,12 +145,12 @@ router.delete('/admin/:id/items/:itemId', requireAdmin, async (req, res) => {
     }
     const favorite = await Favorite.findOneAndUpdate(
       { _id: id, 'items._id': itemId },
-      { $pull: { items: { _id: itemId } } },
+      { $pull: { items: { _id: itemId } }, $inc: { __v: 1 } },
       { new: true, runValidators: true }
     ).exec();
     if (!favorite) return res.status(404).json({ message: 'Favorito no encontrado.' });
     if (!favorite.items.length) {
-      await Favorite.deleteOne({ _id: favorite._id }).exec();
+      await Favorite.deleteOne({ _id: favorite._id, 'items.0': { $exists: false } }).exec();
       return res.status(200).json({ deleted: true, itemsCount: 0 });
     }
     return res.status(200).json(await buildFavoriteDetail(favorite));
@@ -182,9 +183,9 @@ router.get('/:sessionId', requireFavoriteOwner, async (req, res) => {
       .lean()
       .exec();
     if (!favorite || !Array.isArray(favorite.items) || favorite.items.length === 0) {
-      return res.status(404).json({ message: 'No se encontraron favoritos.' });
+      return res.status(200).json({ sessionId: req.favoriteSessionId, items: [], itemsCount: 0, revision: favoriteRevision(favorite) });
     }
-    return res.status(200).json(await buildFavoriteDetail(favorite));
+    return res.status(200).json({ ...(await buildFavoriteDetail(favorite)), revision: favoriteRevision(favorite) });
   } catch (error) {
     console.error('Error obteniendo favoritos del comprador:', error?.message);
     return res.status(500).json({ message: 'No fue posible cargar favoritos.' });
@@ -196,47 +197,21 @@ router.put('/:sessionId', requireFavoriteOwner, async (req, res) => {
     return res.status(400).json({ message: 'La lista de favoritos es inválida.' });
   }
   try {
-    const current = await Favorite.findOne({ sessionId: req.favoriteSessionId }).lean().exec();
-    const items = await canonicalizeFavoriteItems(req.body.items, {
-      previousItems: current?.items || [],
+    const favorite = await writeFavoriteList({
+      sessionId: req.favoriteSessionId,
+      items: req.body.items,
+      revision: req.body.revision,
     });
-
-    if (!items.length) {
-      await Favorite.deleteOne({ sessionId: req.favoriteSessionId }).exec();
-      return res.status(200).json({
-        message: 'Lista de favoritos vacía.',
-        persisted: false,
-        favorites: {
-          sessionId: req.favoriteSessionId,
-          items: [],
-          itemsCount: 0,
-          potentialValue: 0,
-        },
-      });
-    }
-
-    const favorite = await Favorite.findOneAndUpdate(
-      { sessionId: req.favoriteSessionId },
-      {
-        $set: {
-          items,
-          lastCustomerActivityAt: new Date(),
-        },
-      },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    ).exec();
-
     return res.status(200).json({
-      message: 'Favoritos sincronizados.',
-      persisted: true,
-      favorites: await buildFavoriteDetail(favorite),
+      persisted: Boolean(favorite.items.length),
+      favorites: { ...(await buildFavoriteDetail(favorite)), revision: favoriteRevision(favorite) },
     });
   } catch (error) {
-    console.error('Error sincronizando favoritos:', error?.code || error?.message);
-    if (error?.code === 11000) {
-      return res.status(409).json({ message: 'La lista cambió. Vuelve a intentarlo.' });
-    }
-    return res.status(500).json({ message: 'No fue posible sincronizar favoritos.' });
+    if (!error.status) console.error('Error sincronizando favoritos:', error?.code || error?.message);
+    return res.status(error.status || 500).json({
+      error: error.code || 'FAVORITE_WRITE_FAILED',
+      message: error.status ? error.message : 'No fue posible sincronizar favoritos.',
+    });
   }
 });
 

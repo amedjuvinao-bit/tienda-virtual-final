@@ -230,6 +230,7 @@
     "test:cart-admin-operations": "node scripts/testCartAdminOperationsIntegrity.js",
     "test:cart-admin-routes": "node scripts/testCartAdminRoutesIntegration.js",
     "test:favorites-module": "node scripts/testFavoritesModuleIntegrity.js",
+    "test:favorites-public-plus": "node --test scripts/testFavoritesPublicPlus.js",
     "test:favorites-trace-seed": "node scripts/testPersistentFavoritesTraceSeed.js",
     "demo:favorites-trace": "node scripts/seedPersistentFavoritesTrace.js",
     "test:payment-configuration-authority": "node scripts/testPaymentConfigurationAuthorityIntegrity.js",

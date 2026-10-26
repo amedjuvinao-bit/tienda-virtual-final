@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import CatalogPageView from "../../../components/catalog/CatalogPageView";
 import CartPreview from "./CartPreview";
+import FavoritesPreview from "./FavoritesPreview";
 import ProductDetailView from "../../../components/product-detail/ProductDetailView";
 import useProductDetailSelection from "../../../components/product-detail/useProductDetailSelection";
 import Header from "../../../components/Header";
@@ -174,7 +175,7 @@ function Preview() {
         );
       if (
         event.data?.type === "pages-preview:update" &&
-        ["catalog", "product-detail", "cart-page"].includes(event.data.draft?.pageType)
+        ["catalog", "product-detail", "cart-page", "favorites-page"].includes(event.data.draft?.pageType)
       )
         setDraft(event.data.draft);
     };
@@ -229,7 +230,7 @@ function Preview() {
                   footer={draft.useFooter !== false ? <FooterSection theme={settings?.theme} store={settings?.store} polishedGlass /> : null}
                 />
               ) : (
-                draft.pageType === "cart-page" ? <CartPreview draft={draft}/> : <DetailPreview draft={draft} />
+                draft.pageType === "cart-page" ? <CartPreview draft={draft}/> : draft.pageType === "favorites-page" ? <FavoritesPreview draft={draft}/> : <DetailPreview draft={draft} />
               )}
 
             </div>

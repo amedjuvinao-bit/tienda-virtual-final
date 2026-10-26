@@ -1,6 +1,8 @@
 # Cierre del módulo de Favoritos
 
-Fecha de cierre: **13 de agosto de 2026**.
+Cierre administrativo original: **13 de agosto de 2026**.
+
+Revisión de la página pública y su editor: **25 de octubre de 2026**.
 
 ## Objetivo
 
@@ -15,7 +17,7 @@ El navegador no fabrica un identificador aislado. La primera operación solicita
 - `sessionId`, con formato `fav_...`.
 - `favoriteAccessToken`, firmado mediante HMAC-SHA256 y ligado a una única sesión.
 
-El frontend conserva ambos valores en `localStorage` y los envía únicamente mediante los encabezados `X-Favorite-Session-Id` y `X-Favorite-Access-Token`. No se incluyen en URL, query string, cuerpo de la solicitud ni registros de consola.
+El frontend conserva ambos valores juntos en la entrada atómica `favorite_access` de `localStorage`, migra las dos entradas anteriores y los envía únicamente mediante los encabezados `X-Favorite-Session-Id` y `X-Favorite-Access-Token`. No se incluyen en URL, query string, cuerpo de la solicitud ni registros de consola.
 
 Las rutas públicas de lectura, sincronización y eliminación aplican la misma validación de propiedad. Una credencial ausente, alterada o perteneciente a otra sesión recibe una respuesta genérica `404`, sin revelar si existe una lista ajena.
 
@@ -29,7 +31,7 @@ El valor efectivo debe tener al menos 32 caracteres. En producción se recomiend
 
 ## Autoridad de producto y persistencia
 
-El cliente solamente solicita productos y variantes. Antes de escribir, el backend consulta el catálogo y reemplaza título, imagen, precio, slug, SKU, categoría y atributos por sus valores canónicos. También descarta productos inválidos, duplicados, archivados o no disponibles.
+El cliente solamente solicita productos y variantes. Antes de escribir, el backend consulta el catálogo y reemplaza título, imagen, precio, slug, SKU, categoría y atributos por sus valores canónicos. Descarta solicitudes nuevas inválidas y duplicadas. Los productos ya guardados que dejan de estar disponibles conservan exclusivamente su copia previa del servidor hasta que el propietario los retire; su compra queda bloqueada. Un favorito de producto sin variante permite ir al detalle para seleccionar opciones.
 
 Cada sesión tiene un índice único y admite como máximo 200 productos. No se conservan documentos vacíos: si el comprador retira el último producto, la lista se elimina. `lastCustomerActivityAt` registra actividad real del comprador y `timestamps` conserva creación y última modificación.
 
@@ -72,6 +74,31 @@ El router está montado en `/api/favorites`.
 | DELETE | `/api/favorites/:sessionId` | Eliminar la lista propia. |
 
 Las tres operaciones asociadas a `:sessionId` requieren los encabezados de propiedad dedicados.
+
+Una lectura autenticada de una lista vacía devuelve `200`, `items: []` y `revision: null`; una credencial inválida sigue devolviendo el `404` genérico. En documentos heredados vacíos, la lectura conserva su revisión hasta que se eliminen.
+
+`PUT` exige `{items, revision}`. La revisión incluye el identificador del documento y su `__v`; `null` representa una lista todavía inexistente. El servidor canonicaliza y después compara esa revisión en la escritura o eliminación atómica. Responde `428` si falta la revisión y `409 / FAVORITE_WRITE_CONFLICT` si quedó obsoleta. El cliente vuelve a leer y aplica únicamente la operación pendiente, hasta cuatro intentos; no reenvía una copia antigua completa. Las retiradas administrativas de artículos incrementan también `__v`.
+
+## Página pública y editor
+
+La página `/favoritos` usa el mismo material, borde pulido y fondo continuo del carrito. Incluye cuadrícula configurable, imagen completa o recortada, atributos de cada selección, búsqueda, orden por nombre o precio vigente, estado vacío, retirada individual y compra con la identidad canónica de variante. Los productos que necesitan opciones abren el detalle y los no disponibles no se agregan al carrito.
+
+El editor `/admin/favorites-page/:id` utiliza `PageEditorWorkspace`, guardado verificado, protección del borrador, carga de imágenes desde el equipo a Cloudinary y una vista previa fija de escritorio/móvil. Contenido, colores, material, tarjetas y visibilidad están agrupados. La vista previa ejecuta `FavoritesPageView` con estado de demostración aislado; sus botones no escriben favoritos ni carritos reales.
+
+`FavoritesContext` delega las operaciones a `favoriteStore`. El servidor reemplaza el respaldo local al leer: no se mezclan selecciones antiguas que puedan resucitar una retirada. Un buzón de operaciones en `sessionStorage` permite conservar y reintentar cambios fallidos, incluso al recargar la pestaña. `BroadcastChannel`, eventos de almacenamiento, foco y conexión actualizan las demás pestañas. Web Locks serializa las operaciones del mismo navegador, y la comparación de revisión protege las escrituras del servidor aun sin ese mecanismo.
+
+Si el servidor rechaza una credencial firmada, el cliente confirma la restauración con una credencial nueva antes de sustituir la anterior. Un fallo de red conserva la selección, presenta un error recuperable y permite reintentar. Una lista vacía autenticada nunca dispara esa recuperación.
+
+La actualización del frontend y del backend debe hacerse conjuntamente: los clientes anteriores que no envíen revisión reciben `428` y no pueden sobrescribir listas actuales.
+
+Pruebas de la revisión pública:
+
+```sh
+npm --prefix backend run test:favorites-public-plus
+npm --prefix frontend run test:favorites-module
+```
+
+Las pruebas HTTP usan el enrutador real y modelos controlados, sin conectarse a MongoDB. La revisión del navegador usa los componentes reales con respuestas API simuladas; no crea compras, cargas de Cloudinary ni registros en la base de la tienda.
 
 ### Administración
 
