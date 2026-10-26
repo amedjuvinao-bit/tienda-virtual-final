@@ -1,3 +1,4 @@
+import MemoryTable from "./MemoryTable";
 import { useState } from "react";
 import { ArrowUpRight, BookOpen } from "lucide-react";
 import ServicePageFrame, {
@@ -68,6 +69,7 @@ export default function InformationPageView({ page, theme, preview = false }) {
         s.image ||
         s.items.some((i) => i.title || i.body)),
   );
+  const memory = config.layout === "memory-table";
   const navigation =
     config.showNavigation && sections.some((s) => s.title.trim());
   return (
@@ -76,14 +78,18 @@ export default function InformationPageView({ page, theme, preview = false }) {
       config={config}
       theme={theme}
       preview={preview}
-      className="information-page"
+      className={`information-page${memory ? " information-page--memory" : ""}`}
     >
-      <ServiceHeading
-        config={config}
-        title={config.titleText || page.name || "Información"}
-        icon={BookOpen}
-      />
-      {sections.length > 0 && (
+      {memory ? (
+        <MemoryTable config={config} name={page.name} preview={preview} />
+      ) : (
+        <ServiceHeading
+          config={config}
+          title={config.titleText || page.name || "Información"}
+          icon={BookOpen}
+        />
+      )}
+      {(!memory || config.journal.showSections) && sections.length > 0 && (
         <div
           className="information-layout"
           data-navigation={navigation}
@@ -119,14 +125,16 @@ export default function InformationPageView({ page, theme, preview = false }) {
           </div>
         </div>
       )}
-      {config.actionText && config.actionHref && (
-        <div className="information-actions">
-          <ServiceButton as="a" config={config} href={config.actionHref}>
-            {config.actionText}
-            <ArrowUpRight size={16} aria-hidden="true" />
-          </ServiceButton>
-        </div>
-      )}
+      {(!memory || config.journal.showFooterAction) &&
+        config.actionText &&
+        config.actionHref && (
+          <div className="information-actions">
+            <ServiceButton as="a" config={config} href={config.actionHref}>
+              {config.actionText}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </ServiceButton>
+          </div>
+        )}
     </ServicePageFrame>
   );
 }

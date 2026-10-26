@@ -79,6 +79,21 @@ async function call(method, path, req = {}) {
     presentation: { reflection: 0 },
     extension: { keep: true },
   };
+  config.journal = {
+    featuredId: "memory-one",
+    extension: { keep: true },
+    moments: [
+      {
+        id: "memory-one",
+        title: "Encuentro",
+        date: "2026-06-03",
+        category: "Equipo",
+        image: "/business.webp",
+        story: "Relato propio",
+        gallery: [{ image: "/second.webp", caption: "Otra imagen" }],
+      },
+    ],
+  };
   const saved = await call("put", "/:id", {
     params: { id: about._id },
     body: {

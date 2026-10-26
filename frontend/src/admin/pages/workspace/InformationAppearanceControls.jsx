@@ -1,3 +1,5 @@
+import MemoryMomentsEditor from "./MemoryMomentsEditor";
+import MemoryDesignControls from "./MemoryDesignControls";
 import ServiceAppearanceControls from "./ServiceAppearanceControls";
 import InformationSectionsEditor from "./InformationSectionsEditor";
 import { serviceEditorSections } from "./serviceEditorFields";
@@ -8,11 +10,29 @@ const f = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 export default function InformationAppearanceControls(props) {
+  if (props.topic === "moments") return <MemoryMomentsEditor {...props} />;
+  if (["journal-texts", "journal-design"].includes(props.topic))
+    return <MemoryDesignControls {...props} />;
   if (props.topic === "sections")
     return <InformationSectionsEditor {...props} />;
   const common = serviceEditorSections("returns-page");
   const sections = {
     ...common,
+    content: common.content.map(([title, fields]) => [
+      title,
+      [
+        {
+          key: "layout",
+          label: "Diseño de la página",
+          type: "select",
+          options: [
+            ["memory-table", "Mesa de recuerdos"],
+            ["editorial", "Página de lectura"],
+          ],
+        },
+        ...fields,
+      ],
+    ]),
     actions: [
       [
         "Navegación y llamada a la acción",

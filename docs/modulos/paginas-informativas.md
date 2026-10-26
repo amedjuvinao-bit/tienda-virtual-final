@@ -2,6 +2,8 @@
 
 La primera página es **Nosotros**. El administrador dispone de una plantilla informativa reutilizable para presentar el negocio, información de atención, tarjetas de contenido o preguntas frecuentes. Los textos, imágenes y presentación se administran desde Páginas; no dependen de una categoría comercial concreta.
 
+Nosotros incorpora también la [mesa de recuerdos del diario visual](diario-visual.md), con fotografía protagonista, galería e historias por fecha. El diseño de lectura continúa disponible para las demás páginas informativas y puede seleccionarse desde el editor.
+
 ## Rutas e identidad
 
 - `/nosotros` abre la página con dirección `nosotros`.

@@ -1,3 +1,7 @@
+import {
+  buildMemoryJournal,
+  validateMemoryJournal,
+} from "./memoryJournalConfig";
 import { buildSafeCartPageConfig } from "../cart/cartPageConfig";
 import { catalogImageUrl } from "../catalog/catalogPresentation";
 import { safeFooterLink } from "../footer/footerEditorialConfig";
@@ -88,6 +92,11 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
+    layout: source.layout === "memory-table" ? "memory-table" : "editorial",
+    journal: buildMemoryJournal(
+      source.journal,
+      Array.isArray(source.sections) ? source.sections : [],
+    ),
     eyebrowText: text(source.eyebrowText, "Conócenos", 180),
     titleText: text(source.titleText, "Nosotros", 180),
     subtitleText: text(
@@ -152,6 +161,8 @@ export function normalizeInformationPage(page) {
   };
 }
 export function informationConfigForPage(page) {
+  const raw = object(page.informationPageConfig);
+  const adopt = page.systemRole === "about" && raw.layout === undefined;
   return buildInformationConfig({
     ...(page.systemRole === "about"
       ? {}
@@ -161,7 +172,34 @@ export function informationConfigForPage(page) {
           subtitleText: "",
           sections: [],
         }),
-    ...object(page.informationPageConfig),
+    ...raw,
+    ...(adopt
+      ? {
+          layout: "memory-table",
+          eyebrowText:
+            !raw.eyebrowText || raw.eyebrowText === "Conócenos"
+              ? "Nosotros"
+              : raw.eyebrowText,
+          titleText:
+            !raw.titleText || raw.titleText === "Nosotros"
+              ? "Nuestra historia,\npor dentro"
+              : raw.titleText,
+          subtitleText:
+            !raw.subtitleText ||
+            raw.subtitleText ===
+              "Descubre nuestra propuesta y encuentra cómo comunicarte con nuestro equipo."
+              ? "Explora los recuerdos que dan vida a nuestro negocio."
+              : raw.subtitleText,
+          contentMaxWidthPx:
+            !raw.contentMaxWidthPx || raw.contentMaxWidthPx === 1200
+              ? 1480
+              : raw.contentMaxWidthPx,
+          titleFontSizePx:
+            !raw.titleFontSizePx || raw.titleFontSizePx === 48
+              ? 56
+              : raw.titleFontSizePx,
+        }
+      : {}),
   });
 }
 export function validateInformationPage(page) {
@@ -169,6 +207,8 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
+  const memoryError = validateMemoryJournal(config.journal);
+  if (memoryError) return memoryError;
   if (config.actionHref?.trim() && !informationLink(config.actionHref))
     return "Revisa el destino del botón: usa una página pública o un enlace http(s), correo o teléfono.";
   if (

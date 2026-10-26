@@ -6,6 +6,9 @@ import {
 } from "../../components/information-page/informationPageConfig";
 const tabs = [
   { id: "content", label: "Título y presentación", group: "content" },
+  { id: "moments", label: "Recuerdos y fotografías", group: "content" },
+  { id: "journal-texts", label: "Textos del diario", group: "content" },
+  { id: "journal-design", label: "Mesa y fotografías", group: "design" },
   { id: "sections", label: "Secciones de contenido", group: "content" },
   { id: "actions", label: "Navegación y botón", group: "content" },
   { id: "background", label: "Fondo y cristal", group: "design" },
