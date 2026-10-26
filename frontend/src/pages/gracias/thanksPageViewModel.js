@@ -17,6 +17,8 @@ export function formatMoneyCop(value) {
   return Number(value || 0).toLocaleString("es-CO", {
     style: "currency",
     currency: "COP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   });
 }
 
@@ -149,9 +151,11 @@ export function buildThanksPageViewModel({
     dynamicMainMessage:
       verified && !verificationLoading && fallbackStatus === "approved"
         ? thanksConfig.mainMessage
-        : hasPaymentResult
-          ? paymentMeta.message
-          : thanksConfig.entryMessage,
+        : verified && !verificationLoading && fallbackStatus === "pending"
+          ? thanksConfig.pendingMessageText
+          : hasPaymentResult
+            ? paymentMeta.message
+            : thanksConfig.entryMessage,
     summaryTitle: thanksConfig.summaryTitle,
     hasOrderDetails: Boolean(thanksOrderData),
     totalLabel:

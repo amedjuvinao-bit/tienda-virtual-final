@@ -31,6 +31,7 @@ export const thanksEditorSections = {
       "Mensajes",
       [
         f("mainMessage", "Mensaje del pedido recibido", "textarea"),
+        f("pendingMessageText", "Mensaje del pago pendiente", "textarea"),
         f("entryMessage", "Mensaje al entrar sin un pedido", "textarea"),
         f("helpText", "Texto de ayuda", "textarea"),
       ],
@@ -166,6 +167,7 @@ export const thanksEditorSections = {
         c("panelBorderColor", "Color del brillo del borde"),
         c("visualBorderColor", "Borde de la galería"),
         c("textPrimaryColor", "Texto principal"),
+        c("factValueColor", "Valores del resumen"),
         c("textSecondaryColor", "Texto secundario"),
         c("titleTextColor", "Color del título"),
         c("accentColor", "Color de acento"),

@@ -53,6 +53,8 @@ export default function GraciasPageView(controller) {
         "--gp-button-blur": `${config.presentation.checkoutGlassBlur}px`,
         "--gp-button-radius": `${controller.presentationStyle.buttonRadius}px`,
         "--gp-line": style.lineColor,
+        "--gp-reflection": config.presentation.reflection,
+        "--gp-fact-value": style.factValueColor,
         "--gp-status-bg": style.statusBadgeBg,
         "--gp-status-ink": style.statusBadgeTextColor,
         "--gp-icon": style.iconColor,

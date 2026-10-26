@@ -1,0 +1,50 @@
+// One explicit visual preset shared by first adoption and the editor's restore action.
+// Content, uploads, background selection and protected order data are not replaced.
+export const THANKS_CENTRAL_VERSION = 3;
+export function applyThanksCentralPreset(raw = {}) {
+  return {
+    ...raw,
+    designVersion: THANKS_CENTRAL_VERSION,
+    showVisualPanel: false,
+    style: {
+      ...raw.style,
+      contentMaxWidthPx: 1200,
+      contentTopPaddingPx: 28,
+      headingFontFamily: "editorial",
+      titleFontSizePx: 56,
+      titleTextColor: "#74243e",
+      panelWidthPx: 1000,
+      panelMinHeightPx: 0,
+      panelPaddingPx: 40,
+      panelRadiusPx: 24,
+      panelBg: "#efb9b7",
+      panelBorderColor: "#fff4ed",
+      textPrimaryColor: "#652d42",
+      textSecondaryColor: "#875a68",
+      factValueColor: "#74243e",
+      accentColor: "#a52c53",
+      lineColor: "#c68899",
+      iconColor: "#a52c53",
+      statusBadgeBg: "#f7bfd2",
+      statusBadgeTextColor: "#9a214e",
+      medallionSizePx: 88,
+      stepIconSizePx: 62,
+      buttonBg: "#a52c53",
+      buttonTextColor: "#fff6f5",
+      secondaryButtonBg: "#f4bdcf",
+      secondaryButtonTextColor: "#922048",
+      buttonStyle: "rounded",
+      buttonRadiusPx: 14,
+      shadowStyle: "soft",
+    },
+    presentation: {
+      ...raw.presentation,
+      glassOpacity: 0.12,
+      glassBlur: 3,
+      borderWidth: 2.75,
+      reflection: 1,
+      checkoutGlassOpacity: 0.8,
+      checkoutGlassBlur: 6,
+    },
+  };
+}

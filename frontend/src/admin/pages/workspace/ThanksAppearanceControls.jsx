@@ -1,4 +1,5 @@
 import React from "react";
+import { applyThanksCentralPreset } from "../../../pages/gracias/thanksCentralPreset";
 import EditorSection from "./EditorSection";
 import { Input, Select, ColorInput, Toggle } from "./ProductDetailEditorFields";
 import AdminImageUploadField from "../../media/AdminImageUploadField";
@@ -145,6 +146,29 @@ export default function ThanksAppearanceControls({
           }
         >
           <div className="grid gap-4 sm:grid-cols-2">{fields.map(render)}</div>
+          {topic === "layout" && title === "Contenido" && (
+            <div className="mt-5 space-y-3">
+              <p className="page-editor-section__help">
+                Recupera las medidas, tipografía, colores y cristal de la
+                propuesta. Se aplica al borrador y se publica al guardar.
+              </p>
+              <button
+                type="button"
+                className="pages-button"
+                disabled={saving}
+                onClick={() =>
+                  onChange((current) => ({
+                    ...current,
+                    thanksPageConfig: applyThanksCentralPreset(
+                      current.thanksPageConfig,
+                    ),
+                  }))
+                }
+              >
+                Restablecer diseño aprobado
+              </button>
+            </div>
+          )}
         </EditorSection>
       ))}
       {topic === "gallery" && (

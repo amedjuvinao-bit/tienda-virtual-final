@@ -34,6 +34,8 @@
   padding: calc(var(--gp-medallion) / 2 + 20px)
     clamp(18px, 4vw, var(--cart-padding)) clamp(22px, 3vw, var(--cart-padding));
   overflow: visible;
+  container-type: inline-size;
+  container-name: thanks-summary;
 }
 .gp-central-panel .gp-panel-content {
   position: static;
@@ -69,6 +71,7 @@
 }
 .gp-central-panel .gp-title {
   font-weight: 400;
+  font-size: clamp(26px, 4.5vw, var(--gp-title-size));
   line-height: 1.15;
   margin-bottom: 14px;
 }
@@ -130,8 +133,8 @@
   font-size: clamp(18px, 2.1vw, 25px);
   line-height: 1.25;
   margin: 0;
-  color: var(--cart-accent);
-  overflow-wrap: anywhere;
+  color: var(--gp-fact-value);
+  overflow-wrap: normal;
   font-variant-numeric: tabular-nums;
 }
 .gp-next-steps {
@@ -316,6 +319,36 @@
   }
 }
 @media (max-width: 520px) {
+  .gp-central-panel .gp-actions {
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .gp-central-panel .gp-message {
+    font-size: 13px;
+  }
+  .gp-support-actions {
+    gap: 8px 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-returns-link,
+  .gp-order-details > summary {
+    transition: none;
+    translate: none !important;
+  }
+}
+
+.gp-order-fact[data-fact="order"] dd {
+  overflow-wrap: anywhere;
+}
+.gp-order-fact[data-fact="total"] dd {
+  white-space: nowrap;
+}
+/* Respond to the panel itself, including narrow sizes selected in the editor. */
+@container thanks-summary (max-width:680px) {
+  .gp-central-panel .gp-title {
+    font-size: clamp(26px, 7cqi, var(--gp-title-size));
+  }
   .gp-order-facts {
     grid-auto-flow: row;
     grid-template-columns: 1fr;
@@ -337,14 +370,19 @@
     justify-content: space-between;
     gap: 14px;
     flex: 1;
+    min-width: 0;
   }
   .gp-order-fact dt {
     margin: 0;
     font-size: 11px;
+    overflow-wrap: anywhere;
   }
   .gp-order-fact dd {
     text-align: right;
     font-size: 20px;
+  }
+  .gp-next-steps {
+    --gp-step-icon: 48px;
   }
   .gp-next-steps ol {
     grid-template-columns: 1fr;
@@ -376,24 +414,33 @@
     margin: 0;
     max-width: none;
   }
-  .gp-central-panel .gp-actions {
-    gap: 10px;
-    margin-top: 20px;
+}
+@container thanks-summary (max-width:360px) {
+  .gp-order-fact > div {
+    display: block;
   }
-  .gp-central-panel .gp-message {
-    font-size: 13px;
+  .gp-order-fact dt {
+    margin-bottom: 3px;
   }
-  .gp-support-actions {
-    gap: 8px 14px;
-  }
-  .gp-central-panel {
-    --gp-step-icon: 48px;
+  .gp-order-fact dd {
+    text-align: left;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .gp-returns-link,
-  .gp-order-details > summary {
-    transition: none;
-    translate: none !important;
-  }
+
+/* The second contour lights only the polished edge; the panel face stays clear. */
+.gp-central-panel::before,
+.gp-medallion::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--cart-edge) * 1.6);
+  pointer-events: none;
+  border: calc(var(--cart-edge) / 3) solid var(--cart-light);
+  opacity: calc(var(--gp-reflection) * 0.8);
+  z-index: 2;
+}
+.gp-central-panel::before {
+  border-radius: max(0px, calc(var(--cart-radius) - var(--cart-edge) * 1.6));
+}
+.gp-medallion::before {
+  border-radius: 50%;
 }

@@ -1,4 +1,8 @@
 import {
+  applyThanksCentralPreset,
+  THANKS_CENTRAL_VERSION,
+} from "./thanksCentralPreset";
+import {
   buildSafeCartPageConfig,
   safePath,
 } from "../../components/cart/cartPageConfig";
@@ -14,26 +18,8 @@ function clampInt(value, min, max, fallback) {
 
 export function buildSafeThanksPageConfig(raw) {
   const original = object(raw);
-  // Adopt the approved central composition once, preserving uploaded slides and custom colors.
-  const legacy = original.designVersion !== 2;
-  const oldStyle = object(original.style);
-  const migratedStyle = { ...oldStyle };
-  if (legacy) {
-    const defaults = {
-      titleTextColor: ["#db2777", "#74243e"],
-      textPrimaryColor: ["#111827", "#652d42"],
-      textSecondaryColor: ["#4b5563", "#875a68"],
-      accentColor: ["#ec4899", "#a52c53"],
-      buttonBg: ["#ec4899", "#a52c53"],
-      buttonTextColor: ["#652d42", "#fff6f5"],
-      titleFontSizePx: [28, 48],
-      panelWidthPx: [540, 1000],
-      panelPaddingPx: [24, 40],
-    };
-    for (const [key, [previous, next]] of Object.entries(defaults))
-      if (migratedStyle[key] === previous) migratedStyle[key] = next;
-  }
-  const config = { ...original, style: migratedStyle };
+  const adopting = original.designVersion !== THANKS_CENTRAL_VERSION;
+  const config = adopting ? applyThanksCentralPreset(original) : original;
   const material = buildSafeCartPageConfig({
     presentation: config.presentation,
   });
@@ -72,7 +58,7 @@ export function buildSafeThanksPageConfig(raw) {
 
   return {
     ...config,
-    designVersion: 2,
+    designVersion: THANKS_CENTRAL_VERSION,
     showNextSteps: config.showNextSteps !== false,
     showOrderDetails: config.showOrderDetails !== false,
     refreshButtonText: text(config.refreshButtonText, "Actualizar estado"),
@@ -106,19 +92,15 @@ export function buildSafeThanksPageConfig(raw) {
     ),
     entryTitleText: text(config.entryTitleText, "Consulta tu pedido"),
     pendingTotalLabel: text(config.pendingTotalLabel, "Total del pedido"),
+    pendingMessageText: text(
+      config.pendingMessageText,
+      "Recibimos tu pedido. Estamos esperando la confirmación del pago.",
+    ),
     itemSingularText: text(config.itemSingularText, "producto"),
     itemPluralText: text(config.itemPluralText, "productos"),
     presentation: {
       ...object(config.presentation),
       ...material.presentation,
-      borderWidth:
-        legacy && material.presentation.borderWidth === 1.25
-          ? 2.75
-          : material.presentation.borderWidth,
-      checkoutGlassOpacity:
-        legacy && material.presentation.checkoutGlassOpacity === 0.2
-          ? 0.8
-          : material.presentation.checkoutGlassOpacity,
     },
     continueButtonLink: safePath(config.continueButtonLink, "/"),
     entryMessage: text(
@@ -131,7 +113,7 @@ export function buildSafeThanksPageConfig(raw) {
       ? config.titleMode
       : "text",
     titleText:
-      legacy && config.titleText === "¡Gracias por tu compra!"
+      adopting && config.titleText === "¡Gracias por tu compra!"
         ? "Gracias por tu pedido"
         : text(config.titleText, "Gracias por tu pedido"),
     titleImage: catalogImageUrl(config.titleImage),
@@ -147,7 +129,7 @@ export function buildSafeThanksPageConfig(raw) {
     showTotal: config.showTotal !== false,
     showContinueButton: config.showContinueButton !== false,
     showHelpText: config.showHelpText !== false,
-    showVisualPanel: legacy ? false : config.showVisualPanel === true,
+    showVisualPanel: config.showVisualPanel === true,
     mainMessage: text(
       config.mainMessage,
       "Hemos recibido tu pedido correctamente. Te enviaremos un mensaje cuando esté en camino.",
@@ -184,6 +166,7 @@ function buildStyle(raw) {
     typeof value === "string" ? value : fallback;
   return {
     ...style,
+    factValueColor: color(style.factValueColor, "#74243e"),
     lineColor: color(style.lineColor, "#c68899"),
     statusBadgeBg: color(style.statusBadgeBg, "#f7bfd2"),
     statusBadgeTextColor: color(style.statusBadgeTextColor, "#9a214e"),

@@ -122,7 +122,7 @@ it("respeta visibilidad y recupera imágenes rotas", () => {
       titleImage: "/title.png",
       titleText: "Título recuperado",
       entryTitleText: "Título recuperado",
-      designVersion: 2,
+      designVersion: 3,
       showVisualPanel: true,
       showWhatsAppButton: false,
       slider: {

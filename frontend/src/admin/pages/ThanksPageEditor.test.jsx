@@ -25,6 +25,7 @@ beforeEach(() => {
     useHeader: true,
     useFooter: true,
     thanksPageConfig: {
+      designVersion: 3,
       titleMode: "text",
       titleText: "Tu thanks",
       extension: { preserve: true },
@@ -170,7 +171,36 @@ it("guarda textos de los próximos pasos y colores propios del diseño central",
       "Prepararemos tu selección",
     ),
   );
-  expect(stored.thanksPageConfig.designVersion).toBe(2);
+  expect(stored.thanksPageConfig.designVersion).toBe(3);
   expect(stored.thanksPageConfig.showVisualPanel).toBe(false);
   expect(stored.thanksPageConfig.style.panelBg).toBe("#ab6789");
+});
+
+it("restablece el diseño aprobado en el borrador y solo lo publica al guardar", async () => {
+  const user = userEvent.setup();
+  mount();
+  await screen.findByLabelText("Texto del título");
+  await user.click(screen.getByRole("button", { name: "Diseño", exact: true }));
+  await user.click(
+    screen.getByRole("button", { name: "Medidas y formas", exact: true }),
+  );
+  await user.click(
+    screen.getByRole("button", {
+      name: "Restablecer diseño aprobado",
+      exact: true,
+    }),
+  );
+  const draft = JSON.parse(screen.getByTestId("draft").textContent);
+  expect(draft.thanksPageConfig.style.panelWidthPx).toBe(1000);
+  expect(draft.thanksPageConfig.style.factValueColor).toBe("#74243e");
+  expect(stored.thanksPageConfig.style.panelBg).toBe("#ab6789");
+  expect(lastPayload).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Guardar cambios", exact: true }),
+  );
+  await waitFor(() =>
+    expect(stored.thanksPageConfig.style.panelBg).toBe("#efb9b7"),
+  );
+  expect(stored.thanksPageConfig.titleText).toBe("Tu thanks");
+  expect(stored.thanksPageConfig.extension).toEqual({ preserve: true });
 });
