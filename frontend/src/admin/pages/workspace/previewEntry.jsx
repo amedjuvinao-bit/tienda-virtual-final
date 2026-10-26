@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import CatalogPageView from "../../../components/catalog/CatalogPageView";
 import CartPreview from "./CartPreview";
 import FavoritesPreview from "./FavoritesPreview";
+import ThanksPreview from "./ThanksPreview";
 import NotFoundPageView from "../../../components/not-found/NotFoundPageView";
 import ProductDetailView from "../../../components/product-detail/ProductDetailView";
 import useProductDetailSelection from "../../../components/product-detail/useProductDetailSelection";
@@ -176,7 +177,7 @@ function Preview() {
         );
       if (
         event.data?.type === "pages-preview:update" &&
-        ["catalog", "product-detail", "cart-page", "favorites-page", "notfound-page"].includes(event.data.draft?.pageType)
+        ["catalog", "product-detail", "cart-page", "favorites-page", "notfound-page", "thanks-page"].includes(event.data.draft?.pageType)
       )
         setDraft(event.data.draft);
     };
@@ -231,7 +232,7 @@ function Preview() {
                   footer={draft.useFooter !== false ? <FooterSection theme={settings?.theme} store={settings?.store} polishedGlass /> : null}
                 />
               ) : (
-                draft.pageType === "cart-page" ? <CartPreview draft={draft}/> : draft.pageType === "favorites-page" ? <FavoritesPreview draft={draft}/> : draft.pageType === "notfound-page" ? <NotFoundPageView page={draft} preview/> : <DetailPreview draft={draft} />
+                draft.pageType === "cart-page" ? <CartPreview draft={draft}/> : draft.pageType === "favorites-page" ? <FavoritesPreview draft={draft}/> : draft.pageType === "notfound-page" ? <NotFoundPageView page={draft} preview/> : draft.pageType === "thanks-page" ? <ThanksPreview draft={draft}/> : <DetailPreview draft={draft} />
               )}
 
             </div>
