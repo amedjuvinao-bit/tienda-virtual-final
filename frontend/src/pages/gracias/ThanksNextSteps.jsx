@@ -1,5 +1,5 @@
 import { Check, Clock3, Package, Truck, CircleAlert } from "lucide-react";
-import PolishedGlassRim from "../../components/PolishedGlassRim";
+import ThanksGlassRim from "./ThanksGlassRim";
 export default function ThanksNextSteps({ config, model }) {
   // These are explanatory stages. Payment approval does not prove preparation or dispatch.
   if (
@@ -54,11 +54,7 @@ export default function ThanksNextSteps({ config, model }) {
           >
             <div className="gp-step-symbol">
               <Icon size={26} strokeWidth={1.4} aria-hidden="true" />
-              <PolishedGlassRim
-                radius={999}
-                width={config.presentation.borderWidth}
-                reflection={config.presentation.reflection}
-              />
+              <ThanksGlassRim config={config} radius={999} />
             </div>
             <h3>{title}</h3>
             <p>{message}</p>

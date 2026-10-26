@@ -10,6 +10,7 @@ import GraciasVisualPanel from "./GraciasVisualPanel";
 import "../../components/cart/cartPage.css";
 import "./graciasPage.css";
 import "./thanksCentral.css";
+import "./thanksLiquidGlass.css";
 export default function GraciasPageView(controller) {
   const {
     thanksConfig: config,
@@ -43,7 +44,12 @@ export default function GraciasPageView(controller) {
           ? `url(${JSON.stringify(backdrop.image)})`
           : "none",
         "--gp-title-color": style.titleTextColor,
-        "--gp-heading-font": style.headingFontFamily === "theme" ? "var(--font-headings, Georgia, serif)" : style.headingFontFamily === "body" ? "var(--font-body, system-ui, sans-serif)" : '"Thanks Editorial", Georgia, serif',
+        "--gp-heading-font":
+          style.headingFontFamily === "theme"
+            ? "var(--font-headings, Georgia, serif)"
+            : style.headingFontFamily === "body"
+              ? "var(--font-body, system-ui, sans-serif)"
+              : '"Thanks Editorial", Georgia, serif',
         "--gp-title-size": `${style.titleFontSizePx}px`,
         "--gp-button-tint": style.buttonBg,
         "--gp-button-ink": style.buttonTextColor,
@@ -93,7 +99,6 @@ export default function GraciasPageView(controller) {
           )}
           <GraciasSummaryPanel
             config={config}
-            material={material}
             model={model}
             accessError={controller.thanksAccessError}
             retryVerification={controller.retryVerification}

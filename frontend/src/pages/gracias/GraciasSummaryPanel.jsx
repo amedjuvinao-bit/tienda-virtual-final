@@ -8,8 +8,7 @@ import {
   ChevronDown,
   RefreshCw,
 } from "lucide-react";
-import { CartGlass } from "../../components/cart/CartMaterial";
-import PolishedGlassRim from "../../components/PolishedGlassRim";
+import ThanksGlassRim from "./ThanksGlassRim";
 import GraciasSummaryRows from "./GraciasSummaryRows";
 import ThanksStatusIcon from "./ThanksStatusIcon";
 import ThanksGlassButton from "./ThanksGlassButton";
@@ -17,7 +16,6 @@ import ThanksOrderFacts from "./ThanksOrderFacts";
 import ThanksNextSteps from "./ThanksNextSteps";
 export default function GraciasSummaryPanel({
   config,
-  material,
   model,
   accessError,
   retryVerification,
@@ -55,9 +53,8 @@ export default function GraciasSummaryPanel({
       (config.showShipping && model.hasOrderDetails) ||
       model.storeCreditAmount > 0);
   return (
-    <CartGlass
-      config={material}
-      className="gp-panel gp-central-panel"
+    <section
+      className="cart-glass gp-panel gp-central-panel"
       style={{ minHeight: style.panelMinHeightPx }}
     >
       <div className="gp-medallion">
@@ -67,11 +64,7 @@ export default function GraciasSummaryPanel({
           loading={model.verificationLoading}
           accent={style.iconColor}
         />
-        <PolishedGlassRim
-          radius={999}
-          width={config.presentation.borderWidth}
-          reflection={config.presentation.reflection}
-        />
+        <ThanksGlassRim config={config} radius={999} />
       </div>
       <div className="gp-panel-content">
         <h1 className="gp-title">
@@ -176,6 +169,7 @@ export default function GraciasSummaryPanel({
           </p>
         )}
       </div>
-    </CartGlass>
+      <ThanksGlassRim config={config} />
+    </section>
   );
 }

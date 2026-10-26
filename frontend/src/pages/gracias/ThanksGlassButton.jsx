@@ -1,4 +1,4 @@
-import PolishedGlassRim from "../../components/PolishedGlassRim";
+import ThanksGlassRim from "./ThanksGlassRim";
 export default function ThanksGlassButton({
   config,
   children,
@@ -20,11 +20,7 @@ export default function ThanksGlassButton({
       {...props}
     >
       {children}
-      <PolishedGlassRim
-        radius={radius}
-        width={config.presentation.borderWidth}
-        reflection={config.presentation.reflection}
-      />
+      <ThanksGlassRim config={config} radius={radius} />
     </button>
   );
 }

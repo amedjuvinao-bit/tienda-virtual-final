@@ -1,0 +1,146 @@
+/* The lens samples the backdrop at the edge. Frost lives on a separate inset
+   face, so an ancestor filter cannot flatten the rim's optical relief. */
+.gp-page {
+  --gp-lip: calc(var(--cart-edge) * 2);
+}
+.gp-central-panel > .gp-liquid-rim {
+  /* The floating medallion interrupts the top edge instead of crossing its icon. */
+  z-index: 2;
+  mask-image: radial-gradient(
+    circle at 50% 0,
+    transparent calc(var(--gp-medallion) / 2 - 1px),
+    #000 calc(var(--gp-medallion) / 2)
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 0,
+    transparent calc(var(--gp-medallion) / 2 - 1px),
+    #000 calc(var(--gp-medallion) / 2)
+  );
+}
+.gp-central-panel,
+.gp-medallion,
+.gp-central-panel .gp-cta-btn,
+.gp-central-panel .gp-step-symbol {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.gp-central-panel::before,
+.gp-medallion::before,
+.gp-central-panel .gp-cta-btn::before,
+.gp-central-panel .gp-step-symbol::before {
+  content: "";
+  position: absolute;
+  inset: var(--gp-lip);
+  border-radius: max(0px, calc(var(--cart-radius) - var(--gp-lip)));
+  pointer-events: none;
+  z-index: -1;
+  backdrop-filter: blur(var(--cart-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--cart-blur)) saturate(1.08);
+}
+.gp-medallion::before,
+.gp-central-panel .gp-step-symbol::before {
+  border-radius: 50%;
+}
+.gp-central-panel .gp-cta-btn::before {
+  border-radius: max(0px, calc(var(--gp-button-radius) - var(--gp-lip)));
+  backdrop-filter: blur(var(--gp-button-blur)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--gp-button-blur)) saturate(1.15);
+}
+
+/* One convex lip, without the extra inset white contour. Alternating light
+   and tinted return light follow its cross-section instead of a flat stroke. */
+.gp-page .gp-liquid-rim > .polished-glass-rim__depth {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cart-accent) 85%, transparent),
+    color-mix(in srgb, var(--cart-accent) 30%, transparent) 24%,
+    color-mix(in srgb, var(--cart-accent) 70%, transparent) 52%,
+    color-mix(in srgb, var(--cart-accent) 35%, transparent) 76%,
+    color-mix(in srgb, var(--cart-accent) 80%, transparent)
+  );
+  opacity: calc(var(--pg-shine) * 0.8);
+}
+.gp-page .gp-liquid-rim > .polished-glass-rim__shine {
+  background:
+    radial-gradient(
+      ellipse 90px 60px at 1% 100%,
+      var(--cart-light) 12%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 80px 55px at 99% 0%,
+      var(--cart-light) 12%,
+      transparent 100%
+    ),
+    linear-gradient(
+      115deg,
+      var(--cart-light),
+      color-mix(in srgb, var(--cart-light) 38%, transparent) 18%,
+      color-mix(in srgb, var(--cart-light) 90%, transparent) 37%,
+      color-mix(in srgb, var(--cart-light) 32%, transparent) 56%,
+      color-mix(in srgb, var(--cart-light) 95%, transparent) 78%,
+      var(--cart-light)
+    );
+}
+.gp-page .gp-liquid-rim > .polished-glass-rim__refraction {
+  opacity: var(--pg-shine);
+}
+.gp-page .gp-liquid-rim::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: calc(var(--pg-width) + 2px);
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 28px 7px at 94% 0%, var(--cart-light), transparent),
+    radial-gradient(
+      ellipse 22px 7px at 6% 100%,
+      var(--cart-light),
+      transparent
+    ),
+    radial-gradient(ellipse 7px 20px at 0% 76%, var(--cart-light), transparent),
+    radial-gradient(
+      ellipse 7px 18px at 100% 28%,
+      var(--cart-light),
+      transparent
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  filter: blur(0.6px);
+  opacity: var(--pg-shine);
+}
+.gp-medallion {
+  /* The convex rim supplies the inset lighting. */
+  box-shadow: 0 8px 20px -12px var(--cart-accent);
+}
+.gp-central-panel .gp-cta-btn {
+  --gp-button-relief:
+    inset 0 var(--cart-edge) calc(var(--cart-edge) * 2)
+      calc(var(--cart-edge) * -1)
+      color-mix(
+        in srgb,
+        var(--cart-light) calc(var(--gp-reflection) * 60%),
+        transparent
+      ),
+    inset 0 calc(var(--cart-edge) * -1) calc(var(--cart-edge) * 2)
+      calc(var(--cart-edge) * -1)
+      color-mix(
+        in srgb,
+        var(--cart-accent) calc(var(--gp-reflection) * 30%),
+        transparent
+      );
+  box-shadow:
+    var(--gp-button-relief),
+    0 5px 15px -10px var(--cart-accent);
+}
+.gp-central-panel .gp-cta-btn:hover {
+  box-shadow:
+    var(--gp-button-relief),
+    0 10px 20px -12px var(--cart-accent);
+}

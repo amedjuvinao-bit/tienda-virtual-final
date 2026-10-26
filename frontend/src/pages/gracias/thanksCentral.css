@@ -426,21 +426,3 @@
     text-align: left;
   }
 }
-
-/* The second contour lights only the polished edge; the panel face stays clear. */
-.gp-central-panel::before,
-.gp-medallion::before {
-  content: "";
-  position: absolute;
-  inset: calc(var(--cart-edge) * 1.6);
-  pointer-events: none;
-  border: calc(var(--cart-edge) / 3) solid var(--cart-light);
-  opacity: calc(var(--gp-reflection) * 0.8);
-  z-index: 2;
-}
-.gp-central-panel::before {
-  border-radius: max(0px, calc(var(--cart-radius) - var(--cart-edge) * 1.6));
-}
-.gp-medallion::before {
-  border-radius: 50%;
-}
