@@ -169,7 +169,7 @@ export default function GraciasSummaryPanel({
           </p>
         )}
       </div>
-      <ThanksGlassRim config={config} />
+      <ThanksGlassRim config={config} topGap={style.medallionSizePx} />
     </section>
   );
 }
