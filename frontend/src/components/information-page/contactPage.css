@@ -123,21 +123,6 @@
   display: block;
   border-radius: 42px;
 }
-.contact-whatsapp__badge {
-  position: absolute;
-  top: -17px;
-  right: 12px;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  color: var(--service-button-ink);
-  background: color-mix(in srgb, var(--service-button-bg) 80%, transparent);
-  backdrop-filter: blur(var(--cart-blur));
-  box-shadow: var(--cart-shadow);
-  transition: transform 0.25s;
-}
 .contact-content .service-button {
   --contact-rim-light: var(--service-button-edge);
   font-weight: 500;
@@ -221,12 +206,8 @@
 .contact-whatsapp__icon:hover .contact-medallion {
   transform: translateY(-3px) rotate(-4deg);
 }
-.contact-row:active,
-.contact-whatsapp__badge:active {
+.contact-row:active {
   transform: scale(0.98);
-}
-.contact-whatsapp__badge:hover {
-  transform: translateY(-3px) rotate(6deg);
 }
 .information-page--contact .contact-location {
   padding-top: var(--cart-padding);

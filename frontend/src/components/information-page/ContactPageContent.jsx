@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowRight, Clock3, Mail, MessageCircle, Phone } from "lucide-react";
+import { ArrowRight, Clock3, Mail, Phone } from "lucide-react";
 import { StorefrontSettingsContext } from "../../context/StorefrontSettingsContext";
 import {
   ContactGlass as CartGlass,
@@ -156,16 +156,6 @@ export default function ContactPageContent({
                   <ArrowRight size={18} aria-hidden="true" />
                 </ServiceButton>
               </div>
-              <a
-                href={data.whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="contact-whatsapp__badge"
-                aria-label={c.whatsappTitle || "WhatsApp"}
-              >
-                <MessageCircle size={21} aria-hidden="true" />
-                <ContactGlassRim config={config} radius={999} />
-              </a>
             </CartGlass>
           )}
           <div className="contact-rows">
