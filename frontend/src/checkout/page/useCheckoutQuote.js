@@ -205,7 +205,7 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [key, attempt]);
+  }, [key, attempt, state.configurationAttempt]);
   return {
     handleApplyCoupon,
     handlePreviewStoreCredit,

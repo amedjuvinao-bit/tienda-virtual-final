@@ -13,7 +13,8 @@ const { SERVICE_PAGES, ensureServicePages } = require("../services/pages/service
 const { ABOUT_SLUG, ensureAboutPage } = require("../services/pages/aboutPage");
 const { CONTACT_SLUG, ensureContactPage } = require("../services/pages/contactPage");
 const { HELP_SLUG, ensureHelpPage } = require("../services/pages/helpPage");
-const INFORMATION_ROLE_SLUGS = new Map([["about", ABOUT_SLUG], ["contact", CONTACT_SLUG], ["help", HELP_SLUG]]);
+const { CONSUMER_PAGES, ensureConsumerPages } = require("../services/pages/consumerPages");
+const INFORMATION_ROLE_SLUGS = new Map([["about", ABOUT_SLUG], ["contact", CONTACT_SLUG], ["help", HELP_SLUG], ...CONSUMER_PAGES.map(p => [p.role, p.slug])]);
 
 function normalizePageType(value) {
   const safe = String(value || "").trim().toLowerCase();
@@ -387,6 +388,7 @@ router.get("/", async (req, res) => {
     await ensureAboutPage(Page);
     await ensureContactPage(Page);
     await ensureHelpPage(Page);
+    await ensureConsumerPages(Page);
     const pages = await Page.find().sort({ createdAt: -1 });
     res.json(pages);
   } catch (error) {
@@ -407,6 +409,7 @@ router.get("/:value", async (req, res) => {
     await ensureAboutPage(Page);
     await ensureContactPage(Page);
     await ensureHelpPage(Page);
+    await ensureConsumerPages(Page);
 
     const rawValue = String(req.params.value || "").trim();
     const slug = rawValue.toLowerCase();
@@ -457,6 +460,7 @@ router.post("/", async (req, res) => {
       slug === ABOUT_SLUG ||
       slug === CONTACT_SLUG ||
       slug === HELP_SLUG ||
+      CONSUMER_PAGES.some(p => p.slug === slug) ||
       slug === SYSTEM_CART_SLUG ||
       pageType === "cart-page" ||
       slug === SYSTEM_CHECKOUT_SLUG ||
@@ -574,6 +578,8 @@ router.put("/:id", async (req, res) => {
     if (!service && SERVICE_PAGES.some((page) => page.slug === String(body.slug || "").trim().toLowerCase() || page.pageType === requestedPageType)) {
       return res.status(400).json({ message: "No se puede convertir otra página en una página fija del sistema." });
     }
+    if (CONSUMER_PAGES.some(p => p.slug === String(body.slug || "").trim().toLowerCase() && p.slug !== existingPage.slug)) return res.status(400).json({ message: "Esta dirección pertenece a una página de atención al consumidor." });
+    if (String(existingPage.systemRole || "").startsWith("consumer-") && body.enabled === false) return res.status(400).json({ message: "La información para el consumidor debe permanecer disponible. Puedes editar su presentación y condiciones complementarias." });
     const informationSlug = INFORMATION_ROLE_SLUGS.get(existingPage.systemRole);
     const finalPageType = informationSlug ? "information" : service ? service.pageType : existingIsSystemCart
       ? "cart-page"

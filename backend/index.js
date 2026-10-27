@@ -183,6 +183,7 @@ if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
 if (orderCustomerNotificationRoutes) {
   app.use('/api/orders', orderCustomerNotificationRoutes);
 }
+app.use('/api/consumer', requireCritical('./routes/consumer'));
 if (orderQuoteRoutes) app.use('/api/orders', orderQuoteRoutes);
 if (orderReturnRoutes) app.use('/api/orders', orderReturnRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);

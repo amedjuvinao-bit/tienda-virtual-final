@@ -27,6 +27,9 @@ export function validateCheckoutState({ state, derived }) {
     total,
   } = derived;
   const errors = [];
+  const offer = derived.consumerOffer;
+  if (!offer?.ready) errors.push("La tienda debe completar su información y las condiciones de entrega.");
+  if (!offer?.fingerprint || state.acceptedTerms !== offer.fingerprint || state.authorizedPrivacy !== offer.fingerprint) errors.push("Revisa y acepta las condiciones de esta compra y autoriza el tratamiento informado de tus datos.");
   if (state.geographyError) errors.push(state.geographyError);
   const isBlank = (value) => !value || String(value).trim() === '';
 
@@ -217,6 +220,7 @@ export function buildOrderDraft({
   };
   return {
     sessionId,
+    consumerAcceptance: { fingerprint: derived.consumerOffer?.fingerprint || "", terms: state.acceptedTerms === derived.consumerOffer?.fingerprint, privacy: state.authorizedPrivacy === derived.consumerOffer?.fingerprint },
     cart: finalItems,
     subtotal: Number(finalSummary.subtotal || 0),
     shipping: derived.shipping,

@@ -7,6 +7,8 @@ import {
 } from './checkoutPageModel';
 
 export default function useCheckoutState() {
+  const [acceptedTerms, setAcceptedTerms] = useState('');
+  const [authorizedPrivacy, setAuthorizedPrivacy] = useState('');
   const [deliveryType, setDeliveryType] = useState('envio');
   const [discountCode, setDiscountCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -70,6 +72,7 @@ export default function useCheckoutState() {
   const [isPlacing, setIsPlacing] = useState(false);
 
   return {
+    acceptedTerms, setAcceptedTerms, authorizedPrivacy, setAuthorizedPrivacy,
     quoteError,
     setQuoteError,
     checkoutConfigError,

@@ -19,6 +19,7 @@ it("un doble clic en el mismo turno solo inicia una validación y creación", as
     () => new Promise((_resolve, failure) => (reject = failure)),
   );
   const state = {
+    acceptedTerms: "offer-1", authorizedPrivacy: "offer-1",
     checkoutConfig: {
       ...buildSafeCheckoutPageConfig({}),
       showBillingSection: false,
@@ -33,6 +34,7 @@ it("un doble clic en el mismo turno solo inicia una validación y creación", as
     setErrors: vi.fn(),
   };
   const derived = {
+    consumerOffer: { fingerprint: "offer-1", ready: true },
     currentCart: [{ _id: "p", quantity: 1 }],
     itemCount: 1,
     paymentCanProceed: true,

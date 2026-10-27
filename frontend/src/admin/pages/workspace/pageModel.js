@@ -67,6 +67,7 @@ export const PAGE_TYPES = {
   },
 };
 export function pageMeta(page) {
+  if (String(page?.systemRole || "").startsWith("consumer-")) return { ...PAGE_TYPES.information, system: true, slug: page.slug, publicPath: `/${page.slug}` };
   if (page?.systemRole === "help") return {
     ...PAGE_TYPES.information, system: true, slug: "preguntas-frecuentes", publicPath: "/preguntas-frecuentes",
   };

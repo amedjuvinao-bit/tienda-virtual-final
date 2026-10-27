@@ -41,6 +41,7 @@ function Harness({
   quoteError = "",
   quoteLoading = false,
   provider = "manual",
+  pickupEnabled = true,
 }) {
   const form = useCheckoutState();
   const state = {
@@ -65,6 +66,7 @@ function Harness({
     selectedCountry: state.countries[0],
   });
   state.checkoutQuote = {
+    consumerOffer: { pickupEnabled },
     _checkoutKey: key,
     pricing: {
       subtotal: 90000,
@@ -178,3 +180,5 @@ it("bloquea una pasarela que todavía no tiene flujo de pago disponible", () => 
     ),
   ).toBeInTheDocument();
 });
+
+it("no ofrece retiro si la tienda no lo ha habilitado", () => { mount({ pickupEnabled: false }); expect(screen.queryByRole("radio", { name: "Retiro en tienda" })).not.toBeInTheDocument(); });

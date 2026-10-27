@@ -1,3 +1,4 @@
+import ConsumerLinks from "./components/consumer/ConsumerLinks";
 import 'react-toastify/dist/ReactToastify.css';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {
@@ -259,6 +260,7 @@ export default function App() {
                 {!themeReady ? window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <StorefrontLoadingScreen /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
+                  {["envios", "terminos", "privacidad", "cambios-y-devoluciones", "pqr"].map(slug => <Route key={slug} path={`/${slug}`} element={<DynamicPage theme={themeFromServer} fixedSlug={slug} />} />)}
                   <Route path="/contacto" element={<DynamicPage theme={themeFromServer} fixedSlug="contacto" />} />
                   <Route path="/preguntas-frecuentes" element={<DynamicPage theme={themeFromServer} fixedSlug="preguntas-frecuentes" />} />
                   <Route path="/ayuda" element={<DynamicPage theme={themeFromServer} fixedSlug="ayuda" />} />
@@ -309,6 +311,7 @@ export default function App() {
                     <Route path="configuracion/sedes" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/facturacion" element={<Navigate to="/admin/facturacion/configuracion" replace />} />
                     <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/consumidor" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/instagram" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/tiktok" element={protectAdminContent(<ConfiguracionPage />)} />
@@ -338,6 +341,7 @@ export default function App() {
                 </Routes>}
                 </AdminLogoutGate>
 
+                {themeReady && <ConsumerLinks />}
                 <AppToastContainer />
               </Suspense>
               </StorefrontLoadingBoundary>

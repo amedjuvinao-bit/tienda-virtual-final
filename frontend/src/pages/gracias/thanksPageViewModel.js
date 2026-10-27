@@ -132,6 +132,7 @@ export function buildThanksPageViewModel({
     customerName,
     itemCount,
     provider,
+    consumerContract: thanksOrderData?.consumerContract || null,
     paymentStatus: fallbackStatus,
     rawPaymentStatus,
     shipping,

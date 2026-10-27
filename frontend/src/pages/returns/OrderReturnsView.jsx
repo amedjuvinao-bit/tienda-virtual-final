@@ -53,6 +53,7 @@ export default function OrderReturnsView({
           </p>
         )}
       </ServiceHeading>
+      <p className="service-message">Las condiciones comerciales de este portal no limitan el retracto ni la garantía legal. Puedes <a href="/pqr">radicar una solicitud de atención</a> aunque no haya productos disponibles aquí. <a href="/cambios-y-devoluciones">Consultar tus derechos</a>.</p>
       {configError && (
         <div role="alert" className="service-message">
           {configError}{" "}

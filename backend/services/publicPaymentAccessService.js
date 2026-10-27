@@ -410,6 +410,8 @@ function buildPublicThanksResponse({ order } = {}) {
     ok: true,
     orderId: idValue(order?._id),
     orderNumber: cleanText(order?.orderNumber, 60),
+    consumerContract: order?.consumerContract || null,
+    acknowledgedAt: order?.createdAt || null,
     status: cleanText(order?.status, 40).toLowerCase(),
     subtotal: Number(order?.subtotal || 0),
     shipping: Number(order?.shipping || 0),

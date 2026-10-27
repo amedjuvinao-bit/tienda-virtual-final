@@ -72,6 +72,7 @@ const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
 const ADMIN_SIDEBAR_COLLAPSED_KEY = 'admin_sidebar_collapsed';
 
 const CONFIG_SUBLINKS = [
+  { to: '/admin/configuracion/consumidor', label: 'Consumidor y PQR', icon: ShieldCheck },
   { to: '/admin/configuracion/empresa', label: 'Tienda', icon: Store },
   { to: '/admin/configuracion/pagos', label: 'Pagos', icon: CreditCard },
   { to: '/admin/configuracion/envios', label: 'Envíos', icon: Truck },

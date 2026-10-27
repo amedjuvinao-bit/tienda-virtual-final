@@ -35,6 +35,8 @@ function buildOrderCreationResult(order, extra = {}) {
     total: Number(order?.total || 0),
     amountDue: Number(order?.payment?.amount ?? order?.total ?? 0),
     storeCredit,
+    consumerContract: order?.consumerContract || null,
+    acknowledgedAt: order?.createdAt || null,
     ...extra,
   };
 }
@@ -345,6 +347,11 @@ function getPaymentTransactionId(rawBody = {}) {
 function buildOrderCreationFingerprintPayload(cleaned = {}, rawBody = {}) {
   return {
     version: 2,
+    consumerAcceptance: {
+      fingerprint: canonicalText(rawBody.consumerAcceptance?.fingerprint),
+      terms: rawBody.consumerAcceptance?.terms === true,
+      privacy: rawBody.consumerAcceptance?.privacy === true,
+    },
     sessionId: canonicalText(cleaned.sessionId),
     cart: canonicalizeCart(cleaned.cart),
     subtotal: canonicalNumber(cleaned.subtotal),

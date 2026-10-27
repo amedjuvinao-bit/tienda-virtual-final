@@ -94,6 +94,7 @@ function buildPublicSiteSettings(rawSettings) {
 
   delete safe._credentialStatus;
   delete safe.billing;
+  delete safe.consumerProtection;
   delete safe.storeRevision;
   delete safe.appearanceRevision;
   delete safe.paymentSettingsRevision;

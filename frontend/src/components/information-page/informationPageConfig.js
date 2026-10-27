@@ -156,7 +156,7 @@ export function normalizeInformationPage(page) {
     name: text(page.name, "Nosotros", 120).trim(),
     slug: text(page.slug, "nosotros", 160).trim().toLowerCase(),
     pageType: "information",
-    ...(["about", "contact", "help"].includes(page.systemRole) ? { systemRole: page.systemRole } : {}),
+    ...((["about", "contact", "help"].includes(page.systemRole) || String(page.systemRole || "").startsWith("consumer-")) ? { systemRole: page.systemRole } : {}),
     enabled: page.enabled !== false,
     useHeader: page.useHeader !== false,
     useFooter: page.useFooter !== false,

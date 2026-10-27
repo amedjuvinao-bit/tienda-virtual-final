@@ -42,6 +42,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'configuracion/sedes': ['branches:view'],
   'configuracion/facturacion': ['settings:billing'],
   'configuracion/pagos': ['settings:payments'],
+  'configuracion/consumidor': ['settings:store'],
   'configuracion/envios': ['settings:shipping'],
   'configuracion/instagram': ['settings:instagram'],
   'configuracion/tiktok': ['settings:tiktok'],

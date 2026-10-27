@@ -342,6 +342,11 @@ export default function useCheckoutSubmission({
       ]);
       scrollCheckoutToTop();
     } catch (error) {
+      if (String(error?.response?.data?.error || '').startsWith('CONSUMER_')) {
+        state.setAcceptedTerms('');
+        state.setAuthorizedPrivacy('');
+        state.setConfigurationAttempt(v => v + 1);
+      }
       if (error?.response?.status === 409) {
         const data = error.response.data || {};
         if (data?.error === 'CART_VERSION_CONFLICT') {

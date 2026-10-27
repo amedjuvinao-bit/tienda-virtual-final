@@ -1,3 +1,4 @@
+import ConsumerReceipt from "../../components/consumer/ConsumerReceipt";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -121,6 +122,7 @@ export default function GraciasSummaryPanel({
             <ThanksOrderFacts config={config} model={model} />
           </>
         )}
+        {model.consumerContract && <ConsumerReceipt contract={model.consumerContract} orderNumber={model.orderNumber} />}
         <ThanksNextSteps config={config} model={model} />
         <div className="gp-actions">
           {refresh && (

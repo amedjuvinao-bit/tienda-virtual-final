@@ -112,7 +112,9 @@ export default function InformationAppearanceControls(props) {
       configKey="informationPageConfig"
       sections={sections}
       settingsHelp={
-        props.form.systemRole === "help"
+        String(props.form.systemRole || "").startsWith("consumer-")
+          ? "La identidad, el plazo y los derechos se conectan con Configuración → Consumidor y PQR. Aquí editas título, apariencia y secciones complementarias; no se reducen los derechos legales. La dirección se conserva."
+          : props.form.systemRole === "help"
           ? "Esta página está conectada con Preguntas frecuentes, Ayuda y Centro de ayuda. Su dirección se conserva; puedes administrar sus temas, respuestas y diseño."
           : props.form.systemRole === "contact"
           ? "Esta página abre Contacto y, si no existe una página propia de sede, Nuestra sede. Puedes editar el contenido y el diseño; la dirección se conserva para mantener sus enlaces."

@@ -1,3 +1,4 @@
+import ConsumerPageContent from "../consumer/ConsumerPageContent";
 import MemoryTable from "./MemoryTable";
 import ContactPageContent from "./ContactPageContent";
 import HelpPageContent from "./HelpPageContent";
@@ -71,6 +72,7 @@ export default function InformationPageView({ page, theme, preview = false }) {
         s.image ||
         s.items.some((i) => i.title || i.body)),
   );
+  const consumer = String(page.systemRole || "").startsWith("consumer-");
   const memory = config.layout === "memory-table";
   const contact = config.layout === "contact";
   const help = config.layout === "help";
@@ -85,9 +87,9 @@ export default function InformationPageView({ page, theme, preview = false }) {
       config={config}
       theme={theme}
       preview={preview}
-      className={`information-page${memory ? " information-page--memory" : contact ? " information-page--contact" : help ? " information-page--help" : ""}`}
+      className={`information-page${consumer ? " information-page--consumer" : memory ? " information-page--memory" : contact ? " information-page--contact" : help ? " information-page--help" : ""}`}
     >
-      {help ? <HelpPageContent config={config} name={page.name} preview={preview} /> : contact ? <ContactPageContent config={config} name={page.name} theme={theme} preview={preview} /> : memory ? (
+      {consumer ? <ConsumerPageContent page={page} config={config} preview={preview} /> : help ? <HelpPageContent config={config} name={page.name} preview={preview} /> : contact ? <ContactPageContent config={config} name={page.name} theme={theme} preview={preview} /> : memory ? (
         <MemoryTable config={config} name={page.name} preview={preview} />
       ) : (
         <ServiceHeading

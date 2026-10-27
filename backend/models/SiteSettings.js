@@ -705,6 +705,7 @@ const SiteSettingsSchema = new Schema(
       type: StoreSchema,
       default: () => ({}),
     },
+    consumerProtection: { type: Schema.Types.Mixed, default: undefined },
     storeRevision: { type: Number, min: 0, default: 0 },
     paymentSettingsRevision: { type: Number, min: 0, default: 0 },
     shippingRatesRevision: { type: Number, min: 0, default: 0 },

@@ -1,3 +1,4 @@
+import CheckoutConsumerAcceptance from "../../components/consumer/CheckoutConsumerAcceptance";
 import { CheckoutButton } from "./CheckoutMaterial";
 import React from "react";
 import CheckoutDianCustomerFields from "../dian/CheckoutDianCustomerFields";
@@ -35,6 +36,8 @@ export default function CheckoutFormActions({ state, derived, onPlaceOrder }) {
         />
       )}
 
+      <CheckoutConsumerAcceptance state={state} derived={derived} />
+
       {checkoutConfig.showConfirmButton && (
         <CheckoutButton
           className="co-btn-primary"
@@ -45,6 +48,9 @@ export default function CheckoutFormActions({ state, derived, onPlaceOrder }) {
           }}
           onClick={onPlaceOrder}
           disabled={
+            !derived.consumerOffer?.ready ||
+            state.acceptedTerms !== derived.consumerOffer?.fingerprint ||
+            state.authorizedPrivacy !== derived.consumerOffer?.fingerprint ||
             state.isPlacing ||
             state.cartLoading ||
             !derived.currentCart ||
@@ -137,44 +143,9 @@ export default function CheckoutFormActions({ state, derived, onPlaceOrder }) {
         </div>
       )}
 
-      <div className="co-policies">
-        <button
-          type="button"
-          className="co-policy-link"
-          onClick={() => state.setShowModal(true)}
-        >
-          Políticas de reembolso
-        </button>
-        <button
-          type="button"
-          className="co-policy-link"
-          onClick={() => state.setShowEnvioModal(true)}
-        >
-          Política de Envío
-        </button>
-        <button
-          type="button"
-          className="co-policy-link"
-          onClick={() => state.setShowPrivacidadModal(true)}
-        >
-          Privacidad
-        </button>
-        <button
-          type="button"
-          className="co-policy-link"
-          onClick={() => state.setShowTerminosModal(true)}
-        >
-          Términos del servicio
-        </button>
-        <a
-          href="/contacto"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="co-policy-link"
-        >
-          Contacto
-        </a>
-      </div>
+      <nav className="co-policies" aria-label="Condiciones de compra">
+        {[["cambios-y-devoluciones", "Retracto, garantía y devoluciones"], ["envios", "Envíos y entregas"], ["privacidad", "Datos personales"], ["terminos", "Condiciones de compra"], ["pqr", "Peticiones y reclamos"], ["contacto", "Contacto"]].map(([slug, label]) => <a className="co-policy-link" key={slug} href={`/${slug}`} target="_blank" rel="noopener noreferrer">{label}</a>)}
+      </nav>
     </>
   );
 }

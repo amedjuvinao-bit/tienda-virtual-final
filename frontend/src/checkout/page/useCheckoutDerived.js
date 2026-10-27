@@ -206,30 +206,9 @@ export default function useCheckoutDerived({ state, cart }) {
   const appliedStoreCreditAmount = storeCreditCalculation.appliedAmount;
   const amountDue = storeCreditCalculation.amountDue;
 
-  const shippingEta = useMemo(() => {
-    if (!cartRequiresShipping) return 'Sin envío físico';
-    if (deliveryType === 'retiro') return 'Retiro disponible en tienda';
-    if (finalShipping === 0) {
-      return (
-        matchedZone?.eta ||
-        shippingConfig?.estimatedTime ||
-        shippingConfig?.fallback?.eta ||
-        'Envío gratis aplicado'
-      );
-    }
-    return (
-      matchedZone?.eta ||
-      shippingConfig?.fallback?.eta ||
-      shippingConfig?.estimatedTime ||
-      'Tiempo no configurado'
-    );
-  }, [
-    cartRequiresShipping,
-    deliveryType,
-    finalShipping,
-    matchedZone,
-    shippingConfig,
-  ]);
+  const shippingEta = checkoutQuote?._checkoutKey === quoteKey
+    ? checkoutQuote.consumerOffer?.delivery?.text || 'Verificando plazo de entrega…'
+    : 'Verificando plazo de entrega…';
   const shippingLabel = useMemo(() => {
     if (!cartRequiresShipping) return 'Entrega digital o coordinación';
     if (deliveryType === 'retiro') return 'Retiro en tienda';
@@ -352,6 +331,7 @@ export default function useCheckoutDerived({ state, cart }) {
   else if (total <= 0) disableReason = 'El total debe ser mayor a 0.';
 
   return {
+    consumerOffer: checkoutQuote?._checkoutKey === quoteKey ? checkoutQuote.consumerOffer : null,
     currentCart,
     cartRequiresShipping,
     cartNeedsElectronicDelivery,

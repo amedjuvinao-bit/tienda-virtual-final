@@ -29,6 +29,7 @@ function validFixture() {
     tributeCode: 'ZZ',
   };
   const state = {
+    acceptedTerms: "offer-1", authorizedPrivacy: "offer-1",
     checkoutConfig: {
       ...buildSafeCheckoutPageConfig({}),
       showBillingSection: false,
@@ -60,6 +61,7 @@ function validFixture() {
     storeCreditPreview: { accessToken: 'store-credit-access' },
   };
   const derived = {
+    consumerOffer: { fingerprint: "offer-1", ready: true },
     cartNeedsElectronicDelivery: false,
     cartRequiresShipping: true,
     currentCart: [{ _id: 'product-1', quantity: 1 }],
@@ -95,6 +97,13 @@ describe('estados críticos de Checkout', () => {
         derived: { ...derived, quotePricing: null },
       })
     ).toContain('No fue posible verificar el total final con el servidor.');
+  });
+
+  it('rechaza aceptación de otra oferta y conserva su huella al crear el pedido', () => {
+    const { state, derived } = validFixture();
+    expect(validateCheckoutState({ state: { ...state, authorizedPrivacy: 'anterior' }, derived })).toContain('Revisa y acepta las condiciones de esta compra y autoriza el tratamiento informado de tus datos.');
+    const order = buildOrderDraft({ state, derived, sessionId: 'session', finalItems: [], finalSummary: { subtotal: 100000 } });
+    expect(order.consumerAcceptance).toEqual({ fingerprint: 'offer-1', terms: true, privacy: true });
   });
 
   it('exige dirección para envío físico y correo válido para entrega electrónica', () => {

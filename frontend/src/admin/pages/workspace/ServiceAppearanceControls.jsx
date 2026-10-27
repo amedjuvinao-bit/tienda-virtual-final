@@ -45,6 +45,7 @@ export default function ServiceAppearanceControls({
       };
     });
   const render = (f) => {
+    if (f.scope === "form" && f.key === "enabled" && String(form.systemRole || "").startsWith("consumer-")) return <p key="consumer-publication" className="text-sm">La información para el consumidor permanece publicada para conservar el acceso a sus condiciones y reclamos.</p>;
     if (f.customOnly && config.presentation.backgroundMode !== "custom")
       return null;
     const scope = f.scope || "config",

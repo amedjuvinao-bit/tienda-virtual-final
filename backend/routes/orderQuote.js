@@ -45,6 +45,7 @@ router.post('/quote', async (req, res) => {
       ok: true,
       coupon: couponSnapshot(quote.couponValidation),
       pricing: quote.pricing,
+      consumerOffer: quote.consumerOffer,
       items: quote.pricing.items.map((item) => ({
         productId: item.productId,
         variantId: item.variantId || item.variantKey || '',

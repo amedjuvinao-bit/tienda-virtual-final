@@ -80,7 +80,7 @@ export default function CheckoutDeliverySection({ state, derived }) {
           <Truck size={18} aria-hidden="true" />
           <span style={{ fontWeight: 500 }}>Envío a domicilio</span>
         </label>
-        <label className="co-radio-option">
+        {derived.consumerOffer?.pickupEnabled && (<label className="co-radio-option">
           <input
             type="radio"
             name="delivery"
@@ -90,7 +90,7 @@ export default function CheckoutDeliverySection({ state, derived }) {
           />
           <Store size={18} aria-hidden="true" />
           <span style={{ fontWeight: 500 }}>Retiro en tienda</span>
-        </label>
+        </label>)}
       </div>
 
       {state.deliveryType === "envio" && (

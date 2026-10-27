@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { Store, CreditCard, Truck, Mail, ShieldCheck, LayoutPanelTop, Users, IdCard, FileSearch, Building2, Fingerprint, DatabaseBackup } from 'lucide-react';
 
 // 🔹 IMPORTS MODULARES
+import ConsumerSection from './configuracion/sections/ConsumerSection';
 import EmpresaSection from './configuracion/sections/EmpresaSection';
 import PagosSection from './configuracion/sections/PagosSection';
 import EnviosSection from './configuracion/sections/EnviosSection';
@@ -21,6 +22,7 @@ import RespaldosSection from './configuracion/sections/RespaldosSection';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
+  { id: 'consumidor', label: 'Atención al consumidor', description: 'Identidad legal, entregas y radicados.' },
   { id: 'tiktok', label: 'TikTok', description: 'Cuenta y credenciales privadas de TikTok.' },
   { id: 'instagram', label: 'Instagram', description: 'Cuenta y credenciales privadas de Instagram.' },
   {
@@ -108,6 +110,7 @@ export default function ConfiguracionPage() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'consumidor': return <ConsumerSection />;
       case 'empresa':
         return <EmpresaSection />;
       case 'sedes':

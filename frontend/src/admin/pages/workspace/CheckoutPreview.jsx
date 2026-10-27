@@ -50,6 +50,7 @@ export default function CheckoutPreview({ draft }) {
     ];
   const state = {
     ...form,
+    preview: true,
     checkoutConfig: config,
     checkoutPageData: draft,
     checkoutConfigLoading: false,
@@ -80,6 +81,32 @@ export default function CheckoutPreview({ draft }) {
   state.checkoutQuote = cart.length
     ? {
         _checkoutKey: key,
+        consumerOffer: {
+          ready: true,
+          fingerprint: `preview-${key}`,
+          version: "Vista previa",
+          currency: "COP",
+          pickupEnabled: true,
+          seller: {
+            legalName: "Nombre legal de ejemplo · vista previa",
+            nit: "dato de ejemplo",
+            notificationAddress: "Dirección de ejemplo",
+            email: "contacto@example.com",
+            phone: "Teléfono de ejemplo",
+          },
+          delivery: {
+            text: "Plazo de ejemplo; en la tienda se conserva el plazo real aceptado.",
+          },
+          items: cart,
+          policies: [],
+          pricing: {
+            subtotal: 90000,
+            shipping,
+            total: 90000 + shipping,
+            taxAmount: 0,
+            totalDiscount: 0,
+          },
+        },
         pricing: { subtotal: 90000, shipping, total: 90000 + shipping },
       }
     : null;
