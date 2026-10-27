@@ -3,6 +3,7 @@ import {
   validateMemoryJournal,
 } from "./memoryJournalConfig";
 import { buildContactConfig, validateContactConfig } from "./contactPageConfig";
+import { buildHelpConfig, validateHelpConfig } from "./helpPageConfig";
 import { buildSafeCartPageConfig } from "../cart/cartPageConfig";
 import { catalogImageUrl } from "../catalog/catalogPresentation";
 import { safeFooterLink } from "../footer/footerEditorialConfig";
@@ -93,7 +94,8 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
-    layout: ["memory-table", "contact"].includes(source.layout) ? source.layout : "editorial",
+    layout: ["memory-table", "contact", "help"].includes(source.layout) ? source.layout : "editorial",
+    help: buildHelpConfig(source.help, { starter: source.layout === "help" }),
     contact: buildContactConfig(source.contact),
     journal: buildMemoryJournal(
       source.journal,
@@ -154,7 +156,7 @@ export function normalizeInformationPage(page) {
     name: text(page.name, "Nosotros", 120).trim(),
     slug: text(page.slug, "nosotros", 160).trim().toLowerCase(),
     pageType: "information",
-    ...(["about", "contact"].includes(page.systemRole) ? { systemRole: page.systemRole } : {}),
+    ...(["about", "contact", "help"].includes(page.systemRole) ? { systemRole: page.systemRole } : {}),
     enabled: page.enabled !== false,
     useHeader: page.useHeader !== false,
     useFooter: page.useFooter !== false,
@@ -172,6 +174,13 @@ export function informationConfigForPage(page) {
     style: { cardRadiusPx: 32, buttonRadiusPx: 999, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
     presentation: { borderWidth: 3.25, checkoutGlassOpacity: .8, checkoutGlassBlur: 8 },
   } : {};
+  const helpDefaults = page.systemRole === "help" ? {
+    layout: "help", eyebrowText: "Te acompañamos", titleText: "¿Cómo podemos ayudarte?",
+    subtitleText: "Encuentra respuestas y sigue con tu compra.", titleFontSizePx: 56,
+    contentMaxWidthPx: 1440, gapPx: 24, actionText: "", sections: [],
+    style: { cardRadiusPx: 28, cardPaddingPx: 26, buttonRadiusPx: 999, navigationWidthPx: 290, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
+    presentation: { borderWidth: 3.25, checkoutGlassOpacity: .8, checkoutGlassBlur: 8 },
+  } : {};
   return buildInformationConfig({
     ...(page.systemRole === "about"
       ? {}
@@ -182,10 +191,15 @@ export function informationConfigForPage(page) {
           sections: [],
         }),
     ...contactDefaults,
+    ...helpDefaults,
     ...raw,
     ...(page.systemRole === "contact" ? {
       style: { ...contactDefaults.style, ...object(raw.style) },
       presentation: { ...contactDefaults.presentation, ...object(raw.presentation) },
+    } : {}),
+    ...(page.systemRole === "help" ? {
+      style: { ...helpDefaults.style, ...object(raw.style) },
+      presentation: { ...helpDefaults.presentation, ...object(raw.presentation) },
     } : {}),
     ...(adopt
       ? {
@@ -225,6 +239,8 @@ export function validateInformationPage(page) {
   if (memoryError) return memoryError;
   const contactError = config.layout === "contact" ? validateContactConfig(config.contact) : "";
   if (contactError) return contactError;
+  const helpError = config.layout === "help" ? validateHelpConfig(config.help) : "";
+  if (helpError) return helpError;
   if (config.actionHref?.trim() && !informationLink(config.actionHref))
     return "Revisa el destino del botón: usa una página pública o un enlace http(s), correo o teléfono.";
   if (

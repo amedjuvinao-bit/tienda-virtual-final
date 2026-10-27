@@ -48,5 +48,8 @@ it("enruta páginas informativas y la identidad fija de Nosotros al editor corre
   const contact = { _id: "c", slug: "contacto", pageType: "information", systemRole: "contact" };
   expect(pageEditorPath(contact)).toBe("/admin/information-page/c");
   expect(pagePublicPath(contact)).toBe("/contacto");
+  const help = { _id: "h", slug: "preguntas-frecuentes", pageType: "information", systemRole: "help" };
+  expect(pageEditorPath(help)).toBe("/admin/information-page/h");
+  expect(pagePublicPath(help)).toBe("/preguntas-frecuentes");
   expect(pagePublicPath({ pageType: "information", slug: "ayuda" })).toBe("/pagina/ayuda");
 });

@@ -64,8 +64,24 @@ async function call(method, path, req = {}) {
   const contact = list.body.find(page => page.slug === "contacto");
   assert.equal(contact.pageType, "information");
   assert.equal(contact.systemRole, "contact");
+  const help = list.body.find(page => page.slug === "preguntas-frecuentes");
+  assert.equal(help.pageType, "information");
+  assert.equal(help.systemRole, "help");
   await Promise.all([call("get", "/"), call("get", "/")]);
   assert.equal([...pages.values()].filter(page => page.slug === "contacto").length, 1);
+  assert.equal([...pages.values()].filter(page => page.slug === "preguntas-frecuentes").length, 1);
+  checks++;
+  const helpConfig = { layout: "help", help: { extension: true, categories: [{ id: "pedidos", title: "Pedidos", extension: true, questions: [{ id: "compra", question: "¿Cómo compro?", answer: "Revisa tu carrito.", actionText: "Ver carrito", actionHref: "/carrito", extension: true }] }] } };
+  const helpSaved = await call("put", "/:id", { params: { id: help._id }, body: { name: "Atención", slug: "otra-ayuda", pageType: "custom", systemRole: "", informationPageConfig: helpConfig } });
+  assert.equal(helpSaved.status, 200);
+  assert.equal(helpSaved.body.slug, "preguntas-frecuentes");
+  assert.equal(helpSaved.body.pageType, "information");
+  assert.equal(helpSaved.body.systemRole, "help");
+  assert.deepEqual(helpSaved.body.informationPageConfig, helpConfig);
+  checks++;
+  for (const alias of ["ayuda", "centro-ayuda"]) assert.equal((await call("get", "/:value", { params: { value: alias } })).body._id, help._id);
+  assert.equal((await call("delete", "/:id", { params: { id: help._id } })).status, 400);
+  assert.equal((await call("post", "/", { body: { name: "Duplicada", slug: "preguntas-frecuentes", pageType: "information", systemRole: "help" } })).status, 400);
   checks++;
   const contactConfig = { layout: "contact", contact: { extension: true, whatsappSource: "custom", whatsappPhone: "+12025550123", latitude: "0", longitude: "0" }, presentation: { borderWidth: 0 } };
   const contactSaved = await call("put", "/:id", { params: { id: contact._id }, body: { name: "Atención", slug: "otra-direccion", pageType: "custom", systemRole: "", informationPageConfig: contactConfig } });
@@ -154,6 +170,9 @@ async function call(method, path, req = {}) {
   assert.deepEqual(created.body.informationPageConfig, config);
   checks++;
   const custom = created.body;
+  assert.equal((await call("put", "/:id", { params: { id: custom._id }, body: { name: "Otra", slug: "preguntas-frecuentes", pageType: "information", systemRole: "help" } })).status, 400);
+  assert.notEqual(custom.systemRole, "help");
+  checks++;
   assert.equal((await call("put", "/:id", { params: { id: custom._id }, body: { name: "Otra", slug: "contacto", pageType: "information", systemRole: "contact" } })).status, 400);
   checks++;
   const renamed = await call("put", "/:id", {
@@ -247,6 +266,15 @@ async function call(method, path, req = {}) {
   const ownVenue = insert({ name: "Sede propia", slug: "nuestra-sede", pageType: "information", blocks: [] });
   assert.equal((await call("get", "/:value", { params: { value: "nuestra-sede" } })).body._id, ownVenue._id);
   assert.ok(Page.schema.path("systemRole").enumValues.includes("contact"));
+  checks++;
+  const ownHelpAlias = insert({ name: "Ayuda propia", slug: "ayuda", pageType: "custom", blocks: [{ id: "contenido-propio" }] });
+  assert.equal((await call("get", "/:value", { params: { value: "ayuda" } })).body._id, ownHelpAlias._id);
+  pages.delete(help._id);
+  const legacyHelp = insert({ name: "Preguntas anteriores", slug: "preguntas-frecuentes", pageType: "custom", blocks: [{ id: "preguntas-originales" }] });
+  assert.equal((await call("get", "/:value", { params: { value: "preguntas-frecuentes" } })).body._id, legacyHelp._id);
+  assert.equal(legacyHelp.pageType, "custom");
+  assert.equal(legacyHelp.blocks[0].id, "preguntas-originales");
+  assert.ok(Page.schema.path("systemRole").enumValues.includes("help"));
   checks++;
   console.log(
     `PASS ${checks} information page persistence, aliases, safe adoption and identity checks`,

@@ -6,6 +6,8 @@ Nosotros incorpora también la [mesa de recuerdos del diario visual](diario-visu
 
 [Contacto](contacto.md) incorpora canales comerciales, horario, ubicación y su composición propia, administrados en el mismo editor por temas.
 
+El [Centro de ayuda](centro-ayuda.md) incorpora búsqueda, temas, preguntas desplegables y catorce respuestas iniciales basadas en el recorrido de compra de la tienda.
+
 ## Rutas e identidad
 
 - `/nosotros` abre la página con dirección `nosotros`.
@@ -42,6 +44,6 @@ La auditoría de navegador utiliza App, encabezado, pie, editor e iframe reales 
 
 ## Alcance de esta entrega
 
-Se entrega la base reutilizable, Nosotros y Contacto, junto con sus enlaces compatibles. Nuestra sede utiliza Contacto cuando no existe una página propia. Envíos, políticas, privacidad y términos podrán usar esta base con el contenido aprobado por el negocio. El portal de devoluciones por orden conserva su función y autorización independientes.
+Se entrega la base reutilizable, Nosotros, Contacto y Centro de ayuda, junto con sus enlaces compatibles. Nuestra sede utiliza Contacto cuando no existe una página propia. Envíos, políticas, privacidad y términos podrán usar esta base con el contenido aprobado por el negocio. El portal de devoluciones por orden conserva su función y autorización independientes.
 
 Resultado: 107 pruebas de frontend en 28 archivos, contratos de backend de servicios (18) e información (14), diez recorridos de navegador y compilación de producción aprobados. Una comprobación final dirigida repite las 17 pruebas de creación, edición, normalización, cancelación e identidad después de los últimos ajustes.

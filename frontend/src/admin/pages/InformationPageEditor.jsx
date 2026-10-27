@@ -6,6 +6,11 @@ import {
 } from "../../components/information-page/informationPageConfig";
 const tabs = [
   { id: "content", label: "Título y presentación", group: "content" },
+  { id: "help-topics", label: "Temas y categorías", group: "content" },
+  { id: "help-questions", label: "Preguntas y respuestas", group: "content" },
+  { id: "help-texts", label: "Buscador y mensajes", group: "content" },
+  { id: "help-support", label: "Atención y enlaces", group: "content" },
+  { id: "help-design", label: "Diseño del centro", group: "design" },
   { id: "contact-channels", label: "Canales de contacto", group: "content" },
   { id: "contact-hours", label: "Horarios de atención", group: "content" },
   { id: "contact-location", label: "Ubicación y mapa", group: "content" },
@@ -24,6 +29,7 @@ const tabs = [
 ];
 const resolveTabs = (tabs, form) => tabs.filter(tab => {
   const layout = form.informationPageConfig.layout;
+  if (tab.id.startsWith("help-")) return layout === "help";
   if (tab.id.startsWith("contact-")) return layout === "contact";
   if (["moments", "journal-texts", "journal-design"].includes(tab.id)) return layout === "memory-table";
   return true;

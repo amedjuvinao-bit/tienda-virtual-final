@@ -260,6 +260,9 @@ export default function App() {
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
                   <Route path="/contacto" element={<DynamicPage theme={themeFromServer} fixedSlug="contacto" />} />
+                  <Route path="/preguntas-frecuentes" element={<DynamicPage theme={themeFromServer} fixedSlug="preguntas-frecuentes" />} />
+                  <Route path="/ayuda" element={<DynamicPage theme={themeFromServer} fixedSlug="ayuda" />} />
+                  <Route path="/centro-ayuda" element={<DynamicPage theme={themeFromServer} fixedSlug="centro-ayuda" />} />
                   <Route path="/nuestra-sede" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-sede" />} />
                   <Route path="/nuestra-historia" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-historia" />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />

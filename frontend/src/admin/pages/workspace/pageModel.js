@@ -67,6 +67,9 @@ export const PAGE_TYPES = {
   },
 };
 export function pageMeta(page) {
+  if (page?.systemRole === "help") return {
+    ...PAGE_TYPES.information, system: true, slug: "preguntas-frecuentes", publicPath: "/preguntas-frecuentes",
+  };
   if (page?.systemRole === "contact") return {
     ...PAGE_TYPES.information, system: true, slug: "contacto", publicPath: "/contacto",
   };

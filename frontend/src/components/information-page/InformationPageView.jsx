@@ -1,5 +1,6 @@
 import MemoryTable from "./MemoryTable";
 import ContactPageContent from "./ContactPageContent";
+import HelpPageContent from "./HelpPageContent";
 import { useState } from "react";
 import { ArrowUpRight, BookOpen } from "lucide-react";
 import ServicePageFrame, {
@@ -72,8 +73,10 @@ export default function InformationPageView({ page, theme, preview = false }) {
   );
   const memory = config.layout === "memory-table";
   const contact = config.layout === "contact";
-  const showSections = memory ? config.journal.showSections : contact ? config.contact.showSections : true;
-  const showFooterAction = memory ? config.journal.showFooterAction : contact ? config.contact.showFooterAction : true;
+  const help = config.layout === "help";
+  const extra = memory ? config.journal : contact ? config.contact : help ? config.help : null;
+  const showSections = extra ? extra.showSections : true;
+  const showFooterAction = extra ? extra.showFooterAction : true;
   const navigation =
     config.showNavigation && sections.some((s) => s.title.trim());
   return (
@@ -82,9 +85,9 @@ export default function InformationPageView({ page, theme, preview = false }) {
       config={config}
       theme={theme}
       preview={preview}
-      className={`information-page${memory ? " information-page--memory" : contact ? " information-page--contact" : ""}`}
+      className={`information-page${memory ? " information-page--memory" : contact ? " information-page--contact" : help ? " information-page--help" : ""}`}
     >
-      {contact ? <ContactPageContent config={config} name={page.name} theme={theme} preview={preview} /> : memory ? (
+      {help ? <HelpPageContent config={config} name={page.name} preview={preview} /> : contact ? <ContactPageContent config={config} name={page.name} theme={theme} preview={preview} /> : memory ? (
         <MemoryTable config={config} name={page.name} preview={preview} />
       ) : (
         <ServiceHeading
