@@ -1,5 +1,6 @@
 import MemoryMomentsEditor from "./MemoryMomentsEditor";
 import MemoryDesignControls from "./MemoryDesignControls";
+import ContactAppearanceControls from "./ContactAppearanceControls";
 import ServiceAppearanceControls from "./ServiceAppearanceControls";
 import InformationSectionsEditor from "./InformationSectionsEditor";
 import { serviceEditorSections } from "./serviceEditorFields";
@@ -10,6 +11,7 @@ const f = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 export default function InformationAppearanceControls(props) {
+  if (props.topic.startsWith("contact-")) return <ContactAppearanceControls {...props} />;
   if (props.topic === "moments") return <MemoryMomentsEditor {...props} />;
   if (["journal-texts", "journal-design"].includes(props.topic))
     return <MemoryDesignControls {...props} />;
@@ -26,6 +28,7 @@ export default function InformationAppearanceControls(props) {
           label: "Diseño de la página",
           type: "select",
           options: [
+            ["contact", "Contacto y ubicación"],
             ["memory-table", "Mesa de recuerdos"],
             ["editorial", "Página de lectura"],
           ],
@@ -88,7 +91,7 @@ export default function InformationAppearanceControls(props) {
           f(
             "slug",
             "Dirección de la página",
-            props.form.systemRole === "about" ? "readonly" : "text",
+            ["about", "contact"].includes(props.form.systemRole) ? "readonly" : "text",
             { scope: "form" },
           ),
           f("enabled", "Página activa", "toggle", { scope: "form" }),
@@ -102,7 +105,9 @@ export default function InformationAppearanceControls(props) {
       configKey="informationPageConfig"
       sections={sections}
       settingsHelp={
-        props.form.systemRole === "about"
+        props.form.systemRole === "contact"
+          ? "Esta página abre Contacto y, si no existe una página propia de sede, Nuestra sede. Puedes editar el contenido y el diseño; la dirección se conserva para mantener sus enlaces."
+          : props.form.systemRole === "about"
           ? "Esta página está conectada con Nosotros y Nuestra historia. Puedes editar su nombre, contenido y diseño; su dirección se conserva para mantener los enlaces."
           : "Los enlaces de esta página usan /pagina/ seguido de su dirección. Al cambiarla, actualiza los enlaces que la abren."
       }

@@ -10,7 +10,6 @@ import "../../components/cart/cartPage.css";
 import "./checkoutPage.css";
 import StorefrontFooter from "../../components/StorefrontFooter";
 import Header from "../../components/Header";
-import ModalContacto from "../../components/ModalContacto";
 import ModalEnvio from "../../components/ModalEnvio";
 import ModalPrivacidad from "../../components/ModalPrivacidad";
 import ModalReembolso from "../../components/ModalReembolso";
@@ -41,10 +40,6 @@ function CheckoutModals({ state }) {
       <ModalTerminos
         visible={state.showTerminosModal}
         onClose={() => state.setShowTerminosModal(false)}
-      />
-      <ModalContacto
-        visible={state.showContactoModal}
-        onClose={() => state.setShowContactoModal(false)}
       />
     </>
   );

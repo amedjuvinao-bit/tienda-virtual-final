@@ -1,4 +1,5 @@
 import MemoryTable from "./MemoryTable";
+import ContactPageContent from "./ContactPageContent";
 import { useState } from "react";
 import { ArrowUpRight, BookOpen } from "lucide-react";
 import ServicePageFrame, {
@@ -70,6 +71,9 @@ export default function InformationPageView({ page, theme, preview = false }) {
         s.items.some((i) => i.title || i.body)),
   );
   const memory = config.layout === "memory-table";
+  const contact = config.layout === "contact";
+  const showSections = memory ? config.journal.showSections : contact ? config.contact.showSections : true;
+  const showFooterAction = memory ? config.journal.showFooterAction : contact ? config.contact.showFooterAction : true;
   const navigation =
     config.showNavigation && sections.some((s) => s.title.trim());
   return (
@@ -78,9 +82,9 @@ export default function InformationPageView({ page, theme, preview = false }) {
       config={config}
       theme={theme}
       preview={preview}
-      className={`information-page${memory ? " information-page--memory" : ""}`}
+      className={`information-page${memory ? " information-page--memory" : contact ? " information-page--contact" : ""}`}
     >
-      {memory ? (
+      {contact ? <ContactPageContent config={config} name={page.name} theme={theme} preview={preview} /> : memory ? (
         <MemoryTable config={config} name={page.name} preview={preview} />
       ) : (
         <ServiceHeading
@@ -89,7 +93,7 @@ export default function InformationPageView({ page, theme, preview = false }) {
           icon={BookOpen}
         />
       )}
-      {(!memory || config.journal.showSections) && sections.length > 0 && (
+      {showSections && sections.length > 0 && (
         <div
           className="information-layout"
           data-navigation={navigation}
@@ -125,7 +129,7 @@ export default function InformationPageView({ page, theme, preview = false }) {
           </div>
         </div>
       )}
-      {(!memory || config.journal.showFooterAction) &&
+      {showFooterAction &&
         config.actionText &&
         config.actionHref && (
           <div className="information-actions">

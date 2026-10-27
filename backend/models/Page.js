@@ -68,7 +68,7 @@ const PageSchema = new mongoose.Schema(
       default: "custom",
     },
 
-    systemRole: { type: String, enum: ["", "about"], default: "" },
+    systemRole: { type: String, enum: ["", "about", "contact"], default: "" },
     informationPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     enabled: {

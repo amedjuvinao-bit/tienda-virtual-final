@@ -2,6 +2,7 @@ import {
   buildMemoryJournal,
   validateMemoryJournal,
 } from "./memoryJournalConfig";
+import { buildContactConfig, validateContactConfig } from "./contactPageConfig";
 import { buildSafeCartPageConfig } from "../cart/cartPageConfig";
 import { catalogImageUrl } from "../catalog/catalogPresentation";
 import { safeFooterLink } from "../footer/footerEditorialConfig";
@@ -92,7 +93,8 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
-    layout: source.layout === "memory-table" ? "memory-table" : "editorial",
+    layout: ["memory-table", "contact"].includes(source.layout) ? source.layout : "editorial",
+    contact: buildContactConfig(source.contact),
     journal: buildMemoryJournal(
       source.journal,
       Array.isArray(source.sections) ? source.sections : [],
@@ -152,7 +154,7 @@ export function normalizeInformationPage(page) {
     name: text(page.name, "Nosotros", 120).trim(),
     slug: text(page.slug, "nosotros", 160).trim().toLowerCase(),
     pageType: "information",
-    ...(page.systemRole === "about" ? { systemRole: "about" } : {}),
+    ...(["about", "contact"].includes(page.systemRole) ? { systemRole: page.systemRole } : {}),
     enabled: page.enabled !== false,
     useHeader: page.useHeader !== false,
     useFooter: page.useFooter !== false,
@@ -163,6 +165,13 @@ export function normalizeInformationPage(page) {
 export function informationConfigForPage(page) {
   const raw = object(page.informationPageConfig);
   const adopt = page.systemRole === "about" && raw.layout === undefined;
+  const contactDefaults = page.systemRole === "contact" ? {
+    layout: "contact", eyebrowText: "Estamos cerca", titleText: "Hablemos de lo\nque necesitas.",
+    subtitleText: "Elige cómo prefieres contactarnos.", contentMaxWidthPx: 1440,
+    titleFontSizePx: 64, gapPx: 36, actionText: "", sections: [],
+    style: { cardRadiusPx: 32, buttonRadiusPx: 999, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
+    presentation: { borderWidth: 3.25, checkoutGlassOpacity: .8, checkoutGlassBlur: 8 },
+  } : {};
   return buildInformationConfig({
     ...(page.systemRole === "about"
       ? {}
@@ -172,7 +181,12 @@ export function informationConfigForPage(page) {
           subtitleText: "",
           sections: [],
         }),
+    ...contactDefaults,
     ...raw,
+    ...(page.systemRole === "contact" ? {
+      style: { ...contactDefaults.style, ...object(raw.style) },
+      presentation: { ...contactDefaults.presentation, ...object(raw.presentation) },
+    } : {}),
     ...(adopt
       ? {
           layout: "memory-table",
@@ -207,8 +221,10 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
-  const memoryError = validateMemoryJournal(config.journal);
+  const memoryError = config.layout === "memory-table" ? validateMemoryJournal(config.journal) : "";
   if (memoryError) return memoryError;
+  const contactError = config.layout === "contact" ? validateContactConfig(config.contact) : "";
+  if (contactError) return contactError;
   if (config.actionHref?.trim() && !informationLink(config.actionHref))
     return "Revisa el destino del botón: usa una página pública o un enlace http(s), correo o teléfono.";
   if (

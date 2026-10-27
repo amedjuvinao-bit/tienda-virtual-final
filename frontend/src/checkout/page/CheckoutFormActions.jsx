@@ -166,13 +166,14 @@ export default function CheckoutFormActions({ state, derived, onPlaceOrder }) {
         >
           Términos del servicio
         </button>
-        <button
-          type="button"
+        <a
+          href="/contacto"
+          target="_blank"
+          rel="noopener noreferrer"
           className="co-policy-link"
-          onClick={() => state.setShowContactoModal(true)}
         >
           Contacto
-        </button>
+        </a>
       </div>
     </>
   );

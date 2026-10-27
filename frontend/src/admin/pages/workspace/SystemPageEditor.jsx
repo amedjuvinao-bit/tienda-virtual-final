@@ -20,6 +20,7 @@ export default function SystemPageEditor({
   label,
   normalizePage,
   tabs,
+  resolveTabs,
   Controls,
   validatePage,
   usePageName = false,
@@ -120,12 +121,14 @@ export default function SystemPageEditor({
         onBack={() => navigate("/admin/paginas")}
       />
     );
+  const visibleTabs = resolveTabs ? resolveTabs(tabs, form) : tabs;
+  const topic = visibleTabs.some(tab => tab.id === activeTab) ? activeTab : visibleTabs[0].id;
   return (
     <div className={className}>
       <PageEditorWorkspace
         form={usePageName ? form : { ...form, name: label }}
-        tabs={tabs}
-        activeTab={activeTab}
+        tabs={visibleTabs}
+        activeTab={topic}
         onTabChange={setActiveTab}
         onBack={() => draft.leave(() => navigate("/admin/paginas"))}
         onSave={save}
@@ -139,7 +142,7 @@ export default function SystemPageEditor({
           <Controls
             form={form}
             onChange={setForm}
-            topic={activeTab}
+            topic={topic}
             saving={saving}
             onUploadingChange={(key, busy) =>
               setUploads((current) => ({ ...current, [key]: busy }))

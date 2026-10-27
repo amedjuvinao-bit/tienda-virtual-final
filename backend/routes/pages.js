@@ -11,6 +11,7 @@ const SYSTEM_FAVORITES_SLUG = "favoritos";
 const SYSTEM_NOT_FOUND_SLUG = "not-found";
 const { SERVICE_PAGES, ensureServicePages } = require("../services/pages/servicePages");
 const { ABOUT_SLUG, ensureAboutPage } = require("../services/pages/aboutPage");
+const { CONTACT_SLUG, ensureContactPage } = require("../services/pages/contactPage");
 
 function normalizePageType(value) {
   const safe = String(value || "").trim().toLowerCase();
@@ -382,6 +383,7 @@ router.get("/", async (req, res) => {
     await ensureSystemNotFoundPage();
     await ensureServicePages(Page);
     await ensureAboutPage(Page);
+    await ensureContactPage(Page);
     const pages = await Page.find().sort({ createdAt: -1 });
     res.json(pages);
   } catch (error) {
@@ -400,12 +402,14 @@ router.get("/:value", async (req, res) => {
     await ensureSystemNotFoundPage();
     await ensureServicePages(Page);
     await ensureAboutPage(Page);
+    await ensureContactPage(Page);
 
     const rawValue = String(req.params.value || "").trim();
     const slug = rawValue.toLowerCase();
 
     let page = await Page.findOne({ slug });
     if (!page && slug === "nuestra-historia") page = await Page.findOne({ slug: ABOUT_SLUG });
+    if (!page && slug === "nuestra-sede") page = await Page.findOne({ slug: CONTACT_SLUG });
 
     if (!page && mongoose.Types.ObjectId.isValid(rawValue)) {
       page = await Page.findById(rawValue);
@@ -446,6 +450,7 @@ router.post("/", async (req, res) => {
 
     if (
       slug === ABOUT_SLUG ||
+      slug === CONTACT_SLUG ||
       slug === SYSTEM_CART_SLUG ||
       pageType === "cart-page" ||
       slug === SYSTEM_CHECKOUT_SLUG ||
@@ -554,10 +559,13 @@ router.put("/:id", async (req, res) => {
     if (existingPage.slug !== ABOUT_SLUG && String(body.slug || "").trim().toLowerCase() === ABOUT_SLUG) {
       return res.status(400).json({ message: "La dirección de Nosotros está reservada para su página." });
     }
+    if (existingPage.slug !== CONTACT_SLUG && String(body.slug || "").trim().toLowerCase() === CONTACT_SLUG) {
+      return res.status(400).json({ message: "La dirección de Contacto está reservada para su página." });
+    }
     if (!service && SERVICE_PAGES.some((page) => page.slug === String(body.slug || "").trim().toLowerCase() || page.pageType === requestedPageType)) {
       return res.status(400).json({ message: "No se puede convertir otra página en una página fija del sistema." });
     }
-    const finalPageType = existingPage.systemRole === "about" ? "information" : service ? service.pageType : existingIsSystemCart
+    const finalPageType = ["about", "contact"].includes(existingPage.systemRole) ? "information" : service ? service.pageType : existingIsSystemCart
       ? "cart-page"
       : existingIsSystemCheckout
       ? "checkout-page"
@@ -569,7 +577,7 @@ router.put("/:id", async (req, res) => {
       ? "notfound-page"
       : requestedPageType;
 
-    const finalSlug = existingPage.systemRole === "about" ? ABOUT_SLUG : service ? service.slug : existingIsSystemCart
+    const finalSlug = existingPage.systemRole === "contact" ? CONTACT_SLUG : existingPage.systemRole === "about" ? ABOUT_SLUG : service ? service.slug : existingIsSystemCart
       ? SYSTEM_CART_SLUG
       : existingIsSystemCheckout
       ? SYSTEM_CHECKOUT_SLUG
@@ -697,7 +705,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     if (
-      page.systemRole === "about" ||
+      ["about", "contact"].includes(page.systemRole) ||
       String(page.slug || "").toLowerCase() === SYSTEM_CART_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_CHECKOUT_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_THANKS_SLUG ||

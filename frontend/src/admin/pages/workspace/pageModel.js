@@ -67,6 +67,9 @@ export const PAGE_TYPES = {
   },
 };
 export function pageMeta(page) {
+  if (page?.systemRole === "contact") return {
+    ...PAGE_TYPES.information, system: true, slug: "contacto", publicPath: "/contacto",
+  };
   if (page?.systemRole === "about") return {
     ...PAGE_TYPES.information, system: true, slug: "nosotros", publicPath: "/nosotros",
   };

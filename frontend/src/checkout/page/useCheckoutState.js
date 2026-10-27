@@ -24,7 +24,6 @@ export default function useCheckoutState() {
   const [showEnvioModal, setShowEnvioModal] = useState(false);
   const [showPrivacidadModal, setShowPrivacidadModal] = useState(false);
   const [showTerminosModal, setShowTerminosModal] = useState(false);
-  const [showContactoModal, setShowContactoModal] = useState(false);
   const [errors, setErrors] = useState([]);
   const [checkoutPageData, setCheckoutPageData] = useState(null);
   const [checkoutConfig, setCheckoutConfig] = useState(
@@ -105,8 +104,6 @@ export default function useCheckoutState() {
     setShowPrivacidadModal,
     showTerminosModal,
     setShowTerminosModal,
-    showContactoModal,
-    setShowContactoModal,
     errors,
     setErrors,
     checkoutPageData,

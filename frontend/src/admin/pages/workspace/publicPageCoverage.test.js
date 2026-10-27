@@ -9,6 +9,8 @@ it("toda ruta pública tiene una ubicación de configuración conocida", () => {
   const configured = {
     "/": "Apariencia",
     "/nosotros": "Páginas",
+    "/contacto": "Páginas",
+    "/nuestra-sede": "Páginas",
     "/nuestra-historia": "Páginas",
     "/pagina/:slug": "Páginas",
     "/lo-nuevo": "Apariencia",

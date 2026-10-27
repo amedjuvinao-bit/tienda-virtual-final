@@ -259,6 +259,8 @@ export default function App() {
                 {!themeReady ? window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <StorefrontLoadingScreen /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
+                  <Route path="/contacto" element={<DynamicPage theme={themeFromServer} fixedSlug="contacto" />} />
+                  <Route path="/nuestra-sede" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-sede" />} />
                   <Route path="/nuestra-historia" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-historia" />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
                   <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />

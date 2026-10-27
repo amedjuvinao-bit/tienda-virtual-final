@@ -61,6 +61,24 @@ async function call(method, path, req = {}) {
   assert.equal(about.pageType, "information");
   assert.equal(about.systemRole, "about");
   checks++;
+  const contact = list.body.find(page => page.slug === "contacto");
+  assert.equal(contact.pageType, "information");
+  assert.equal(contact.systemRole, "contact");
+  await Promise.all([call("get", "/"), call("get", "/")]);
+  assert.equal([...pages.values()].filter(page => page.slug === "contacto").length, 1);
+  checks++;
+  const contactConfig = { layout: "contact", contact: { extension: true, whatsappSource: "custom", whatsappPhone: "+12025550123", latitude: "0", longitude: "0" }, presentation: { borderWidth: 0 } };
+  const contactSaved = await call("put", "/:id", { params: { id: contact._id }, body: { name: "Atención", slug: "otra-direccion", pageType: "custom", systemRole: "", informationPageConfig: contactConfig } });
+  assert.equal(contactSaved.status, 200);
+  assert.equal(contactSaved.body.slug, "contacto");
+  assert.equal(contactSaved.body.pageType, "information");
+  assert.equal(contactSaved.body.systemRole, "contact");
+  assert.deepEqual(contactSaved.body.informationPageConfig, contactConfig);
+  checks++;
+  assert.equal((await call("get", "/:value", { params: { value: "nuestra-sede" } })).body._id, contact._id);
+  assert.equal((await call("delete", "/:id", { params: { id: contact._id } })).status, 400);
+  assert.equal((await call("post", "/", { body: { name: "Duplicada", slug: "contacto", pageType: "information" } })).status, 400);
+  checks++;
   await Promise.all([call("get", "/"), call("get", "/")]);
   assert.equal(
     [...pages.values()].filter((page) => page.slug === "nosotros").length,
@@ -136,6 +154,8 @@ async function call(method, path, req = {}) {
   assert.deepEqual(created.body.informationPageConfig, config);
   checks++;
   const custom = created.body;
+  assert.equal((await call("put", "/:id", { params: { id: custom._id }, body: { name: "Otra", slug: "contacto", pageType: "information", systemRole: "contact" } })).status, 400);
+  checks++;
   const renamed = await call("put", "/:id", {
     params: { id: custom._id },
     body: {
@@ -217,6 +237,16 @@ async function call(method, path, req = {}) {
   );
   checks++;
   assert.ok(Page.schema.path("pageType").enumValues.includes("information"));
+  checks++;
+  pages.delete(contact._id);
+  const legacyContact = insert({ name: "Contacto anterior", slug: "contacto", pageType: "custom", blocks: [{ id: "original-contact" }] });
+  assert.equal((await call("get", "/:value", { params: { value: "contacto" } })).body._id, legacyContact._id);
+  assert.equal(legacyContact.pageType, "custom");
+  assert.equal(legacyContact.blocks[0].id, "original-contact");
+  checks++;
+  const ownVenue = insert({ name: "Sede propia", slug: "nuestra-sede", pageType: "information", blocks: [] });
+  assert.equal((await call("get", "/:value", { params: { value: "nuestra-sede" } })).body._id, ownVenue._id);
+  assert.ok(Page.schema.path("systemRole").enumValues.includes("contact"));
   checks++;
   console.log(
     `PASS ${checks} information page persistence, aliases, safe adoption and identity checks`,

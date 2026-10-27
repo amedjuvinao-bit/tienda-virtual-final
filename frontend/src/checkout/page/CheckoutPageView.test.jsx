@@ -103,6 +103,8 @@ it("mantiene disponibles los campos necesarios aunque se oculten los títulos de
       showBillingSection: false,
     },
   });
+  expect(screen.getByRole("link", { name: "Contacto", exact: true })).toHaveAttribute("href", "/contacto");
+  expect(screen.getByRole("link", { name: "Contacto", exact: true })).toHaveAttribute("target", "_blank");
   expect(screen.getByLabelText("Nombre")).toBeInTheDocument();
   expect(screen.getByLabelText("Apellidos")).toBeInTheDocument();
   expect(screen.getByLabelText("Teléfono")).toBeInTheDocument();

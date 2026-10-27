@@ -84,7 +84,7 @@ export function normalizeEditorialOptions(footer = {}, {store={},theme={}} = {})
 }
 const defaults=[
   {title:'Nuestra tienda',links:[{label:'Nuestra historia',href:'/nuestra-historia'},{label:'Catálogo',href:'/#categorias'}]},
-  {title:'Atención al cliente',links:[{label:'Envíos',href:'/politicas'},{label:'Cambios y devoluciones',href:'/cambios-devoluciones'},{label:'Contacto',href:'/#informacion'}]},
+  {title:'Atención al cliente',links:[{label:'Envíos',href:'/politicas'},{label:'Cambios y devoluciones',href:'/cambios-devoluciones'},{label:'Contacto',href:'/contacto'}]},
   {title:'Información legal',links:[{label:'Privacidad',href:'/privacidad'},{label:'Términos y condiciones',href:'/terminos'}]},
 ];
 export const FOOTER_SOCIALS=[{key:'instagram',label:'Instagram'},{key:'tiktok',label:'TikTok'},{key:'facebook',label:'Facebook'},{key:'whatsapp',label:'WhatsApp'}];
