@@ -1,5 +1,6 @@
 'use strict';
 const { buildConsumerOffer } = require('./consumer/checkoutContract');
+const { withReturnPolicy } = require('./consumer/settingsService');
 
 const mongoose = require('mongoose');
 
@@ -461,7 +462,7 @@ async function buildOrderQuote(input = {}, options = {}) {
     couponCode,
     couponValidation,
     pricing,
-    consumerOffer: buildConsumerOffer({ settings: settings || {}, pricing, customer }),
+    consumerOffer: buildConsumerOffer({ settings: await withReturnPolicy(settings || {}, { session, returnPolicy: options.returnPolicy }), pricing, customer }),
   };
 }
 

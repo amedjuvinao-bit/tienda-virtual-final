@@ -1,3 +1,4 @@
+import OrdersWorkspace from "./admin/orders/OrdersWorkspace";
 import ConsumerLinks from "./components/consumer/ConsumerLinks";
 import 'react-toastify/dist/ReactToastify.css';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
@@ -89,6 +90,7 @@ const ConfiguracionPage = lazy(() => import('./admin/ConfiguracionPage'));
 const CarritosAdmin = lazy(() => import('./admin/CarritosAdmin'));
 const FavoritosAdmin = lazy(() => import('./admin/FavoritosAdmin'));
 const OrdersAdmin = lazy(loadOrdersAdmin);
+const ConsumerCasesPanel = lazy(() => import("./admin/orders/ConsumerCasesPanel"));
 const AppearancePage = lazy(() => import('./admin/AppearancePage'));
 
 const RB_SETTINGS_TICK_KEY = 'rb_site_settings_tick';
@@ -292,7 +294,8 @@ export default function App() {
                   >
                     <Route path="dashboard" element={protectAdminContent(<Dashboard />)} />
                     <Route path="productos" element={protectAdminContent(<ProductosAdmin />)} />
-                    <Route path="ordenes" element={protectAdminContent(<OrdersAdmin />)} />
+                    <Route path="ordenes" element={protectAdminContent(<OrdersWorkspace><OrdersAdmin /></OrdersWorkspace>)} />
+                    <Route path="ordenes/reclamos" element={protectAdminContent(<OrdersWorkspace claims><ConsumerCasesPanel /></OrdersWorkspace>)} />
                     <Route path="facturacion" element={<Navigate to="/admin/facturacion/resumen" replace />} />
                     <Route path="facturacion/:tab" element={protectAdminContent(<AdminBillingPage />)} />
                     <Route path="clientes" element={protectAdminContent(<AdminCustomersPage />)} />
@@ -311,7 +314,7 @@ export default function App() {
                     <Route path="configuracion/sedes" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/facturacion" element={<Navigate to="/admin/facturacion/configuracion" replace />} />
                     <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
-                    <Route path="configuracion/consumidor" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/consumidor" element={<Navigate to="/admin/configuracion/empresa?tema=privacidad" replace />} />
                     <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/instagram" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/tiktok" element={protectAdminContent(<ConfiguracionPage />)} />

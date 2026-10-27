@@ -5,18 +5,8 @@ import {
   ContactButton,
 } from "../information-page/ContactMaterial";
 import { downloadText } from "./ConsumerReceipt";
-export const CASE_STATUS = {
-  received: "Recibida",
-  in_review: "En revisión",
-  answered: "Respondida",
-  closed: "Cerrada",
-};
-export const caseDate = (value) =>
-  new Date(value).toLocaleString("es-CO", {
-    timeZone: "America/Bogota",
-    dateStyle: "long",
-    timeStyle: "short",
-  });
+import { CASE_STATUS, caseDate } from "./consumerCaseModel";
+export { CASE_STATUS, caseDate } from "./consumerCaseModel";
 export function caseReceiptText(receipt, key) {
   return [
     `CONSTANCIA DE RADICACIÓN`,

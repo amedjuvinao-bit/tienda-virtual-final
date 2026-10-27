@@ -1,6 +1,7 @@
 "use strict";
 const crypto = require("crypto");
-const { normalizeConfig, policyDocument } = require("./policies");
+const { policyDocument } = require("./policies");
+const { deliverySettings } = require("./sources");
 const { findShippingZone } = require("../../lib/shipping/shippingRateRules");
 const digest = (value) =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -19,7 +20,7 @@ function buildConsumerOffer({
   now = new Date(),
 } = {}) {
   const document = policyDocument(settings),
-    config = normalizeConfig(settings.consumerProtection);
+    config = deliverySettings(settings);
   const physical = (pricing.items || []).some(
     (i) => i.requiresShipping !== false,
   );
@@ -53,6 +54,13 @@ function buildConsumerOffer({
   }
   if (pickup && !config.pickupEnabled)
     missing.push("El retiro no está habilitado");
+  const estimate =
+    physical && !pickup
+      ? findShippingZone(rates, customer)?.eta ||
+        rates?.estimatedTime ||
+        rates?.fallback?.eta ||
+        ""
+      : "";
   const communicatedOn = colombianDate(now);
   const due = new Date(`${communicatedOn}T12:00:00Z`);
   due.setUTCDate(due.getUTCDate() + document.deliveryDays);
@@ -64,7 +72,8 @@ function buildConsumerOffer({
     starts: "day_after_order",
     communicatedOn,
     deadlineDate,
-    text: `${!physical ? "Entrega o prestación" : pickup ? "Disponible para recoger" : "Entrega"} a más tardar el ${new Intl.DateTimeFormat("es-CO", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(due)} (${document.deliveryDays} días calendario desde el día siguiente al pedido).${pickup ? ` ${config.pickupInstructions}` : ""}`,
+    estimate,
+    text: `${estimate ? `Tiempo estimado para tu destino: ${estimate}. ` : ""}${!physical ? "Entrega o prestación" : pickup ? "Disponible para recoger" : "Entrega"} a más tardar el ${new Intl.DateTimeFormat("es-CO", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(due)} (${document.deliveryDays} días calendario desde el día siguiente al pedido).${pickup ? ` ${config.pickupInstructions}` : ""}`,
   };
   const snapshot = {
     paymentMethod: settings.theme?.global?.payments?.provider || "manual",

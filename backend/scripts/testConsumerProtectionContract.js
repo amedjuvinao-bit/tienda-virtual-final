@@ -150,7 +150,11 @@ async function main() {
         () => acceptConsumerOffer(missing, {}),
         (e) => e.code === "CONSUMER_CONFIGURATION_REQUIRED",
       );
-      assert.equal(normalizeConfig(null).deliveryDays, null);
+      assert.equal(
+        require("../services/consumer/sources").deliverySettings({})
+          .deliveryDays,
+        null,
+      );
     },
   );
   await check(
@@ -537,7 +541,7 @@ async function main() {
           ],
           customer,
         },
-        { settings, ProductModel },
+        { settings, ProductModel, returnPolicy: {} },
       );
       assert.equal(quote.pricing.subtotal, 80000);
       assert.equal(quote.pricing.shipping, 10000);
@@ -550,53 +554,49 @@ async function main() {
     },
   );
   await check(
-    "las condiciones administrativas no pierden cambios concurrentes",
+    "la privacidad se guarda sin modificar los datos de Tienda, Facturación ni Envíos",
     async () => {
-      const SiteSettings = require("../models/SiteSettings");
-      const beforeFind = SiteSettings.findOne,
-        beforeUpdate = SiteSettings.updateOne;
+      const { saveSection } = require("../services/consumer/settingsService");
       const current = {
         ...settings,
         _id: "settings-test",
+        shippingDelivery: { revision: 7, deliveryDays: 4 },
         consumerProtection: { ...settings.consumerProtection },
       };
-      SiteSettings.findOne = () => ({ lean: async () => current });
-      SiteSettings.updateOne = async (filter, update) => {
-        if (
-          filter["consumerProtection.revision"] !==
-          current.consumerProtection.revision
-        )
-          return { matchedCount: 0 };
-        current.consumerProtection = update.$set.consumerProtection;
-        return { matchedCount: 1 };
+      const Model = {
+        findOne: () => ({ lean: async () => current }),
+        updateOne: async (filter, update) => {
+          if (
+            filter["consumerProtection.revision"] !==
+            current.consumerProtection.revision
+          )
+            return { matchedCount: 0 };
+          Object.assign(current, update.$set);
+          return { matchedCount: 1 };
+        },
       };
-      const update = router.stack
-        .find((l) => l.route?.path === "/admin/settings" && l.route.methods.put)
-        .route.stack.at(-1).handle;
-      try {
-        const config = normalizeConfig(current.consumerProtection);
-        const a = resMock();
-        await update({ body: { config: { ...config, deliveryDays: 7 } } }, a);
-        assert.equal(a.statusCode, 200);
-        assert.equal(current.consumerProtection.deliveryDays, 7);
-        assert.equal(a.body.config.revision, 3);
-        const stale = resMock();
-        await update(
-          { body: { config: { ...config, deliveryDays: 9 } } },
-          stale,
-        );
-        assert.equal(stale.statusCode, 409);
-        assert.equal(current.consumerProtection.deliveryDays, 7);
-        const invalid = resMock();
-        await update(
-          { body: { config: { ...a.body.config, deliveryDays: 0 } } },
-          invalid,
-        );
-        assert.equal(invalid.statusCode, 400);
-      } finally {
-        SiteSettings.findOne = beforeFind;
-        SiteSettings.updateOne = beforeUpdate;
-      }
+      const config = normalizeConfig(current.consumerProtection);
+      const saved = await saveSection(
+        Model,
+        { ...config, retention: "Criterio actualizado" },
+        "privacy",
+      );
+      assert.equal(saved.consumerProtection.retention, "Criterio actualizado");
+      assert.equal(saved.shippingDelivery.deliveryDays, 4);
+      assert.equal(saved.consumerProtection.deliveryDays, 5); // previous data preserved, not edited by this form
+      await assert.rejects(
+        () => saveSection(Model, config, "privacy"),
+        (e) => e.code === "CONSUMER_CONFIG_CONFLICT",
+      );
+      await assert.rejects(
+        () =>
+          saveSection(
+            Model,
+            { ...normalizeConfig(saved.consumerProtection), nit: "otro" },
+            "privacy",
+          ),
+        (e) => e.statusCode === 400,
+      );
     },
   );
   await check(
@@ -622,6 +622,139 @@ async function main() {
       assert.equal(pages.get("envios").name, "Título personalizado");
       for (const definition of CONSUMER_PAGES)
         assert.equal(pages.get(definition.slug).systemRole, definition.role);
+    },
+  );
+  await check(
+    "Tienda y Facturación son la fuente actual y prevalecen sobre las copias antiguas",
+    () => {
+      const { sellerSource } = require("../services/consumer/sources");
+      const source = {
+        ...settings,
+        billing: {
+          fiscalInfo: {
+            businessName: "Empresa fiscal vigente",
+            nit: "800123456",
+            dv: "2",
+          },
+        },
+        consumerProtection: {
+          ...settings.consumerProtection,
+          legalName: "Nombre anterior",
+          nit: "999999999",
+          email: "anterior@example.com",
+          phone: "1111111111",
+        },
+      };
+      const current = sellerSource(source);
+      assert.equal(current.legalName, "Empresa fiscal vigente");
+      assert.equal(current.nit, "800123456-2");
+      assert.equal(current.email, settings.store.supportEmail);
+      assert.equal(current.phone, settings.store.phone);
+      assert.equal(
+        sellerSource({
+          ...source,
+          store: { ...source.store, phone: "3007654321" },
+        }).phone,
+        "3007654321",
+      );
+      assert.equal(
+        sellerSource({
+          ...source,
+          billing: {
+            fiscalInfo: {
+              businessName: "Nueva razón social",
+              nit: "700123456",
+            },
+          },
+        }).legalName,
+        "Nueva razón social",
+      );
+    },
+  );
+  await check(
+    "las condiciones de Envíos se conservan al cambiar tarifas o privacidad",
+    async () => {
+      const { deliverySettings } = require("../services/consumer/sources");
+      const { saveSection } = require("../services/consumer/settingsService");
+      const current = {
+        ...settings,
+        _id: "test",
+        consumerProtection: { ...settings.consumerProtection },
+        theme: {
+          global: {
+            envios: { estimatedTime: "2 a 3 días hábiles", fixedPrice: 10000 },
+          },
+        },
+      };
+      const Model = {
+        findOne: () => ({ lean: async () => current }),
+        updateOne: async (filter, update) => {
+          Object.assign(current, update.$set);
+          return { matchedCount: 1 };
+        },
+      };
+      const config = deliverySettings(current);
+      assert.equal(config.deliveryDays, 5);
+      await saveSection(Model, { ...config, deliveryDays: 8 }, "delivery");
+      assert.equal(current.shippingDelivery.deliveryDays, 8);
+      assert.equal(current.consumerProtection.deliveryDays, 5);
+      assert.equal(
+        current.theme.global.envios.estimatedTime,
+        "2 a 3 días hábiles",
+      );
+      assert.equal(current.theme.global.envios.fixedPrice, 10000);
+      const offer = buildConsumerOffer({
+        settings: current,
+        pricing,
+        customer,
+        now,
+      });
+      assert.equal(offer.delivery.days, 8);
+      assert.equal(offer.delivery.estimate, "2 a 3 días hábiles");
+    },
+  );
+  await check(
+    "la política publicada y la compra usan la misma revisión de cambios de Órdenes",
+    () => {
+      const policy = {
+        enabled: true,
+        windowDays: 45,
+        policyText: "Texto vigente guardado desde Órdenes",
+        revision: 9,
+      };
+      const source = {
+        ...settings,
+        consumerReturnPolicy: policy,
+        consumerProtection: {
+          ...settings.consumerProtection,
+          commercialChanges: "Texto duplicado antiguo",
+        },
+      };
+      const page = policyDocument(source),
+        original = buildConsumerOffer({
+          settings: source,
+          pricing,
+          customer,
+          now,
+        });
+      const text = page.sections.find((s) => s.id === "garantia").body;
+      assert(text.includes("45 días calendario"));
+      assert(text.includes(policy.policyText));
+      assert(!text.includes("Texto duplicado antiguo"));
+      const changed = buildConsumerOffer({
+        settings: {
+          ...source,
+          consumerReturnPolicy: {
+            ...policy,
+            revision: 10,
+            policyText: "Nueva política vigente",
+          },
+        },
+        pricing,
+        customer,
+        now,
+      });
+      assert.notEqual(changed.fingerprint, original.fingerprint);
     },
   );
   console.log(`PASS ${checks} grupos de protección al consumidor`);

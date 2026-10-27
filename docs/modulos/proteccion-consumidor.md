@@ -4,16 +4,19 @@ Implementación en `feature/paginas-nivel-plus`. Marco consultado el 27 de octub
 
 ## Dónde se administra
 
-- **Configuración → Consumidor y PQR**: identidad del vendedor, NIT, dirección de notificación judicial, contactos, países de envío, plazo total en días calendario, retiro, beneficios de cambios y condiciones reales de tratamiento de datos.
+- **Configuración → Tienda**: datos de contacto, dirección y pestaña Privacidad para vigencia, conservación y proveedores de tratamiento.
+- **Facturación → Configuración**: razón social y NIT, reutilizados en las páginas y en la compra.
+- **Configuración → Envíos → Plazo y recogida**: destinos y compromiso general de entrega.
+- **Órdenes**: entregas, cambios, devoluciones y política comercial existente; pestaña Peticiones y reclamos para recibir y responder solicitudes.
 - **Páginas**: Envíos y entregas, Condiciones de compra, Datos personales, Retracto/garantía/devoluciones y Peticiones y reclamos. Se reutilizan el editor por temas, el borrador, la carga de imágenes y la vista previa. Las secciones complementarias no sustituyen los derechos legales.
 - **Configuración → Envíos**: tarifas, zonas y envío gratuito. La tarifa de la transportadora no se consulta automáticamente al comprador. Envia conserva su integración logística administrativa existente.
-- **Consumidor y PQR → Peticiones y reclamos**: consulta y respuesta pública de radicados. Acceso global reservado a propietario y administradores; no se conceden datos de todos los compradores a operadores de una sede.
+- **Órdenes → Peticiones y reclamos**: consulta y respuesta pública de radicados. Acceso global reservado a propietario y administradores; no se conceden datos de todos los compradores a operadores de una sede.
 
 ## Datos que debe completar el responsable
 
-No se inventan NIT, identidad jurídica, dirección, fecha de vigencia, política de conservación ni proveedores de tratamiento. El nombre legal y los contactos pueden heredarse de Configuración → Tienda; el NIT y las condiciones de tratamiento requieren información real. El checkout bloquea la confirmación si faltan datos necesarios. Esto requiere actualización coordinada de backend y frontend.
+No se inventan NIT, identidad jurídica, dirección, fecha de vigencia, política de conservación ni proveedores de tratamiento. La razón social y el NIT se leen de la información fiscal; los contactos y la dirección, de Tienda. La privacidad se configura una sola vez en Tienda. El checkout bloquea la confirmación si faltan datos necesarios. Esto requiere actualización coordinada de backend y frontend.
 
-El país inicial para envío es CO. El responsable puede configurar otros códigos de dos letras. Esta es una decisión operativa configurable, no una prohibición legal de exportar. El retiro no se ofrece hasta habilitarlo e informar instrucciones.
+Los destinos existentes se recuperan de la configuración anterior o de los países de las zonas; si no hay países informados, el valor inicial es CO. El responsable puede configurar otros códigos de dos letras. Esta es una decisión operativa configurable, no una prohibición legal de exportar. El retiro no se ofrece hasta habilitarlo e informar instrucciones.
 
 El plazo operativo admite 1–30 días calendario e incluye preparación y transporte. Sin plazo particular se informa expresamente el plazo legal supletorio de 30 días desde el día siguiente a la comunicación del pedido. No se anuncian 2–7 días ni cobertura nacional automáticamente. El envío gratuito no altera el plazo.
 
@@ -51,6 +54,8 @@ Las respuestas requieren revisión optimista y texto público. Se conserva el hi
 - Tramitar correctamente la reversión con los actores del pago; el consumidor también debe notificar al emisor en el plazo legal. El formulario no promete reversión automática.
 - Aplicar garantía legal independientemente de los beneficios comerciales. La ventana general del RMA no es una caducidad universal de derechos; desde ese portal se ofrece el canal de reclamación general.
 - Aplicar la política de datos declarada, los acuerdos con encargados y las obligaciones de conservación, seguridad y transferencias. Evaluar obligaciones tributarias, sectoriales y registrales según las características reales del responsable y de los productos.
+
+La antigua dirección `/admin/configuracion/consumidor` redirige a Tienda → Privacidad. No hay una segunda pantalla de identidad ni una segunda política comercial. `shippingDelivery` contiene las condiciones editadas exclusivamente desde Envíos; los valores de la versión anterior se conservan como respaldo hasta guardar allí. El formulario de privacidad solo puede modificar sus tres campos y su revisión, sin sobrescribir la entrega. La política pública de cambios y la fotografía de compra leen `OrderReturnPolicy`, con su revisión vigente.
 
 La implementación cubre los vacíos técnicos identificados en compra, información y atención. No certifica por sí sola toda la operación jurídica, tributaria o sectorial de la empresa ni inventa verificaciones en el entorno productivo.
 

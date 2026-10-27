@@ -5,10 +5,7 @@ const SiteSettings = require("../models/SiteSettings");
 const ConsumerCase = require("../models/ConsumerCase");
 const requireAdmin = require("../middleware/requireAdmin");
 const requirePermission = require("../middleware/requirePermission");
-const {
-  normalizeConfig,
-  policyDocument,
-} = require("../services/consumer/policies");
+const { policyDocument } = require("../services/consumer/policies");
 const { digest } = require("../services/consumer/checkoutContract");
 const {
   TYPES,
@@ -18,6 +15,11 @@ const {
   normalizeReply,
 } = require("../services/consumer/cases");
 const { ensureConsumerCaseIndexes } = require("../services/consumer/indexes");
+const {
+  withReturnPolicy,
+  sectionResponse,
+  saveSection,
+} = require("../services/consumer/settingsService");
 const router = express.Router();
 const guard = [requireAdmin, requirePermission.adminOrOwner()];
 const limiter = rateLimit({
@@ -46,7 +48,10 @@ router.get(
   "/information",
   handle(async (_req, res) => {
     const settings = await SiteSettings.findOne().lean();
-    res.json({ ...policyDocument(settings || {}), types: TYPES });
+    res.json({
+      ...policyDocument(await withReturnPolicy(settings || {})),
+      types: TYPES,
+    });
   }),
 );
 router.post(
@@ -62,7 +67,7 @@ router.post(
         await submitCase(
           ConsumerCase,
           req.body,
-          policyDocument(settings || {}),
+          policyDocument(await withReturnPolicy(settings || {})),
         ),
       );
   }),
@@ -92,79 +97,37 @@ router.post(
     res.set("Cache-Control", "no-store").json(publicCase(doc));
   }),
 );
-router.get(
-  "/admin/settings",
-  ...guard,
-  handle(async (_req, res) => {
-    const settings = await SiteSettings.findOne().lean();
-    res.set("Cache-Control", "no-store").json({
-      config: normalizeConfig(settings?.consumerProtection),
-      document: policyDocument(settings || {}),
-    });
-  }),
-);
-router.put(
-  "/admin/settings",
-  ...guard,
-  handle(async (req, res) => {
-    const raw = req.body?.config;
-    if (
-      !raw ||
-      typeof raw !== "object" ||
-      Array.isArray(raw) ||
-      !Number.isInteger(raw.revision) ||
-      raw.revision < 0
-    )
-      throw error("Recarga la configuración antes de guardar.");
-    const config = normalizeConfig(raw);
-    if (
-      raw.shippingCountries &&
-      !/^[A-Za-z]{2}(?:\s*,\s*[A-Za-z]{2})*$/.test(
-        String(raw.shippingCountries).trim(),
-      )
-    )
-      throw error("Usa códigos de país de dos letras separados por coma.");
-    if (
-      config.deliveryDays !== null &&
-      (!Number.isInteger(config.deliveryDays) ||
-        config.deliveryDays < 1 ||
-        config.deliveryDays > 30)
-    )
-      throw error(
-        "El plazo debe ser de 1 a 30 días calendario, o déjalo vacío para el plazo legal supletorio.",
+for (const [path, section, permission] of [
+  ["/admin/settings", "privacy", "settings:store"],
+  ["/admin/delivery-settings", "delivery", "settings:shipping"],
+]) {
+  const sectionGuard = [requireAdmin, requirePermission(permission)];
+  router.get(
+    path,
+    ...sectionGuard,
+    handle(async (_req, res) => {
+      const settings = await SiteSettings.findOne().lean();
+      res
+        .set("Cache-Control", "no-store")
+        .json(sectionResponse(await withReturnPolicy(settings || {}), section));
+    }),
+  );
+  router.put(
+    path,
+    ...sectionGuard,
+    handle(async (req, res) => {
+      const settings = await saveSection(
+        SiteSettings,
+        req.body?.config,
+        section,
+        req.adminUserId || req.adminUsername,
       );
-    const settings = await SiteSettings.findOne().lean();
-    if (!settings)
-      throw error("Completa primero la configuración de la tienda.");
-    const filter = {
-      _id: settings._id,
-      ...(raw.revision === 0
-        ? {
-            $or: [
-              { "consumerProtection.revision": 0 },
-              { "consumerProtection.revision": { $exists: false } },
-            ],
-          }
-        : { "consumerProtection.revision": raw.revision }),
-    };
-    config.revision = raw.revision + 1;
-    const result = await SiteSettings.updateOne(
-      filter,
-      { $set: { consumerProtection: config } },
-      { runValidators: true },
-    );
-    if (result.matchedCount !== 1)
-      throw error(
-        "Otra sesión actualizó las condiciones. Recarga para revisar sus cambios.",
-        "CONSUMER_CONFIG_CONFLICT",
-        409,
-      );
-    res.json({
-      config,
-      document: policyDocument({ ...settings, consumerProtection: config }),
-    });
-  }),
-);
+      res
+        .set("Cache-Control", "no-store")
+        .json(sectionResponse(await withReturnPolicy(settings), section));
+    }),
+  );
+}
 router.get(
   "/admin/cases",
   ...guard,

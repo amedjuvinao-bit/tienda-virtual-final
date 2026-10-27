@@ -7,10 +7,8 @@ const SOURCES = [
   "https://normograma.superservicios.gov.co/NORMOGRAMA/compilacion/docs/ley_2439_2024.htm",
   "https://cancilleria.gov.co/normograma/compilacion/docs/ley_1581_2012.htm",
 ];
-const clean = (value, max = 300) =>
-  typeof value === "string"
-    ? value.trim().replace(/\s+/g, " ").slice(0, max)
-    : "";
+const { clean } = require("./policiesText");
+const { deliverySettings, sellerSource } = require("./sources");
 function normalizeConfig(raw = {}) {
   raw = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   return {
@@ -18,24 +16,6 @@ function normalizeConfig(raw = {}) {
       Number.isSafeInteger(raw.revision) && raw.revision >= 0
         ? raw.revision
         : 0,
-    legalName: clean(raw.legalName),
-    nit: clean(raw.nit, 30),
-    notificationAddress: clean(raw.notificationAddress),
-    email: clean(raw.email, 180).toLowerCase(),
-    phone: clean(raw.phone, 40),
-    shippingCountries: [
-      ...new Set(
-        (clean(raw.shippingCountries, 500) || "CO")
-          .toUpperCase()
-          .split(",")
-          .map((v) => v.trim())
-          .filter((v) => /^[A-Z]{2}$/.test(v)),
-      ),
-    ].join(", ") || "CO",
-    deliveryDays: raw.deliveryDays == null ? null : Number(raw.deliveryDays),
-    pickupEnabled: raw.pickupEnabled === true,
-    pickupInstructions: clean(raw.pickupInstructions, 1000),
-    commercialChanges: clean(raw.commercialChanges, 3000),
     privacyEffectiveDate: /^\d{4}-\d{2}-\d{2}$/.test(
       raw.privacyEffectiveDate || "",
     )
@@ -46,30 +26,33 @@ function normalizeConfig(raw = {}) {
   };
 }
 function sellerFor(settings = {}) {
-  const c = normalizeConfig(settings.consumerProtection);
-  const s = settings.store || {};
+  return sellerSource(settings);
+}
+function normalizePrivacyConfig(raw = {}) {
+  const c = normalizeConfig(raw);
   return {
-    legalName: c.legalName || clean(s.businessName),
-    nit: c.nit,
-    notificationAddress:
-      c.notificationAddress ||
-      [s.address, s.city, s.department]
-        .map((v) => clean(v))
-        .filter(Boolean)
-        .join(", "),
-    email: c.email || clean(s.supportEmail || s.email, 180).toLowerCase(),
-    phone: c.phone || clean(s.phone || s.whatsapp, 40),
+    revision: c.revision,
+    privacyEffectiveDate: c.privacyEffectiveDate,
+    retention: c.retention,
+    processors: c.processors,
   };
 }
 function readiness(settings = {}) {
-  const c = normalizeConfig(settings.consumerProtection),
+  const c = {
+      ...normalizeConfig(settings.consumerProtection),
+      ...deliverySettings(settings),
+    },
     s = sellerFor(settings);
   const missing = [];
   if (!s.legalName) missing.push("Nombre o razón social del vendedor");
   if (!/^\d[\d.\s-]{4,28}$/.test(s.nit)) missing.push("NIT del vendedor");
   if (
     !s.notificationAddress ||
-    !(c.notificationAddress || settings.store?.address)
+    !(
+      settings.store?.address ||
+      settings.billing?.fiscalInfo?.address ||
+      settings.consumerProtection?.notificationAddress
+    )
   )
     missing.push("Dirección de notificación judicial");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email))
@@ -90,8 +73,10 @@ function readiness(settings = {}) {
   return { ready: missing.length === 0, missing };
 }
 function policyDocument(settings = {}) {
-  const c = normalizeConfig(settings.consumerProtection),
+  const privacy = normalizeConfig(settings.consumerProtection);
+  const c = { ...privacy, ...deliverySettings(settings) },
     seller = sellerFor(settings);
+  const returns = settings.consumerReturnPolicy;
   const delivery =
     c.deliveryDays == null
       ? "Si no se acuerda un plazo particular, la entrega tiene como límite 30 días calendario contados desde el día siguiente a la comunicación del pedido."
@@ -120,7 +105,7 @@ function policyDocument(settings = {}) {
     {
       id: "garantia",
       title: "Garantía legal y cambios comerciales",
-      body: `La garantía legal protege la calidad, idoneidad y seguridad y no se elimina por una promoción ni por cerrar el plazo de cambios comerciales. La reparación, transporte necesario y repuestos no tienen costo en los casos cubiertos. Si no admite reparación procede reposición o devolución; si la falla se repite, el consumidor elige la solución legal aplicable. El término es el que establece la norma o se anuncia; a falta de indicación, los productos nuevos tienen garantía de un año, sin perjuicio de reglas especiales según su naturaleza. No se exige exclusivamente la factura para demostrar la relación de consumo. Los cambios por gusto o talla son beneficios comerciales adicionales, distintos del retracto y la garantía. ${c.commercialChanges || "Las condiciones comerciales adicionales se informan en la oferta cuando existan."} Puedes presentar una reclamación directa en Peticiones y reclamos. Se responde dentro de 15 días hábiles conforme al artículo 58 de la Ley 1480.`,
+      body: `La garantía legal protege la calidad, idoneidad y seguridad y no se elimina por una promoción ni por cerrar el plazo de cambios comerciales. La reparación, transporte necesario y repuestos no tienen costo en los casos cubiertos. Si no admite reparación procede reposición o devolución; si la falla se repite, el consumidor elige la solución legal aplicable. El término es el que establece la norma o se anuncia; a falta de indicación, los productos nuevos tienen garantía de un año, sin perjuicio de reglas especiales según su naturaleza. No se exige exclusivamente la factura para demostrar la relación de consumo. Los cambios por gusto o talla son beneficios comerciales adicionales, distintos del retracto y la garantía. ${returns ? (returns.enabled === false ? "Los cambios comerciales adicionales no están habilitados." : `La política comercial vigente ofrece una ventana general de ${returns.windowDays || 30} días calendario para los artículos que cumplan sus condiciones; pueden existir reglas especiales según el producto. ${clean(returns.policyText, 4000)}`) : "Las condiciones comerciales adicionales se informan en la oferta cuando existan."} Puedes presentar una reclamación directa en Peticiones y reclamos. Se responde dentro de 15 días hábiles conforme al artículo 58 de la Ley 1480.`,
     },
     {
       id: "reversion",
@@ -134,7 +119,7 @@ function policyDocument(settings = {}) {
     },
   ];
   return {
-    version: `${VERSION}:${c.revision}`,
+    version: `${VERSION}:${privacy.revision}:delivery-${c.revision}:returns-${returns?.revision ?? 0}`,
     seller,
     sections,
     authorityUrl: AUTHORITY_URL,
@@ -156,6 +141,7 @@ module.exports = {
   SOURCES,
   clean,
   normalizeConfig,
+  normalizePrivacyConfig,
   sellerFor,
   readiness,
   policyDocument,

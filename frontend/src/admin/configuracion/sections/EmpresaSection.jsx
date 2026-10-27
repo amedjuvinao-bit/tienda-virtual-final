@@ -1,3 +1,4 @@
+import ConsumerSettingsEditor from "./ConsumerSettingsEditor";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -11,6 +12,7 @@ import {
   MapPin,
   RotateCcw,
   Save,
+  ShieldCheck,
   Store,
 } from 'lucide-react';
 
@@ -81,6 +83,7 @@ const STEPS = [
       'weeklySchedule',
     ],
   },
+  { id: 'privacy', label: 'Privacidad', description: 'Uso de los datos de clientes', icon: ShieldCheck, fields: [] },
 ];
 
 const REQUIRED_FIELDS = [
@@ -200,7 +203,8 @@ export default function EmpresaSection() {
   const [revision, setRevision] = useState(0);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [updatedBy, setUpdatedBy] = useState('');
-  const [activeStep, setActiveStep] = useState('identity');
+  const [activeStep, setActiveStep] = useState(() => new URLSearchParams(window.location.search).get('tema') === 'privacidad' ? 'privacy' : 'identity');
+  const [privacyDirty, setPrivacyDirty] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -468,7 +472,7 @@ export default function EmpresaSection() {
           const Icon = step.icon;
           const hasErrors = step.fields.some((field) => errors[field]);
           return (
-            <button key={step.id} type="button" className="store-step" data-active={activeStep === step.id} data-error={hasErrors} aria-current={activeStep === step.id ? 'step' : undefined} onClick={() => setActiveStep(step.id)}>
+            <button key={step.id} type="button" className="store-step" data-active={activeStep === step.id} data-error={hasErrors} aria-current={activeStep === step.id ? 'step' : undefined} onClick={() => { if (privacyDirty && !window.confirm("Tienes cambios de privacidad sin guardar. ¿Quieres descartarlos?")) return; setActiveStep(step.id); }}>
               <Icon size={19} />
               <span><strong>{step.label}</strong><small>{step.description}</small></span>
               {hasErrors ? <b className="store-step__alert">Revisar</b> : null}
@@ -477,6 +481,7 @@ export default function EmpresaSection() {
         })}
       </nav>
 
+      {activeStep === "privacy" ? <ConsumerSettingsEditor onDirtyChange={setPrivacyDirty} /> : <>
       <div className="store-workspace">
         <section className="store-form-card">
           {activeStep === 'identity' ? (
@@ -566,6 +571,7 @@ export default function EmpresaSection() {
           <button type="button" className="store-button store-button--primary" onClick={handleSave} disabled={!dirty || saving}>{saving ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}{saving ? 'Guardando…' : 'Guardar cambios'}</button>
         </div>
       </footer>
+      </>}
     </div>
   );
 }

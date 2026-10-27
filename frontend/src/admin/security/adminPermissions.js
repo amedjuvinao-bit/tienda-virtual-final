@@ -13,6 +13,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   carritos: ['carts:view'],
   favoritos: ['favorites:view'],
   ordenes: ['orders:view'],
+  'ordenes/reclamos': ['orders:view'],
   facturacion: ['billing:view', 'billing:settings'],
   clientes: ['customers:view'],
   pos: ['pos:view'],
@@ -239,6 +240,7 @@ export function getRequiredPermissionsForAdminPath(pathname) {
 }
 
 export function canAccessAdminPath(user, pathname) {
+  if (normalizePath(pathname) === 'ordenes/reclamos') return ['owner', 'admin'].includes(getAdminUserRole(user));
   if (normalizePath(pathname) === 'configuracion/respaldos') {
     return getAdminUserRole(user) === 'owner';
   }
