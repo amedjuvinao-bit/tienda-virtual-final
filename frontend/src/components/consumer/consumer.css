@@ -25,10 +25,14 @@
   border-radius: 999px;
   color: inherit;
   background: transparent;
-  font: 600 14px/1.5 system-ui, sans-serif;
+  font:
+    600 14px/1.5 system-ui,
+    sans-serif;
   text-decoration: none;
   overflow-wrap: anywhere;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 .consumer-claims-link svg {
   flex-shrink: 0;
@@ -95,6 +99,33 @@
 .consumer-source {
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+.consumer-document-reference {
+  min-width: 0;
+  color: var(--cart-ink, inherit);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.consumer-document-reference p {
+  margin: 0 0 10px;
+}
+.consumer-document-reference summary {
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.consumer-document-reference summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.consumer-document-reference code {
+  font-size: 0.95em;
+  user-select: all;
 }
 .consumer-form {
   display: grid;

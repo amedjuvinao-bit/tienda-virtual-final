@@ -7,6 +7,9 @@ import {
 import ConsumerCaseForm from "./ConsumerCaseForm";
 import useConsumerInformation from "./useConsumerInformation";
 import { downloadText } from "./ConsumerReceipt";
+import ConsumerDocumentReference, {
+  documentReferenceText,
+} from "./ConsumerDocumentReference";
 import "./consumer.css";
 import ShippingPageContent from "../shipping/ShippingPageContent";
 const sectionIds = {
@@ -24,7 +27,17 @@ const sectionIds = {
 };
 export default function ConsumerPageContent({ page, config, preview }) {
   const { data, error, retry } = useConsumerInformation();
-  if (page.systemRole === "consumer-shipping") return <ShippingPageContent page={page} config={config} data={data} error={error} retry={retry} preview={preview}/>;
+  if (page.systemRole === "consumer-shipping")
+    return (
+      <ShippingPageContent
+        page={page}
+        config={config}
+        data={data}
+        error={error}
+        retry={retry}
+        preview={preview}
+      />
+    );
   const sections =
     data?.sections?.filter((s) =>
       (sectionIds[page.systemRole] || []).includes(s.id),
@@ -82,7 +95,7 @@ export default function ConsumerPageContent({ page, config, preview }) {
                     `${page.slug}.txt`,
                     [
                       page.name,
-                      `Versión ${data.version}`,
+                      documentReferenceText(data.version),
                       Object.values(data.seller).join("\n"),
                       ...sections.flatMap((s) => [s.title, s.body]),
                     ].join("\n\n"),
@@ -103,8 +116,13 @@ export default function ConsumerPageContent({ page, config, preview }) {
               preview={preview}
             />
           )}
+          <ConsumerDocumentReference
+            version={data.version}
+            purchase={["consumer-terms", "consumer-returns"].includes(
+              page.systemRole,
+            )}
+          />
           <p className="consumer-source">
-            Versión {data.version}.{" "}
             <a
               href={data.authorityUrl}
               target="_blank"

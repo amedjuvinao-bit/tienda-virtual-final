@@ -166,6 +166,12 @@ it("muestra el proceso, abre ayuda y conserva condiciones reales sin inventar pr
   expect(
     screen.getByRole("button", { name: "Descargar esta información" }),
   ).toBeEnabled();
+  expect(
+    screen.getByText(/guardamos las condiciones que aceptaste/),
+  ).toBeVisible();
+  expect(screen.getByText(data.version)).not.toBeVisible();
+  fireEvent.click(screen.getByText("Ver referencia del documento"));
+  expect(screen.getByText(data.version)).toBeVisible();
 });
 it("publica recogida solo cuando está habilitada y utiliza las instrucciones del servidor", () => {
   const view = mount();

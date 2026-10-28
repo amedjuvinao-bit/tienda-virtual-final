@@ -77,6 +77,12 @@ La antigua dirección `/admin/configuracion/consumidor` redirige a Tienda → Pr
 
 La implementación cubre los vacíos técnicos identificados en compra, información y atención. No certifica por sí sola toda la operación jurídica, tributaria o sectorial de la empresa ni inventa verificaciones en el entorno productivo.
 
+## Referencia del documento en la página pública
+
+Las páginas de condiciones, privacidad, cambios, PQR y envíos presentan el identificador técnico dentro de **Ver referencia del documento**, acompañado de una explicación de su utilidad y de su diferencia con un pedido o una clave de acceso. Las páginas de condiciones comerciales explican que la constancia del pedido conserva lo aceptado, aunque la página cambie posteriormente. No se deriva una supuesta fecha de actualización del código compuesto de revisiones; la vigencia de privacidad continúa informándose en su política desde su configuración real.
+
+Se mantiene sin cambios el valor original de `version`, su aceptación y la fotografía contractual del servidor. Las descargas conservan el identificador completo con una etiqueta explicativa; la constancia del pedido conserva su versión histórica y su referencia de integridad. Las condiciones y la descarga no quedan dentro del nuevo desplegable; este contiene únicamente la explicación y el código de referencia. El enlace visible a la SIC se conserva. Este ajuste de presentación se apoya en la accesibilidad y descarga de condiciones y la conservación de prueba previstas en el artículo 50, literales d y e de la Ley 1480; no constituye una certificación del cumplimiento integral de la tienda.
+
 ## Fuentes primarias
 
 - https://normograma.mintic.gov.co/mintic/compilacion/docs/ley_1480_2011.htm
@@ -91,3 +97,5 @@ La implementación cubre los vacíos técnicos identificados en compra, informac
 Pruebas frontend de consumidor, checkout, páginas informativas, Gracias y devoluciones; compilación Vite y recorrido Chromium con API controlada de información, radicación, consulta, configuración, respuesta pública y presentación móvil.
 
 Pruebas adicionales: `node backend/scripts/testConsumerCaseAccess.js` cubre caducidad, intentos, concurrencia, reintentos, revocación, transporte fallido, acceso firmado a la compra, vinculación y recuperación asistida. Los correos y modelos se sustituyen por dobles de prueba; no se envían mensajes a clientes.
+
+Para la presentación de la referencia: 26 pruebas frontend (incluidas cuatro sobre explicación, descargas e historial contractual), 17 grupos del contrato de consumidor y compilación Vite correctos. Un recorrido Chromium con API controlada verificó las cinco páginas a 1440 y 320 px, apertura con teclado, ausencia de desbordamiento, SIC y descargas con la referencia íntegra (14 controles). No se modificaron pedidos, consentimientos ni políticas guardadas.

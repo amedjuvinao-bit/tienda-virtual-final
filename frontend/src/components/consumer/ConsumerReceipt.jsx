@@ -38,7 +38,8 @@ export function contractText(contract, orderNumber = "") {
     `Impuestos incluidos en el total: ${money(p.taxAmount)}`,
     `Envío: ${money(p.shipping)}`,
     `TOTAL: ${money(p.total)}`,
-    `Versión de condiciones: ${contract.version}`,
+    `Referencia de las condiciones aceptadas: ${contract.version}`,
+    "Este código identifica las condiciones guardadas con tu pedido. Los cambios posteriores de la página no modifican esta constancia.",
     `Referencia de integridad: ${contract.fingerprint}`,
     ...(contract.policies || []).flatMap((s) => [`\n${s.title}`, s.body]),
   ]

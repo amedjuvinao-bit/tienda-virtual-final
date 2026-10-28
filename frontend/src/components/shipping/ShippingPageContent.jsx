@@ -20,6 +20,9 @@ import {
 } from "../information-page/ContactMaterial";
 import ContactGlassRim from "../information-page/ContactGlassRim";
 import { downloadText } from "../consumer/ConsumerReceipt";
+import ConsumerDocumentReference, {
+  documentReferenceText,
+} from "../consumer/ConsumerDocumentReference";
 import "./shippingPage.css";
 const icons = {
   cart: ShoppingCart,
@@ -280,7 +283,7 @@ export default function ShippingPageContent({
                   `${page.slug}.txt`,
                   [
                     page.name,
-                    `Versión ${data.version}`,
+                    documentReferenceText(data.version),
                     ...Object.values(data.seller),
                     ...shipment.flatMap((section) => [
                       section.title,
@@ -295,6 +298,7 @@ export default function ShippingPageContent({
           </>
         )}
       </details>
+      {!error && <ConsumerDocumentReference version={data?.version} purchase />}
       {data?.authorityUrl && (
         <p className="shipping-authority">
           <a
