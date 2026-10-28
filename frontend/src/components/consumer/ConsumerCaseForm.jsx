@@ -6,6 +6,8 @@ import {
 } from "../information-page/ContactMaterial";
 import { downloadText } from "./ConsumerReceipt";
 import { CASE_STATUS, caseDate } from "./consumerCaseModel";
+import ConsumerRecoveryForm from "./ConsumerRecoveryForm";
+import { newCaseKey, caseOrderContext } from "./consumerCaseAccess";
 export { CASE_STATUS, caseDate } from "./consumerCaseModel";
 export function caseReceiptText(receipt, key) {
   return [
@@ -26,19 +28,17 @@ export function caseReceiptText(receipt, key) {
     ]),
   ].join("\n\n");
 }
-function newKey() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
 export default function ConsumerCaseForm({ config, document, preview }) {
   const [tab, setTab] = useState("create"),
     [receipt, setReceipt] = useState(null),
     [tracked, setTracked] = useState(null),
     [pending, setPending] = useState(false),
     [error, setError] = useState(""),
-    [attempted, setAttempted] = useState(false);
+    [attempted, setAttempted] = useState(false),
+    [recovered, setRecovered] = useState(null),
+    [orderContext, setOrderContext] = useState(caseOrderContext);
   const request = useRef(null),
+    requestHeaders = useRef({}),
     key = useRef(""),
     trackForm = useRef(null),
     createForm = useRef(null),
@@ -48,7 +48,7 @@ export default function ConsumerCaseForm({ config, document, preview }) {
     if (preview || inFlight.current) return;
     if (!request.current) {
       try {
-        key.current = newKey();
+        key.current = newCaseKey();
       } catch {
         setError(
           "Este navegador no permite generar un acceso seguro. Utiliza un navegador actualizado o los canales de contacto.",
@@ -61,14 +61,18 @@ export default function ConsumerCaseForm({ config, document, preview }) {
         privacyAuthorized: fields.get("privacyAuthorized") === "on",
         privacyVersion: document.version,
         accessKey: key.current,
+        ...(orderContext ? { orderId: orderContext.orderId } : {}),
       };
+      requestHeaders.current = orderContext?.headers || {};
     }
     inFlight.current = true;
     setPending(true);
     setError("");
     setAttempted(true);
     try {
-      const { data } = await api.post("/api/consumer/cases", request.current);
+      const { data } = await api.post("/api/consumer/cases", request.current, {
+        headers: requestHeaders.current,
+      });
       setReceipt(data);
     } catch (e) {
       setError(
@@ -82,10 +86,13 @@ export default function ConsumerCaseForm({ config, document, preview }) {
       }
       if (
         e.response?.status === 400 ||
+        e.response?.data?.error === "CONSUMER_ORDER_ACCESS_INVALID" ||
         e.response?.data?.error === "CONSUMER_POLICY_CHANGED"
       ) {
         request.current = null;
         setAttempted(false);
+        if (e.response?.data?.error === "CONSUMER_ORDER_ACCESS_INVALID")
+          setOrderContext(null);
       }
     } finally {
       setPending(false);
@@ -115,7 +122,13 @@ export default function ConsumerCaseForm({ config, document, preview }) {
       inFlight.current = false;
     }
   }
-  const result = tab === "create" ? receipt : tracked;
+  const result =
+    tab === "create"
+      ? receipt
+      : tab === "recover"
+        ? recovered?.receipt
+        : tracked;
+  const resultKey = tab === "recover" ? recovered?.key : key.current;
   return (
     <ContactGlass config={config} className="consumer-case-panel">
       <div className="consumer-case-tabs" aria-label="Acciones de atención">
@@ -140,6 +153,17 @@ export default function ConsumerCaseForm({ config, document, preview }) {
           }}
         >
           Consultar radicado
+        </ContactButton>
+        <ContactButton
+          config={config}
+          aria-pressed={tab === "recover"}
+          disabled={pending}
+          onClick={() => {
+            setTab("recover");
+            setError("");
+          }}
+        >
+          Recuperar acceso
         </ContactButton>
       </div>
       <p>
@@ -169,6 +193,19 @@ export default function ConsumerCaseForm({ config, document, preview }) {
               <input name="contact" required maxLength={180} />
             </label>
             <label>
+              Correo para constancia y recuperación (opcional)
+              <input
+                name="recoveryEmail"
+                type="email"
+                maxLength={180}
+                autoComplete="email"
+              />
+              <small>
+                Si el contacto anterior es un correo, puedes dejar este campo
+                vacío.
+              </small>
+            </label>
+            <label>
               Tipo de solicitud
               <select name="type" aria-label="Tipo de solicitud">
                 {Object.entries(document.types || {}).map(([value, label]) => (
@@ -182,6 +219,15 @@ export default function ConsumerCaseForm({ config, document, preview }) {
               Número de pedido (opcional)
               <input name="orderNumber" maxLength={80} />
             </label>
+            {orderContext && (
+              <p className="consumer-wide">
+                Abriste esta solicitud desde una compra. Verificaremos su acceso
+                y la vincularemos al radicar.{" "}
+                <button type="button" onClick={() => setOrderContext(null)}>
+                  Radicar sin vincular una compra
+                </button>
+              </p>
+            )}
             <label className="consumer-wide">
               Asunto
               <input name="subject" required maxLength={180} />
@@ -264,6 +310,14 @@ export default function ConsumerCaseForm({ config, document, preview }) {
           </ContactButton>
         </form>
       )}
+      {tab === "recover" && !recovered && (
+        <ConsumerRecoveryForm
+          config={config}
+          preview={preview}
+          onRecovered={setRecovered}
+          onPending={setPending}
+        />
+      )}
       {result && (
         <div className="consumer-case-result" role="status" aria-live="polite">
           <h2>Radicado {result.reference}</h2>
@@ -272,20 +326,37 @@ export default function ConsumerCaseForm({ config, document, preview }) {
           </p>
           <p>{result.subject}</p>
           <p>{result.message}</p>
-          {tab === "create" && (
+          {result.orderLinked && (
+            <p>Solicitud vinculada a la compra #{result.orderNumber}.</p>
+          )}
+          {tab === "create" && receipt.emailStatus === "sent" && (
+            <p>
+              También enviamos la constancia y la clave al correo registrado.
+            </p>
+          )}
+          {tab === "create" && receipt.emailStatus === "failed" && (
+            <p>
+              No pudimos enviar el correo. Tu solicitud está guardada: descarga
+              la constancia y la clave.
+            </p>
+          )}
+          {(tab === "create" || tab === "recover") && (
             <>
               <p>
                 Guarda la constancia y esta clave privada; la necesitarás para
                 ver la respuesta. Por seguridad no se incluye en enlaces
                 públicos.
               </p>
-              <code>{key.current}</code>
+              {tab === "recover" && (
+                <p>Acceso recuperado. La clave anterior dejó de funcionar.</p>
+              )}
+              <code>{resultKey}</code>
               <ContactButton
                 config={config}
                 onClick={() =>
                   downloadText(
                     `${result.reference}.txt`,
-                    caseReceiptText(result, key.current),
+                    caseReceiptText(result, resultKey),
                   )
                 }
               >

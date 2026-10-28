@@ -430,7 +430,10 @@ async function main() {
           [...docs.values()].find(
             (d) =>
               d.reference === filter.reference &&
-              d.accessHash === filter.accessHash,
+              (filter.$or || []).some(branch =>
+                branch.trackingHash && typeof branch.trackingHash === "string"
+                  ? d.trackingHash === branch.trackingHash
+                  : !d.trackingHash && d.accessHash === branch.accessHash),
           ) || null,
       });
       const track = router.stack

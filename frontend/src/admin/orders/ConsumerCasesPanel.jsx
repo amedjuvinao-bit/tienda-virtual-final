@@ -6,7 +6,8 @@ import {
   caseDate,
 } from "../../components/consumer/consumerCaseModel";
 import "../components/consumerAdmin.css";
-export default function ConsumerCasesPanel() {
+import ConsumerAssistedRecovery from "./ConsumerAssistedRecovery";
+export default function ConsumerCasesPanel({ order }) {
   const [cases, setCases] = useState([]),
     [next, setNext] = useState(""),
     [selected, setSelected] = useState(""),
@@ -18,42 +19,106 @@ export default function ConsumerCasesPanel() {
     version = useRef(0),
     lock = useRef(false);
   const draft = usePageDraft({ reply });
-  async function load(cursor = "") {
+  const cursorRef = useRef(""),
+    current = useRef({});
+  current.current = { dirty: draft.dirty, pending, selected };
+  const orderId = String(order?._id || "");
+  async function load(cursor = "", background = false) {
+    if (
+      background &&
+      (lock.current ||
+        current.current.dirty ||
+        current.current.pending ||
+        cursorRef.current)
+    )
+      return;
     const request = ++version.current;
-    setPending(true);
+    if (!background) {
+      current.current.pending = true;
+      setPending(true);
+    }
     setError("");
     try {
       const { data } = await api.get("/api/consumer/admin/cases", {
-        params: { before: cursor },
+        params: { before: cursor, ...(orderId ? { orderId } : {}) },
       });
-      if (mounted.current && request === version.current) {
-        setCases(data.cases);
+      if (
+        mounted.current &&
+        request === version.current &&
+        (!background || !current.current.dirty)
+      ) {
+        setCases((previous) => {
+          const selectedItem =
+            background &&
+            previous.find((c) => c.id === current.current.selected);
+          return selectedItem &&
+            !data.cases.some((c) => c.id === selectedItem.id)
+            ? [...data.cases, selectedItem]
+            : data.cases;
+        });
         setNext(data.next);
-        setSelected("");
-        setReply("");
-        draft.initialize({ reply: "" });
+        cursorRef.current = cursor;
+        if (!background) {
+          setSelected("");
+          setReply("");
+          draft.initialize({ reply: "" });
+        }
       }
     } catch (e) {
-      if (mounted.current)
+      if (mounted.current && request === version.current)
         setError(
           e.response?.data?.message || "No pudimos cargar las solicitudes.",
         );
     } finally {
-      if (mounted.current && request === version.current) setPending(false);
+      if (!background && mounted.current && request === version.current) {
+        current.current.pending = false;
+        setPending(false);
+      }
     }
   }
   useEffect(() => {
     mounted.current = true;
     load();
+    const refresh = () => {
+      if (document.visibilityState !== "hidden") load("", true);
+    };
+    const timer = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
     return () => {
       mounted.current = false;
       version.current++;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
     };
-  }, []);
+  }, [orderId]);
+  async function linkOrder(event) {
+    event.preventDefault();
+    if (lock.current || !item) return;
+    const fields = new FormData(event.currentTarget);
+    lock.current = true;
+    version.current++;
+    setPending(true);
+    setError("");
+    try {
+      await api.post(`/api/consumer/admin/cases/${item.id}/order`, {
+        orderNumber: fields.get("orderNumber"),
+        identityVerified: fields.get("identityVerified") === "on",
+        revision: item.revision,
+      });
+      if (mounted.current) await load();
+    } catch (e) {
+      if (mounted.current)
+        setError(e.response?.data?.message || "No pudimos vincular la compra.");
+    } finally {
+      lock.current = false;
+      if (mounted.current) setPending(false);
+    }
+  }
   async function respond(e) {
     e.preventDefault();
     if (lock.current || !item) return;
     lock.current = true;
+    version.current++;
     setPending(true);
     setError("");
     try {
@@ -83,11 +148,19 @@ export default function ConsumerCasesPanel() {
     <section className="consumer-admin">
       <header>
         <span>Órdenes · Atención al cliente</span>
-        <h2>Peticiones y reclamos</h2>
+        <h2>
+          {orderId
+            ? `Peticiones y reclamos de la compra #${order.orderNumber}`
+            : "Peticiones y reclamos"}
+        </h2>
         <p>
           Aquí llegan las solicitudes enviadas por los clientes. Responde el
           radicado y abre la compra para gestionar su entrega, cambio o
           devolución.
+        </p>
+        <p>
+          El listado se actualiza cada 20 segundos y al volver a esta pestaña.
+          Una respuesta en edición se conserva.
         </p>
       </header>
       {error && <p role="alert">{error}</p>}
@@ -143,6 +216,9 @@ export default function ConsumerCasesPanel() {
             <p>{item.message}</p>
             {item.orderNumber ? (
               <p>
+                {item.linkedOrderId
+                  ? "Vínculo verificado. "
+                  : "Número indicado por el cliente; vínculo pendiente de verificar. "}
                 <a
                   href={`/admin/ordenes?q=${encodeURIComponent(item.orderNumber)}`}
                 >
@@ -151,6 +227,28 @@ export default function ConsumerCasesPanel() {
               </p>
             ) : (
               <p>Esta solicitud no tiene número de compra informado.</p>
+            )}
+            {!item.linkedOrderId && (
+              <form onSubmit={linkOrder} key={`${item.id}-${item.revision}`}>
+                <fieldset disabled={pending || draft.dirty}>
+                  <legend>Vincular con una compra</legend>
+                  <label>
+                    Número exacto de pedido
+                    <input
+                      name="orderNumber"
+                      required
+                      maxLength={80}
+                      defaultValue={order?.orderNumber || item.orderNumber}
+                    />
+                  </label>
+                  <label>
+                    <input name="identityVerified" type="checkbox" required />
+                    Verifiqué la identidad del solicitante y su relación con
+                    esta compra.
+                  </label>
+                  <button type="submit">Vincular solicitud a la compra</button>
+                </fieldset>
+              </form>
             )}
             {item.preferredRefundMethod && (
               <p>
@@ -165,6 +263,18 @@ export default function ConsumerCasesPanel() {
                 </li>
               ))}
             </ol>
+            <ConsumerAssistedRecovery
+              key={item.id}
+              item={item}
+              disabled={pending || draft.dirty}
+              onRecovered={(revision) =>
+                setCases((previous) =>
+                  previous.map((c) =>
+                    c.id === item.id ? { ...c, revision } : c,
+                  ),
+                )
+              }
+            />
             <form onSubmit={respond}>
               <fieldset disabled={pending}>
                 <legend>Respuesta para el cliente</legend>

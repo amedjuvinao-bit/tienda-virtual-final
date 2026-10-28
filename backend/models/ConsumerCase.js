@@ -5,6 +5,17 @@ const ConsumerCaseSchema = new mongoose.Schema(
     reference: { type: String, required: true, unique: true },
     accessHash: { type: String, required: true, unique: true, select: false },
     requestHash: { type: String, required: true, select: false },
+    trackingHash: { type: String, select: false },
+    recoveryEmail: { type: String, maxlength: 180, select: false },
+    recovery: { type: mongoose.Schema.Types.Mixed, select: false },
+    receiptEmail: { type: mongoose.Schema.Types.Mixed, select: false },
+    accessRecovery: { type: mongoose.Schema.Types.Mixed, select: false },
+    order: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+    },
+    orderLink: { type: mongoose.Schema.Types.Mixed },
     name: { type: String, required: true, maxlength: 180 },
     contact: { type: String, required: true, maxlength: 180 },
     type: { type: String, required: true },
@@ -27,6 +38,8 @@ const ConsumerCaseSchema = new mongoose.Schema(
   { timestamps: true },
 );
 ConsumerCaseSchema.index({ status: 1, createdAt: 1 });
+ConsumerCaseSchema.index({ order: 1, _id: -1 });
+ConsumerCaseSchema.index({ orderNumber: 1, order: 1, _id: -1 });
 module.exports =
   mongoose.models.ConsumerCase ||
   mongoose.model("ConsumerCase", ConsumerCaseSchema);

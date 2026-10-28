@@ -144,6 +144,7 @@ export default function GraciasSummaryPanel({
           )}
         </div>
         <div className="gp-support-actions">
+          {model.verified && model.orderId && <a className="gp-returns-link" href={`/pqr?pedido=${encodeURIComponent(model.orderId)}`}>Peticiones y reclamos sobre esta compra</a>}
           {hasDetails && (
             <details className="gp-order-details">
               <summary>

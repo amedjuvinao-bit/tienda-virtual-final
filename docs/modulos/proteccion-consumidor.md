@@ -44,6 +44,22 @@ La clave privada de seguimiento usa 32 bytes aleatorios y solo se guarda su hash
 
 Los reintentos conservan la misma clave y carga: una respuesta de red incierta no genera otra solicitud. Los índices únicos de referencia y hash evitan duplicados concurrentes. Como producción desactiva `autoIndex`, la primera radicación espera `ConsumerCase.createIndexes()`; solo crea índices declarados en esta colección y no elimina/sincroniza índices ajenos. Un fallo de índices impide la escritura. Reiniciar el servidor no elimina los radicados: se guardan en MongoDB.
 
+### Recuperación de acceso
+
+La radicación envía una constancia y la clave mediante el correo configurado en **Configuración → Correo**. Se usa el correo de contacto o el correo de recuperación opcional que indicó el cliente. Un fallo SMTP no elimina el radicado ni lo duplica: se informa al cliente y sigue disponible la descarga. El envío de esta constancia de PQR se intenta una vez por radicado; no equivale al acuse de un pedido ni activa correos comerciales.
+
+**Recuperar acceso** solicita radicado y correo registrado. La respuesta no revela si existen. El código de seis dígitos se envía exclusivamente al correo guardado, caduca en 10 minutos y admite cinco intentos. Se almacena su HMAC con un secreto existente de la aplicación, nunca el código en claro. Hay limitación por IP y dos minutos entre envíos por radicado. Una confirmación válida rota la clave de seguimiento y revoca la anterior; los reintentos de una respuesta de red perdida conservan la misma nueva clave. La clave original se mantiene únicamente como identidad de radicación para impedir duplicados y ya no permite consultar ni recuperar contenido por reenvío del formulario.
+
+Para solicitudes antiguas con correo se reutiliza ese contacto. Si el cliente registró solo teléfono, el propietario o administrador puede usar **Asistir a un cliente que perdió su clave**, comprobar su identidad por el contacto registrado y describir cómo lo verificó. La operación conserva fecha, operador y motivo, invalida códigos pendientes y genera una constancia de acceso que debe entregarse al cliente por ese canal verificado. Las claves no se guardan en claro ni se entregan por búsquedas públicas. La comprobación de identidad y la entrega asistida son acciones del operador.
+
+### Conexión con la compra
+
+Desde Gracias y el portal de devoluciones se puede abrir PQR con el identificador de la compra. Las credenciales existentes se transmiten en cabeceras, nunca en el enlace. El servidor verifica el acceso de pago o de devoluciones antes de guardar el vínculo y usa el número canónico de la orden. No confía en el número escrito por el navegador ni modifica el estado de entrega, cambio o reembolso.
+
+En el detalle de cada orden, la pestaña **Peticiones y reclamos** muestra sus radicados verificados y las referencias pendientes cuyo número indicado coincide exactamente. Estas últimas se distinguen expresamente y requieren comprobación de identidad antes de crear el vínculo. La vinculación administrativa usa revisión optimista y registra fecha y operador. Las solicitudes sin compra siguen admitidas en la bandeja general.
+
+Los listados se actualizan cada 20 segundos y al recuperar foco. Se conserva la selección y se omite la actualización cuando hay una respuesta en edición; una respuesta de red iniciada antes de escribir tampoco reemplaza su revisión. Cambiar de pestaña o cerrar el detalle pide descartar una respuesta sin guardar. Tanto la bandeja general como las operaciones de PQR dentro de una compra se reservan a propietario y administradores.
+
 Las respuestas requieren revisión optimista y texto público. Se conserva el historial con fecha, estado y actor administrativo; el consumidor recibe solo su información y las respuestas públicas, sin identificadores internos del operador. La radicación y el registro de una respuesta no ejecutan un reembolso ni marcan un pago como devuelto.
 
 ## Operación que debe cumplir el negocio
@@ -73,3 +89,5 @@ La implementación cubre los vacíos técnicos identificados en compra, informac
 `node backend/scripts/testConsumerProtectionContract.js`: reglas de aceptación, fechas, cambios de oferta, ausencia de información inventada, radicación, concurrencia, reintentos, privacidad, seguimiento y protección del rol. Las pruebas usan modelos controlados, no datos ni pagos reales.
 
 Pruebas frontend de consumidor, checkout, páginas informativas, Gracias y devoluciones; compilación Vite y recorrido Chromium con API controlada de información, radicación, consulta, configuración, respuesta pública y presentación móvil.
+
+Pruebas adicionales: `node backend/scripts/testConsumerCaseAccess.js` cubre caducidad, intentos, concurrencia, reintentos, revocación, transporte fallido, acceso firmado a la compra, vinculación y recuperación asistida. Los correos y modelos se sustituyen por dobles de prueba; no se envían mensajes a clientes.

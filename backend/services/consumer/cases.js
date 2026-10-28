@@ -25,6 +25,12 @@ function normalizeCase(body = {}) {
     message: clean(body.message, 6000),
     preferredRefundMethod: clean(body.preferredRefundMethod, 300),
   };
+  if (body.recoveryEmail) {
+    const email = clean(body.recoveryEmail, 180).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      throw error("Indica un correo de recuperación válido.");
+    data.recoveryEmail = email;
+  }
   if (
     !data.name ||
     !data.subject ||
@@ -65,6 +71,7 @@ function publicCase(doc) {
     subject: doc.subject,
     message: doc.message,
     orderNumber: doc.orderNumber,
+    orderLinked: Boolean(doc.order),
     preferredRefundMethod: doc.preferredRefundMethod,
     policyVersion: doc.authorization?.version,
     history: (doc.history || []).map((h) => ({
@@ -74,10 +81,24 @@ function publicCase(doc) {
     })),
   };
 }
-async function submitCase(Model, body, document, now = new Date()) {
+async function submitCase(
+  Model,
+  body,
+  document,
+  now = new Date(),
+  context = {},
+) {
   const { data, accessHash, requestHash } = normalizeCase(body);
-  const existing = await Model.findOne({ accessHash }).select("+requestHash");
+  const existing = await Model.findOne({ accessHash }).select(
+    "+requestHash +trackingHash",
+  );
   if (existing) {
+    if (existing.trackingHash)
+      throw error(
+        "El acceso fue recuperado. Consulta con la nueva clave.",
+        "CONSUMER_CASE_ACCESS_CHANGED",
+        409,
+      );
     if (existing.requestHash !== requestHash)
       throw error(
         "Esta clave ya pertenece a una solicitud distinta. Conserva la constancia o inicia otra solicitud.",
@@ -96,6 +117,18 @@ async function submitCase(Model, body, document, now = new Date()) {
   try {
     const doc = await Model.create({
       ...data,
+      ...(context.order
+        ? {
+            order: context.order._id,
+            orderNumber: context.order.orderNumber,
+            orderLink: { at: now, method: "customer_access" },
+          }
+        : {}),
+      recoveryEmail:
+        data.recoveryEmail ||
+        (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact)
+          ? data.contact.toLowerCase()
+          : ""),
       accessHash,
       requestHash,
       reference,
@@ -120,9 +153,10 @@ async function submitCase(Model, body, document, now = new Date()) {
   } catch (err) {
     if (err.code === 11000) {
       const repeated = await Model.findOne({ accessHash }).select(
-        "+requestHash",
+        "+requestHash +trackingHash",
       );
-      if (repeated?.requestHash === requestHash) return publicCase(repeated);
+      if (repeated?.requestHash === requestHash && !repeated.trackingHash)
+        return publicCase(repeated);
     }
     throw err;
   }
