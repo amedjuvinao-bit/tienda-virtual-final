@@ -10,6 +10,8 @@ it("toda ruta pública tiene una ubicación de configuración conocida", () => {
     "/": "Apariencia",
     "/nosotros": "Páginas",
     "/contacto": "Páginas",
+    "/politicas": "Páginas",
+    "/cambios-devoluciones": "Páginas",
     "/preguntas-frecuentes": "Páginas",
     "/ayuda": "Páginas",
     "/centro-ayuda": "Páginas",

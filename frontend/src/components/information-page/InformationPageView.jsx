@@ -76,7 +76,8 @@ export default function InformationPageView({ page, theme, preview = false }) {
   const memory = config.layout === "memory-table";
   const contact = config.layout === "contact";
   const help = config.layout === "help";
-  const extra = memory ? config.journal : contact ? config.contact : help ? config.help : null;
+  const shipping = page.systemRole === "consumer-shipping";
+  const extra = shipping ? config.shipping : memory ? config.journal : contact ? config.contact : help ? config.help : null;
   const showSections = extra ? extra.showSections : true;
   const showFooterAction = extra ? extra.showFooterAction : true;
   const navigation =
@@ -87,7 +88,7 @@ export default function InformationPageView({ page, theme, preview = false }) {
       config={config}
       theme={theme}
       preview={preview}
-      className={`information-page${consumer ? " information-page--consumer" : memory ? " information-page--memory" : contact ? " information-page--contact" : help ? " information-page--help" : ""}`}
+      className={`information-page${shipping ? " information-page--shipping" : ""}${consumer ? " information-page--consumer" : memory ? " information-page--memory" : contact ? " information-page--contact" : help ? " information-page--help" : ""}`}
     >
       {consumer ? <ConsumerPageContent page={page} config={config} preview={preview} /> : help ? <HelpPageContent config={config} name={page.name} preview={preview} /> : contact ? <ContactPageContent config={config} name={page.name} theme={theme} preview={preview} /> : memory ? (
         <MemoryTable config={config} name={page.name} preview={preview} />

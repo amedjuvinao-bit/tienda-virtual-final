@@ -7,6 +7,7 @@ import { buildHelpConfig, validateHelpConfig } from "./helpPageConfig";
 import { buildSafeCartPageConfig } from "../cart/cartPageConfig";
 import { catalogImageUrl } from "../catalog/catalogPresentation";
 import { safeFooterLink } from "../footer/footerEditorialConfig";
+import { buildShippingConfig, validateShippingConfig } from "../shipping/shippingPageConfig";
 const object = (v) =>
   v && typeof v === "object" && !Array.isArray(v) ? v : {};
 const text = (v, fallback = "", limit = Infinity) =>
@@ -94,6 +95,7 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
+    ...(source.shipping !== undefined ? { shipping: buildShippingConfig(source.shipping) } : {}),
     layout: ["memory-table", "contact", "help"].includes(source.layout) ? source.layout : "editorial",
     help: buildHelpConfig(source.help, { starter: source.layout === "help" }),
     contact: buildContactConfig(source.contact),
@@ -166,6 +168,15 @@ export function normalizeInformationPage(page) {
 }
 export function informationConfigForPage(page) {
   const raw = object(page.informationPageConfig);
+  const shipping = page.systemRole === "consumer-shipping";
+  const adoptShipping = shipping && raw.shipping === undefined && raw.subtitleText === "Información clara para comprar y recibir atención." && raw.eyebrowText === "Tu compra, con confianza";
+  const shippingDefaults = shipping ? {
+    shipping: {},
+    titleText: page.name || "Envíos y entregas", eyebrowText: "Información de tu compra", subtitleText: "Todo lo que necesitas saber para recibir tu pedido.",
+    contentMaxWidthPx: 1440, titleFontSizePx: 64, gapPx: 16, actionText: "", sections: [],
+    style: { cardRadiusPx: 28, cardPaddingPx: 28, buttonRadiusPx: 999, textPrimaryColor: "#6b1635", textSecondaryColor: "#71384b", accentColor: "#922e50", sectionTitleSizePx: 32, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
+    presentation: { backgroundMode: "continuity", borderWidth: 2.25, glassOpacity: .12, glassBlur: 5, reflection: .9, checkoutGlassOpacity: .88, checkoutGlassBlur: 8 },
+  } : {};
   const adopt = page.systemRole === "about" && raw.layout === undefined;
   const contactDefaults = page.systemRole === "contact" ? {
     layout: "contact", eyebrowText: "Estamos cerca", titleText: "Hablemos de lo\nque necesitas.",
@@ -192,7 +203,13 @@ export function informationConfigForPage(page) {
         }),
     ...contactDefaults,
     ...helpDefaults,
+    ...shippingDefaults,
     ...raw,
+    ...(shipping ? {
+      style: { ...shippingDefaults.style, ...object(raw.style) },
+      presentation: { ...shippingDefaults.presentation, ...object(raw.presentation) },
+      ...(adoptShipping ? { eyebrowText: shippingDefaults.eyebrowText, subtitleText: shippingDefaults.subtitleText, ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 64 } : {}) } : {}),
+    } : {}),
     ...(page.systemRole === "contact" ? {
       style: { ...contactDefaults.style, ...object(raw.style) },
       presentation: { ...contactDefaults.presentation, ...object(raw.presentation) },
@@ -235,6 +252,8 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
+  const shippingError = page.systemRole === "consumer-shipping" ? validateShippingConfig(config.shipping) : "";
+  if (shippingError) return shippingError;
   const memoryError = config.layout === "memory-table" ? validateMemoryJournal(config.journal) : "";
   if (memoryError) return memoryError;
   const contactError = config.layout === "contact" ? validateContactConfig(config.contact) : "";

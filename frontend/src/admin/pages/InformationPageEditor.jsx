@@ -6,6 +6,10 @@ import {
 } from "../../components/information-page/informationPageConfig";
 const tabs = [
   { id: "content", label: "Título y presentación", group: "content" },
+  { id: "shipping-journey", label: "Proceso de entrega", group: "content" },
+  { id: "shipping-details", label: "Costo, plazo y cobertura", group: "content" },
+  { id: "shipping-support", label: "Ayuda y enlaces", group: "content" },
+  { id: "shipping-design", label: "Composición de envíos", group: "design" },
   { id: "help-topics", label: "Temas y categorías", group: "content" },
   { id: "help-questions", label: "Preguntas y respuestas", group: "content" },
   { id: "help-texts", label: "Buscador y mensajes", group: "content" },
@@ -28,6 +32,9 @@ const tabs = [
   { id: "settings", label: "Identidad y publicación", group: "settings" },
 ];
 const resolveTabs = (tabs, form) => tabs.filter(tab => {
+  const shipping = form.systemRole === "consumer-shipping";
+  if (tab.id.startsWith("shipping-")) return shipping;
+  if (shipping && (tab.id.startsWith("help-") || tab.id.startsWith("contact-") || ["moments", "journal-texts", "journal-design"].includes(tab.id))) return false;
   const layout = form.informationPageConfig.layout;
   if (tab.id.startsWith("help-")) return layout === "help";
   if (tab.id.startsWith("contact-")) return layout === "contact";

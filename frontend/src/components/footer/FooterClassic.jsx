@@ -74,7 +74,7 @@ function buildFooterConfig(theme) {
       ? footer.column2Links
       : [
           { label: "Contáctanos", href: "/contacto" },
-          { label: "Cambio y devoluciones", href: "/cambios-devoluciones" },
+          { label: "Cambio y devoluciones", href: "/cambios-y-devoluciones" },
           { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },
         ],
 
@@ -82,7 +82,7 @@ function buildFooterConfig(theme) {
     column3Links: Array.isArray(footer.column3Links)
       ? footer.column3Links
       : [
-          { label: "Políticas de compra, despacho y envío", href: "/politicas" },
+          { label: "Envíos y entregas", href: "/envios" },
           { label: "Términos y condiciones", href: "/terminos" },
         ],
 

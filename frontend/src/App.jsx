@@ -263,6 +263,8 @@ export default function App() {
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
                   <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
                   {["envios", "terminos", "privacidad", "cambios-y-devoluciones", "pqr"].map(slug => <Route key={slug} path={`/${slug}`} element={<DynamicPage theme={themeFromServer} fixedSlug={slug} />} />)}
+                  <Route path="/politicas" element={<Navigate to="/envios" replace />} />
+                  <Route path="/cambios-devoluciones" element={<Navigate to="/cambios-y-devoluciones" replace />} />
                   <Route path="/contacto" element={<DynamicPage theme={themeFromServer} fixedSlug="contacto" />} />
                   <Route path="/preguntas-frecuentes" element={<DynamicPage theme={themeFromServer} fixedSlug="preguntas-frecuentes" />} />
                   <Route path="/ayuda" element={<DynamicPage theme={themeFromServer} fixedSlug="ayuda" />} />

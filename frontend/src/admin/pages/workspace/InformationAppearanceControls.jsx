@@ -7,6 +7,7 @@ import HelpAppearanceControls from "./HelpAppearanceControls";
 import ServiceAppearanceControls from "./ServiceAppearanceControls";
 import InformationSectionsEditor from "./InformationSectionsEditor";
 import { serviceEditorSections } from "./serviceEditorFields";
+import ShippingAppearanceControls from "./ShippingAppearanceControls";
 const f = (key, label, type = "text", extra = {}) => ({
   key,
   label,
@@ -14,6 +15,7 @@ const f = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 export default function InformationAppearanceControls(props) {
+  if (props.topic.startsWith("shipping-")) return <ShippingAppearanceControls {...props}/>;
   if (props.topic === "help-topics") return <HelpTopicsEditor {...props} />;
   if (props.topic === "help-questions") return <HelpQuestionsEditor {...props} />;
   if (props.topic.startsWith("help-")) return <HelpAppearanceControls {...props} />;
@@ -29,7 +31,7 @@ export default function InformationAppearanceControls(props) {
     content: common.content.map(([title, fields]) => [
       title,
       [
-        {
+        ...(props.form.systemRole === "consumer-shipping" ? [] : [{
           key: "layout",
           label: "Diseño de la página",
           type: "select",
@@ -39,7 +41,7 @@ export default function InformationAppearanceControls(props) {
             ["memory-table", "Mesa de recuerdos"],
             ["editorial", "Página de lectura"],
           ],
-        },
+        }]),
         ...fields,
       ],
     ]),

@@ -8,6 +8,7 @@ import ConsumerCaseForm from "./ConsumerCaseForm";
 import useConsumerInformation from "./useConsumerInformation";
 import { downloadText } from "./ConsumerReceipt";
 import "./consumer.css";
+import ShippingPageContent from "../shipping/ShippingPageContent";
 const sectionIds = {
   "consumer-shipping": ["envios"],
   "consumer-privacy": ["privacidad"],
@@ -23,6 +24,7 @@ const sectionIds = {
 };
 export default function ConsumerPageContent({ page, config, preview }) {
   const { data, error, retry } = useConsumerInformation();
+  if (page.systemRole === "consumer-shipping") return <ShippingPageContent page={page} config={config} data={data} error={error} retry={retry} preview={preview}/>;
   const sections =
     data?.sections?.filter((s) =>
       (sectionIds[page.systemRole] || []).includes(s.id),
