@@ -7,6 +7,7 @@ import FooterSocials from './FooterSocials';
 import './footerEditorial.css';
 import { footerClickFeedback } from './footerClickFeedback';
 import PolishedGlassRim from '../PolishedGlassRim';
+import ConsumerClaimsLink from '../consumer/ConsumerClaimsLink';
 
 export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false, inheritBackground=false }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
@@ -49,6 +50,7 @@ export default function FooterEditorial({ theme, store, preview=false, polishedG
         </div>}
         <FooterNavigation columns={columns} mobileNavigation={c.mobileNavigation}/>
       </div>
+      <div className="footer-ed__claims"><ConsumerClaimsLink footer={footer} preview={preview}/></div>
       <div className="footer-ed__utility">
         <FooterSocials footer={footer} theme={theme} config={c}/>
         {c.backToTopEnabled && <button type="button" className="footer-ed__top-button" aria-label={c.backToTopLabel || 'Volver arriba'} onClick={backToTop}><ArrowUp size={30} aria-hidden="true"/></button>}

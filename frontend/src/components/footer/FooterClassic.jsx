@@ -1,5 +1,6 @@
 // src/components/FooterSection.jsx
 import React, { useMemo, useState } from "react";
+import ConsumerClaimsLink from "../consumer/ConsumerClaimsLink";
 
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
@@ -196,7 +197,7 @@ function FooterAccordionSection({
   );
 }
 
-export default function FooterSection({ theme, inheritBackground = false }) {
+export default function FooterSection({ theme, inheritBackground = false, preview = false }) {
   const footer = useMemo(() => buildFooterConfig(theme), [theme]);
 
   const column1Links = sanitizeLinks(footer.column1Links);
@@ -432,6 +433,10 @@ export default function FooterSection({ theme, inheritBackground = false }) {
               textColor={footer.textColor}
             />
           </div>
+        </div>
+
+        <div className="px-4 pb-6 text-center sm:px-6 md:px-8">
+          <ConsumerClaimsLink footer={theme?.footer} preview={preview} />
         </div>
 
         {/* Barra inferior */}

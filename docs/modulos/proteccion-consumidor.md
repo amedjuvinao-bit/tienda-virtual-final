@@ -34,6 +34,8 @@ La respuesta de creación contiene la recepción del pedido y la fotografía con
 
 ## Radicación y seguimiento
 
+El footer público, en sus variantes editorial y clásica, incluye un acceso directo «Peticiones y reclamos · PQR» a `/pqr`, fuera de los grupos plegables y antes de la firma inferior. Permanece visible aunque las columnas configurables estén vacías u ocultas. Si existe un enlace `/pqr` personalizado en las columnas, el acceso toma su nombre. En la vista previa del panel no navega. La franja global conserva el acceso de respaldo cuando una página no muestra footer.
+
 `POST /api/consumer/cases` admite solicitudes con o sin pedido. Distingue petición, queja/reclamo, incumplimiento de entrega, retracto, garantía, reversión, consulta de datos y reclamo de datos. No aplica los filtros ni la ventana de cambios comerciales del portal RMA a la recepción de estas solicitudes.
 
 Se conserva la solicitud, la autorización informada vigente, el medio de devolución preferido si se informa, el radicado y la fecha/hora. La constancia descargable permite acreditar su texto y consultar posteriormente. Las fechas se muestran en hora de Colombia.

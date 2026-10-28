@@ -12,6 +12,40 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.consumer-claims-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 48px;
+  padding: 12px 20px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  font: 600 14px/1.5 system-ui, sans-serif;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.consumer-claims-link svg {
+  flex-shrink: 0;
+}
+.consumer-claims-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .consumer-claims-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 0 -2px currentColor;
+  }
+  .consumer-claims-link:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
 .consumer-acceptance {
   display: grid;
   gap: 12px;
