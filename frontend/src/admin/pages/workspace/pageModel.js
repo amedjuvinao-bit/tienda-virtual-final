@@ -67,6 +67,9 @@ export const PAGE_TYPES = {
   },
 };
 export function pageMeta(page) {
+  if (page?.slug === "complementos" && page?.pageType === "catalog") return {
+    ...PAGE_TYPES.catalog, system: true, slug: "complementos", publicPath: "/complementos",
+  };
   if (String(page?.systemRole || "").startsWith("consumer-")) return { ...PAGE_TYPES.information, system: true, slug: page.slug, publicPath: `/${page.slug}` };
   if (page?.systemRole === "help") return {
     ...PAGE_TYPES.information, system: true, slug: "preguntas-frecuentes", publicPath: "/preguntas-frecuentes",

@@ -1,10 +1,12 @@
 import React from 'react';
+import CollectionCatalogIntro from './CollectionCatalogIntro';
 import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import CatalogGlassBags from './CatalogGlassBags';
 import CatalogLiquidGlass from './CatalogLiquidGlass';
 
 export default function CatalogIntro({ config: safeConfig, page, children, resultCount }) {
+  if(safeConfig.collection && safeConfig.presentation?.layout === "glass-grid")return <CollectionCatalogIntro config={safeConfig} page={page} resultCount={resultCount}>{children}</CollectionCatalogIntro>;
   const glass = safeConfig.presentation?.layout === 'glass-grid';
   const title = safeConfig.title || page?.name || 'Catálogo';
   const subtitle = safeConfig.subtitle, description = safeConfig.description;

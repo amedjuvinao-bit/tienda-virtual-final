@@ -22,6 +22,7 @@ import PolishedGlassRim from "../PolishedGlassRim";
 import "./catalogPolishedGlass.css";
 import "./catalogFilters.css";
 import {
+  ShoppingBag,
   Filter,
   ChevronLeft,
   X,
@@ -29,6 +30,7 @@ import {
 } from "lucide-react";
 
 // columnas -> clases tailwind
+import "./collectionCatalog.css";
 const colClasses = {
   1: "grid-cols-1",
   2: "grid-cols-2",
@@ -390,7 +392,7 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
 
   return (
     <>
-      <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-layout={presentation.layout} data-background={backdrop ? "continuity" : "custom"} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial || backdrop ? presentationStyle : undefined}>
+      <div ref={depthRef} className="cpv-page flex min-h-screen flex-col" data-collection={!!safeConfig.collection && editorial} data-layout={presentation.layout} data-background={backdrop ? "continuity" : "custom"} data-motion={presentation.motion} data-show-description={presentation.showDescription} data-show-options={presentation.showOptions} style={editorial || backdrop ? presentationStyle : undefined}>
         <div className="cpv-shell">
           {editorial && <div className="cpv-editorial-heading"><CatalogIntro config={safeConfig} page={page} resultCount={resultCount}>{commandBar}</CatalogIntro></div>}
           <div className="cpv-main-grid">
@@ -469,9 +471,9 @@ export default function CatalogPageView({ page = null, catalogConfig = {}, theme
                   </div>
                 ) : filteredProducts.length === 0 ? (
                   <div className="cpv-empty">
-                    <div className="cpv-empty-icon">🔍</div>
-                    <h3>{safeConfig.emptyTitle}</h3>
-                    <p>{safeConfig.emptyText}</p>
+                    {safeConfig.collection ? <ShoppingBag className="collection-empty-icon" aria-hidden="true"/> : <div className="cpv-empty-icon">🔍</div>}
+                    <h3>{safeConfig.collection && (query.q || activeFilters.length) ? safeConfig.collection.filteredEmptyTitle : safeConfig.emptyTitle}</h3>
+                    <p>{safeConfig.collection && (query.q || activeFilters.length) ? safeConfig.collection.filteredEmptyText : safeConfig.emptyText}</p>
                   </div>
                 ) : (
                   filteredProducts.map((product, idx) => (

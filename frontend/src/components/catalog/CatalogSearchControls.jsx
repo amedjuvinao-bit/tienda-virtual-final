@@ -29,7 +29,7 @@ export default function CatalogSearchControls({
           <input
             aria-label="Buscar productos"
             maxLength={160}
-            placeholder="Buscar en este catálogo…"
+            placeholder={config.collection?.searchPlaceholder || "Buscar en este catálogo…"}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />

@@ -4,6 +4,7 @@ const Page = require("../models/Page");
 
 const router = express.Router();
 
+const { CATALOG_PAGES, ensureCatalogPages } = require("../services/pages/catalogPages");
 const SYSTEM_CART_SLUG = "carrito";
 const SYSTEM_CHECKOUT_SLUG = "checkout";
 const SYSTEM_THANKS_SLUG = "gracias";
@@ -389,6 +390,7 @@ router.get("/", async (req, res) => {
     await ensureContactPage(Page);
     await ensureHelpPage(Page);
     await ensureConsumerPages(Page);
+    await ensureCatalogPages(Page);
     const pages = await Page.find().sort({ createdAt: -1 });
     res.json(pages);
   } catch (error) {
@@ -410,6 +412,7 @@ router.get("/:value", async (req, res) => {
     await ensureContactPage(Page);
     await ensureHelpPage(Page);
     await ensureConsumerPages(Page);
+    await ensureCatalogPages(Page);
 
     const rawValue = String(req.params.value || "").trim();
     const slug = rawValue.toLowerCase();
@@ -457,6 +460,7 @@ router.post("/", async (req, res) => {
     }
 
     if (
+      CATALOG_PAGES.some(page => page.slug === slug) ||
       slug === ABOUT_SLUG ||
       slug === CONTACT_SLUG ||
       slug === HELP_SLUG ||
@@ -564,6 +568,13 @@ router.put("/:id", async (req, res) => {
     const existingIsSystemNotFound =
       String(existingPage.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG;
 
+    const catalogPage = CATALOG_PAGES.find(page => page.slug === existingPage.slug);
+    if (CATALOG_PAGES.some(page =>
+      page.slug === String(body.slug || "").trim().toLowerCase() &&
+      page.slug !== existingPage.slug
+    )) {
+      return res.status(400).json({ message: "Esta dirección pertenece a un catálogo del sistema." });
+    }
     const service = SERVICE_PAGES.find((page) => page.slug === existingPage.slug);
     const requestedPageType = normalizePageType(body.pageType === undefined ? existingPage.pageType : body.pageType);
     if (existingPage.slug !== ABOUT_SLUG && String(body.slug || "").trim().toLowerCase() === ABOUT_SLUG) {
@@ -581,7 +592,7 @@ router.put("/:id", async (req, res) => {
     if (CONSUMER_PAGES.some(p => p.slug === String(body.slug || "").trim().toLowerCase() && p.slug !== existingPage.slug)) return res.status(400).json({ message: "Esta dirección pertenece a una página de atención al consumidor." });
     if (String(existingPage.systemRole || "").startsWith("consumer-") && body.enabled === false) return res.status(400).json({ message: "La información para el consumidor debe permanecer disponible. Puedes editar su presentación y condiciones complementarias." });
     const informationSlug = INFORMATION_ROLE_SLUGS.get(existingPage.systemRole);
-    const finalPageType = informationSlug ? "information" : service ? service.pageType : existingIsSystemCart
+    const finalPageType = catalogPage ? "catalog" : informationSlug ? "information" : service ? service.pageType : existingIsSystemCart
       ? "cart-page"
       : existingIsSystemCheckout
       ? "checkout-page"
@@ -593,7 +604,7 @@ router.put("/:id", async (req, res) => {
       ? "notfound-page"
       : requestedPageType;
 
-    const finalSlug = informationSlug || (service ? service.slug : existingIsSystemCart
+    const finalSlug = catalogPage?.slug || informationSlug || (service ? service.slug : existingIsSystemCart
       ? SYSTEM_CART_SLUG
       : existingIsSystemCheckout
       ? SYSTEM_CHECKOUT_SLUG
@@ -721,6 +732,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     if (
+      CATALOG_PAGES.some(definition => definition.slug === page.slug) ||
       INFORMATION_ROLE_SLUGS.has(page.systemRole) ||
       String(page.slug || "").toLowerCase() === SYSTEM_CART_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_CHECKOUT_SLUG ||

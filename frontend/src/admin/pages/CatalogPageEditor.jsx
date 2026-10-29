@@ -1,3 +1,5 @@
+import CollectionCatalogControls from "./workspace/CollectionCatalogControls";
+import { pagePublicPath } from "./workspace/pageModel";
 import { applyCatalogEditorialPreset, restoreCatalogVisualBackup } from "../../components/catalog/catalogEditorialPreset";
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/CatalogPageEditor.jsx
@@ -16,6 +18,7 @@ const API_BASE = API_BASE_URL;
 const EDITOR_TABS = [
   { id: "products", label: "Productos", group: "content" },
   { id: "visual", label: "Fondo y cristal", group: "design" },
+  { id: "collection", label: "Ilustración y mensajes", group: "design" },
   { id: "header", label: "Encabezado", group: "design" },
   { id: "grid", label: "Distribución", group: "design" },
   { id: "card-style", label: "Tarjetas de producto", group: "design" },
@@ -390,7 +393,7 @@ export default function CatalogPageEditor() {
   const previewUrl = useMemo(() => {
     const slug = String(form?.slug || page?.slug || "").trim();
     if (!slug) return "";
-    return `/pagina/${slug}`;
+    return pagePublicPath({...(page || {}),...(form || {}),slug});
   }, [form?.slug, page?.slug]);
 
   const allCategoryOptions = useMemo(() => {
@@ -495,11 +498,14 @@ export default function CatalogPageEditor() {
       });
       if (query) params.set('q', query.trim().slice(0, 160));
       productKeys.forEach((value) => params.append('productKeys', value));
-      const [productsResponse, metaResponse] = await Promise.all([
+      const [productsResponse, metaResponse, taxonomyResponse] = await Promise.all([
         adminFetch(`${API_BASE}/api/products?${params.toString()}`),
         query || productKeys.length
           ? Promise.resolve(null)
           : adminFetch(`${API_BASE}/api/products/meta`),
+        query || productKeys.length
+          ? Promise.resolve(null)
+          : adminFetch(`${API_BASE}/api/products/catalog-categories`).catch(() => null),
       ]);
       if (!productsResponse.ok) throw new Error(`HTTP ${productsResponse.status}`);
       const data = await productsResponse.json();
@@ -517,10 +523,16 @@ export default function CatalogPageEditor() {
         const bounded = new Map([...selected, ...values.slice(0, 100)].map(p => [String(p._id || p.slug), p]));
         return [...bounded.values()];
       });
-      if (metaResponse?.ok) {
-        const meta = await metaResponse.json();
+      if (taxonomyResponse?.ok || metaResponse?.ok) {
+        const meta = metaResponse?.ok ? await metaResponse.json() : {};
+        const taxonomy = taxonomyResponse?.ok ? await taxonomyResponse.json() : {};
         setAvailableProductCategories(
-          Array.isArray(meta?.categories) ? meta.categories : []
+          [
+            ...(Array.isArray(meta?.categories) ? meta.categories : []),
+            ...(Array.isArray(taxonomy?.categories)
+              ? taxonomy.categories.map(item => item.name).filter(Boolean)
+              : []),
+          ]
         );
       }
     } catch (error) {
@@ -844,13 +856,14 @@ export default function CatalogPageEditor() {
   return (
     <PageEditorWorkspace
       form={form}
-      tabs={EDITOR_TABS}
+      tabs={EDITOR_TABS.filter(tab => tab.id !== "collection" || form.catalogConfig.collection)}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onBack={() => draft.leave(() => navigate("/admin/paginas"))}
       onSave={handleSave}
       saving={saving}
       uploading={uploadingTitleImage || uploadingAppearance}
+      lockNavigationDuringUpload
       draft={draft}
       pageTypeLabel="Catálogo"
       scrollToFieldsOnTabChange
@@ -872,6 +885,7 @@ export default function CatalogPageEditor() {
 
             <Input
               label="Dirección de la página"
+              readOnly={page?.slug === "complementos"}
               value={form.slug}
               onChange={(e) => updateRoot({ slug: slugify(e.target.value) })}
               placeholder="Ej: lo-nuevo"
@@ -940,6 +954,7 @@ export default function CatalogPageEditor() {
         </div>
       )}
 
+      {activeTab === "collection" && form.catalogConfig.collection && <CollectionCatalogControls value={form.catalogConfig.collection} saving={saving} onUploadingChange={setUploadingAppearance} onChange={patch=>updateCatalogConfig({collection:{...form.catalogConfig.collection,...patch}})}/>}
       {activeTab === "header" && (
         <CatalogAppearancePanel key="header" section="header" config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance}
           onApplyPreset={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}
@@ -1068,7 +1083,7 @@ export default function CatalogPageEditor() {
           {productsSubtab === "universe" && (
             <SectionCard
               title="Productos de este catálogo"
-              text="Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."
+              text={page?.slug === "complementos" ? "Esta selección parte de la categoría Complementos. Los productos publicados aparecerán cuando los asignes a esa categoría. Puedes cambiar las categorías en el apartado Categorías." : "Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."}
             >
               <Select
                 label="Origen de productos"

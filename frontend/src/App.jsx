@@ -261,6 +261,7 @@ export default function App() {
                 <AdminLogoutGate>
                 {!themeReady ? window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <StorefrontLoadingScreen /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
+                  <Route path="/complementos" element={<DynamicPage theme={themeFromServer} fixedSlug="complementos" />} />
                   <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
                   {["envios", "terminos", "privacidad", "cambios-y-devoluciones", "pqr"].map(slug => <Route key={slug} path={`/${slug}`} element={<DynamicPage theme={themeFromServer} fixedSlug={slug} />} />)}
                   <Route path="/politicas" element={<Navigate to="/envios" replace />} />

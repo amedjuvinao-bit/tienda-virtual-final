@@ -70,7 +70,15 @@ export default function CatalogEditorialCard({ product, config }) {
 
     <div className="catalog-ecard__photo">
       <Link className="catalog-ecard__photo-link" to={destination} aria-label={`Ver ${product.title}`}>
-        <img src={cover} alt={product.title || ''} loading="lazy" decoding="async" onError={() => { if (!failedImage) setFailedImage(true); }}/>
+        {config.collection && (failedImage || (!product.image && !gallery.length)) ? (
+          <div className="collection-product-image-missing">
+            <ShoppingBag aria-hidden="true"/>
+            <span>{config.collection.missingImageText}</span>
+          </div>
+        ) : (
+          <img src={cover} alt={product.title || ''} loading="lazy" decoding="async"
+            onError={() => { if (!failedImage) setFailedImage(true); }}/>
+        )}
       </Link>
       {favorite}
     </div>

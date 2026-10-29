@@ -496,7 +496,7 @@ export default function FilterSidebar({
       </div>
 
       <FilterSection
-        title="Categorías"
+        title={catalogConfig?.collection?.categoriesTitle || "Categorías"}
         section="categories"
         icon={<Search className="h-4 w-4" />}
         isOpen={openCats}

@@ -1,3 +1,4 @@
+import { buildCollectionCatalog } from "./collectionCatalogConfig";
 import { prepareCatalogEditorialConfig } from "./catalogEditorialPreset";
 import { buildCatalogPresentation } from "./catalogPresentation";
 function clampInt(value, min, max, fallback) {
@@ -250,6 +251,7 @@ function buildSafeCatalogConfig(raw) {
   const presentation = buildCatalogPresentation(cfg.presentation);
 
   return {
+    ...(cfg.collection !== undefined ? {collection:buildCollectionCatalog(cfg.collection)} : {}),
     presentation,
     visualBackup: cfg.visualBackup || null,
     glassPaletteBackup: cfg.glassPaletteBackup || null,
