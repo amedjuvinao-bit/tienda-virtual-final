@@ -1,6 +1,9 @@
 import { useRef, useState } from "react";
 import api from "../../lib/api";
 import { ContactButton } from "../information-page/ContactMaterial";
+import ConsumerCaseField from "./ConsumerCaseField";
+import { buildClaimsPage } from "./claimsPageConfig";
+import { Hash, KeyRound, Mail } from "lucide-react";
 import { newCaseKey } from "./consumerCaseAccess";
 export default function ConsumerRecoveryForm({
   config,
@@ -49,28 +52,42 @@ export default function ConsumerRecoveryForm({
       onPending?.(false);
     }
   }
+  const c = config.claimsPage || buildClaimsPage();
   return (
     <form className="consumer-track" onSubmit={submit}>
       <p>
         Recibe un código en el correo que registraste al radicar. Después podrás
         descargar una nueva clave. Si solo registraste un teléfono,{" "}
-        <a href="/contacto">contacta con la tienda</a> para verificar tu
-        identidad y recibir asistencia.
+        <a
+          href="/contacto"
+          onClick={preview ? (event) => event.preventDefault() : undefined}
+        >
+          contacta con la tienda
+        </a>{" "}
+        para verificar tu identidad y recibir asistencia.
       </p>
       <fieldset className="consumer-fields" disabled={pending || preview}>
-        <label>
-          Radicado a recuperar
+        <ConsumerCaseField
+          config={config}
+          label={c.fields.recoveryReference.label}
+          icon={Hash}
+        >
           <input
+            placeholder={c.fields.recoveryReference.placeholder}
             name="reference"
             required
             maxLength={60}
             autoComplete="off"
             readOnly={sent}
           />
-        </label>
-        <label>
-          Correo registrado
+        </ConsumerCaseField>
+        <ConsumerCaseField
+          config={config}
+          label={c.fields.registeredEmail.label}
+          icon={Mail}
+        >
           <input
+            placeholder={c.fields.registeredEmail.placeholder}
             name="email"
             type="email"
             required
@@ -78,11 +95,15 @@ export default function ConsumerRecoveryForm({
             autoComplete="email"
             readOnly={sent}
           />
-        </label>
+        </ConsumerCaseField>
         {sent && (
-          <label>
-            Código recibido por correo
+          <ConsumerCaseField
+            config={config}
+            label={c.fields.recoveryCode.label}
+            icon={KeyRound}
+          >
             <input
+              placeholder={c.fields.recoveryCode.placeholder}
               name="code"
               required
               inputMode="numeric"
@@ -91,7 +112,7 @@ export default function ConsumerRecoveryForm({
               maxLength={6}
               autoComplete="one-time-code"
             />
-          </label>
+          </ConsumerCaseField>
         )}
       </fieldset>
       {notice && <p role="status">{notice}</p>}
@@ -102,10 +123,10 @@ export default function ConsumerRecoveryForm({
         disabled={pending || preview}
       >
         {pending
-          ? "Procesando…"
+          ? c.recoveryPendingText || "Procesando…"
           : sent
-            ? "Verificar código y recuperar acceso"
-            : "Enviar código de recuperación"}
+            ? c.recoveryConfirmText || "Verificar código y recuperar acceso"
+            : c.recoverySendText || "Enviar código de recuperación"}
       </ContactButton>
       {sent && (
         <ContactButton
@@ -118,7 +139,7 @@ export default function ConsumerRecoveryForm({
             setError("");
           }}
         >
-          Solicitar otro código
+          {c.recoveryAgainText || "Solicitar otro código"}
         </ContactButton>
       )}
     </form>

@@ -178,7 +178,7 @@ it("consulta por POST y muestra solo las respuestas del radicado autorizado", as
     },
   });
   render(<ConsumerCaseForm config={config} document={policy} />);
-  fireEvent.click(screen.getByRole("button", { name: "Consultar radicado" }));
+  fireEvent.click(screen.getByRole("button", { name: "Consultar solicitud" }));
   fireEvent.change(screen.getByLabelText("Radicado"), {
     target: { value: "PQR-TEST" },
   });
@@ -201,7 +201,7 @@ it("la vista previa no radica ni consulta solicitudes", () => {
   expect(
     screen.getByRole("button", { name: "Enviar y obtener radicado" }),
   ).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Consultar radicado" }));
+  fireEvent.click(screen.getByRole("button", { name: "Consultar solicitud" }));
   expect(
     screen.getByRole("button", { name: "Consultar estado y respuesta" }),
   ).toBeDisabled();

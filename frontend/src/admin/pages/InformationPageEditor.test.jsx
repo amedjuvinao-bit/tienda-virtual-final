@@ -281,3 +281,78 @@ it("la ilustración de cambios usa carga de imagen y bloquea guardar o navegar d
     screen.getByRole("button", { name: "Contenido", exact: true }),
   ).toBeDisabled();
 });
+it("organiza PQR por campos, mensajes y guía; guarda y recarga sin perder extensiones", async () => {
+  const state = mount({
+    name: "Peticiones y reclamos",
+    slug: "pqr",
+    systemRole: "consumer-claims",
+    informationPageConfig: { extension: { keep: true } },
+  });
+  await screen.findByLabelText("Texto del título");
+  expect(
+    screen.queryByRole("button", { name: "Opciones de atención", exact: true }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Formulario y campos", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Etiqueta del campo"), {
+    target: { value: "Tu nombre completo" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Pestañas y mensajes", exact: true }),
+  );
+  fireEvent.change(
+    screen.getByLabelText("Título del formulario de solicitud"),
+    { target: { value: "Estamos para escucharte" } },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Guía y contacto", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Título del paso"), {
+    target: { value: "Cuéntanos tu caso" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByText(
+    "Cambios guardados. La página pública ya usa esta configuración.",
+  );
+  const saved = state.stored();
+  expect(saved.informationPageConfig.extension.keep).toBe(true);
+  expect(saved.informationPageConfig.claimsPage).toMatchObject({
+    createTitle: "Estamos para escucharte",
+    fields: { name: { label: "Tu nombre completo" } },
+  });
+  expect(saved.informationPageConfig.claimsPage.steps[0].title).toBe(
+    "Cuéntanos tu caso",
+  );
+  state.view.unmount();
+  mount(saved);
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Formulario y campos", exact: true }),
+  );
+  expect(screen.getByLabelText("Etiqueta del campo")).toHaveValue(
+    "Tu nombre completo",
+  );
+});
+it("la ilustración de PQR usa carga de imagen y conserva el bloqueo de subida", async () => {
+  mount({ name: "PQR", slug: "pqr", systemRole: "consumer-claims" });
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(screen.getByRole("button", { name: "Diseño", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Composición de PQR", exact: true }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Ilustración de peticiones y reclamos",
+      exact: true,
+    }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeDisabled(),
+  );
+  expect(
+    screen.getByRole("button", { name: "Contenido", exact: true }),
+  ).toBeDisabled();
+});

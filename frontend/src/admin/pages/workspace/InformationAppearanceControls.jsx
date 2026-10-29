@@ -8,6 +8,7 @@ import ServiceAppearanceControls from "./ServiceAppearanceControls";
 import InformationSectionsEditor from "./InformationSectionsEditor";
 import { serviceEditorSections } from "./serviceEditorFields";
 import ShippingAppearanceControls from "./ShippingAppearanceControls";
+import ClaimsAppearanceControls from "./ClaimsAppearanceControls";
 import ReturnsGuideAppearanceControls from "./ReturnsGuideAppearanceControls";
 const f = (key, label, type = "text", extra = {}) => ({
   key,
@@ -16,6 +17,8 @@ const f = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 export default function InformationAppearanceControls(props) {
+  if (props.topic.startsWith("claims-"))
+    return <ClaimsAppearanceControls {...props} />;
   if (props.topic.startsWith("returns-"))
     return <ReturnsGuideAppearanceControls {...props} />;
   if (props.topic.startsWith("shipping-"))
@@ -38,9 +41,11 @@ export default function InformationAppearanceControls(props) {
     content: common.content.map(([title, fields]) => [
       title,
       [
-        ...(["consumer-shipping", "consumer-returns"].includes(
-          props.form.systemRole,
-        )
+        ...([
+          "consumer-shipping",
+          "consumer-returns",
+          "consumer-claims",
+        ].includes(props.form.systemRole)
           ? []
           : [
               {
@@ -70,7 +75,9 @@ export default function InformationAppearanceControls(props) {
     ],
     colors: common.colors.map(([title, fields]) => [
       title,
-      fields.filter((field) => !field.key.startsWith("input")),
+      props.form.systemRole === "consumer-claims"
+        ? fields
+        : fields.filter((field) => !field.key.startsWith("input")),
     ]),
     layout: [
       ...common.layout,

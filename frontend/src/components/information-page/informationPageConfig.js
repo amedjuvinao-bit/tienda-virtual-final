@@ -15,6 +15,10 @@ import {
   buildReturnsGuide,
   validateReturnsGuide,
 } from "../consumer/returnsGuideConfig";
+import {
+  buildClaimsPage,
+  validateClaimsPage,
+} from "../consumer/claimsPageConfig";
 const object = (v) =>
   v && typeof v === "object" && !Array.isArray(v) ? v : {};
 const text = (v, fallback = "", limit = Infinity) =>
@@ -102,6 +106,9 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
+    ...(source.claimsPage !== undefined
+      ? { claimsPage: buildClaimsPage(source.claimsPage) }
+      : {}),
     ...(source.shipping !== undefined
       ? { shipping: buildShippingConfig(source.shipping) }
       : {}),
@@ -147,6 +154,19 @@ export function buildInformationConfig(raw = {}) {
     style: {
       ...s,
       ...material.style,
+      ...(source.claimsPage !== undefined
+        ? {
+            inputBg: color(s.inputBg, material.style.cardBg),
+            inputTextColor: color(
+              s.inputTextColor,
+              material.style.textPrimaryColor,
+            ),
+            inputBorderColor: color(
+              s.inputBorderColor,
+              material.style.cardBorderColor,
+            ),
+          }
+        : {}),
       titleTextColor: color(s.titleTextColor, material.style.textPrimaryColor),
       lineColor: color(s.lineColor, material.style.cardBorderColor),
       buttonBg: color(s.buttonBg, material.style.accentColor),
@@ -185,6 +205,46 @@ export function normalizeInformationPage(page) {
 }
 export function informationConfigForPage(page) {
   const raw = object(page.informationPageConfig);
+  const claims = page.systemRole === "consumer-claims";
+  const adoptClaims =
+    claims &&
+    raw.claimsPage === undefined &&
+    raw.subtitleText === "Información clara para comprar y recibir atención." &&
+    raw.eyebrowText === "Tu compra, con confianza";
+  const claimsDefaults = claims
+    ? {
+        claimsPage: {},
+        titleText: page.name || "Peticiones y reclamos",
+        eyebrowText: "Atención al cliente",
+        subtitleText: "Estamos para escucharte y ayudarte con tu solicitud.",
+        contentMaxWidthPx: 1440,
+        titleFontSizePx: 60,
+        gapPx: 14,
+        actionText: "",
+        sections: [],
+        style: {
+          cardRadiusPx: 28,
+          cardPaddingPx: 26,
+          buttonRadiusPx: 999,
+          textPrimaryColor: "#6b1635",
+          textSecondaryColor: "#71384b",
+          accentColor: "#922e50",
+          sectionTitleSizePx: 32,
+          bodyFontSizePx: 14,
+          buttonBg: "#7e2440",
+          buttonTextColor: "#fff4ed",
+        },
+        presentation: {
+          backgroundMode: "continuity",
+          borderWidth: 2.25,
+          glassOpacity: 0.12,
+          glassBlur: 5,
+          reflection: 0.9,
+          checkoutGlassOpacity: 0.88,
+          checkoutGlassBlur: 8,
+        },
+      }
+    : {};
   const shipping = page.systemRole === "consumer-shipping";
   const returns = page.systemRole === "consumer-returns";
   const adoptReturns =
@@ -329,7 +389,24 @@ export function informationConfigForPage(page) {
     ...helpDefaults,
     ...shippingDefaults,
     ...returnsDefaults,
+    ...claimsDefaults,
     ...raw,
+    ...(claims
+      ? {
+          style: { ...claimsDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...claimsDefaults.presentation,
+            ...object(raw.presentation),
+          },
+          ...(adoptClaims
+            ? {
+                eyebrowText: claimsDefaults.eyebrowText,
+                subtitleText: claimsDefaults.subtitleText,
+                ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 60 } : {}),
+              }
+            : {}),
+        }
+      : {}),
     ...(returns
       ? {
           style: { ...returnsDefaults.style, ...object(raw.style) },
@@ -417,6 +494,11 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
+  const claimsError =
+    page.systemRole === "consumer-claims"
+      ? validateClaimsPage(config.claimsPage)
+      : "";
+  if (claimsError) return claimsError;
   const returnsError =
     page.systemRole === "consumer-returns"
       ? validateReturnsGuide(config.returnsGuide)

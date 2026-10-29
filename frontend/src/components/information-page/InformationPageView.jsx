@@ -78,17 +78,20 @@ export default function InformationPageView({ page, theme, preview = false }) {
   const help = config.layout === "help";
   const shipping = page.systemRole === "consumer-shipping";
   const returns = page.systemRole === "consumer-returns";
-  const extra = returns
-    ? config.returnsGuide
-    : shipping
-      ? config.shipping
-      : memory
-        ? config.journal
-        : contact
-          ? config.contact
-          : help
-            ? config.help
-            : null;
+  const claims = page.systemRole === "consumer-claims";
+  const extra = claims
+    ? config.claimsPage
+    : returns
+      ? config.returnsGuide
+      : shipping
+        ? config.shipping
+        : memory
+          ? config.journal
+          : contact
+            ? config.contact
+            : help
+              ? config.help
+              : null;
   const showSections = extra ? extra.showSections : true;
   const showFooterAction = extra ? extra.showFooterAction : true;
   const navigation =

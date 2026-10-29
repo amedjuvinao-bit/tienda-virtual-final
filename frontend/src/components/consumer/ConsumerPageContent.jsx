@@ -4,7 +4,7 @@ import {
   ContactGlass,
   ContactButton,
 } from "../information-page/ContactMaterial";
-import ConsumerCaseForm from "./ConsumerCaseForm";
+import ClaimsPageContent from "./ClaimsPageContent";
 import useConsumerInformation from "./useConsumerInformation";
 import { downloadText } from "./ConsumerReceipt";
 import ConsumerDocumentReference, {
@@ -28,6 +28,17 @@ const sectionIds = {
 };
 export default function ConsumerPageContent({ page, config, preview }) {
   const { data, error, retry } = useConsumerInformation();
+  if (page.systemRole === "consumer-claims")
+    return (
+      <ClaimsPageContent
+        page={page}
+        config={config}
+        data={data}
+        error={error}
+        retry={retry}
+        preview={preview}
+      />
+    );
   if (page.systemRole === "consumer-returns")
     return (
       <ReturnsGuideContent
@@ -120,13 +131,6 @@ export default function ConsumerPageContent({ page, config, preview }) {
                 Peticiones y reclamos
               </ContactButton>
             </div>
-          )}
-          {page.systemRole === "consumer-claims" && (
-            <ConsumerCaseForm
-              config={config}
-              document={data}
-              preview={preview}
-            />
           )}
           <ConsumerDocumentReference
             version={data.version}
