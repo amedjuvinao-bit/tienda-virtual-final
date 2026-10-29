@@ -61,6 +61,88 @@ function mount(initial = {}) {
   );
   return { view, stored: () => stored, writes: () => writes };
 }
+it("organiza condiciones por temas y guarda nombres del índice y ayuda sin modificar políticas ni extensiones", async () => {
+  const state = mount({
+    name: "Condiciones de compra",
+    slug: "terminos",
+    systemRole: "consumer-terms",
+    informationPageConfig: {
+      extension: { keep: true },
+      termsPage: { extension: "conservar" },
+    },
+  });
+  await screen.findByLabelText("Texto del título");
+  expect(
+    screen.queryByRole("button", { name: "Formulario y campos", exact: true }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Índice y descarga", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Tema del índice"), {
+    target: { value: "garantia" },
+  });
+  fireEvent.change(screen.getByLabelText("Nombre del tema en el índice"), {
+    target: { value: "Servicio posventa" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Ayuda e información", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Texto del enlace de ayuda"), {
+    target: { value: "Solicitar atención" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByText(
+    "Cambios guardados. La página pública ya usa esta configuración.",
+  );
+  expect(state.stored().informationPageConfig).toMatchObject({
+    extension: { keep: true },
+    termsPage: {
+      extension: "conservar",
+      topics: { garantia: { label: "Servicio posventa" } },
+      helpText: "Solicitar atención",
+    },
+  });
+  const saved = state.stored();
+  state.view.unmount();
+  mount(saved);
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Índice y descarga", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Tema del índice"), {
+    target: { value: "garantia" },
+  });
+  expect(screen.getByLabelText("Nombre del tema en el índice")).toHaveValue(
+    "Servicio posventa",
+  );
+});
+it("bloquea guardado y navegación al cargar la ilustración de condiciones desde el equipo", async () => {
+  mount({
+    name: "Condiciones de compra",
+    slug: "terminos",
+    systemRole: "consumer-terms",
+  });
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(screen.getByRole("button", { name: "Diseño", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Composición de condiciones",
+      exact: true,
+    }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Ilustración de condiciones de compra",
+      exact: true,
+    }),
+  );
+  expect(
+    screen.getByRole("button", { name: "Guardar cambios" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Contenido", exact: true }),
+  ).toBeDisabled();
+});
 it("edits content and sections, preserves extensions and saves the complete draft", async () => {
   const state = mount();
   fireEvent.change(await screen.findByLabelText("Texto del título"), {

@@ -19,6 +19,7 @@ import {
   buildClaimsPage,
   validateClaimsPage,
 } from "../consumer/claimsPageConfig";
+import { buildTermsPage, validateTermsPage } from "../consumer/termsPageConfig";
 const object = (v) =>
   v && typeof v === "object" && !Array.isArray(v) ? v : {};
 const text = (v, fallback = "", limit = Infinity) =>
@@ -106,6 +107,9 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
+    ...(source.termsPage !== undefined
+      ? { termsPage: buildTermsPage(source.termsPage) }
+      : {}),
     ...(source.claimsPage !== undefined
       ? { claimsPage: buildClaimsPage(source.claimsPage) }
       : {}),
@@ -205,6 +209,48 @@ export function normalizeInformationPage(page) {
 }
 export function informationConfigForPage(page) {
   const raw = object(page.informationPageConfig);
+  const terms = page.systemRole === "consumer-terms";
+  const adoptTerms =
+    terms &&
+    raw.termsPage === undefined &&
+    raw.subtitleText === "Información clara para comprar y recibir atención." &&
+    raw.eyebrowText === "Tu compra, con confianza";
+  const termsDefaults = terms
+    ? {
+        termsPage: {},
+        titleText: page.name || "Condiciones de compra",
+        eyebrowText: "Información para tu compra",
+        subtitleText:
+          "Consulta cada tema y conserva una copia de las condiciones.",
+        contentMaxWidthPx: 1440,
+        titleFontSizePx: 60,
+        gapPx: 14,
+        actionText: "",
+        sections: [],
+        style: {
+          cardRadiusPx: 28,
+          cardPaddingPx: 24,
+          buttonRadiusPx: 999,
+          navigationWidthPx: 360,
+          textPrimaryColor: "#6b1635",
+          textSecondaryColor: "#71384b",
+          accentColor: "#922e50",
+          sectionTitleSizePx: 32,
+          bodyFontSizePx: 15,
+          buttonBg: "#7e2440",
+          buttonTextColor: "#fff4ed",
+        },
+        presentation: {
+          backgroundMode: "continuity",
+          borderWidth: 2.25,
+          glassOpacity: 0.12,
+          glassBlur: 5,
+          reflection: 0.9,
+          checkoutGlassOpacity: 0.88,
+          checkoutGlassBlur: 8,
+        },
+      }
+    : {};
   const claims = page.systemRole === "consumer-claims";
   const adoptClaims =
     claims &&
@@ -390,7 +436,24 @@ export function informationConfigForPage(page) {
     ...shippingDefaults,
     ...returnsDefaults,
     ...claimsDefaults,
+    ...termsDefaults,
     ...raw,
+    ...(terms
+      ? {
+          style: { ...termsDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...termsDefaults.presentation,
+            ...object(raw.presentation),
+          },
+          ...(adoptTerms
+            ? {
+                eyebrowText: termsDefaults.eyebrowText,
+                subtitleText: termsDefaults.subtitleText,
+                ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 60 } : {}),
+              }
+            : {}),
+        }
+      : {}),
     ...(claims
       ? {
           style: { ...claimsDefaults.style, ...object(raw.style) },
@@ -494,6 +557,11 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
+  const termsError =
+    page.systemRole === "consumer-terms"
+      ? validateTermsPage(config.termsPage)
+      : "";
+  if (termsError) return termsError;
   const claimsError =
     page.systemRole === "consumer-claims"
       ? validateClaimsPage(config.claimsPage)

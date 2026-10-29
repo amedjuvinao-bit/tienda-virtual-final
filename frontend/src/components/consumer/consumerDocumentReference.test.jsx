@@ -60,7 +60,7 @@ it("conserva las condiciones, la referencia exacta en la descarga y el enlace a 
     screen.getByRole("link", { name: /Superintendencia/ }),
   ).toHaveAttribute("href", data.authorityUrl);
   fireEvent.click(
-    screen.getByRole("button", { name: "Descargar esta información" }),
+    screen.getByRole("button", { name: "Descargar condiciones" }),
   );
   const [name, text] = downloadText.mock.calls[0];
   expect(name).toBe("terminos.txt");
