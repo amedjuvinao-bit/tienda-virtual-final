@@ -12,6 +12,7 @@ import ConsumerDocumentReference, {
 } from "./ConsumerDocumentReference";
 import "./consumer.css";
 import ShippingPageContent from "../shipping/ShippingPageContent";
+import ReturnsGuideContent from "./ReturnsGuideContent";
 const sectionIds = {
   "consumer-shipping": ["envios"],
   "consumer-privacy": ["privacidad"],
@@ -27,6 +28,17 @@ const sectionIds = {
 };
 export default function ConsumerPageContent({ page, config, preview }) {
   const { data, error, retry } = useConsumerInformation();
+  if (page.systemRole === "consumer-returns")
+    return (
+      <ReturnsGuideContent
+        page={page}
+        config={config}
+        data={data}
+        error={error}
+        retry={retry}
+        preview={preview}
+      />
+    );
   if (page.systemRole === "consumer-shipping")
     return (
       <ShippingPageContent

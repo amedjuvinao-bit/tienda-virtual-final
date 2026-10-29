@@ -7,7 +7,14 @@ import { buildHelpConfig, validateHelpConfig } from "./helpPageConfig";
 import { buildSafeCartPageConfig } from "../cart/cartPageConfig";
 import { catalogImageUrl } from "../catalog/catalogPresentation";
 import { safeFooterLink } from "../footer/footerEditorialConfig";
-import { buildShippingConfig, validateShippingConfig } from "../shipping/shippingPageConfig";
+import {
+  buildShippingConfig,
+  validateShippingConfig,
+} from "../shipping/shippingPageConfig";
+import {
+  buildReturnsGuide,
+  validateReturnsGuide,
+} from "../consumer/returnsGuideConfig";
 const object = (v) =>
   v && typeof v === "object" && !Array.isArray(v) ? v : {};
 const text = (v, fallback = "", limit = Infinity) =>
@@ -95,8 +102,15 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
-    ...(source.shipping !== undefined ? { shipping: buildShippingConfig(source.shipping) } : {}),
-    layout: ["memory-table", "contact", "help"].includes(source.layout) ? source.layout : "editorial",
+    ...(source.shipping !== undefined
+      ? { shipping: buildShippingConfig(source.shipping) }
+      : {}),
+    ...(source.returnsGuide !== undefined
+      ? { returnsGuide: buildReturnsGuide(source.returnsGuide) }
+      : {}),
+    layout: ["memory-table", "contact", "help"].includes(source.layout)
+      ? source.layout
+      : "editorial",
     help: buildHelpConfig(source.help, { starter: source.layout === "help" }),
     contact: buildContactConfig(source.contact),
     journal: buildMemoryJournal(
@@ -158,7 +172,10 @@ export function normalizeInformationPage(page) {
     name: text(page.name, "Nosotros", 120).trim(),
     slug: text(page.slug, "nosotros", 160).trim().toLowerCase(),
     pageType: "information",
-    ...((["about", "contact", "help"].includes(page.systemRole) || String(page.systemRole || "").startsWith("consumer-")) ? { systemRole: page.systemRole } : {}),
+    ...(["about", "contact", "help"].includes(page.systemRole) ||
+    String(page.systemRole || "").startsWith("consumer-")
+      ? { systemRole: page.systemRole }
+      : {}),
     enabled: page.enabled !== false,
     useHeader: page.useHeader !== false,
     useFooter: page.useFooter !== false,
@@ -169,29 +186,136 @@ export function normalizeInformationPage(page) {
 export function informationConfigForPage(page) {
   const raw = object(page.informationPageConfig);
   const shipping = page.systemRole === "consumer-shipping";
-  const adoptShipping = shipping && raw.shipping === undefined && raw.subtitleText === "Información clara para comprar y recibir atención." && raw.eyebrowText === "Tu compra, con confianza";
-  const shippingDefaults = shipping ? {
-    shipping: {},
-    titleText: page.name || "Envíos y entregas", eyebrowText: "Información de tu compra", subtitleText: "Todo lo que necesitas saber para recibir tu pedido.",
-    contentMaxWidthPx: 1440, titleFontSizePx: 64, gapPx: 16, actionText: "", sections: [],
-    style: { cardRadiusPx: 28, cardPaddingPx: 28, buttonRadiusPx: 999, textPrimaryColor: "#6b1635", textSecondaryColor: "#71384b", accentColor: "#922e50", sectionTitleSizePx: 32, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
-    presentation: { backgroundMode: "continuity", borderWidth: 2.25, glassOpacity: .12, glassBlur: 5, reflection: .9, checkoutGlassOpacity: .88, checkoutGlassBlur: 8 },
-  } : {};
+  const returns = page.systemRole === "consumer-returns";
+  const adoptReturns =
+    returns &&
+    raw.returnsGuide === undefined &&
+    raw.subtitleText === "Información clara para comprar y recibir atención." &&
+    raw.eyebrowText === "Tu compra, con confianza";
+  const returnsDefaults = returns
+    ? {
+        returnsGuide: {},
+        titleText: "Cambios y devoluciones",
+        eyebrowText: "Después de tu compra",
+        subtitleText: "Encuentra la opción que necesitas y cómo solicitarla.",
+        contentMaxWidthPx: 1440,
+        titleFontSizePx: 64,
+        gapPx: 16,
+        actionText: "",
+        sections: [],
+        style: {
+          cardRadiusPx: 28,
+          cardPaddingPx: 26,
+          buttonRadiusPx: 999,
+          textPrimaryColor: "#6b1635",
+          textSecondaryColor: "#71384b",
+          accentColor: "#922e50",
+          sectionTitleSizePx: 32,
+          buttonBg: "#7e2440",
+          buttonTextColor: "#fff4ed",
+        },
+        presentation: {
+          backgroundMode: "continuity",
+          borderWidth: 2.25,
+          glassOpacity: 0.12,
+          glassBlur: 5,
+          reflection: 0.9,
+          checkoutGlassOpacity: 0.88,
+          checkoutGlassBlur: 8,
+        },
+      }
+    : {};
+  const adoptShipping =
+    shipping &&
+    raw.shipping === undefined &&
+    raw.subtitleText === "Información clara para comprar y recibir atención." &&
+    raw.eyebrowText === "Tu compra, con confianza";
+  const shippingDefaults = shipping
+    ? {
+        shipping: {},
+        titleText: page.name || "Envíos y entregas",
+        eyebrowText: "Información de tu compra",
+        subtitleText: "Todo lo que necesitas saber para recibir tu pedido.",
+        contentMaxWidthPx: 1440,
+        titleFontSizePx: 64,
+        gapPx: 16,
+        actionText: "",
+        sections: [],
+        style: {
+          cardRadiusPx: 28,
+          cardPaddingPx: 28,
+          buttonRadiusPx: 999,
+          textPrimaryColor: "#6b1635",
+          textSecondaryColor: "#71384b",
+          accentColor: "#922e50",
+          sectionTitleSizePx: 32,
+          buttonBg: "#7e2440",
+          buttonTextColor: "#fff4ed",
+        },
+        presentation: {
+          backgroundMode: "continuity",
+          borderWidth: 2.25,
+          glassOpacity: 0.12,
+          glassBlur: 5,
+          reflection: 0.9,
+          checkoutGlassOpacity: 0.88,
+          checkoutGlassBlur: 8,
+        },
+      }
+    : {};
   const adopt = page.systemRole === "about" && raw.layout === undefined;
-  const contactDefaults = page.systemRole === "contact" ? {
-    layout: "contact", eyebrowText: "Estamos cerca", titleText: "Hablemos de lo\nque necesitas.",
-    subtitleText: "Elige cómo prefieres contactarnos.", contentMaxWidthPx: 1440,
-    titleFontSizePx: 64, gapPx: 36, actionText: "", sections: [],
-    style: { cardRadiusPx: 32, buttonRadiusPx: 999, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
-    presentation: { borderWidth: 3.25, checkoutGlassOpacity: .8, checkoutGlassBlur: 8 },
-  } : {};
-  const helpDefaults = page.systemRole === "help" ? {
-    layout: "help", eyebrowText: "Te acompañamos", titleText: "¿Cómo podemos ayudarte?",
-    subtitleText: "Encuentra respuestas y sigue con tu compra.", titleFontSizePx: 56,
-    contentMaxWidthPx: 1440, gapPx: 24, actionText: "", sections: [],
-    style: { cardRadiusPx: 28, cardPaddingPx: 26, buttonRadiusPx: 999, navigationWidthPx: 290, buttonBg: "#7e2440", buttonTextColor: "#fff4ed" },
-    presentation: { borderWidth: 3.25, checkoutGlassOpacity: .8, checkoutGlassBlur: 8 },
-  } : {};
+  const contactDefaults =
+    page.systemRole === "contact"
+      ? {
+          layout: "contact",
+          eyebrowText: "Estamos cerca",
+          titleText: "Hablemos de lo\nque necesitas.",
+          subtitleText: "Elige cómo prefieres contactarnos.",
+          contentMaxWidthPx: 1440,
+          titleFontSizePx: 64,
+          gapPx: 36,
+          actionText: "",
+          sections: [],
+          style: {
+            cardRadiusPx: 32,
+            buttonRadiusPx: 999,
+            buttonBg: "#7e2440",
+            buttonTextColor: "#fff4ed",
+          },
+          presentation: {
+            borderWidth: 3.25,
+            checkoutGlassOpacity: 0.8,
+            checkoutGlassBlur: 8,
+          },
+        }
+      : {};
+  const helpDefaults =
+    page.systemRole === "help"
+      ? {
+          layout: "help",
+          eyebrowText: "Te acompañamos",
+          titleText: "¿Cómo podemos ayudarte?",
+          subtitleText: "Encuentra respuestas y sigue con tu compra.",
+          titleFontSizePx: 56,
+          contentMaxWidthPx: 1440,
+          gapPx: 24,
+          actionText: "",
+          sections: [],
+          style: {
+            cardRadiusPx: 28,
+            cardPaddingPx: 26,
+            buttonRadiusPx: 999,
+            navigationWidthPx: 290,
+            buttonBg: "#7e2440",
+            buttonTextColor: "#fff4ed",
+          },
+          presentation: {
+            borderWidth: 3.25,
+            checkoutGlassOpacity: 0.8,
+            checkoutGlassBlur: 8,
+          },
+        }
+      : {};
   return buildInformationConfig({
     ...(page.systemRole === "about"
       ? {}
@@ -204,20 +328,61 @@ export function informationConfigForPage(page) {
     ...contactDefaults,
     ...helpDefaults,
     ...shippingDefaults,
+    ...returnsDefaults,
     ...raw,
-    ...(shipping ? {
-      style: { ...shippingDefaults.style, ...object(raw.style) },
-      presentation: { ...shippingDefaults.presentation, ...object(raw.presentation) },
-      ...(adoptShipping ? { eyebrowText: shippingDefaults.eyebrowText, subtitleText: shippingDefaults.subtitleText, ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 64 } : {}) } : {}),
-    } : {}),
-    ...(page.systemRole === "contact" ? {
-      style: { ...contactDefaults.style, ...object(raw.style) },
-      presentation: { ...contactDefaults.presentation, ...object(raw.presentation) },
-    } : {}),
-    ...(page.systemRole === "help" ? {
-      style: { ...helpDefaults.style, ...object(raw.style) },
-      presentation: { ...helpDefaults.presentation, ...object(raw.presentation) },
-    } : {}),
+    ...(returns
+      ? {
+          style: { ...returnsDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...returnsDefaults.presentation,
+            ...object(raw.presentation),
+          },
+          ...(adoptReturns
+            ? {
+                eyebrowText: returnsDefaults.eyebrowText,
+                subtitleText: returnsDefaults.subtitleText,
+                ...(raw.titleText === "Retracto, garantía y devoluciones"
+                  ? { titleText: returnsDefaults.titleText }
+                  : {}),
+                ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 64 } : {}),
+              }
+            : {}),
+        }
+      : {}),
+    ...(shipping
+      ? {
+          style: { ...shippingDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...shippingDefaults.presentation,
+            ...object(raw.presentation),
+          },
+          ...(adoptShipping
+            ? {
+                eyebrowText: shippingDefaults.eyebrowText,
+                subtitleText: shippingDefaults.subtitleText,
+                ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 64 } : {}),
+              }
+            : {}),
+        }
+      : {}),
+    ...(page.systemRole === "contact"
+      ? {
+          style: { ...contactDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...contactDefaults.presentation,
+            ...object(raw.presentation),
+          },
+        }
+      : {}),
+    ...(page.systemRole === "help"
+      ? {
+          style: { ...helpDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...helpDefaults.presentation,
+            ...object(raw.presentation),
+          },
+        }
+      : {}),
     ...(adopt
       ? {
           layout: "memory-table",
@@ -252,13 +417,26 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
-  const shippingError = page.systemRole === "consumer-shipping" ? validateShippingConfig(config.shipping) : "";
+  const returnsError =
+    page.systemRole === "consumer-returns"
+      ? validateReturnsGuide(config.returnsGuide)
+      : "";
+  if (returnsError) return returnsError;
+  const shippingError =
+    page.systemRole === "consumer-shipping"
+      ? validateShippingConfig(config.shipping)
+      : "";
   if (shippingError) return shippingError;
-  const memoryError = config.layout === "memory-table" ? validateMemoryJournal(config.journal) : "";
+  const memoryError =
+    config.layout === "memory-table"
+      ? validateMemoryJournal(config.journal)
+      : "";
   if (memoryError) return memoryError;
-  const contactError = config.layout === "contact" ? validateContactConfig(config.contact) : "";
+  const contactError =
+    config.layout === "contact" ? validateContactConfig(config.contact) : "";
   if (contactError) return contactError;
-  const helpError = config.layout === "help" ? validateHelpConfig(config.help) : "";
+  const helpError =
+    config.layout === "help" ? validateHelpConfig(config.help) : "";
   if (helpError) return helpError;
   if (config.actionHref?.trim() && !informationLink(config.actionHref))
     return "Revisa el destino del botón: usa una página pública o un enlace http(s), correo o teléfono.";

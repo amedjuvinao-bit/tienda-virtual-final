@@ -133,3 +133,30 @@ it("la vista previa permite explorar la recuperación sin enviar correos ni modi
   );
   expect(api.post).not.toHaveBeenCalled();
 });
+it("abre consulta desde el enlace público sin pedir nuevamente datos de radicación", () => {
+  window.history.replaceState({}, "", "/pqr?vista=consulta");
+  render(<ConsumerCaseForm config={config} document={document} />);
+  expect(screen.getByLabelText("Radicado")).toBeVisible();
+  expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument();
+  expect(api.post).not.toHaveBeenCalled();
+});
+it("preselecciona solo tipos del servidor y no autoriza ni envía por abrir un enlace", () => {
+  const types = {
+    petition: "Petición",
+    warranty: "Garantía legal",
+    withdrawal: "Retracto",
+  };
+  window.history.replaceState({}, "", "/pqr?tipo=warranty");
+  const view = render(
+    <ConsumerCaseForm config={config} document={{ ...document, types }} />,
+  );
+  expect(screen.getByLabelText("Tipo de solicitud")).toHaveValue("warranty");
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  expect(api.post).not.toHaveBeenCalled();
+  view.unmount();
+  window.history.replaceState({}, "", "/pqr?tipo=constructor");
+  render(
+    <ConsumerCaseForm config={config} document={{ ...document, types }} />,
+  );
+  expect(screen.getByLabelText("Tipo de solicitud")).toHaveValue("petition");
+});

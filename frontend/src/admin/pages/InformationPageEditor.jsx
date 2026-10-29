@@ -6,8 +6,16 @@ import {
 } from "../../components/information-page/informationPageConfig";
 const tabs = [
   { id: "content", label: "Título y presentación", group: "content" },
+  { id: "returns-choices", label: "Opciones de atención", group: "content" },
+  { id: "returns-journey", label: "Pasos de la solicitud", group: "content" },
+  { id: "returns-support", label: "Ayuda y condiciones", group: "content" },
+  { id: "returns-design", label: "Composición de cambios", group: "design" },
   { id: "shipping-journey", label: "Proceso de entrega", group: "content" },
-  { id: "shipping-details", label: "Costo, plazo y cobertura", group: "content" },
+  {
+    id: "shipping-details",
+    label: "Costo, plazo y cobertura",
+    group: "content",
+  },
   { id: "shipping-support", label: "Ayuda y enlaces", group: "content" },
   { id: "shipping-design", label: "Composición de envíos", group: "design" },
   { id: "help-topics", label: "Temas y categorías", group: "content" },
@@ -31,16 +39,26 @@ const tabs = [
   { id: "visibility", label: "Visibilidad", group: "options" },
   { id: "settings", label: "Identidad y publicación", group: "settings" },
 ];
-const resolveTabs = (tabs, form) => tabs.filter(tab => {
-  const shipping = form.systemRole === "consumer-shipping";
-  if (tab.id.startsWith("shipping-")) return shipping;
-  if (shipping && (tab.id.startsWith("help-") || tab.id.startsWith("contact-") || ["moments", "journal-texts", "journal-design"].includes(tab.id))) return false;
-  const layout = form.informationPageConfig.layout;
-  if (tab.id.startsWith("help-")) return layout === "help";
-  if (tab.id.startsWith("contact-")) return layout === "contact";
-  if (["moments", "journal-texts", "journal-design"].includes(tab.id)) return layout === "memory-table";
-  return true;
-});
+const resolveTabs = (tabs, form) =>
+  tabs.filter((tab) => {
+    const shipping = form.systemRole === "consumer-shipping";
+    const returns = form.systemRole === "consumer-returns";
+    if (tab.id.startsWith("returns-")) return returns;
+    if (tab.id.startsWith("shipping-")) return shipping;
+    if (
+      (shipping || returns) &&
+      (tab.id.startsWith("help-") ||
+        tab.id.startsWith("contact-") ||
+        ["moments", "journal-texts", "journal-design"].includes(tab.id))
+    )
+      return false;
+    const layout = form.informationPageConfig.layout;
+    if (tab.id.startsWith("help-")) return layout === "help";
+    if (tab.id.startsWith("contact-")) return layout === "contact";
+    if (["moments", "journal-texts", "journal-design"].includes(tab.id))
+      return layout === "memory-table";
+    return true;
+  });
 export default function InformationPageEditor() {
   return (
     <SystemPageEditor

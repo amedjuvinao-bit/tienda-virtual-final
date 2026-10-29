@@ -8,6 +8,7 @@ import ServiceAppearanceControls from "./ServiceAppearanceControls";
 import InformationSectionsEditor from "./InformationSectionsEditor";
 import { serviceEditorSections } from "./serviceEditorFields";
 import ShippingAppearanceControls from "./ShippingAppearanceControls";
+import ReturnsGuideAppearanceControls from "./ReturnsGuideAppearanceControls";
 const f = (key, label, type = "text", extra = {}) => ({
   key,
   label,
@@ -15,11 +16,17 @@ const f = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 export default function InformationAppearanceControls(props) {
-  if (props.topic.startsWith("shipping-")) return <ShippingAppearanceControls {...props}/>;
+  if (props.topic.startsWith("returns-"))
+    return <ReturnsGuideAppearanceControls {...props} />;
+  if (props.topic.startsWith("shipping-"))
+    return <ShippingAppearanceControls {...props} />;
   if (props.topic === "help-topics") return <HelpTopicsEditor {...props} />;
-  if (props.topic === "help-questions") return <HelpQuestionsEditor {...props} />;
-  if (props.topic.startsWith("help-")) return <HelpAppearanceControls {...props} />;
-  if (props.topic.startsWith("contact-")) return <ContactAppearanceControls {...props} />;
+  if (props.topic === "help-questions")
+    return <HelpQuestionsEditor {...props} />;
+  if (props.topic.startsWith("help-"))
+    return <HelpAppearanceControls {...props} />;
+  if (props.topic.startsWith("contact-"))
+    return <ContactAppearanceControls {...props} />;
   if (props.topic === "moments") return <MemoryMomentsEditor {...props} />;
   if (["journal-texts", "journal-design"].includes(props.topic))
     return <MemoryDesignControls {...props} />;
@@ -31,17 +38,23 @@ export default function InformationAppearanceControls(props) {
     content: common.content.map(([title, fields]) => [
       title,
       [
-        ...(props.form.systemRole === "consumer-shipping" ? [] : [{
-          key: "layout",
-          label: "Diseño de la página",
-          type: "select",
-          options: [
-            ["help", "Centro de ayuda"],
-            ["contact", "Contacto y ubicación"],
-            ["memory-table", "Mesa de recuerdos"],
-            ["editorial", "Página de lectura"],
-          ],
-        }]),
+        ...(["consumer-shipping", "consumer-returns"].includes(
+          props.form.systemRole,
+        )
+          ? []
+          : [
+              {
+                key: "layout",
+                label: "Diseño de la página",
+                type: "select",
+                options: [
+                  ["help", "Centro de ayuda"],
+                  ["contact", "Contacto y ubicación"],
+                  ["memory-table", "Mesa de recuerdos"],
+                  ["editorial", "Página de lectura"],
+                ],
+              },
+            ]),
         ...fields,
       ],
     ]),
@@ -100,7 +113,9 @@ export default function InformationAppearanceControls(props) {
           f(
             "slug",
             "Dirección de la página",
-            ["about", "contact", "help"].includes(props.form.systemRole) ? "readonly" : "text",
+            ["about", "contact", "help"].includes(props.form.systemRole)
+              ? "readonly"
+              : "text",
             { scope: "form" },
           ),
           f("enabled", "Página activa", "toggle", { scope: "form" }),
@@ -117,12 +132,12 @@ export default function InformationAppearanceControls(props) {
         String(props.form.systemRole || "").startsWith("consumer-")
           ? "La identidad usa Tienda y Facturación; los plazos usan Envíos y los cambios usan la política de Órdenes. Aquí editas título, apariencia y secciones complementarias; no se reducen los derechos legales. La dirección se conserva."
           : props.form.systemRole === "help"
-          ? "Esta página está conectada con Preguntas frecuentes, Ayuda y Centro de ayuda. Su dirección se conserva; puedes administrar sus temas, respuestas y diseño."
-          : props.form.systemRole === "contact"
-          ? "Esta página abre Contacto y, si no existe una página propia de sede, Nuestra sede. Puedes editar el contenido y el diseño; la dirección se conserva para mantener sus enlaces."
-          : props.form.systemRole === "about"
-          ? "Esta página está conectada con Nosotros y Nuestra historia. Puedes editar su nombre, contenido y diseño; su dirección se conserva para mantener los enlaces."
-          : "Los enlaces de esta página usan /pagina/ seguido de su dirección. Al cambiarla, actualiza los enlaces que la abren."
+            ? "Esta página está conectada con Preguntas frecuentes, Ayuda y Centro de ayuda. Su dirección se conserva; puedes administrar sus temas, respuestas y diseño."
+            : props.form.systemRole === "contact"
+              ? "Esta página abre Contacto y, si no existe una página propia de sede, Nuestra sede. Puedes editar el contenido y el diseño; la dirección se conserva para mantener sus enlaces."
+              : props.form.systemRole === "about"
+                ? "Esta página está conectada con Nosotros y Nuestra historia. Puedes editar su nombre, contenido y diseño; su dirección se conserva para mantener los enlaces."
+                : "Los enlaces de esta página usan /pagina/ seguido de su dirección. Al cambiarla, actualiza los enlaces que la abren."
       }
     />
   );

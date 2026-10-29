@@ -7,7 +7,11 @@ import {
 import { downloadText } from "./ConsumerReceipt";
 import { CASE_STATUS, caseDate } from "./consumerCaseModel";
 import ConsumerRecoveryForm from "./ConsumerRecoveryForm";
-import { newCaseKey, caseOrderContext } from "./consumerCaseAccess";
+import {
+  newCaseKey,
+  caseOrderContext,
+  caseNavigation,
+} from "./consumerCaseAccess";
 export { CASE_STATUS, caseDate } from "./consumerCaseModel";
 export function caseReceiptText(receipt, key) {
   return [
@@ -29,7 +33,7 @@ export function caseReceiptText(receipt, key) {
   ].join("\n\n");
 }
 export default function ConsumerCaseForm({ config, document, preview }) {
-  const [tab, setTab] = useState("create"),
+  const [tab, setTab] = useState(() => caseNavigation(document.types).tab),
     [receipt, setReceipt] = useState(null),
     [tracked, setTracked] = useState(null),
     [pending, setPending] = useState(false),
@@ -207,7 +211,11 @@ export default function ConsumerCaseForm({ config, document, preview }) {
             </label>
             <label>
               Tipo de solicitud
-              <select name="type" aria-label="Tipo de solicitud">
+              <select
+                name="type"
+                aria-label="Tipo de solicitud"
+                defaultValue={caseNavigation(document.types).type}
+              >
                 {Object.entries(document.types || {}).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}

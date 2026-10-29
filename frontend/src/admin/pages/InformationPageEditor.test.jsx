@@ -128,10 +128,156 @@ it("keeps invalid link edits in the draft and reports them before sending", asyn
     "javascript:alert(1)",
   );
 });
-it('agrupa el diseño de envíos y conserva pasos, textos y destinos al guardar y recargar',async()=>{
- const state=mount({name:'Envíos y entregas',slug:'envios',systemRole:'consumer-shipping',informationPageConfig:{extension:{keep:true}}});await screen.findByLabelText('Texto del título');expect(screen.queryByRole('button',{name:'Temas y categorías',exact:true})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Recuerdos y fotografías',exact:true})).not.toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'Proceso de entrega',exact:true}));fireEvent.change(screen.getByLabelText('Título del paso'),{target:{value:'Confirmas tu compra'}});fireEvent.change(screen.getByLabelText('Descripción del paso'),{target:{value:'Revisa los datos antes de confirmar.'}});
- fireEvent.click(screen.getByRole('button',{name:'Costo, plazo y cobertura',exact:true}));fireEvent.change(screen.getByLabelText('Explicación del costo'),{target:{value:'Consulta el valor final al comprar.'}});
- fireEvent.click(screen.getByRole('button',{name:'Ayuda y enlaces',exact:true}));fireEvent.change(screen.getByLabelText('Texto del botón de contacto'),{target:{value:'Hablar con nuestro equipo'}});fireEvent.change(screen.getByLabelText('Destino del botón de contacto'),{target:{value:'/contacto#ubicacion'}});
- fireEvent.click(screen.getByRole('button',{name:'Guardar cambios'}));await screen.findByText('Cambios guardados. La página pública ya usa esta configuración.');const saved=state.stored();expect(saved.informationPageConfig).toMatchObject({extension:{keep:true},shipping:{costText:'Consulta el valor final al comprar.',contactText:'Hablar con nuestro equipo',contactHref:'/contacto#ubicacion'}});expect(saved.informationPageConfig.shipping.steps[0].title).toBe('Confirmas tu compra');state.view.unmount();mount(saved);await screen.findByLabelText('Texto del título');fireEvent.click(screen.getByRole('button',{name:'Proceso de entrega',exact:true}));expect(screen.getByLabelText('Título del paso')).toHaveValue('Confirmas tu compra');
+it("agrupa el diseño de envíos y conserva pasos, textos y destinos al guardar y recargar", async () => {
+  const state = mount({
+    name: "Envíos y entregas",
+    slug: "envios",
+    systemRole: "consumer-shipping",
+    informationPageConfig: { extension: { keep: true } },
+  });
+  await screen.findByLabelText("Texto del título");
+  expect(
+    screen.queryByRole("button", { name: "Temas y categorías", exact: true }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", {
+      name: "Recuerdos y fotografías",
+      exact: true,
+    }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Proceso de entrega", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Título del paso"), {
+    target: { value: "Confirmas tu compra" },
+  });
+  fireEvent.change(screen.getByLabelText("Descripción del paso"), {
+    target: { value: "Revisa los datos antes de confirmar." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Costo, plazo y cobertura",
+      exact: true,
+    }),
+  );
+  fireEvent.change(screen.getByLabelText("Explicación del costo"), {
+    target: { value: "Consulta el valor final al comprar." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Ayuda y enlaces", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Texto del botón de contacto"), {
+    target: { value: "Hablar con nuestro equipo" },
+  });
+  fireEvent.change(screen.getByLabelText("Destino del botón de contacto"), {
+    target: { value: "/contacto#ubicacion" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByText(
+    "Cambios guardados. La página pública ya usa esta configuración.",
+  );
+  const saved = state.stored();
+  expect(saved.informationPageConfig).toMatchObject({
+    extension: { keep: true },
+    shipping: {
+      costText: "Consulta el valor final al comprar.",
+      contactText: "Hablar con nuestro equipo",
+      contactHref: "/contacto#ubicacion",
+    },
+  });
+  expect(saved.informationPageConfig.shipping.steps[0].title).toBe(
+    "Confirmas tu compra",
+  );
+  state.view.unmount();
+  mount(saved);
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Proceso de entrega", exact: true }),
+  );
+  expect(screen.getByLabelText("Título del paso")).toHaveValue(
+    "Confirmas tu compra",
+  );
+});
+it("agrupa cambios por opciones, pasos y ayuda, conserva extensiones y recarga lo guardado", async () => {
+  const state = mount({
+    name: "Cambios y devoluciones",
+    slug: "cambios-y-devoluciones",
+    systemRole: "consumer-returns",
+    informationPageConfig: { extension: { keep: true } },
+  });
+  await screen.findByLabelText("Texto del título");
+  expect(
+    screen.queryByRole("button", { name: "Proceso de entrega", exact: true }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Opciones de atención", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Título de la opción"), {
+    target: { value: "Solicita tu cambio" },
+  });
+  fireEvent.change(screen.getByLabelText("Descripción de la opción"), {
+    target: { value: "Conoce tus opciones de atención." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Pasos de la solicitud", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Título del paso"), {
+    target: { value: "Selecciona tu motivo" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Ayuda y condiciones", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Texto del botón de seguimiento"), {
+    target: { value: "Revisar mi radicado" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByText(
+    "Cambios guardados. La página pública ya usa esta configuración.",
+  );
+  const saved = state.stored();
+  expect(saved.informationPageConfig.extension).toEqual({ keep: true });
+  expect(saved.informationPageConfig.returnsGuide.choices[0].title).toBe(
+    "Solicita tu cambio",
+  );
+  expect(saved.informationPageConfig.returnsGuide.steps[0].title).toBe(
+    "Selecciona tu motivo",
+  );
+  expect(saved.informationPageConfig.returnsGuide.trackText).toBe(
+    "Revisar mi radicado",
+  );
+  state.view.unmount();
+  mount(saved);
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Opciones de atención", exact: true }),
+  );
+  expect(screen.getByLabelText("Título de la opción")).toHaveValue(
+    "Solicita tu cambio",
+  );
+});
+it("la ilustración de cambios usa carga de imagen y bloquea guardar o navegar durante la subida", async () => {
+  mount({
+    name: "Cambios",
+    slug: "cambios-y-devoluciones",
+    systemRole: "consumer-returns",
+  });
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(screen.getByRole("button", { name: "Diseño", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Composición de cambios", exact: true }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Ilustración de cambios y devoluciones",
+      exact: true,
+    }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeDisabled(),
+  );
+  expect(
+    screen.getByRole("button", { name: "Contenido", exact: true }),
+  ).toBeDisabled();
 });

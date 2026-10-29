@@ -21,3 +21,13 @@ export function caseOrderContext() {
     : buildOrderPaymentAccessHeaders(payment);
   return Object.keys(headers).length ? { orderId: id, headers } : null;
 }
+export function caseNavigation(types = {}) {
+  const query = new URLSearchParams(window.location.search);
+  const type = query.get("tipo");
+  return {
+    tab: query.get("vista") === "consulta" ? "track" : "create",
+    type: Object.prototype.hasOwnProperty.call(types || {}, type)
+      ? type
+      : undefined,
+  };
+}
