@@ -8,6 +8,7 @@ const SOURCES = [
   "https://cancilleria.gov.co/normograma/compilacion/docs/ley_1581_2012.htm",
 ];
 const { clean } = require("./policiesText");
+const { privacyDocument } = require("./privacyDocument");
 const { deliverySettings, sellerSource } = require("./sources");
 function normalizeConfig(raw = {}) {
   raw = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
@@ -86,6 +87,7 @@ function policyDocument(settings = {}) {
     .split(", ")
     .map((code) => regionNames.of(code) || code)
     .join(", ");
+  const privacyPolicy = privacyDocument(c);
   const sections = [
     {
       id: "terminos",
@@ -115,13 +117,14 @@ function policyDocument(settings = {}) {
     {
       id: "privacidad",
       title: "Tratamiento de datos personales",
-      body: `El responsable del tratamiento es el vendedor identificado en esta página. Tratamos los datos de contacto, identificación, compra y entrega necesarios para gestionar pedidos, pagos, facturación, logística, atención y obligaciones legales. No envíes contraseñas, datos de tarjetas ni información sensible en un reclamo. Las comunicaciones comerciales requieren una autorización independiente y opcional, que puedes retirar. Puedes conocer, actualizar y rectificar tus datos, pedir prueba de la autorización, conocer su uso, acceder gratuitamente y solicitar revocatoria o supresión cuando proceda, así como acudir a la SIC después de agotar el trámite ante el responsable. Presenta consultas o reclamos por el canal de Peticiones y reclamos o los datos de contacto publicados. Las consultas se atienden en 10 días hábiles, prorrogables hasta 5 más con aviso previo motivado; los reclamos completos en 15 días hábiles, prorrogables hasta 8 más con aviso motivado y fecha de respuesta. La conservación informada por el responsable es: ${c.retention || "pendiente de configurar"}. Encargados y tratamiento mediante proveedores: ${c.processors || "pendiente de configurar"}. Las transmisiones o transferencias deben cumplir las reglas aplicables. Vigencia de esta política: ${c.privacyEffectiveDate || "pendiente de configurar"}.`,
+      body: privacyPolicy.body,
     },
   ];
   return {
     version: `${VERSION}:${privacy.revision}:delivery-${c.revision}:returns-${returns?.revision ?? 0}`,
     seller,
     sections,
+    privacySections: privacyPolicy.sections,
     authorityUrl: AUTHORITY_URL,
     sources: SOURCES,
     readiness: readiness(settings),

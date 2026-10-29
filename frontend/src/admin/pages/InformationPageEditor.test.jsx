@@ -61,6 +61,121 @@ function mount(initial = {}) {
   );
   return { view, stored: () => stored, writes: () => writes };
 }
+it("agrupa privacidad y conserva resumen, temas, derechos y extensiones al guardar y recargar", async () => {
+  const state = mount({
+    name: "Datos personales",
+    slug: "privacidad",
+    systemRole: "consumer-privacy",
+    informationPageConfig: {
+      extension: { keep: true },
+      privacyPage: { extension: "conservar" },
+    },
+  });
+  await screen.findByLabelText("Texto del título");
+  expect(
+    screen.queryByRole("button", { name: "Formulario y campos", exact: true }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Resumen de privacidad", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Título del elemento"), {
+    target: { value: "Información que utilizamos" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Lectura y descarga", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Tema de privacidad"), {
+    target: { value: "conservacion" },
+  });
+  fireEvent.change(screen.getByLabelText("Título del tema"), {
+    target: { value: "Conservación de la información" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Derechos y atención", exact: true }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Solicitudes y contacto", exact: true }),
+  );
+  expect(screen.getByLabelText("Texto del botón de derechos")).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Texto del botón de derechos"), {
+    target: { value: "Solicitar atención sobre mis datos" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByText(
+    "Cambios guardados. La página pública ya usa esta configuración.",
+  );
+  expect(state.stored().informationPageConfig).toMatchObject({
+    extension: { keep: true },
+    privacyPage: {
+      extension: "conservar",
+      topics: { conservacion: { label: "Conservación de la información" } },
+      rightsText: "Solicitar atención sobre mis datos",
+    },
+  });
+  expect(
+    state.stored().informationPageConfig.privacyPage.summaries[0].title,
+  ).toBe("Información que utilizamos");
+  const saved = state.stored();
+  state.view.unmount();
+  mount(saved);
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Resumen de privacidad", exact: true }),
+  );
+  expect(screen.getByLabelText("Título del elemento")).toHaveValue(
+    "Información que utilizamos",
+  );
+});
+it("conserva enlaces de privacidad inválidos en el borrador y no los guarda", async () => {
+  const state = mount({
+    name: "Datos personales",
+    slug: "privacidad",
+    systemRole: "consumer-privacy",
+  });
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Derechos y atención", exact: true }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Solicitudes y contacto", exact: true }),
+  );
+  fireEvent.change(screen.getByLabelText("Destino del botón de derechos"), {
+    target: { value: "javascript:alert(1)" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByText(/Revisa los destinos de atención/);
+  expect(state.writes()).toBe(0);
+  expect(screen.getByLabelText("Destino del botón de derechos")).toHaveValue(
+    "javascript:alert(1)",
+  );
+});
+it("bloquea guardado y navegación mientras sube la ilustración de privacidad", async () => {
+  mount({
+    name: "Datos personales",
+    slug: "privacidad",
+    systemRole: "consumer-privacy",
+  });
+  await screen.findByLabelText("Texto del título");
+  fireEvent.click(screen.getByRole("button", { name: "Diseño", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Composición de privacidad",
+      exact: true,
+    }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Ilustración de privacidad",
+      exact: true,
+    }),
+  );
+  expect(
+    screen.getByRole("button", { name: "Guardar cambios" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Contenido", exact: true }),
+  ).toBeDisabled();
+});
 it("organiza condiciones por temas y guarda nombres del índice y ayuda sin modificar políticas ni extensiones", async () => {
   const state = mount({
     name: "Condiciones de compra",

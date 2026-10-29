@@ -6,6 +6,10 @@ import {
 } from "../../components/information-page/informationPageConfig";
 const tabs = [
   { id: "content", label: "Título y presentación", group: "content" },
+  { id: "privacy-summary", label: "Resumen de privacidad", group: "content" },
+  { id: "privacy-reading", label: "Lectura y descarga", group: "content" },
+  { id: "privacy-rights", label: "Derechos y atención", group: "content" },
+  { id: "privacy-design", label: "Composición de privacidad", group: "design" },
   { id: "terms-index", label: "Índice y descarga", group: "content" },
   { id: "terms-support", label: "Ayuda e información", group: "content" },
   { id: "terms-design", label: "Composición de condiciones", group: "design" },
@@ -48,6 +52,8 @@ const tabs = [
 ];
 const resolveTabs = (tabs, form) =>
   tabs.filter((tab) => {
+    const privacy = form.systemRole === "consumer-privacy";
+    if (tab.id.startsWith("privacy-")) return privacy;
     const terms = form.systemRole === "consumer-terms";
     if (tab.id.startsWith("terms-")) return terms;
     const shipping = form.systemRole === "consumer-shipping";
@@ -57,7 +63,7 @@ const resolveTabs = (tabs, form) =>
     if (tab.id.startsWith("returns-")) return returns;
     if (tab.id.startsWith("shipping-")) return shipping;
     if (
-      (shipping || returns || claims || terms) &&
+      (shipping || returns || claims || terms || privacy) &&
       (tab.id.startsWith("help-") ||
         tab.id.startsWith("contact-") ||
         ["moments", "journal-texts", "journal-design"].includes(tab.id))

@@ -80,21 +80,24 @@ export default function InformationPageView({ page, theme, preview = false }) {
   const returns = page.systemRole === "consumer-returns";
   const claims = page.systemRole === "consumer-claims";
   const terms = page.systemRole === "consumer-terms";
-  const extra = terms
-    ? config.termsPage
-    : claims
-      ? config.claimsPage
-      : returns
-        ? config.returnsGuide
-        : shipping
-          ? config.shipping
-          : memory
-            ? config.journal
-            : contact
-              ? config.contact
-              : help
-                ? config.help
-                : null;
+  const privacy = page.systemRole === "consumer-privacy";
+  const extra = privacy
+    ? config.privacyPage
+    : terms
+      ? config.termsPage
+      : claims
+        ? config.claimsPage
+        : returns
+          ? config.returnsGuide
+          : shipping
+            ? config.shipping
+            : memory
+              ? config.journal
+              : contact
+                ? config.contact
+                : help
+                  ? config.help
+                  : null;
   const showSections = extra ? extra.showSections : true;
   const showFooterAction = extra ? extra.showFooterAction : true;
   const navigation =

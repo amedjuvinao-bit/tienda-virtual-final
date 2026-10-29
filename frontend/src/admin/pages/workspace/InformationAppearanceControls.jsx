@@ -1,3 +1,4 @@
+import PrivacyAppearanceControls from "./PrivacyAppearanceControls";
 import TermsAppearanceControls from "./TermsAppearanceControls";
 import MemoryMomentsEditor from "./MemoryMomentsEditor";
 import MemoryDesignControls from "./MemoryDesignControls";
@@ -18,6 +19,8 @@ const f = (key, label, type = "text", extra = {}) => ({
   ...extra,
 });
 export default function InformationAppearanceControls(props) {
+  if (props.topic.startsWith("privacy-"))
+    return <PrivacyAppearanceControls {...props} />;
   if (props.topic.startsWith("terms-"))
     return <TermsAppearanceControls {...props} />;
   if (props.topic.startsWith("claims-"))
@@ -47,6 +50,7 @@ export default function InformationAppearanceControls(props) {
         ...([
           "consumer-shipping",
           "consumer-terms",
+          "consumer-privacy",
           "consumer-returns",
           "consumer-claims",
         ].includes(props.form.systemRole)
@@ -124,9 +128,13 @@ export default function InformationAppearanceControls(props) {
           f(
             "slug",
             "Dirección de la página",
-            ["about", "contact", "help", "consumer-terms"].includes(
-              props.form.systemRole,
-            )
+            [
+              "about",
+              "contact",
+              "help",
+              "consumer-terms",
+              "consumer-privacy",
+            ].includes(props.form.systemRole)
               ? "readonly"
               : "text",
             { scope: "form" },

@@ -20,6 +20,10 @@ import {
   validateClaimsPage,
 } from "../consumer/claimsPageConfig";
 import { buildTermsPage, validateTermsPage } from "../consumer/termsPageConfig";
+import {
+  buildPrivacyPage,
+  validatePrivacyPage,
+} from "../consumer/privacyPageConfig";
 const object = (v) =>
   v && typeof v === "object" && !Array.isArray(v) ? v : {};
 const text = (v, fallback = "", limit = Infinity) =>
@@ -107,6 +111,9 @@ export function buildInformationConfig(raw = {}) {
   });
   return {
     ...source,
+    ...(source.privacyPage !== undefined
+      ? { privacyPage: buildPrivacyPage(source.privacyPage) }
+      : {}),
     ...(source.termsPage !== undefined
       ? { termsPage: buildTermsPage(source.termsPage) }
       : {}),
@@ -209,6 +216,47 @@ export function normalizeInformationPage(page) {
 }
 export function informationConfigForPage(page) {
   const raw = object(page.informationPageConfig);
+  const privacy = page.systemRole === "consumer-privacy";
+  const adoptPrivacy =
+    privacy &&
+    raw.privacyPage === undefined &&
+    raw.subtitleText === "Información clara para comprar y recibir atención." &&
+    raw.eyebrowText === "Tu compra, con confianza";
+  const privacyDefaults = privacy
+    ? {
+        privacyPage: {},
+        titleText: "Privacidad y datos personales",
+        eyebrowText: "Información y atención",
+        subtitleText:
+          "Conoce cómo se utilizan tus datos y cómo ejercer tus derechos.",
+        contentMaxWidthPx: 1440,
+        titleFontSizePx: 58,
+        gapPx: 14,
+        actionText: "",
+        sections: [],
+        style: {
+          cardRadiusPx: 28,
+          cardPaddingPx: 26,
+          buttonRadiusPx: 999,
+          textPrimaryColor: "#6b1635",
+          textSecondaryColor: "#71384b",
+          accentColor: "#922e50",
+          sectionTitleSizePx: 32,
+          bodyFontSizePx: 15,
+          buttonBg: "#7e2440",
+          buttonTextColor: "#fff4ed",
+        },
+        presentation: {
+          backgroundMode: "continuity",
+          borderWidth: 2.25,
+          glassOpacity: 0.12,
+          glassBlur: 5,
+          reflection: 0.9,
+          checkoutGlassOpacity: 0.88,
+          checkoutGlassBlur: 8,
+        },
+      }
+    : {};
   const terms = page.systemRole === "consumer-terms";
   const adoptTerms =
     terms &&
@@ -437,7 +485,27 @@ export function informationConfigForPage(page) {
     ...returnsDefaults,
     ...claimsDefaults,
     ...termsDefaults,
+    ...privacyDefaults,
     ...raw,
+    ...(privacy
+      ? {
+          style: { ...privacyDefaults.style, ...object(raw.style) },
+          presentation: {
+            ...privacyDefaults.presentation,
+            ...object(raw.presentation),
+          },
+          ...(adoptPrivacy
+            ? {
+                eyebrowText: privacyDefaults.eyebrowText,
+                subtitleText: privacyDefaults.subtitleText,
+                ...(raw.titleText === "Datos personales"
+                  ? { titleText: privacyDefaults.titleText }
+                  : {}),
+                ...(raw.titleFontSizePx === 40 ? { titleFontSizePx: 58 } : {}),
+              }
+            : {}),
+        }
+      : {}),
     ...(terms
       ? {
           style: { ...termsDefaults.style, ...object(raw.style) },
@@ -557,6 +625,11 @@ export function validateInformationPage(page) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug || ""))
     return "Usa una dirección con letras minúsculas, números y guiones, sin espacios.";
   const config = page.informationPageConfig || {};
+  const privacyError =
+    page.systemRole === "consumer-privacy"
+      ? validatePrivacyPage(config.privacyPage)
+      : "";
+  if (privacyError) return privacyError;
   const termsError =
     page.systemRole === "consumer-terms"
       ? validateTermsPage(config.termsPage)
