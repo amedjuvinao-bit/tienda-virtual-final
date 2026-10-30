@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import CATALOG_PAGES from '../../../../../../shared/catalogPages.json';
 import { Flower2, ArrowUp, ArrowDown, Plus } from 'lucide-react';
 import { Button } from '../ui/UiComponents';
 import { ColorField, FontFamilyField } from '../ui/SectionsPanelUI';
@@ -83,9 +84,16 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
           <DesignText label="Descripción de la sección" value={c.subtitleText} onChange={(e) => config({ subtitleText: e.target.value })} />
           <DesignText label="Texto inferior" value={c.footerText} onChange={(e) => config({ footerText: e.target.value })} />
         </DesignCard>
-        <CategoryPanel current={current} picker={picker} title="Nombre y enlace" hint="Cada categoría abre su propia galería.">
+        <CategoryPanel current={current} picker={picker} title="Nombre y enlace" hint="Elige el catálogo que abrirá esta tarjeta o conserva un enlace personalizado.">
           <DesignChoice label="Visibilidad de la categoría" value={current?.enabled} options={[[true, 'Visible'], [false, 'Oculta']]} onChange={(enabled) => patchCategory(current.id, { enabled })} />
           <DesignText label="Nombre de la categoría" value={current?.title || ''} onChange={(e) => patchCategory(current.id, { title: e.target.value })} />
+          <label className="section-design-field">Página del catálogo
+            <select value={CATALOG_PAGES.some(page => page.publicPath === current?.href) ? current.href : ''}
+              onChange={(event) => patchCategory(current.id, { href: event.target.value })}>
+              <option value="" disabled>Enlace personalizado: puedes editarlo abajo</option>
+              {CATALOG_PAGES.map(page => <option key={page.slug} value={page.publicPath}>{page.name}</option>)}
+            </select>
+          </label>
           <DesignText label="Enlace de la galería" placeholder="/categoria/ejemplo" value={current?.href || ''} onChange={(e) => patchCategory(current.id, { href: e.target.value })} />
           <DesignText label="Descripción al explorar" value={current?.subtitle || ''} onChange={(e) => patchCategory(current.id, { subtitle: e.target.value })} />
           <DesignText label="Etiqueta corta" value={current?.badge || ''} onChange={(e) => patchCategory(current.id, { badge: e.target.value })} />

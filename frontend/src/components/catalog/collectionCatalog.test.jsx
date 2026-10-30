@@ -21,6 +21,8 @@ import api from "../../lib/api";
 const require = createRequire(import.meta.url);
 const {
   complementsConfig,
+  buildCategoryCatalogConfig,
+  CATALOG_PAGES,
 } = require("../../../../backend/services/pages/catalogPages.js");
 const { addToCart, toggleFavorite } = vi.hoisted(() => ({
   addToCart: vi.fn(),
@@ -79,13 +81,27 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
-function mount(config = complementsConfig) {
+function mount(config = complementsConfig, selection = page) {
   return render(
-    <MemoryRouter initialEntries={["/complementos"]}>
-      <CatalogPageView page={page} catalogConfig={config} />
+    <MemoryRouter initialEntries={[pagePublicPath(selection)]}>
+      <CatalogPageView page={selection} catalogConfig={config} />
     </MemoryRouter>,
   );
 }
+it("Bautizos usa el mismo catálogo y editor, en su ruta propia y con selección independiente", async () => {
+  const definition = CATALOG_PAGES.find(item => item.slug === "bautizos");
+  const selection = { ...page, _id: "bautizos-page", name: definition.name, slug: definition.slug };
+  const config = buildCategoryCatalogConfig(definition, complementsConfig);
+  expect(pagePublicPath(selection)).toBe("/categoria/bautizos");
+  expect(pageEditorPath(selection)).toBe("/admin/catalogo/bautizos-page");
+  expect(pageMeta(selection).system).toBe(true);
+  mount(config, selection);
+  await screen.findByRole("heading", { name: config.emptyTitle });
+  expect(screen.getByRole("heading", { name: "Bautizos", exact: true })).toBeVisible();
+  expect(screen.getByPlaceholderText("Buscar en Bautizos…")).toBeVisible();
+  expect(new URL(fetch.mock.calls[0][0]).searchParams.getAll("categoryScope")).toEqual(["Bautizos"]);
+  expect(screen.queryByRole("article")).not.toBeInTheDocument();
+});
 it("la página propia usa su editor y el ámbito de categorías permanece independiente de los filtros del visitante", () => {
   expect(pageMeta(page).system).toBe(true);
   expect(pagePublicPath(page)).toBe("/complementos");

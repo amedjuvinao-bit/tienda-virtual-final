@@ -1,5 +1,5 @@
 "use strict";
-const CATALOG_PAGES = [{ slug: "complementos", name: "Complementos" }];
+const CATALOG_PAGES = require("../../../shared/catalogPages.json");
 const complementsConfig = {
   title: "Complementos",
   subtitle: "Detalles para acompañar tu elección.",
@@ -104,21 +104,60 @@ const complementsConfig = {
     colorDotSizePx: 24,
   },
 };
+function buildCategoryCatalogConfig(definition, source = complementsConfig) {
+  const base =
+    source && typeof source === "object" && !Array.isArray(source) ? source : {};
+  // Copy the saved presentation once; product selection belongs to the new page.
+  return structuredClone({
+    ...complementsConfig,
+    ...base,
+    title: definition.name,
+    subtitle: definition.subtitle,
+    sourceMode: "categories",
+    allowedCategoriesText: definition.category,
+    initialCategoriesText: "",
+    manualProductIdsText: "",
+    emptyTitle: "Pronto encontrarás productos de esta categoría",
+    emptyText:
+      "Estamos preparando esta selección. Vuelve a visitarnos para descubrir las novedades.",
+    presentation: { ...complementsConfig.presentation, ...base.presentation },
+    cardUiConfig: { ...complementsConfig.cardUiConfig, ...base.cardUiConfig },
+    filterUiConfig: { ...complementsConfig.filterUiConfig, ...base.filterUiConfig },
+    collection: {
+      ...complementsConfig.collection,
+      ...base.collection,
+      searchPlaceholder: `Buscar en ${definition.name}…`,
+      categoriesTitle: "Categorías",
+    },
+  });
+}
 async function ensureCatalogPages(Page) {
   for (const definition of CATALOG_PAGES) {
     if (await Page.findOne({ slug: definition.slug })) continue;
+    const original =
+      definition.slug === "complementos"
+        ? null
+        : await Page.findOne({ slug: "complementos" });
+    const catalogConfig =
+      definition.slug === "complementos"
+        ? complementsConfig
+        : buildCategoryCatalogConfig(
+            definition,
+            original?.pageType === "catalog" ? original.catalogConfig : undefined,
+          );
     try {
       await Page.findOneAndUpdate(
         { slug: definition.slug },
         {
           $setOnInsert: {
-            ...definition,
+            slug: definition.slug,
+            name: definition.name,
             pageType: "catalog",
             enabled: true,
             useHeader: true,
             useFooter: true,
             blocks: [],
-            catalogConfig: complementsConfig,
+            catalogConfig,
           },
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
@@ -132,4 +171,9 @@ async function ensureCatalogPages(Page) {
     }
   }
 }
-module.exports = { CATALOG_PAGES, complementsConfig, ensureCatalogPages };
+module.exports = {
+  CATALOG_PAGES,
+  complementsConfig,
+  buildCategoryCatalogConfig,
+  ensureCatalogPages,
+};

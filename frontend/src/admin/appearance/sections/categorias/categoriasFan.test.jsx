@@ -151,6 +151,20 @@ describe('Categorías: Abanico vivo', () => {
     expect(slides).toHaveLength(4); expect(slides.slice(0, 3).map((r) => r.id)).toEqual(['one', 'two', 'three']);
     expect(slides[3].title).toBe('Nueva colección');
   });
+  it('enlaza una tarjeta con su catálogo sin modificar las demás categorías', () => {
+    const save = vi.fn(); render(<Harness save={save} />);
+    content('Nombre y enlace'); category('two');
+    expect(screen.getByLabelText('Enlace de la galería')).toHaveValue('/coleccion/dos');
+    fireEvent.change(screen.getByLabelText('Página del catálogo'), { target: { value: '/categoria/bautizos' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    const slides = save.mock.calls[0][0].sections[0].config.slides;
+    expect(slides[1]).toMatchObject({ ...records[1], href: '/categoria/bautizos' });
+    expect(slides[0]).toMatchObject(records[0]);
+    expect(slides[2]).toMatchObject(records[2]);
+    cleanup();
+    render(<CategoriasSection theme={makeTheme(slides)} />);
+    expect(screen.getByRole('link', { name: 'Explorar Segunda categoría' })).toHaveAttribute('href', '/categoria/bautizos');
+  });
   it('restaura el diseño conservando textos, imágenes y galerías', () => {
     const save = vi.fn(); render(<Harness save={save} />);
     fireEvent.change(screen.getByLabelText('Título de la sección'), { target: { value: 'Mi título' } });

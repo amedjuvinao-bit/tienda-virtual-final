@@ -1,14 +1,18 @@
 import { expect, it } from "vitest";
 import fs from "node:fs";
 import { PAGE_TYPES } from "./pageModel";
+import CATALOG_PAGES from "../../../../../shared/catalogPages.json";
 it("toda ruta pública tiene una ubicación de configuración conocida", () => {
   const source = fs.readFileSync("src/App.jsx", "utf8");
   const paths = [...source.matchAll(/<Route\s+path="([^"]+)"/g)]
     .map((match) => match[1])
     .filter((path) => path.startsWith("/") && !path.startsWith("/admin"));
+  expect(source).toContain("CATALOG_PAGES.map(({ slug, publicPath })");
+  paths.push(...CATALOG_PAGES.map(page => page.publicPath));
   const configured = {
     "/": "Apariencia",
     "/complementos": "Páginas",
+    "/categoria/bautizos": "Páginas",
     "/nosotros": "Páginas",
     "/contacto": "Páginas",
     "/politicas": "Páginas",

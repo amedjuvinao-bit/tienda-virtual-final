@@ -1,5 +1,5 @@
 import CollectionCatalogControls from "./workspace/CollectionCatalogControls";
-import { pagePublicPath } from "./workspace/pageModel";
+import { pageMeta, pagePublicPath } from "./workspace/pageModel";
 import { applyCatalogEditorialPreset, restoreCatalogVisualBackup } from "../../components/catalog/catalogEditorialPreset";
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/CatalogPageEditor.jsx
@@ -885,7 +885,7 @@ export default function CatalogPageEditor() {
 
             <Input
               label="Dirección de la página"
-              readOnly={page?.slug === "complementos"}
+              readOnly={pageMeta(page).system}
               value={form.slug}
               onChange={(e) => updateRoot({ slug: slugify(e.target.value) })}
               placeholder="Ej: lo-nuevo"
@@ -1083,7 +1083,7 @@ export default function CatalogPageEditor() {
           {productsSubtab === "universe" && (
             <SectionCard
               title="Productos de este catálogo"
-              text={page?.slug === "complementos" ? "Esta selección parte de la categoría Complementos. Los productos publicados aparecerán cuando los asignes a esa categoría. Puedes cambiar las categorías en el apartado Categorías." : "Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."}
+              text={pageMeta(page).system ? "Los productos publicados aparecerán cuando los asignes a las categorías permitidas de esta página. Puedes elegirlas en el apartado Categorías." : "Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."}
             >
               <Select
                 label="Origen de productos"

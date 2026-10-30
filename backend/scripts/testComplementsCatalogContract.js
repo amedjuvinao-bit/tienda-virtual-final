@@ -139,8 +139,50 @@ async function call(method, path, req = {}) {
   assert(filter.$and[1].$or[0].category.$in[0].test("Complementos"));
   assert(!filter.$and[1].$or[0].category.$in[0].test("Ropa"));
   checks++;
+  // A new category starts from the saved catalogue appearance, without inheriting its products.
+  const firstBautizos = [...pages.values()].find(p => p.slug === "bautizos");
+  assert(firstBautizos);
+  pages.delete(firstBautizos._id);
+  page.catalogConfig = {
+    ...config,
+    sourceMode: "manual",
+    manualProductIdsText: "otro-producto",
+    initialCategoriesText: "Detalles",
+    presentation: { ...config.presentation, glassColor: "#b46a85", radius: 19 },
+    collection: { ...config.collection, artworkWidthPx: 240 },
+  };
+  const { body: bautizos } = await call("get", "/:value", { params: { value: "bautizos" } });
+  assert.equal(bautizos.pageType, "catalog");
+  assert.equal(bautizos.catalogConfig.title, "Bautizos");
+  assert.equal(bautizos.catalogConfig.allowedCategoriesText, "Bautizos");
+  assert.equal(bautizos.catalogConfig.sourceMode, "categories");
+  assert.equal(bautizos.catalogConfig.manualProductIdsText, "");
+  assert.equal(bautizos.catalogConfig.initialCategoriesText, "");
+  assert.equal(bautizos.catalogConfig.presentation.glassColor, "#b46a85");
+  assert.equal(bautizos.catalogConfig.presentation.radius, 19);
+  assert.equal(bautizos.catalogConfig.collection.artworkWidthPx, 240);
+  assert.equal(bautizos.catalogConfig.collection.searchPlaceholder, "Buscar en Bautizos…");
+  assert.deepEqual(bautizos.catalogConfig.extension, { keep: true });
+  assert.notStrictEqual(bautizos.catalogConfig.presentation, page.catalogConfig.presentation);
+  checks++;
+  const ownConfig = { ...bautizos.catalogConfig, title: "Ceremonias", extension: { keep: "own" } };
+  const updated = await call("put", "/:id", {
+    params: { id: bautizos._id },
+    body: { name: "Ceremonias", slug: "otra", pageType: "custom", catalogConfig: ownConfig },
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.slug, "bautizos");
+  assert.equal(updated.body.pageType, "catalog");
+  page.catalogConfig.presentation.glassColor = "#123456";
+  await call("get", "/");
+  assert.deepEqual(updated.body.catalogConfig, ownConfig);
+  assert.equal([...pages.values()].filter(p => p.slug === "bautizos").length, 1);
+  assert.equal((await call("delete", "/:id", { params: { id: bautizos._id } })).status, 400);
+  assert.equal((await call("post", "/", { body: { name: "Otra", slug: "bautizos", pageType: "catalog" } })).status, 400);
+  assert.equal((await call("put", "/:id", { params: { id: other._id }, body: { name: "Otra", slug: "bautizos", pageType: "catalog" } })).status, 400);
+  checks++;
   console.log(
-    `PASS ${checks} grupos de Complementos: creación única, ruta, edición y conservación, protecciones y ámbito de categorías sin productos de ejemplo`,
+    `PASS ${checks} grupos de catálogos: Complementos y Bautizos, herencia inicial, selección independiente, conservación, rutas y protecciones sin productos de ejemplo`,
   );
 })().catch((error) => {
   console.error(error);

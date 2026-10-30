@@ -1,3 +1,5 @@
+import CATALOG_PAGES from "../../../../../shared/catalogPages.json";
+
 export const PAGE_TYPES = {
   information: {
     label: "Informativa",
@@ -67,8 +69,9 @@ export const PAGE_TYPES = {
   },
 };
 export function pageMeta(page) {
-  if (page?.slug === "complementos" && page?.pageType === "catalog") return {
-    ...PAGE_TYPES.catalog, system: true, slug: "complementos", publicPath: "/complementos",
+  const catalog = page?.pageType === "catalog" && CATALOG_PAGES.find(item => item.slug === page.slug);
+  if (catalog) return {
+    ...PAGE_TYPES.catalog, system: true, slug: catalog.slug, publicPath: catalog.publicPath,
   };
   if (String(page?.systemRole || "").startsWith("consumer-")) return { ...PAGE_TYPES.information, system: true, slug: page.slug, publicPath: `/${page.slug}` };
   if (page?.systemRole === "help") return {
