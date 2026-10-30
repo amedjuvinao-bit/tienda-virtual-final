@@ -1,13 +1,16 @@
 import React from "react";
 import { createRequire } from "node:module";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import CatalogPageEditor from "./CatalogPageEditor";
 const require = createRequire(import.meta.url);
 const {
   complementsConfig,
+  buildCategoryCatalogConfig,
+  CATALOG_PAGES,
 } = require("../../../../backend/services/pages/catalogPages.js");
+const uploadState = vi.hoisted(() => ({ complete: null }));
 vi.mock("../../lib/api", () => ({ adminFetch: (...args) => fetch(...args) }));
 vi.mock("./workspace/PageLivePreview", () => ({
   default: ({ draft }) => (
@@ -20,6 +23,7 @@ vi.mock("../media/AdminImageUploadField", () => ({
       type="button"
       onClick={() => {
         onBusyChange(true);
+        uploadState.complete = () => onBusyChange(false);
         onChange("https://res.cloudinary.com/demo/image/upload/art.webp");
       }}
     >
@@ -30,16 +34,19 @@ vi.mock("../media/AdminImageUploadField", () => ({
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  uploadState.complete = null;
 });
-function mount() {
+function mount(slug = "complementos") {
+  const definition = CATALOG_PAGES.find(item => item.slug === slug);
+  const config = slug === "complementos" ? complementsConfig : buildCategoryCatalogConfig(definition);
   let stored = {
       _id: "comp",
-      name: "Complementos",
-      slug: "complementos",
+      name: definition.name,
+      slug,
       pageType: "catalog",
       catalogConfig: {
-        ...complementsConfig,
-        collection: { ...complementsConfig.collection, extension: true },
+        ...config,
+        collection: { ...config.collection, extension: true },
       },
       blocks: [],
     },
@@ -114,6 +121,25 @@ it("permite enlazar categorías vacías y guarda su ámbito y ajustes de selecci
   expect(state.stored().catalogConfig.collection).toMatchObject({
     extension: true,
     searchPlaceholder: "Encuentra un detalle",
+  });
+});
+it("Bautizos guarda desde Encabezado y Adorno la imagen elegida y la entrega a la vista previa", async () => {
+  const state = mount("bautizos");
+  await screen.findByRole("combobox", { name: "Origen de productos", exact: true });
+  fireEvent.click(screen.getByRole("button", { name: "Diseño", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Encabezado", exact: true }));
+  fireEvent.click(screen.getByRole("tab", { name: "Adorno", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Ilustración del catálogo", exact: true }));
+  expect(screen.getByRole("button", { name: "Guardar cambios", exact: true })).toBeDisabled();
+  act(() => uploadState.complete());
+  expect(JSON.parse(screen.getByTestId("draft").textContent).catalogConfig.collection.heroArtwork).toBe("https://res.cloudinary.com/demo/image/upload/art.webp");
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios", exact: true }));
+  await screen.findByText(/Cambios guardados/);
+  expect(state.writes()).toBe(1);
+  expect(state.stored().catalogConfig).toMatchObject({
+    sourceMode: "categories",
+    allowedCategoriesText: "Bautizos",
+    collection: { heroArtwork: "https://res.cloudinary.com/demo/image/upload/art.webp", extension: true },
   });
 });
 it("bloquea el guardado durante una carga desde el equipo", async () => {

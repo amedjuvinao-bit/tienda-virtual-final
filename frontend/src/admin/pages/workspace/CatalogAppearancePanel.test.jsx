@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -27,8 +28,9 @@ const initial = () =>
     },
     cardUiConfig: { imageFit: "contain" },
   });
-function Editor() {
-  const [config, setConfig] = useState(initial),
+function Editor({ collection }) {
+  const [config, setConfig] = useState(() => collection
+    ? buildSafeCatalogConfig({ ...initial(), collection }) : initial()),
     [section, setSection] = useState("visual"),
     [busy, setBusy] = useState(false);
   const change = (scope, patch) =>
@@ -66,6 +68,40 @@ function Editor() {
     </>
   );
 }
+it("Adorno carga la ilustración de una selección y conserva las ediciones durante la subida", async () => {
+  let complete;
+  adminFetch.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+  render(<Editor collection={{ heroArtwork: "/catalog/crystal-complements.webp", artworkWidthPx: 320, extension: true }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sección: header" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Adorno", exact: true }));
+  expect(screen.queryByLabelText("Adorno del encabezado")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Seleccionar imagen de Ilustración del catálogo"), {
+    target: { files: [new File(["png"], "bautizos-cristal.png", { type: "image/png" })] },
+  });
+  expect(screen.getByTestId("busy")).toHaveTextContent("true");
+  const [url, request] = adminFetch.mock.calls[0];
+  expect(url).toMatch(/\/api\/uploads$/);
+  expect(request.body.get("image").name).toBe("bautizos-cristal.png");
+  fireEvent.change(screen.getByLabelText("Ancho de la ilustración (px)"), { target: { value: "280" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Tipografía", exact: true }));
+  fireEvent.change(screen.getByLabelText("Tamaño del título de catálogo (px)"), { target: { value: "52" } });
+  await act(async () => complete({ ok: true, json: async () => ({ url: "https://res.cloudinary.com/demo/image/upload/bautizos.png" }) }));
+  await waitFor(() => expect(screen.getByTestId("busy")).toHaveTextContent("false"));
+  expect(JSON.parse(screen.getByTestId("config").textContent)).toMatchObject({
+    collection: { heroArtwork: "https://res.cloudinary.com/demo/image/upload/bautizos.png", artworkWidthPx: "280", extension: true },
+    presentation: { titleSize: 52 },
+  });
+  fireEvent.click(screen.getByRole("tab", { name: "Adorno", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Quitar imagen", exact: true }));
+  expect(JSON.parse(screen.getByTestId("config").textContent).collection.heroArtwork).toBe("");
+});
+it("los catálogos anteriores conservan el selector de adorno que sí utiliza su encabezado", () => {
+  render(<Editor />);
+  fireEvent.click(screen.getByRole("button", { name: "Sección: header" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Adorno", exact: true }));
+  expect(screen.getByLabelText("Adorno del encabezado")).toBeVisible();
+  expect(screen.queryByLabelText("Seleccionar imagen de Ilustración del catálogo")).not.toBeInTheDocument();
+});
 it("agrupa por tema y conserva cambios de filtros, tarjetas y encabezado al navegar", async () => {
   const user = userEvent.setup();
   render(<Editor />);

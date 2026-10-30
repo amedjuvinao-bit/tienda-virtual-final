@@ -564,6 +564,16 @@ export default function CatalogPageEditor() {
     setForm((prev) => ({ ...prev, ...patch }));
   };
 
+  const updateCollectionConfig = (patch) => {
+    setForm((previous) => ({
+      ...previous,
+      catalogConfig: {
+        ...previous.catalogConfig,
+        collection: { ...previous.catalogConfig.collection, ...patch },
+      },
+    }));
+  };
+
   const updateCatalogConfig = (patch) => {
     setForm((prev) => ({
       ...prev,
@@ -623,7 +633,7 @@ export default function CatalogPageEditor() {
   };
 
   const updateAppearance = (scope, patch) => {
-    const handlers = { catalog: updateCatalogConfig, presentation: updateCatalogPresentation,
+    const handlers = { catalog: updateCatalogConfig, collection: updateCollectionConfig, presentation: updateCatalogPresentation,
       cardUiConfig: updateCardUiConfig, filterUiConfig: updateFilterUiConfig,
       columnControlsUiConfig: updateColumnControlsUiConfig };
     handlers[scope](patch);
@@ -954,9 +964,9 @@ export default function CatalogPageEditor() {
         </div>
       )}
 
-      {activeTab === "collection" && form.catalogConfig.collection && <CollectionCatalogControls value={form.catalogConfig.collection} saving={saving} onUploadingChange={setUploadingAppearance} onChange={patch=>updateCatalogConfig({collection:{...form.catalogConfig.collection,...patch}})}/>}
+      {activeTab === "collection" && form.catalogConfig.collection && <CollectionCatalogControls value={form.catalogConfig.collection} saving={saving} onUploadingChange={setUploadingAppearance} onChange={updateCollectionConfig}/>}
       {activeTab === "header" && (
-        <CatalogAppearancePanel key="header" section="header" config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance}
+        <CatalogAppearancePanel key="header" section="header" config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance} disabled={saving}
           onApplyPreset={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}
           onRestore={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}
           content={<>

@@ -1,6 +1,6 @@
-import { Input, Toggle } from "./ProductDetailEditorFields";
+import { Input } from "./ProductDetailEditorFields";
 import EditorSection from "./EditorSection";
-import AdminImageUploadField from "../../media/AdminImageUploadField";
+import CollectionCatalogArtworkControls from "./CollectionCatalogArtworkControls";
 export default function CollectionCatalogControls({
   value,
   onChange,
@@ -13,39 +13,12 @@ export default function CollectionCatalogControls({
         title="Ilustración de la selección"
         text="Esta ilustración es decorativa; las fotos de las tarjetas siempre proceden de los productos reales."
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Toggle
-            label="Mostrar ilustración"
-            checked={value.showArtwork}
-            onChange={(showArtwork) => onChange({ showArtwork })}
-          />
-          <div className="sm:col-span-2">
-            <AdminImageUploadField
-              label="Ilustración del catálogo"
-              value={value.heroArtwork}
-              disabled={saving}
-              onChange={(heroArtwork) => onChange({ heroArtwork })}
-              onBusyChange={onUploadingChange}
-            />
-          </div>
-          <Input
-            label="Descripción de la ilustración (vacío si es decorativa)"
-            value={value.heroArtworkAlt}
-            onChange={(event) =>
-              onChange({ heroArtworkAlt: event.target.value })
-            }
-          />
-          <Input
-            label="Ancho de la ilustración (px)"
-            type="number"
-            min={120}
-            max={460}
-            value={value.artworkWidthPx}
-            onChange={(event) =>
-              onChange({ artworkWidthPx: event.target.value })
-            }
-          />
-        </div>
+        <CollectionCatalogArtworkControls
+          value={value}
+          onChange={onChange}
+          disabled={saving}
+          onUploadingChange={onUploadingChange}
+        />
       </EditorSection>
       <EditorSection title="Buscador y categorías">
         <div className="grid gap-4 sm:grid-cols-2">

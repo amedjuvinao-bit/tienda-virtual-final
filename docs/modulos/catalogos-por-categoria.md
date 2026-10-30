@@ -19,6 +19,14 @@ Después de la creación, cada página conserva su propia configuración. Los ca
 
 El selector también ofrece Complementos. Los enlaces personalizados existentes se conservan hasta que el administrador elija otro destino. No se deduce ni se cambia un enlace guardado a partir del nombre o la fotografía de una tarjeta.
 
+## Cargar la ilustración del encabezado
+
+En **Páginas → Bautizos → Diseño → Encabezado → Adorno**, el control **Ilustración del catálogo** permite seleccionar o cambiar una imagen del equipo. Admite PNG con transparencia, JPG o WebP de hasta 8 MB y utiliza el cargador autenticado existente de Cloudinary. Tras la carga, la vista previa muestra la imagen y hay que guardar los cambios para publicarla. También permite ocultar o quitar la ilustración y ajustar su ancho y descripción.
+
+Este apartado edita el mismo ajuste que **Diseño → Ilustración y mensajes** mediante un componente compartido, `CollectionCatalogArtworkControls`. En los catálogos de selección utiliza los campos `catalogConfig.collection` que consume el encabezado público. Los controles del adorno anterior se conservan en los catálogos que sí los utilizan. La carga bloquea el guardado y la navegación del editor hasta terminar; los cambios simultáneos de texto o tamaño se conservan.
+
+Validación del control: 20 pruebas de catálogo, editor, panel de apariencia y carga de imágenes. Incluyen el archivo enviado a `/api/uploads`, la aplicación de la respuesta, cambios durante la carga, el borrador de vista previa, el guardado de Bautizos y la conservación de los controles de los catálogos anteriores. Compilación de producción correcta. Las respuestas de subida se simulan en las pruebas; no se realiza una carga real a la cuenta Cloudinary del usuario.
+
 ## Organización
 
 `shared/catalogPages.json` declara las identidades, rutas públicas y categorías iniciales de estos catálogos. Lo comparten el servidor, las rutas públicas, la identificación de páginas en el panel y el selector de destinos de Apariencia. El slug de cada página está protegido por las reglas existentes de los catálogos del sistema; el nombre visible, textos y presentación son editables.

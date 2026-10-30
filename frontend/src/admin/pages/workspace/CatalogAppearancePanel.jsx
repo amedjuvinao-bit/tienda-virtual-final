@@ -4,6 +4,7 @@ import CatalogPresentationControls, {
 } from "./CatalogPresentationControls";
 import { catalogAppearanceFields } from "./catalogAppearanceFields";
 import { CATALOG_APPEARANCE_SECTIONS } from "./catalogAppearanceSections";
+import CollectionCatalogArtworkControls from "./CollectionCatalogArtworkControls";
 import "./catalogAppearance.css";
 
 function SettingField({ field, value, onChange }) {
@@ -82,6 +83,7 @@ export default function CatalogAppearancePanel({
   onApplyPreset,
   onRestore,
   onUploadingChange,
+  disabled = false,
 }) {
   const definition = CATALOG_APPEARANCE_SECTIONS[section],
     id = useId();
@@ -89,6 +91,8 @@ export default function CatalogAppearancePanel({
   const active = definition.tabs.some((tab) => tab.id === selected)
     ? selected
     : definition.tabs[0].id;
+  const collectionArtwork = section === "header" && config.collection &&
+    config.presentation.layout === "glass-grid";
   return (
     <section
       className="catalog-appearance-panel"
@@ -120,7 +124,17 @@ export default function CatalogAppearancePanel({
           {tab.content && (
             <div className="catalog-appearance-content">{content}</div>
           )}
-          {tab.blocks?.map((block, index) =>
+          {collectionArtwork && tab.id === "icon" ? (
+            <fieldset className="catalog-appearance-group">
+              <legend>Ilustración del encabezado</legend>
+              <CollectionCatalogArtworkControls
+                value={config.collection}
+                onChange={(patch) => onChange("collection", patch)}
+                disabled={disabled}
+                onUploadingChange={onUploadingChange}
+              />
+            </fieldset>
+          ) : tab.blocks?.map((block, index) =>
             block.kind === "presets" ? (
               <div key="presets" className="catalog-appearance-presets">
                 <p>
