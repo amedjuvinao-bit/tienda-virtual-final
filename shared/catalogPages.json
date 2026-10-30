@@ -12,5 +12,26 @@
     "category": "Bautizos",
     "publicPath": "/categoria/bautizos",
     "subtitle": "Detalles para un momento especial."
+  },
+  {
+    "slug": "vestidos",
+    "name": "Vestidos",
+    "category": "Vestidos",
+    "publicPath": "/categoria/vestidos",
+    "subtitle": "Una selección para cada ocasión."
+  },
+  {
+    "slug": "jeans",
+    "name": "Jeans",
+    "category": "Jeans",
+    "publicPath": "/categoria/jeans",
+    "subtitle": "Comodidad y estilo para cada día."
+  },
+  {
+    "slug": "calzado",
+    "name": "Calzado",
+    "category": "Calzado",
+    "publicPath": "/categoria/calzado",
+    "subtitle": "Encuentra el par para tu próximo paso."
   }
 ]

@@ -181,8 +181,57 @@ async function call(method, path, req = {}) {
   assert.equal((await call("post", "/", { body: { name: "Otra", slug: "bautizos", pageType: "catalog" } })).status, 400);
   assert.equal((await call("put", "/:id", { params: { id: other._id }, body: { name: "Otra", slug: "bautizos", pageType: "catalog" } })).status, 400);
   checks++;
+  const { CATALOG_PAGES } = require("../services/pages/catalogPages");
+  for (const slug of ["vestidos", "jeans", "calzado"]) {
+    const definition = CATALOG_PAGES.find(item => item.slug === slug);
+    const first = [...pages.values()].find(item => item.slug === slug);
+    assert(first);
+    pages.delete(first._id);
+    const originalConfig = structuredClone(page.catalogConfig);
+    const result = await call("get", "/:value", { params: { value: slug } });
+    assert.equal(result.status, 200);
+    const selection = result.body;
+    assert.equal(selection.pageType, "catalog");
+    assert.equal(selection.catalogConfig.title, definition.name);
+    assert.equal(selection.catalogConfig.sourceMode, "categories");
+    assert.equal(selection.catalogConfig.allowedCategoriesText, definition.category);
+    assert.equal(selection.catalogConfig.initialCategoriesText, "");
+    assert.equal(selection.catalogConfig.manualProductIdsText, "");
+    assert.equal(selection.catalogConfig.collection.heroArtwork, "");
+    assert.equal(selection.catalogConfig.collection.heroArtworkAlt, "");
+    assert.deepEqual(selection.catalogConfig.presentation, originalConfig.presentation);
+    assert.notStrictEqual(selection.catalogConfig.presentation, page.catalogConfig.presentation);
+    const editedConfig = {
+      ...selection.catalogConfig,
+      title: `Selección ${definition.name}`,
+      collection: { ...selection.catalogConfig.collection, heroArtwork: `https://res.cloudinary.com/store/image/upload/${slug}.png` },
+    };
+    const savedSelection = await call("put", "/:id", {
+      params: { id: selection._id },
+      body: { name: definition.name, slug: "otra-direccion", pageType: "custom", catalogConfig: editedConfig },
+    });
+    assert.equal(savedSelection.status, 200);
+    assert.equal(savedSelection.body.slug, slug);
+    assert.equal(savedSelection.body.pageType, "catalog");
+    await call("get", "/");
+    assert.deepEqual(selection.catalogConfig, editedConfig);
+    assert.deepEqual(page.catalogConfig, originalConfig);
+    assert.deepEqual(bautizos.catalogConfig, ownConfig);
+    assert.equal([...pages.values()].filter(item => item.slug === slug).length, 1);
+    assert.equal((await call("delete", "/:id", { params: { id: selection._id } })).status, 400);
+    assert.equal((await call("post", "/", { body: { name: "Otra", slug, pageType: "catalog" } })).status, 400);
+    assert.equal((await call("put", "/:id", { params: { id: other._id }, body: { name: "Otra", slug, pageType: "catalog" } })).status, 400);
+    const scoped = buildPublicProductListFilter(parsePublicProductListQuery({ categoryScope: definition.category, category: "Complementos" }));
+    assert.equal(scoped.active, true);
+    assert.equal(scoped.archivedAt, null);
+    assert.equal(scoped.$and.length, 2);
+    const matchScope = scoped.$and[1].$or[0].category.$in[0];
+    assert(matchScope.test(definition.category));
+    for (const different of CATALOG_PAGES.filter(item => item.slug !== slug)) assert(!matchScope.test(different.category));
+    checks++;
+  }
   console.log(
-    `PASS ${checks} grupos de catálogos: Complementos y Bautizos, herencia inicial, selección independiente, conservación, rutas y protecciones sin productos de ejemplo`,
+    `PASS ${checks} grupos de catálogos: ${CATALOG_PAGES.map(item => item.name).join(", ")}, selección independiente, conservación y protecciones sin productos de ejemplo`,
   );
 })().catch((error) => {
   console.error(error);

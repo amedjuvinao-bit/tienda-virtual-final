@@ -126,6 +126,8 @@ function buildCategoryCatalogConfig(definition, source = complementsConfig) {
     collection: {
       ...complementsConfig.collection,
       ...base.collection,
+      heroArtwork: definition.heroArtwork || "",
+      heroArtworkAlt: "",
       searchPlaceholder: `Buscar en ${definition.name}…`,
       categoriesTitle: "Categorías",
     },

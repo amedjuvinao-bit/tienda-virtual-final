@@ -123,8 +123,9 @@ it("permite enlazar categorías vacías y guarda su ámbito y ajustes de selecci
     searchPlaceholder: "Encuentra un detalle",
   });
 });
-it("Bautizos guarda desde Encabezado y Adorno la imagen elegida y la entrega a la vista previa", async () => {
-  const state = mount("bautizos");
+it.each(["bautizos", "vestidos", "jeans", "calzado"])("%s guarda desde Encabezado y Adorno la imagen elegida y la entrega a la vista previa", async (slug) => {
+  const state = mount(slug);
+  const definition = CATALOG_PAGES.find(item => item.slug === slug);
   await screen.findByRole("combobox", { name: "Origen de productos", exact: true });
   fireEvent.click(screen.getByRole("button", { name: "Diseño", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "Encabezado", exact: true }));
@@ -138,7 +139,7 @@ it("Bautizos guarda desde Encabezado y Adorno la imagen elegida y la entrega a l
   expect(state.writes()).toBe(1);
   expect(state.stored().catalogConfig).toMatchObject({
     sourceMode: "categories",
-    allowedCategoriesText: "Bautizos",
+    allowedCategoriesText: definition.category,
     collection: { heroArtwork: "https://res.cloudinary.com/demo/image/upload/art.webp", extension: true },
   });
 });

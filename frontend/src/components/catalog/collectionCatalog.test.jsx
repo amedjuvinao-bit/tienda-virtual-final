@@ -102,6 +102,22 @@ it("Bautizos usa el mismo catálogo y editor, en su ruta propia y con selección
   expect(new URL(fetch.mock.calls[0][0]).searchParams.getAll("categoryScope")).toEqual(["Bautizos"]);
   expect(screen.queryByRole("article")).not.toBeInTheDocument();
 });
+it.each(["vestidos", "jeans", "calzado"])("%s tiene su página, selección y carga de ilustración independiente", async (slug) => {
+  const definition = CATALOG_PAGES.find(item => item.slug === slug);
+  const selection = { ...page, _id: `${slug}-page`, name: definition.name, slug };
+  const config = buildCategoryCatalogConfig(definition, complementsConfig);
+  expect(pagePublicPath(selection)).toBe(`/categoria/${slug}`);
+  expect(pageEditorPath(selection)).toBe(`/admin/catalogo/${slug}-page`);
+  expect(pageMeta(selection).system).toBe(true);
+  const view = mount(config, selection);
+  await screen.findByRole("heading", { name: config.emptyTitle });
+  expect(screen.getByRole("heading", { name: definition.name, exact: true })).toBeVisible();
+  expect(screen.getByPlaceholderText(`Buscar en ${definition.name}…`)).toBeVisible();
+  expect(new URL(fetch.mock.calls[0][0]).searchParams.getAll("categoryScope")).toEqual([definition.category]);
+  expect(view.container.querySelector(".collection-catalog-art")).toBeNull();
+  expect(view.container.querySelector(".collection-catalog-hero")).toHaveAttribute("data-artwork", "false");
+  expect(screen.queryByRole("article")).not.toBeInTheDocument();
+});
 it("la página propia usa su editor y el ámbito de categorías permanece independiente de los filtros del visitante", () => {
   expect(pageMeta(page).system).toBe(true);
   expect(pagePublicPath(page)).toBe("/complementos");
