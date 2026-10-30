@@ -79,7 +79,8 @@ export function categoryPhotoSource(value) {
 }
 export function safeCategoryHref(value) {
   const href = typeof value === 'string' ? value.trim() : '';
-  return /^\/(?![\/\\])[^\\\s]*$/.test(href) || /^https?:\/\/[^\s]+$/i.test(href) ? href : '/categorias';
+  if (href === '/categorias') return '/#categorias';
+  return /^\/(?![\/\\])[^\\\s]*$/.test(href) || /^https?:\/\/[^\s]+$/i.test(href) ? href : '/#categorias';
 }
 export function categoriasBackdrop(theme, config, style) {
   if (style.fanBackgroundMode === 'global') return { color: theme?.colors?.background || '#ffffff', image: '' };

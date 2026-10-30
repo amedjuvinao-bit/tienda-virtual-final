@@ -26,7 +26,7 @@ it("toda ruta pública tiene una ubicación de configuración conocida", () => {
     "/nuestra-sede": "Páginas",
     "/nuestra-historia": "Páginas",
     "/pagina/:slug": "Páginas",
-    "/lo-nuevo": "Apariencia",
+    "/lo-nuevo": "Páginas",
     "/producto/:id": "product-detail",
     "/p/:id": "product-detail",
     "/carrito": "cart-page",
@@ -38,6 +38,7 @@ it("toda ruta pública tiene una ubicación de configuración conocida", () => {
     "/probe-site-settings": "development-only",
   };
   expect(source).toContain('<Route path="*" element={<NotFound />}');
+  expect(source).not.toContain('<Route path="/lo-nuevo" element={<Navigate');
   expect(PAGE_TYPES["notfound-page"].system).toBe(true);
   for (const path of paths) {
     expect(configured[path], path).toBeTruthy();

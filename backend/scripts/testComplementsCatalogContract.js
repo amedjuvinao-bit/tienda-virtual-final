@@ -230,6 +230,38 @@ async function call(method, path, req = {}) {
     for (const different of CATALOG_PAGES.filter(item => item.slug !== slug)) assert(!matchScope.test(different.category));
     checks++;
   }
+  const firstNews = [...pages.values()].find(item => item.slug === "lo-nuevo");
+  assert(firstNews);
+  pages.delete(firstNews._id);
+  page.catalogConfig.defaultSort = "price";
+  page.catalogConfig.initialColorsText = "rojo";
+  page.catalogConfig.initialMinPrice = 100000;
+  const sourceBeforeNews = structuredClone(page.catalogConfig);
+  const { body: news } = await call("get", "/:value", { params: { value: "lo-nuevo" } });
+  assert.equal(news.name, "Novedades");
+  assert.equal(news.pageType, "catalog");
+  assert.equal(news.catalogConfig.sourceMode, "all");
+  assert.equal(news.catalogConfig.allowedCategoriesText, "");
+  assert.equal(news.catalogConfig.manualProductIdsText, "");
+  assert.equal(news.catalogConfig.initialCategoriesText, "");
+  assert.equal(news.catalogConfig.initialColorsText, "");
+  assert.equal(news.catalogConfig.initialMinPrice, 0);
+  assert.equal(news.catalogConfig.defaultSort, "-createdAt");
+  assert.equal(news.catalogConfig.collection.heroArtwork, "");
+  assert.deepEqual(news.catalogConfig.presentation, sourceBeforeNews.presentation);
+  assert.deepEqual(parsePublicProductListQuery({ sort: news.catalogConfig.defaultSort }).sort, { createdAt: -1, _id: -1 });
+  const ownNewsConfig = { ...news.catalogConfig, sourceMode: "manual", manualProductIdsText: "un-producto", defaultSort: "title" };
+  await call("put", "/:id", { params: { id: news._id }, body: { name: "Novedades", slug: "otro", pageType: "custom", catalogConfig: ownNewsConfig } });
+  await call("get", "/");
+  assert.equal(news.slug, "lo-nuevo");
+  assert.equal(news.pageType, "catalog");
+  assert.deepEqual(news.catalogConfig, ownNewsConfig);
+  assert.deepEqual(page.catalogConfig, sourceBeforeNews);
+  assert.equal([...pages.values()].filter(item => item.slug === "lo-nuevo").length, 1);
+  assert.equal((await call("delete", "/:id", { params: { id: news._id } })).status, 400);
+  assert.equal((await call("post", "/", { body: { name: "Duplicada", slug: "lo-nuevo", pageType: "catalog" } })).status, 400);
+  assert.equal((await call("put", "/:id", { params: { id: other._id }, body: { name: "Otra", slug: "lo-nuevo", pageType: "catalog" } })).status, 400);
+  checks++;
   console.log(
     `PASS ${checks} grupos de catálogos: ${CATALOG_PAGES.map(item => item.name).join(", ")}, selección independiente, conservación y protecciones sin productos de ejemplo`,
   );

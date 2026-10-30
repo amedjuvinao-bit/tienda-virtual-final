@@ -92,7 +92,13 @@ describe('Categorías: Abanico vivo', () => {
   });
   it.each(['javascript:alert(1)', 'data:text/html,hello', '//example.com', '/\\example.com'])('rechaza destinos no válidos: %s', (href) => {
     render(<CategoriasSection theme={makeTheme([{ ...records[0], href }])} />);
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/categorias');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/#categorias');
+  });
+  it('el destino genérico anterior vuelve a la sección de categorías sin alterar la configuración', () => {
+    const slides = [{ ...records[0], href: '/categorias' }];
+    render(<CategoriasSection theme={makeTheme(slides)} />);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/#categorias');
+    expect(slides[0].href).toBe('/categorias');
   });
   it('sustituye una imagen averiada y vuelve a intentar al cambiar de imagen', () => {
     const slide = normalizeCategoriasSection(makeTheme().sections[0]).config.slides[0];
@@ -150,20 +156,22 @@ describe('Categorías: Abanico vivo', () => {
     const slides = save.mock.calls[0][0].sections[0].config.slides;
     expect(slides).toHaveLength(4); expect(slides.slice(0, 3).map((r) => r.id)).toEqual(['one', 'two', 'three']);
     expect(slides[3].title).toBe('Nueva colección');
+    expect(slides[3].href).toBe('/#categorias');
   });
-  it.each(['bautizos', 'vestidos', 'jeans', 'calzado'])('enlaza una tarjeta con el catálogo %s sin modificar las demás categorías', (slug) => {
+  it.each(['bautizos', 'vestidos', 'jeans', 'calzado', 'lo-nuevo'])('enlaza una tarjeta con el catálogo %s sin modificar las demás categorías', (slug) => {
     const save = vi.fn(); render(<Harness save={save} />);
     content('Nombre y enlace'); category('two');
     expect(screen.getByLabelText('Enlace de la galería')).toHaveValue('/coleccion/dos');
-    fireEvent.change(screen.getByLabelText('Página del catálogo'), { target: { value: `/categoria/${slug}` } });
+    const destination = slug === 'lo-nuevo' ? '/lo-nuevo' : `/categoria/${slug}`;
+    fireEvent.change(screen.getByLabelText('Página del catálogo'), { target: { value: destination } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
     const slides = save.mock.calls[0][0].sections[0].config.slides;
-    expect(slides[1]).toMatchObject({ ...records[1], href: `/categoria/${slug}` });
+    expect(slides[1]).toMatchObject({ ...records[1], href: destination });
     expect(slides[0]).toMatchObject(records[0]);
     expect(slides[2]).toMatchObject(records[2]);
     cleanup();
     render(<CategoriasSection theme={makeTheme(slides)} />);
-    expect(screen.getByRole('link', { name: 'Explorar Segunda categoría' })).toHaveAttribute('href', `/categoria/${slug}`);
+    expect(screen.getByRole('link', { name: 'Explorar Segunda categoría' })).toHaveAttribute('href', destination);
   });
   it('restaura el diseño conservando textos, imágenes y galerías', () => {
     const save = vi.fn(); render(<Harness save={save} />);

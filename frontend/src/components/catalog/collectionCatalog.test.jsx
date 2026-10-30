@@ -118,6 +118,26 @@ it.each(["vestidos", "jeans", "calzado"])("%s tiene su página, selección y car
   expect(view.container.querySelector(".collection-catalog-hero")).toHaveAttribute("data-artwork", "false");
   expect(screen.queryByRole("article")).not.toBeInTheDocument();
 });
+it("Novedades abre su catálogo propio con todos los publicados por fecha, sin heredar el ámbito de otra selección", async () => {
+  const definition = CATALOG_PAGES.find(item => item.slug === "lo-nuevo");
+  const config = buildCategoryCatalogConfig(definition, {
+    ...complementsConfig, defaultSort: "price", initialColorsText: "rojo", initialMinPrice: 50000,
+  });
+  const selection = { ...page, _id: "news", name: definition.name, slug: definition.slug };
+  expect(pagePublicPath(selection)).toBe("/lo-nuevo");
+  expect(pageEditorPath(selection)).toBe("/admin/catalogo/news");
+  mount(config, selection);
+  await screen.findByRole("heading", { name: config.emptyTitle });
+  expect(screen.getByRole("heading", { name: "Novedades", exact: true })).toBeVisible();
+  const params = new URL(fetch.mock.calls[0][0]).searchParams;
+  expect(params.get("status")).toBe("published");
+  expect(params.get("sort")).toBe("-createdAt");
+  expect(params.getAll("categoryScope")).toEqual([]);
+  expect(params.getAll("category")).toEqual([]);
+  expect(params.getAll("productKeys")).toEqual([]);
+  expect(params.getAll("color")).toEqual([]);
+  expect(params.get("minPrice")).toBe("0");
+});
 it("la página propia usa su editor y el ámbito de categorías permanece independiente de los filtros del visitante", () => {
   expect(pageMeta(page).system).toBe(true);
   expect(pagePublicPath(page)).toBe("/complementos");

@@ -1093,7 +1093,7 @@ export default function CatalogPageEditor() {
           {productsSubtab === "universe" && (
             <SectionCard
               title="Productos de este catálogo"
-              text={pageMeta(page).system ? "Los productos publicados aparecerán cuando los asignes a las categorías permitidas de esta página. Puedes elegirlas en el apartado Categorías." : "Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."}
+              text={page?.slug === "lo-nuevo" ? "Por defecto muestra los productos publicados más recientes primero, según su fecha de creación. Puedes limitar la selección por categorías o elegir productos manualmente. El orden inicial se cambia en Distribución → Herramientas." : pageMeta(page).system ? "Los productos publicados aparecerán cuando los asignes a las categorías permitidas de esta página. Puedes elegirlas en el apartado Categorías." : "Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."}
             >
               <Select
                 label="Origen de productos"

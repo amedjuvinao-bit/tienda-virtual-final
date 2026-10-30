@@ -274,7 +274,6 @@ export default function App() {
                   <Route path="/nuestra-sede" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-sede" />} />
                   <Route path="/nuestra-historia" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-historia" />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
-                  <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/p/:id" element={<ProductDetail />} />
                   <Route path="/admin/login" element={<Login initialSettings={siteSettingsFromServer} loaderModel={adminLoader} />} />

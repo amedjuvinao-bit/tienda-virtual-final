@@ -2,13 +2,14 @@
 
 Cada categoría reutiliza `DynamicPage`, `CatalogPageView`, las tarjetas, los filtros, el carrito, los favoritos y el editor de catálogo existentes. No incorpora un segundo motor de catálogo ni modifica las reglas de compra o inventario.
 
-| Página | Ruta pública | Categoría inicial de productos |
+| Página | Ruta pública | Selección inicial de productos |
 | --- | --- | --- |
 | Complementos | `/complementos` | Complementos |
 | Bautizos | `/categoria/bautizos` | Bautizos |
 | Vestidos | `/categoria/vestidos` | Vestidos |
 | Jeans | `/categoria/jeans` | Jeans |
 | Calzado | `/categoria/calzado` | Calzado |
+| Novedades | `/lo-nuevo` | Todos los publicados, más recientes primero |
 
 ## Configuración inicial
 
@@ -25,7 +26,17 @@ Las selecciones nuevas empiezan sin ilustración hasta que el administrador carg
 3. Crear la categoría de productos si todavía no existe, cargar los productos reales, asociarlos a ella y publicarlos. Al abrir o actualizar su página aparecerán los productos correspondientes; sin productos se muestra el estado vacío.
 4. En **Apariencia → Categorías → Contenido → Nombre y enlace**, seleccionar la tarjeta de Inicio y elegir su destino en **Página del catálogo**. Guardar la apariencia. Por ejemplo, elegir **Vestidos** enlaza la tarjeta con `/categoria/vestidos` sin escribir rutas.
 
-El selector ofrece las cinco páginas de la tabla. Los enlaces personalizados existentes se conservan hasta que el administrador elija otro destino. No se deduce ni se cambia un enlace guardado a partir del nombre o la fotografía de una tarjeta.
+El selector ofrece las seis páginas de la tabla. Los enlaces personalizados existentes se conservan hasta que el administrador elija otro destino. No se deduce ni se cambia un enlace guardado a partir del nombre o la fotografía de una tarjeta.
+
+## Novedades
+
+`/lo-nuevo` abre una página de catálogo propia; ya no redirige a la sección de tendencias de Inicio. Se administra desde **Páginas → Novedades** y aparece también en los selectores de destinos de Apariencia.
+
+Su configuración inicial muestra productos activos, visibles y sin archivar, ordenados por `createdAt` descendente, con `_id` descendente como desempate estable del servidor. No impone una antigüedad máxima ni una marca de producto nuevo: presenta el catálogo publicado con las incorporaciones más recientes primero. En **Productos** se puede cambiar a categorías permitidas o selección manual; en **Diseño → Distribución → Herramientas** se cambia el orden inicial.
+
+La creación conserva la presentación del catálogo de referencia, pero limpia las selecciones manuales, categorías y filtros iniciales de color y precio heredados. No utiliza la ilustración de Complementos. La ilustración propia se carga desde **Encabezado → Adorno**. Una página ya guardada con ese slug mantiene su contenido y ajustes; no se sobrescribe en las lecturas.
+
+Las preferencias guardadas de menú que apunten explícitamente a una sección de Inicio se conservan. Para dirigir ese enlace a la página nueva, se elige **Novedades** o **Página · Novedades** en Apariencia y se guarda la configuración.
 
 ## Cargar la ilustración del encabezado
 
@@ -50,5 +61,7 @@ Los filtros son los que ya admite el catálogo existente. La consulta conserva e
 - 24 comprobaciones de regresión de páginas informativas.
 - Compilación de producción de Vite y revisión de diferencias sin errores.
 - Tres comprobaciones HTTP de Vite en desarrollo: el registro compartido se carga desde las rutas públicas, el editor y el selector de Apariencia.
+
+Validación de Novedades: 164 pruebas de interfaz, 12 grupos de contrato de catálogos, 24 comprobaciones de páginas informativas, 16 comprobaciones de paginación pública y compilación de producción. Incluye consulta inicial sin ámbito de otra categoría, orden por fecha, edición y guardado de una selección distinta, ilustración propia y enlace desde Apariencia. Los resultados de la revisión de enlaces se documentan en `auditoria-enlaces-publicos.md`.
 
 Las pruebas usan modelos y respuestas controlados. No se accedió a la configuración ni a los productos de la instalación local del usuario; por eso el enlace guardado de su tarjeta se conserva y se elige desde el selector indicado.

@@ -33,5 +33,14 @@
     "category": "Calzado",
     "publicPath": "/categoria/calzado",
     "subtitle": "Encuentra el par para tu próximo paso."
+  },
+  {
+    "slug": "lo-nuevo",
+    "name": "Novedades",
+    "publicPath": "/lo-nuevo",
+    "subtitle": "Descubre las incorporaciones más recientes.",
+    "sourceMode": "all",
+    "defaultSort": "-createdAt",
+    "emptyTitle": "Pronto encontrarás novedades"
   }
 ]

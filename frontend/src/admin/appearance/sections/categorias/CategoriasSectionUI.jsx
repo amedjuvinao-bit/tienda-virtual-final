@@ -48,7 +48,7 @@ export default function CategoriasSectionUI({ theme, setPath, uploadToCloudinary
   };
   const add = () => {
     const id = globalThis.crypto?.randomUUID?.() || `cat_${Date.now()}_${c.slides.length}`;
-    config({ slides: [...c.slides, { id, title: 'Nueva categoría', image: '', subtitle: '', review: '', badge: '', href: '/categorias', enabled: true }] });
+    config({ slides: [...c.slides, { id, title: 'Nueva categoría', image: '', subtitle: '', review: '', badge: '', href: '/#categorias', enabled: true }] });
     setActiveId(id); setContentGroup(1);
   };
   const slider = (key, label, min, max, step) => <DesignSlider key={key} label={label} value={s[key]} min={min} max={max} step={step} onChange={(value) => style({ [key]: value })} />;

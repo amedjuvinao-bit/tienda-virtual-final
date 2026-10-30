@@ -94,7 +94,7 @@ export default function AppearancePage() {
     () => ({
       public: [
         { label: "Inicio", value: "/" },
-        { label: "Lo Nuevo", value: "/#tendencia" },
+        { label: "Novedades", value: "/lo-nuevo" },
         { label: "Carrito", value: "/carrito" },
         { label: "Favoritos", value: "/favoritos" },
 
