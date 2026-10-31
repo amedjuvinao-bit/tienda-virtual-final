@@ -1,0 +1,147 @@
+.service-storefront {
+  color: var(--cart-ink);
+}
+.service-scene {
+  display: grid;
+  align-content: start;
+  gap: var(--service-gap);
+}
+.service-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.service-heading > div {
+  min-width: 0;
+}
+.service-heading h1 {
+  margin: 4px 0 10px;
+  color: var(--service-title-color);
+  font-family: var(--font-heading, Georgia, serif);
+  font-size: clamp(24px, 4.2vw, var(--service-title-size));
+  font-weight: 400;
+  line-height: 1.16;
+  overflow-wrap: anywhere;
+}
+.service-heading h1 img {
+  max-width: 100%;
+  object-fit: contain;
+}
+.service-heading p {
+  color: var(--cart-muted);
+  margin: 6px 0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+.service-heading .service-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--cart-accent);
+  font-weight: 700;
+}
+.service-heading-icon {
+  flex: none;
+  color: var(--cart-accent);
+}
+.service-storefront .service-button {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 17px;
+  border: 0;
+  border-radius: var(--service-button-radius);
+  background: color-mix(
+    in srgb,
+    var(--service-button-bg) var(--service-button-alpha),
+    transparent
+  );
+  color: var(--service-button-ink);
+  backdrop-filter: blur(var(--service-button-blur));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  --pg-highlight: var(--service-button-edge);
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s;
+}
+.service-button .polished-glass-rim {
+  border-radius: inherit;
+}
+.service-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--cart-shadow);
+}
+.service-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.service-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.service-storefront :is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--cart-accent);
+  outline-offset: 3px;
+}
+.service-storefront .service-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--service-input-edge);
+  border-radius: 14px;
+  padding: 11px 13px;
+  background: color-mix(
+    in srgb,
+    var(--service-input-bg) var(--cart-alpha),
+    transparent
+  );
+  color: var(--service-input-ink);
+  font: inherit;
+  font-size: 14px;
+  backdrop-filter: blur(var(--cart-blur));
+}
+.service-input::placeholder {
+  color: var(--cart-muted);
+  opacity: 0.85;
+}
+.service-input option {
+  background: var(--color-bg, Canvas);
+  color: var(--color-text, CanvasText);
+}
+.service-message {
+  padding: 24px;
+  text-align: center;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.service-message .service-button {
+  margin: 10px;
+}
+.service-muted {
+  color: var(--cart-muted);
+}
+@media (max-width: 520px) {
+  .service-heading-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .service-heading {
+    gap: 12px;
+  }
+  .service-heading p {
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .service-storefront .service-button {
+    transition: none;
+    transform: none !important;
+  }
+}

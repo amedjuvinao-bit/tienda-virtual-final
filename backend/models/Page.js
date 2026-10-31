@@ -64,9 +64,12 @@ const PageSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
-      enum: ["custom", "catalog", "product-detail", "cart-page", "checkout-page", "thanks-page", "favorites-page", "notfound-page"],
+      enum: ["custom", "catalog", "information", "product-detail", "cart-page", "checkout-page", "thanks-page", "favorites-page", "notfound-page", "returns-page", "search-page"],
       default: "custom",
     },
+
+    systemRole: { type: String, enum: ["", "about", "contact", "help", "consumer-shipping", "consumer-terms", "consumer-privacy", "consumer-returns", "consumer-claims"], default: "" },
+    informationPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     enabled: {
       type: Boolean,
@@ -117,6 +120,9 @@ const PageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+
+    returnsPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
+    searchPageConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     notFoundPageConfig: {
       type: mongoose.Schema.Types.Mixed,

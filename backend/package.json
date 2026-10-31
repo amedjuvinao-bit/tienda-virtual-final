@@ -216,6 +216,7 @@
     "test:qa-catalog-50": "node scripts/testQa50CatalogFixtureFactory.js",
     "test:product-code-index-migration": "node scripts/testProductCommercialCodeIndexMigration.js",
     "test:product-code-indexes-physical": "node scripts/testProductCommercialCodeIndexesPhysical.js",
+    "test:catalog-plus": "node scripts/testCatalogPlus.js",
     "test:product-pagination": "node scripts/testProductPaginationIntegrity.js",
     "product-code-indexes:migrate": "node scripts/migrateProductCommercialCodeIndexes.js",
     "test:products-catalog-operations": "node scripts/testProductsCatalogOperations.js",
@@ -229,6 +230,7 @@
     "test:cart-admin-operations": "node scripts/testCartAdminOperationsIntegrity.js",
     "test:cart-admin-routes": "node scripts/testCartAdminRoutesIntegration.js",
     "test:favorites-module": "node scripts/testFavoritesModuleIntegrity.js",
+    "test:favorites-public-plus": "node --test scripts/testFavoritesPublicPlus.js",
     "test:favorites-trace-seed": "node scripts/testPersistentFavoritesTraceSeed.js",
     "demo:favorites-trace": "node scripts/seedPersistentFavoritesTrace.js",
     "test:payment-configuration-authority": "node scripts/testPaymentConfigurationAuthorityIntegrity.js",
@@ -316,7 +318,8 @@
     "seed:demo-products": "node scripts/seedDemonstrationProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
     "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
-    "migrate:categories": "node scripts/migrate-categories.js"
+    "migrate:categories": "node scripts/migrate-categories.js",
+    "test:service-pages": "node scripts/testServicePagesContract.js"
   },
   "keywords": [],
   "author": "",

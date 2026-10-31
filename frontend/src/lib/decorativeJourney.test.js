@@ -164,3 +164,12 @@ it('starts the arrival immediately and does not resize to the destination before
  f.flush();const arrived=piece.getAttribute('transform');expect(f.root.dataset.journeySettled).toBe('true');
  f.flush();expect(piece.getAttribute('transform')).toBe(arrived);f.stop();
 });
+
+it('actualiza el fondo heredado al cambiar el fondo responsive o reemplazar una sección',()=>{
+ const f=fixture({journey:{backgroundImage:'',unifyBackground:true}});
+ const section=document.createElement('div');section.className='look-editorial';section.style.backgroundImage='url("/home-desktop.webp")';f.root.append(section);
+ window.dispatchEvent(new Event('resize'));f.flush();expect(f.root.style.getPropertyValue('--journey-shared-image')).toContain('/home-desktop.webp');
+ section.style.backgroundImage='url("/home-mobile.webp")';f.mobile.matches=true;f.mobile.dispatchEvent(new Event('change'));f.flush();expect(f.root.style.getPropertyValue('--journey-shared-image')).toContain('/home-mobile.webp');
+ section.remove();const replacement=document.createElement('div');replacement.className='look-editorial';replacement.style.backgroundImage='url("/home-updated.webp")';f.root.append(replacement);
+ window.dispatchEvent(new Event('resize'));f.flush();expect(f.root.style.getPropertyValue('--journey-shared-image')).toContain('/home-updated.webp');f.stop();
+});

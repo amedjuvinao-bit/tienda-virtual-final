@@ -12,10 +12,10 @@ const account = { id: '123', username: 'rosa', name: 'Rosa Boutique', avatar: '/
 const post = id => ({ id: `ig_${id}`, caption: `Prenda ${id}`, alt: `Prenda ${id}`, image: `https://cdn.example.com/${id}.jpg`, kind: id === '2' ? 'reel' : 'photo', link: `https://instagram.com/p/${id}/` });
 const records = [post('1'), post('2')];
 const makeTheme = config => ({ sections: [{ id: 'instagram', enabled: true, config: { journalSource: 'connected', posts: [], ...config } }] });
-function Harness({ config = {}, realPreview = false }) {
+function Harness({ config = {}, realPreview = false, uploadToCloudinary }) {
   const [theme, setTheme] = useState(() => makeTheme(config));
   return <InstagramEditorFeedProvider enabled>
-    <InstagramJournalUI theme={theme} setPath={(_path, sections) => setTheme({ sections })} />
+    <InstagramJournalUI uploadToCloudinary={uploadToCloudinary} theme={theme} setPath={(_path, sections) => setTheme({ sections })} />
     {realPreview ? <StorefrontSectionPreview section={theme.sections[0]} theme={theme} /> : <InstagramJournal theme={theme} />}
     <output aria-label="Borrador guardable">{JSON.stringify(theme.sections[0].config)}</output>
   </InstagramEditorFeedProvider>;
@@ -58,7 +58,7 @@ describe('selección visual de la cuenta conectada', () => {
   });
   it('cambia la miniatura guardada anteriormente al elegir otra publicación y mantiene el nombre del destacado', async () => {
     api.get.mockResolvedValue({ data: { connected: true, account, posts: records, nextCursor: '' } });
-    const { container } = render(<Harness config={{ journalHighlights: [{ id: 'legacy', title: 'Mi destacado', postId: 'ig_1', image: records[0].image }] }} />);
+    const { container } = render(<Harness uploadToCloudinary={async()=>'/custom-cover.jpg'} config={{ journalHighlights: [{ id: 'legacy', title: 'Mi destacado', postId: 'ig_1', image: records[0].image }] }} />);
     await screen.findByRole('link', { name: '@rosa' }); openHighlights(); openHighlightPicker();
     fireEvent.click(screen.getByRole('button', { name: 'Elegir para el destacado: Prenda 2' }));
     expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', records[1].image);
@@ -68,7 +68,8 @@ describe('selección visual de la cuenta conectada', () => {
     expect(screen.queryByRole('region', { name: 'Publicaciones de Instagram para el destacado' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Elegir publicación de Instagram para el destacado' })).toHaveFocus();
     fireEvent.change(screen.getByLabelText('Imagen del círculo destacado'), { target: { value: 'custom' } });
-    fireEvent.change(screen.getByLabelText('Imagen del destacado (opcional)'), { target: { value: '/custom-cover.jpg' } });
+    fireEvent.change(screen.getByLabelText('Subir imagen del destacado (opcional)'), {target:{files:[new File(['image'],'portada.jpg',{type:'image/jpeg'})]}});
+    await waitFor(()=>expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src','/custom-cover.jpg'));
     expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', '/custom-cover.jpg');
     fireEvent.change(screen.getByLabelText('Imagen del círculo destacado'), { target: { value: 'post' } });
     expect(container.querySelector('.ig-journal__highlights img')).toHaveAttribute('src', records[1].image);

@@ -245,7 +245,7 @@ const BannerButtonEditor = ({ title = "Botón", value, onChange, uploading, onUp
         <Input label="Texto del botón" value={b.text || ""} onChange={(e) => set({ text: e.target.value })} placeholder="Ej: Ver más" />
       ) : (
         <>
-          <Input label="Imagen del botón (URL)" value={b.imageUrl || ""} onChange={(e) => set({ imageUrl: e.target.value })} placeholder="https://.../VerMas2.png" />
+          {(b.imageUrl || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => set({ imageUrl: "" })}>Quitar imagen</button>}
 
           <div className="rounded-2xl border bg-gray-50 p-3">
             <div className="text-sm font-medium mb-2">Subir imagen del botón</div>
@@ -266,7 +266,7 @@ const BannerButtonEditor = ({ title = "Botón", value, onChange, uploading, onUp
               }}
               className="block w-full text-sm"
             />
-            <div className="text-xs text-gray-500 mt-2">{uploading ? "Subiendo..." : "Tip: también puedes pegar la URL arriba."}</div>
+            <div className="text-xs text-gray-500 mt-2">{uploading ? "Subiendo..." : "Selecciona la imagen desde tu equipo."}</div>
           </div>
 
           <div className="grid grid-cols-[1fr_96px] gap-3 items-center min-w-0">
@@ -567,7 +567,7 @@ export default function BannerPanel({ theme, store, setPath, uploading, setUploa
     }
 
     if (type === "image") {
-      if (!b.imageUrl) out.push({ tone: "red", text: "Imagen única: falta imageUrl." });
+      if (!b.imageUrl) out.push({ tone: "red", text: "Imagen única: selecciona una imagen." });
     }
 
     if (type === "video") {

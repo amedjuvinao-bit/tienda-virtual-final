@@ -60,6 +60,7 @@ import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
 import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import AdminMobileNavigation from './components/AdminMobileNavigation';
+import { isAdminNavigationActive } from './components/adminNavigationIdentity';
 import { preloadAdminRoute } from './adminRoutePreload';
 import AdminLoadingScreen from './loading/AdminLoadingScreen';
 import useAdminModuleLoading from './loading/useAdminModuleLoading';
@@ -502,8 +503,7 @@ export default function AdminLayout({ initialSettings }) {
     .sort((a, b) => b.to.length - a.to.length)
     .find(
       (item) =>
-        location.pathname === item.to ||
-        location.pathname.startsWith(`${item.to}/`)
+        isAdminNavigationActive(location.pathname, item.to)
     );
 
   const formattedHeaderTime = currentTime.toLocaleTimeString('es-CO', {
@@ -2286,7 +2286,7 @@ export default function AdminLayout({ initialSettings }) {
                           onPointerEnter={() => { void preloadAdminRoute(item.to); }}
                           onFocus={() => { void preloadAdminRoute(item.to); }}
                           className={`${linkBase} admin-nav-link`}
-                          style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          style={({ isActive }) => ((isActive || isAdminNavigationActive(location.pathname, item.to)) ? activeNavStyle : normalNavStyle)}
                           data-tooltip={item.label}
                           aria-label={sidebarCollapsed ? item.label : undefined}
                         >
@@ -2312,7 +2312,7 @@ export default function AdminLayout({ initialSettings }) {
                           key={item.to}
                           to={item.to}
                           className={`${linkBase} admin-nav-link`}
-                          style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          style={({ isActive }) => ((isActive || isAdminNavigationActive(location.pathname, item.to)) ? activeNavStyle : normalNavStyle)}
                           data-tooltip={item.label}
                           aria-label={sidebarCollapsed ? item.label : undefined}
                         >
@@ -2364,7 +2364,7 @@ export default function AdminLayout({ initialSettings }) {
                             key={item.to}
                             to={item.to}
                             className={`${subLinkBase} admin-nav-link`}
-                            style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                            style={({ isActive }) => ((isActive || isAdminNavigationActive(location.pathname, item.to)) ? activeNavStyle : normalNavStyle)}
                           >
                             <Icon className="h-3.5 w-3.5 shrink-0" />
                             <span className="admin-nav-label">{item.label}</span>

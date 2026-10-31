@@ -533,8 +533,8 @@ export default function LoginAdminSection() {
             {currentBackground.mode === 'image' ? (
               <div className="login-settings-image-fields">
                 <label>
-                  <span>Imagen publicada</span>
-                  <input value={currentBackground.image} onChange={(event) => setBackground('image', event.target.value)} placeholder="https://..." />
+                  <span>Imagen de fondo</span>
+                  {(currentBackground.image) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => setBackground('image', "")}>Quitar imagen</button>}
                   {fieldErrors[`backgrounds.${form.theme}.image`] || fieldErrors['background.image'] ? <em>{fieldErrors[`backgrounds.${form.theme}.image`] || fieldErrors['background.image']}</em> : null}
                 </label>
                 <label className="login-settings-upload">

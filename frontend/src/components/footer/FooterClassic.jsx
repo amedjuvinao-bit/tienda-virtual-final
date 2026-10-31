@@ -1,5 +1,6 @@
 // src/components/FooterSection.jsx
 import React, { useMemo, useState } from "react";
+import ConsumerClaimsLink from "../consumer/ConsumerClaimsLink";
 
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
@@ -73,7 +74,7 @@ function buildFooterConfig(theme) {
       ? footer.column2Links
       : [
           { label: "Contáctanos", href: "/contacto" },
-          { label: "Cambio y devoluciones", href: "/cambios-devoluciones" },
+          { label: "Cambio y devoluciones", href: "/cambios-y-devoluciones" },
           { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },
         ],
 
@@ -81,7 +82,7 @@ function buildFooterConfig(theme) {
     column3Links: Array.isArray(footer.column3Links)
       ? footer.column3Links
       : [
-          { label: "Políticas de compra, despacho y envío", href: "/politicas" },
+          { label: "Envíos y entregas", href: "/envios" },
           { label: "Términos y condiciones", href: "/terminos" },
         ],
 
@@ -196,7 +197,7 @@ function FooterAccordionSection({
   );
 }
 
-export default function FooterSection({ theme }) {
+export default function FooterSection({ theme, inheritBackground = false, preview = false }) {
   const footer = useMemo(() => buildFooterConfig(theme), [theme]);
 
   const column1Links = sanitizeLinks(footer.column1Links);
@@ -234,7 +235,7 @@ export default function FooterSection({ theme }) {
     <footer
       className="relative mt-16 overflow-hidden rounded-[28px] sm:rounded-[32px]"
       style={{
-        backgroundColor: footer.bgColor,
+        backgroundColor: inheritBackground ? "transparent" : footer.bgColor,
         color: footer.textColor,
         "--footer-height": `${footer.footerHeightPx}px`,
       }}
@@ -434,11 +435,15 @@ export default function FooterSection({ theme }) {
           </div>
         </div>
 
+        <div className="px-4 pb-6 text-center sm:px-6 md:px-8">
+          <ConsumerClaimsLink footer={theme?.footer} preview={preview} />
+        </div>
+
         {/* Barra inferior */}
         <div
           className="mt-auto px-4 py-4 text-center text-xs leading-6 sm:px-6 sm:text-sm md:px-8"
           style={{
-            backgroundColor: footer.bottomBarBg,
+            backgroundColor: inheritBackground ? "transparent" : footer.bottomBarBg,
             color: footer.bottomBarTextColor,
           }}
         >

@@ -10,7 +10,8 @@ const ORDER_ID = '64c000000000000000000001';
 const LINE_ID = '64c000000000000000000101';
 
 vi.mock('../components/Header', () => ({ default: () => <div>Header</div> }));
-vi.mock('../components/FooterSection', () => ({ default: () => <div>Footer</div> }));
+vi.mock('../components/StorefrontFooter', () => ({ default: () => <div>Footer</div> }));
+vi.mock('../components/service-pages/useServicePage', async () => { const { buildServicePageConfig } = await import('../components/service-pages/servicePageConfig'); return { default: () => ({ page: {}, config: buildServicePageConfig({}, 'returns-page'), loading: false }) }; });
 
 function payload(returns = []) {
   return {
@@ -263,4 +264,12 @@ describe('OrderReturnsPage', () => {
     expect(document.body.textContent).not.toContain('score');
     expect(document.body.textContent).not.toContain('frequent_return_requests');
   });
+});
+
+it('no consulta una compra con un token ofrecido para otra orden', async () => {
+  localStorage.clear();
+  const fetchMock=vi.fn(); vi.stubGlobal('fetch',fetchMock);
+  render(<MemoryRouter initialEntries={[{pathname:`/devoluciones/${ORDER_ID}`,state:{returnAccess:{orderId:'otra-orden',token:'token-ajeno',expiresAt:new Date(Date.now()+60000).toISOString()}}}]}><Routes><Route path="/devoluciones/:orderId" element={<OrderReturnsPage/>}/></Routes></MemoryRouter>);
+  await screen.findByText(/Este enlace no está disponible/);
+  expect(fetchMock).not.toHaveBeenCalled(); expect(screen.queryByText('Tenis Plus')).not.toBeInTheDocument();
 });

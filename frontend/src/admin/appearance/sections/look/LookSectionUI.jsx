@@ -343,11 +343,7 @@ export default function LookSectionUI({
                 hint="Puedes usar una imagen subida a Cloudinary o una ruta pública."
               >
                 <div className="space-y-3">
-                  <Input
-                    value={config.titleImage || ""}
-                    onChange={(e) => patchConfig({ titleImage: e.target.value })}
-                    placeholder="URL de la imagen del título"
-                  />
+                  {(config.titleImage || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => patchConfig({ titleImage: "" })}>Quitar imagen</button>}
 
                   <div className="flex flex-wrap items-center gap-3">
                     <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">

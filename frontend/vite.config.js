@@ -50,6 +50,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        pagePreview: fileURLToPath(new URL('./page-preview.html', import.meta.url)),
+      },
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],

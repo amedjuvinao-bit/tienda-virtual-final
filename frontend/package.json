@@ -17,7 +17,7 @@
     "test:product-variant-images": "vitest run src/pages/ProductDetail.test.jsx",
     "test:product-pagination": "vitest run src/utils/productPagination.test.js",
     "test:cart-module": "vitest run src/utils/cartMutationConcurrency.test.js src/utils/cartRecoveryAccess.test.js src/admin/cartAdminApi.test.js src/admin/CarritosAdmin.auth.test.jsx src/admin/CarritosAdmin.operations.test.jsx",
-    "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/admin/favoriteAdminApi.test.js src/admin/FavoritosAdmin.operations.test.jsx",
+    "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/utils/favoriteStore.test.js src/components/favorites src/admin/pages/FavoritesPageEditor.test.jsx src/admin/favoriteAdminApi.test.js src/admin/FavoritosAdmin.operations.test.jsx",
     "test:orders-security": "vitest run src/admin/OrdersAdmin.security.test.jsx src/admin/orders/components/OrderSecurityControls.test.jsx",
     "test:orders-architecture": "vitest run src/admin/orders/hooks/useOrdersAdminQuery.test.jsx src/admin/orders/electronicInvoice/InvoiceSummaryTab.test.jsx",
     "test:orders-logistics": "vitest run src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.test.jsx src/admin/orders/components/orderDetail/orderLogisticsViewModel.test.js",
@@ -25,6 +25,8 @@
     "test:orders-stage4": "vitest run src/utils/orderReturnAccess.test.js src/pages/OrderReturnsPage.test.jsx src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.test.jsx",
     "test:orders-return-risk": "vitest run src/pages/OrderReturnsPage.test.jsx src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.test.jsx",
     "test:checkout-store-credit": "vitest run src/checkout/storeCreditCheckout.test.js src/admin/orders/components/orderDetail/OrderDetailStoryOverview.test.jsx",
+    "test:checkout-module": "vitest run src/checkout/page src/checkout/storeCreditCheckout.test.js src/pages/paymentPages.sensitiveLogging.test.js src/admin/pages/CheckoutPageEditor.test.jsx",
+    "test:thanks-module": "vitest run src/pages/gracias src/pages/paymentPages.sensitiveLogging.test.js src/admin/pages/ThanksPageEditor.test.jsx",
     "test:checkout-architecture": "vitest run src/checkout/page/checkoutPageArchitecture.test.js src/checkout/page/checkoutSubmissionModel.test.js src/checkout/page/useCheckoutSubmission.test.js src/pages/gracias/graciasPageArchitecture.test.jsx src/pages/paymentPages.sensitiveLogging.test.js",
     "test:payu-redirect": "vitest run src/lib/payuRedirect.test.js",
     "test:orders-operations": "vitest run src/admin/orders/components/OrdersOperationsCenter.test.jsx src/admin/orders/hooks/useOrdersQuickViews.test.jsx",
@@ -69,7 +71,10 @@
     "test:admin-security-stage4": "vitest run src/admin/security/AdminTwoFactorSecurity.test.jsx src/admin/security/AdminSecurityCenterStage4.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
     "test:admin-security-stage5": "vitest run src/admin/security/AdminSecurityAlertsStage5.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",
-    "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
+    "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx",
+    "test:pages-module": "vitest run src/checkout/page src/checkout/storeCreditCheckout.test.js src/pages/gracias src/pages/paymentPages.sensitiveLogging.test.js src/components/catalog src/components/StorefrontFooter.test.jsx src/components/not-found src/pages/NotFound.test.jsx src/lib/api.adminFetch.test.js src/admin/pages src/admin/components/adminNavigationIdentity.test.js src/pages/ProductDetail.test.jsx src/components/ProductCard.quickAdd.test.js src/components/service-pages src/pages/OrderReturnsPage.test.jsx src/pages/SearchResults.test.jsx",
+    "test:e2e:pages-module": "node e2e/pagesWorkspace.e2e.js",
+    "test:service-pages": "vitest run src/components/service-pages src/pages/OrderReturnsPage.test.jsx src/pages/SearchResults.test.jsx src/admin/pages/ServicePageEditors.test.jsx src/admin/pages/workspace/publicPageCoverage.test.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

@@ -1,0 +1,46 @@
+[
+  {
+    "slug": "complementos",
+    "name": "Complementos",
+    "category": "Complementos",
+    "publicPath": "/complementos",
+    "subtitle": "Detalles para acompañar tu elección."
+  },
+  {
+    "slug": "bautizos",
+    "name": "Bautizos",
+    "category": "Bautizos",
+    "publicPath": "/categoria/bautizos",
+    "subtitle": "Detalles para un momento especial."
+  },
+  {
+    "slug": "vestidos",
+    "name": "Vestidos",
+    "category": "Vestidos",
+    "publicPath": "/categoria/vestidos",
+    "subtitle": "Una selección para cada ocasión."
+  },
+  {
+    "slug": "jeans",
+    "name": "Jeans",
+    "category": "Jeans",
+    "publicPath": "/categoria/jeans",
+    "subtitle": "Comodidad y estilo para cada día."
+  },
+  {
+    "slug": "calzado",
+    "name": "Calzado",
+    "category": "Calzado",
+    "publicPath": "/categoria/calzado",
+    "subtitle": "Encuentra el par para tu próximo paso."
+  },
+  {
+    "slug": "lo-nuevo",
+    "name": "Novedades",
+    "publicPath": "/lo-nuevo",
+    "subtitle": "Descubre las incorporaciones más recientes.",
+    "sourceMode": "all",
+    "defaultSort": "-createdAt",
+    "emptyTitle": "Pronto encontrarás novedades"
+  }
+]

@@ -1,4 +1,5 @@
 'use strict';
+const { acceptConsumerOffer } = require('./consumer/checkoutContract');
 
 const Counter = require('../models/Counter');
 const Order = require('../models/Order');
@@ -385,6 +386,8 @@ async function createOrderInTransaction({
       adminUserId,
       reservationRequired,
     });
+    // The server rebuilds the exact offer inside the transaction, before any order is saved.
+    base.consumerContract = acceptConsumerOffer(quote.consumerOffer, rawBody.consumerAcceptance);
     base.status = base.status || 'pending';
 
     const customerResolution = await resolveCustomerForOrder(base, {

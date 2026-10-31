@@ -162,6 +162,6 @@ export function getPaymentStatusMeta(status, provider, fallback) {
     expired: ['Pago expirado', '#fef2f2', '#b91c1c', 'Tu intento de pago expiró', 'El intento de pago expiró antes de completarse. Puedes regresar a la tienda y generar un nuevo intento.', false],
     error: ['Error en el pago', '#fee2e2', '#b91c1c', 'Hubo un problema con tu pago', `${providerLabel} devolvió un error en el procesamiento. Te recomendamos intentar nuevamente.`, false],
   };
-  const selected = values[status] || ['Orden recibida', '#fdf2f8', '#db2777', '¡Gracias por tu compra!', fallback || 'Hemos recibido tu pedido correctamente. Te enviaremos un mensaje cuando esté en camino.', true];
+  const selected = values[status] || ['Orden recibida', '#fdf2f8', '#db2777', '¡Gracias por tu compra!', fallback || 'Hemos recibido tu pedido correctamente. Te enviaremos un mensaje cuando esté en camino.', false];
   return { badge: selected[0], badgeBg: selected[1], badgeText: selected[2], title: selected[3], message: selected[4], showSuccessCheck: selected[5] };
 }

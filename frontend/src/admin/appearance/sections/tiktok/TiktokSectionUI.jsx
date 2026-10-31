@@ -662,11 +662,7 @@ function LegacyTiktokSectionUI({
 
             <Field label="Imagen del título">
               <div className="space-y-3">
-                <Input
-                  value={config.titleImage || ""}
-                  placeholder="/SeccionTikTok/tituloTIKTOK.png"
-                  onChange={(e) => updateConfig("titleImage", e.target.value)}
-                />
+                {(config.titleImage || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateConfig("titleImage", "")}>Quitar imagen</button>}
 
                 <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen de título"}
@@ -749,11 +745,7 @@ function LegacyTiktokSectionUI({
 
             <Field label="Imagen del logo">
               <div className="space-y-3">
-                <Input
-                  value={config.tiktokLogo || ""}
-                  placeholder="/SeccionTikTok/LogoTiktok.svg"
-                  onChange={(e) => updateConfig("tiktokLogo", e.target.value)}
-                />
+                {(config.tiktokLogo || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateConfig("tiktokLogo", "")}>Quitar imagen</button>}
 
                 {config.tiktokLogo && !logoPreviewError ? (
                   <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
@@ -874,11 +866,7 @@ function LegacyTiktokSectionUI({
 
             <Field label="Imagen de marca de agua">
               <div className="space-y-3">
-                <Input
-                  value={config.watermarkImage || ""}
-                  placeholder="/icons/watermark.png"
-                  onChange={(e) => updateConfig("watermarkImage", e.target.value)}
-                />
+                {(config.watermarkImage || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateConfig("watermarkImage", "")}>Quitar imagen</button>}
 
                 <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen de marca de agua"}
@@ -1171,11 +1159,7 @@ function LegacyTiktokSectionUI({
 
             <Field label="Imagen personalizada del logo hover">
               <div className="space-y-3">
-                <Input
-                  value={config.hoverLogoImage || ""}
-                  placeholder="/icons/Tiktok.svg"
-                  onChange={(e) => updateConfig("hoverLogoImage", e.target.value)}
-                />
+                {(config.hoverLogoImage || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateConfig("hoverLogoImage", "")}>Quitar imagen</button>}
 
                 <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                   {uploading ? "Subiendo..." : "Subir imagen hover"}
@@ -1335,11 +1319,7 @@ function LegacyTiktokSectionUI({
 
                   <Field label="Imagen principal de la publicación">
                     <div className="space-y-3">
-                      <Input
-                        value={post.image || ""}
-                        placeholder="/SeccionTikTok/post.jpg"
-                        onChange={(e) => updatePost(index, "image", e.target.value)}
-                      />
+                      {(post.image || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updatePost(index, "image", "")}>Quitar imagen</button>}
 
                       <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                         {uploading ? "Subiendo..." : "Subir imagen principal"}
@@ -1358,11 +1338,7 @@ function LegacyTiktokSectionUI({
 
                   <Field label="Miniatura de la publicación">
                     <div className="space-y-3">
-                      <Input
-                        value={post.thumb || ""}
-                        placeholder="/SeccionTikTok/thumb.jpg"
-                        onChange={(e) => updatePost(index, "thumb", e.target.value)}
-                      />
+                      {(post.thumb || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updatePost(index, "thumb", "")}>Quitar imagen</button>}
 
                       <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer section-editor-accent-hover transition">
                         {uploading ? "Subiendo..." : "Subir thumbnail"}

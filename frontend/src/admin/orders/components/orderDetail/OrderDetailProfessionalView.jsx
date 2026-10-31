@@ -18,6 +18,9 @@ import OrderDetailActionToolbar from './OrderDetailActionToolbar';
 import OrderDetailTabs from './OrderDetailTabs';
 import { OrderDetailIcons } from './OrderDetailIcons';
 import { OrderDetailPanel, SectionTitle } from './OrderDetailPrimitives';
+import ConsumerCasesPanel from '../../ConsumerCasesPanel';
+import { useAuth } from '../../../../context/AuthContext';
+import { getAdminUserRole } from '../../../security/adminPermissions';
 
 export default function OrderDetailProfessionalView({
   order,
@@ -98,8 +101,11 @@ export default function OrderDetailProfessionalView({
   onSaveCustomerData,
   savingCustomerData = false,
 }) {
+  const auth = useAuth();
+  const canViewClaims = ['owner', 'admin'].includes(getAdminUserRole(auth?.adminUser || auth?.currentAdminUser));
   const [activeTab, setActiveTab] = useState('summary');
   const [managementOpen, setManagementOpen] = useState(false);
+  const canLeaveClaims = () => activeTab !== 'claims' || document.documentElement.dataset.pageDraftDirty !== 'true' || window.confirm('Tienes una respuesta sin guardar. ¿Quieres descartarla?');
   const hasManagementActions = [
     onSaveStatus,
     onSaveTags,
@@ -147,11 +153,13 @@ export default function OrderDetailProfessionalView({
     { id: 'products', label: 'Pedido', icon: OrderDetailIcons.Package },
     { id: 'operation', label: 'Operación', icon: OrderDetailIcons.Settings2 },
     { id: 'returns', label: 'Posventa', icon: OrderDetailIcons.RotateCcw },
+    ...(canViewClaims ? [{ id: 'claims', label: 'Peticiones y reclamos', icon: OrderDetailIcons.History }] : []),
     { id: 'payment', label: 'Pago y factura', icon: OrderDetailIcons.WalletCards },
     { id: 'customer', label: 'Cliente e historial', icon: OrderDetailIcons.User },
   ];
 
   const tabContent = {
+    claims: canViewClaims ? <ConsumerCasesPanel key={order?._id} order={order}/> : null,
     summary: (
       <OrderDetailStoryOverview
         order={order}
@@ -245,6 +253,7 @@ export default function OrderDetailProfessionalView({
   };
 
   const handleTabChange = (tabId) => {
+    if (tabId !== activeTab && !canLeaveClaims()) return;
     setManagementOpen(false);
     setActiveTab(tabId);
   };
@@ -267,7 +276,7 @@ export default function OrderDetailProfessionalView({
     >
       <OrderDetailHeader
         order={order}
-        onClose={onClose}
+        onClose={() => { if (canLeaveClaims()) onClose?.(); }}
         onDownloadPdf={onDownloadPdf}
         onOpenInvoice={onOpenInvoice}
         downloadingPdf={downloadingPdf}

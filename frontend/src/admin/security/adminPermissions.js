@@ -13,6 +13,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   carritos: ['carts:view'],
   favoritos: ['favorites:view'],
   ordenes: ['orders:view'],
+  'ordenes/reclamos': ['orders:view'],
   facturacion: ['billing:view', 'billing:settings'],
   clientes: ['customers:view'],
   pos: ['pos:view'],
@@ -33,12 +34,16 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'thanks-page': ['pages:update'],
   'favorites-page': ['pages:update'],
   'notfound-page': ['pages:update'],
+  'returns-page': ['pages:update'],
+  'search-page': ['pages:update'],
+  'information-page': ['pages:update'],
 
   configuracion: ['settings:view'],
   'configuracion/empresa': ['settings:store'],
   'configuracion/sedes': ['branches:view'],
   'configuracion/facturacion': ['settings:billing'],
   'configuracion/pagos': ['settings:payments'],
+  'configuracion/consumidor': ['settings:store'],
   'configuracion/envios': ['settings:shipping'],
   'configuracion/instagram': ['settings:instagram'],
   'configuracion/tiktok': ['settings:tiktok'],
@@ -223,6 +228,10 @@ export function getRequiredPermissionsForAdminPath(pathname) {
     return ADMIN_ROUTE_PERMISSIONS['favorites-page'];
   }
 
+  if (path.startsWith('returns-page/')) return ADMIN_ROUTE_PERMISSIONS['returns-page'];
+  if (path.startsWith('information-page/')) return ADMIN_ROUTE_PERMISSIONS['information-page'];
+  if (path.startsWith('search-page/')) return ADMIN_ROUTE_PERMISSIONS['search-page'];
+
   if (path.startsWith('notfound-page/')) {
     return ADMIN_ROUTE_PERMISSIONS['notfound-page'];
   }
@@ -231,6 +240,7 @@ export function getRequiredPermissionsForAdminPath(pathname) {
 }
 
 export function canAccessAdminPath(user, pathname) {
+  if (normalizePath(pathname) === 'ordenes/reclamos') return ['owner', 'admin'].includes(getAdminUserRole(user));
   if (normalizePath(pathname) === 'configuracion/respaldos') {
     return getAdminUserRole(user) === 'owner';
   }

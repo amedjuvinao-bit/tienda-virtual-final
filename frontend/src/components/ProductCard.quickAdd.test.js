@@ -58,4 +58,12 @@ describe('agregado profesional desde la tarjeta del catálogo', () => {
 
     expect(intent).toEqual({ requiresSelection: true, payload: null });
   });
+  it('dirige al detalle cuando los productos antiguos aún requieren talla o color', () => {
+    expect(buildCatalogCartIntent({ sizes: ['S', 'M'], colors: ['rojo'] })).toEqual({ requiresSelection: true, payload: null });
+  });
+  it('bloquea una variante agotada según inventario y permite servicios sin inventario', () => {
+    expect(buildCatalogCartIntent({ inventoryTracked: true, availableStock: 0, variants: [{ variantKey: 'unica', availableStock: 0 }] }).unavailable).toBe(true);
+    expect(buildCatalogCartIntent({ productType: 'service', inventoryTracked: false, availableStock: null }).payload.quantity).toBe(1);
+  });
+
 });

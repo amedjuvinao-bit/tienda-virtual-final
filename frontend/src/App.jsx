@@ -1,3 +1,6 @@
+import CATALOG_PAGES from "../../shared/catalogPages.json";
+import OrdersWorkspace from "./admin/orders/OrdersWorkspace";
+import ConsumerLinks from "./components/consumer/ConsumerLinks";
 import 'react-toastify/dist/ReactToastify.css';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {
@@ -11,7 +14,8 @@ import {
 import { fetchSiteSettings } from './theme/siteSettingsApi';
 import { applyTheme } from './theme/applyTheme';
 import { normalizeGlobalConfig } from './admin/appearance/general/generalHelpers';
-import GlobalPageLoader from './components/GlobalPageLoader';
+import StorefrontLoadingScreen, { StorefrontLoadingBoundary } from './components/StorefrontLoadingScreen';
+import { rememberStorefrontLoadingAppearance } from './theme/storefrontLoadingAppearance';
 import RouteLoaderEffect from './components/RouteLoaderEffect';
 import AppToastContainer from './components/AppToastContainer';
 import BackupMaintenanceNotice from './components/BackupMaintenanceNotice';
@@ -33,6 +37,9 @@ import { StorefrontSettingsContext } from './context/StorefrontSettingsContext';
 import { isStorefrontSectionVisible } from './lib/storefrontSectionVisibility';
 import './storefrontSectionMotion.css';
 
+const InformationPageEditor = lazy(() => import("./admin/pages/InformationPageEditor"));
+const ReturnsPageEditor = lazy(() => import('./admin/pages/ReturnsPageEditor'));
+const SearchPageEditor = lazy(() => import('./admin/pages/SearchPageEditor'));
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
 const FooterSection = lazy(() => import('./components/FooterSection'));
@@ -84,6 +91,7 @@ const ConfiguracionPage = lazy(() => import('./admin/ConfiguracionPage'));
 const CarritosAdmin = lazy(() => import('./admin/CarritosAdmin'));
 const FavoritosAdmin = lazy(() => import('./admin/FavoritosAdmin'));
 const OrdersAdmin = lazy(loadOrdersAdmin);
+const ConsumerCasesPanel = lazy(() => import("./admin/orders/ConsumerCasesPanel"));
 const AppearancePage = lazy(() => import('./admin/AppearancePage'));
 
 const RB_SETTINGS_TICK_KEY = 'rb_site_settings_tick';
@@ -169,6 +177,7 @@ export default function App() {
         };
         setThemeFromServer(normalizedTheme);
         applyTheme(normalizedTheme);
+        rememberStorefrontLoadingAppearance(normalizedTheme);
       }
       succeeded = true;
       adminConnectionErrorLogged.current = false;
@@ -184,8 +193,7 @@ export default function App() {
         setLoadingPage(false);
         if (succeeded || !window.location.pathname.startsWith('/admin')) setThemeReady(true);
       };
-      if (window.location.pathname.startsWith('/admin')) finish();
-      else setTimeout(finish, 400);
+      finish();
     }
     return succeeded;
   };
@@ -246,16 +254,26 @@ export default function App() {
             <StorefrontActionFeedback />
             <BackupMaintenanceNotice adminPanelReady={themeReady} />
             <AppConfirmProvider>
-              <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
+              <StorefrontLoadingBoundary config={themeFromServer?.global?.loader} loading={!themeReady || loadingPage}>
+              <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : <StorefrontLoadingScreen />}>
                 <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
-                <GlobalFloatingButtons theme={themeFromServer} />
-                {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
+                {themeReady && <GlobalFloatingButtons theme={themeFromServer} />}
 
                 <AdminLogoutGate>
-                {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <Routes>
+                {!themeReady ? window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} message={adminConnectionError ? 'Esperando configuración del servidor…' : 'Preparando tu panel…'} /> : <StorefrontLoadingScreen /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} store={siteSettingsFromServer?.store} />} />
+                  {CATALOG_PAGES.map(({ slug, publicPath }) => <Route key={slug} path={publicPath} element={<DynamicPage theme={themeFromServer} fixedSlug={slug} />} />)}
+                  <Route path="/nosotros" element={<DynamicPage theme={themeFromServer} fixedSlug="nosotros" />} />
+                  {["envios", "terminos", "privacidad", "cambios-y-devoluciones", "pqr"].map(slug => <Route key={slug} path={`/${slug}`} element={<DynamicPage theme={themeFromServer} fixedSlug={slug} />} />)}
+                  <Route path="/politicas" element={<Navigate to="/envios" replace />} />
+                  <Route path="/cambios-devoluciones" element={<Navigate to="/cambios-y-devoluciones" replace />} />
+                  <Route path="/contacto" element={<DynamicPage theme={themeFromServer} fixedSlug="contacto" />} />
+                  <Route path="/preguntas-frecuentes" element={<DynamicPage theme={themeFromServer} fixedSlug="preguntas-frecuentes" />} />
+                  <Route path="/ayuda" element={<DynamicPage theme={themeFromServer} fixedSlug="ayuda" />} />
+                  <Route path="/centro-ayuda" element={<DynamicPage theme={themeFromServer} fixedSlug="centro-ayuda" />} />
+                  <Route path="/nuestra-sede" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-sede" />} />
+                  <Route path="/nuestra-historia" element={<DynamicPage theme={themeFromServer} fixedSlug="nuestra-historia" />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
-                  <Route path="/lo-nuevo" element={<Navigate to="/#tendencia" replace />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/p/:id" element={<ProductDetail />} />
                   <Route path="/admin/login" element={<Login initialSettings={siteSettingsFromServer} loaderModel={adminLoader} />} />
@@ -267,7 +285,7 @@ export default function App() {
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
                   <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />
-                  <Route path="/probe-site-settings" element={<ApiProbe />} />
+                  {import.meta.env.DEV && <Route path="/probe-site-settings" element={<ApiProbe />} />}
 
                   <Route
                     path="/admin"
@@ -279,7 +297,8 @@ export default function App() {
                   >
                     <Route path="dashboard" element={protectAdminContent(<Dashboard />)} />
                     <Route path="productos" element={protectAdminContent(<ProductosAdmin />)} />
-                    <Route path="ordenes" element={protectAdminContent(<OrdersAdmin />)} />
+                    <Route path="ordenes" element={protectAdminContent(<OrdersWorkspace><OrdersAdmin /></OrdersWorkspace>)} />
+                    <Route path="ordenes/reclamos" element={protectAdminContent(<OrdersWorkspace claims><ConsumerCasesPanel /></OrdersWorkspace>)} />
                     <Route path="facturacion" element={<Navigate to="/admin/facturacion/resumen" replace />} />
                     <Route path="facturacion/:tab" element={protectAdminContent(<AdminBillingPage />)} />
                     <Route path="clientes" element={protectAdminContent(<AdminCustomersPage />)} />
@@ -298,6 +317,7 @@ export default function App() {
                     <Route path="configuracion/sedes" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/facturacion" element={<Navigate to="/admin/facturacion/configuracion" replace />} />
                     <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/consumidor" element={<Navigate to="/admin/configuracion/empresa?tema=privacidad" replace />} />
                     <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/instagram" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/tiktok" element={protectAdminContent(<ConfiguracionPage />)} />
@@ -317,6 +337,9 @@ export default function App() {
                     <Route path="checkout-page/:id" element={protectAdminContent(<CheckoutPageEditor />)} />
                     <Route path="thanks-page/:id" element={protectAdminContent(<ThanksPageEditor />)} />
                     <Route path="favorites-page/:id" element={protectAdminContent(<FavoritesPageEditor />)} />
+                    <Route path="information-page/:id" element={protectAdminContent(<InformationPageEditor />)} />
+                    <Route path="returns-page/:id" element={protectAdminContent(<ReturnsPageEditor />)} />
+                    <Route path="search-page/:id" element={protectAdminContent(<SearchPageEditor />)} />
                     <Route path="notfound-page/:id" element={protectAdminContent(<NotFoundPageEditor />)} />
                   </Route>
 
@@ -324,8 +347,10 @@ export default function App() {
                 </Routes>}
                 </AdminLogoutGate>
 
+                {themeReady && <ConsumerLinks />}
                 <AppToastContainer />
               </Suspense>
+              </StorefrontLoadingBoundary>
             </AppConfirmProvider>
           </BrowserRouter>
           </StorefrontSettingsContext.Provider>

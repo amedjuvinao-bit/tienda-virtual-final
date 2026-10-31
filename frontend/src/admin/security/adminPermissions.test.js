@@ -34,3 +34,15 @@ describe('acceso inicial de perfiles administrativos', () => {
     expect(canAccessAdminPath({ adminRole: 'manager', permissions: ['settings:store'] }, '/admin/configuracion/respaldos')).toBe(false);
   });
 });
+
+it.each(['returns-page', 'search-page', 'information-page'])('protege el editor %s con pages:update', editor => {
+  expect(canAccessAdminPath({role:'staff',permissions:['dashboard:view']}, `/admin/${editor}/123`)).toBe(false);
+  expect(canAccessAdminPath({role:'staff',permissions:['pages:view']}, `/admin/${editor}/123`)).toBe(false);
+  expect(canAccessAdminPath({role:'staff',permissions:['pages:update']}, `/admin/${editor}/123`)).toBe(true);
+});
+
+it('reserva el listado global de reclamos de Órdenes a propietario y administradores', () => {
+  expect(canAccessAdminPath({ role: 'owner' }, '/admin/ordenes/reclamos')).toBe(true);
+  expect(canAccessAdminPath({ role: 'admin' }, '/admin/ordenes/reclamos')).toBe(true);
+  expect(canAccessAdminPath({ role: 'staff', permissions: ['orders:view', 'settings:store'] }, '/admin/ordenes/reclamos')).toBe(false);
+});

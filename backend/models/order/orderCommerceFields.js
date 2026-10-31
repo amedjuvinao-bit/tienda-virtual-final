@@ -55,6 +55,7 @@ function createOrderCommerceFields() {
     required: true,
   },
 
+  consumerContract: { type: mongoose.Schema.Types.Mixed, default: undefined, immutable: true },
   summary: SummarySchema,
   subtotal: Number,
   shipping: Number,

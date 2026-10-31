@@ -11,7 +11,10 @@ export function cartItemIdentity(item = {}) {
   const productId = clean(item.productId || item._id || item.id);
   const identity = resolveVariantIdentity({
     variantKey:
-      item.variantKey || item.variantId || item.selectedVariantKey || item.selectedVariantId,
+      item.variantKey ||
+      item.variantId ||
+      item.selectedVariantKey ||
+      item.selectedVariantId,
     size: item.size,
     color: item.color,
     attributes: item.variantAttributes || item.attributes || [],
@@ -36,12 +39,27 @@ export function applyCartOperation(items, operation = {}) {
   if (type === 'add') {
     const incoming = { ...(operation.item || {}) };
     const incomingIdentity = cartItemIdentity(incoming);
-    const amount = Math.max(1, quantityOf(incoming) || Number(operation.amount) || 1);
-    const index = current.findIndex((item) => cartItemIdentity(item) === incomingIdentity);
-    if (index < 0) return [...current, { ...incoming, quantity: amount }];
+    const amount = Math.max(
+      1,
+      quantityOf(incoming) || Number(operation.amount) || 1
+    );
+    const index = current.findIndex(
+      (item) => cartItemIdentity(item) === incomingIdentity
+    );
+    if (index < 0)
+      return [
+        ...current,
+        {
+          ...incoming,
+          quantity: amount,
+          ...(incoming.qty !== undefined ? { qty: amount } : {}),
+        },
+      ];
+    const quantity = Math.max(1, quantityOf(current[index]) + amount);
     current[index] = {
       ...current[index],
-      quantity: Math.max(1, quantityOf(current[index]) + amount),
+      quantity,
+      ...(current[index].qty !== undefined ? { qty: quantity } : {}),
     };
     return current;
   }
@@ -50,9 +68,11 @@ export function applyCartOperation(items, operation = {}) {
     const delta = type === 'increase' ? 1 : -1;
     return current.map((item) => {
       if (cartItemIdentity(item) !== identity) return item;
+      const quantity = Math.max(1, quantityOf(item) + delta);
       return {
         ...item,
-        quantity: Math.max(1, quantityOf(item) + delta),
+        quantity,
+        ...(item.qty !== undefined ? { qty: quantity } : {}),
       };
     });
   }
@@ -63,7 +83,10 @@ export function applyCartOperation(items, operation = {}) {
 
   if (type === 'clear') {
     const targets = new Set(
-      (Array.isArray(operation.targetIdentities) ? operation.targetIdentities : [])
+      (Array.isArray(operation.targetIdentities)
+        ? operation.targetIdentities
+        : []
+      )
         .map(clean)
         .filter(Boolean)
     );
@@ -86,7 +109,8 @@ export function applyCartOperation(items, operation = {}) {
 }
 
 export function normalizeCartSnapshot(value = {}) {
-  const cart = value?.cart && typeof value.cart === 'object' ? value.cart : value;
+  const cart =
+    value?.cart && typeof value.cart === 'object' ? value.cart : value;
   return {
     items: cloneItems(cart?.items),
     version: clean(value?.version || cart?.version || cart?.updatedAt),
@@ -96,22 +120,22 @@ export function normalizeCartSnapshot(value = {}) {
 export function isCartWriteConflict(error) {
   return Boolean(
     error?.response?.status === 409 &&
-    error?.response?.data?.error === 'CART_WRITE_CONFLICT'
+      error?.response?.data?.error === 'CART_WRITE_CONFLICT'
   );
 }
 
 export function isInvalidCartItems(error) {
   return Boolean(
     error?.response?.status === 409 &&
-    error?.response?.data?.error === 'CART_ITEMS_INVALID' &&
-    Array.isArray(error?.response?.data?.items)
+      error?.response?.data?.error === 'CART_ITEMS_INVALID' &&
+      Array.isArray(error?.response?.data?.items)
   );
 }
 
 export function isCartAccessNotFound(error) {
   return Boolean(
     error?.response?.status === 404 &&
-    error?.response?.data?.error === 'CART_ACCESS_NOT_FOUND'
+      error?.response?.data?.error === 'CART_ACCESS_NOT_FOUND'
   );
 }
 
@@ -152,23 +176,42 @@ export function createCartMutationCoordinator({
   onTerminalConflict,
   onRejected,
   onMissingCart,
+  getFallbackSnapshot,
 } = {}) {
   let queue = Promise.resolve();
 
   async function executeAgainstCurrentCart(operation) {
-    let snapshot = normalizeCartSnapshot(await getSnapshot());
+    if (operation.type === 'refresh') {
+      const refreshed = normalizeCartSnapshot(await reload());
+      adopt(refreshed, { operation, refreshed: true });
+      return refreshed;
+    }
+    let snapshot;
+    try {
+      snapshot = normalizeCartSnapshot(await getSnapshot());
+    } catch (error) {
+      if (!isCartAccessNotFound(error)) {
+        const fallback = normalizeCartSnapshot(getFallbackSnapshot?.() || {});
+        adopt(fallback, { operation, rejected: true });
+        onRejected?.(error, fallback, operation);
+      }
+      throw error;
+    }
     let desired = applyCartOperation(snapshot.items, operation);
 
     try {
-      const written = normalizeCartSnapshot(await write({
-        items: desired,
-        version: snapshot.version,
-        operation,
-        retry: false,
-      }));
+      const written = normalizeCartSnapshot(
+        await write({
+          items: desired,
+          version: snapshot.version,
+          operation,
+          retry: false,
+        })
+      );
       adopt(written, { operation, retried: false });
       return { ...written, retried: false };
     } catch (error) {
+      if (isCartAccessNotFound(error)) throw error;
       if (!isCartWriteConflict(error)) {
         const invalidIdentities = invalidItemIdentities(error);
         const targetIdentity = operationIdentity(operation);
@@ -191,12 +234,14 @@ export function createCartMutationCoordinator({
           !targetRejected &&
           cleanedSnapshot.items.length !== snapshot.items.length
         ) {
-          const recovered = normalizeCartSnapshot(await write({
-            items: applyCartOperation(cleanedSnapshot.items, operation),
-            version: snapshot.version,
-            operation,
-            retry: true,
-          }));
+          const recovered = normalizeCartSnapshot(
+            await write({
+              items: applyCartOperation(cleanedSnapshot.items, operation),
+              version: snapshot.version,
+              operation,
+              retry: true,
+            })
+          );
           adopt(recovered, { operation, recoveredInvalidItems: true });
           onRejected?.(error, cleanedSnapshot, operation, {
             recovered: true,
@@ -219,15 +264,18 @@ export function createCartMutationCoordinator({
     desired = applyCartOperation(reloaded.items, operation);
 
     try {
-      const written = normalizeCartSnapshot(await write({
-        items: desired,
-        version: reloaded.version,
-        operation,
-        retry: true,
-      }));
+      const written = normalizeCartSnapshot(
+        await write({
+          items: desired,
+          version: reloaded.version,
+          operation,
+          retry: true,
+        })
+      );
       adopt(written, { operation, retried: true });
       return { ...written, retried: true };
     } catch (error) {
+      if (isCartAccessNotFound(error)) throw error;
       if (!isCartWriteConflict(error)) {
         adopt(reloaded, { operation, rejected: true, reloaded: true });
         onRejected?.(error, reloaded, operation);
@@ -236,7 +284,9 @@ export function createCartMutationCoordinator({
       const server = normalizeCartSnapshot(error?.response?.data || {});
       adopt(server, { operation, terminalConflict: true });
       onTerminalConflict?.(server, operation);
-      const controlled = new Error('El carrito volvio a cambiar. Se conservo la version del servidor.');
+      const controlled = new Error(
+        'El carrito volvio a cambiar. Se conservo la version del servidor.'
+      );
       controlled.code = 'CART_WRITE_CONFLICT';
       controlled.response = error.response;
       throw controlled;
@@ -260,5 +310,5 @@ export function createCartMutationCoordinator({
     return task;
   }
 
-  return { enqueue };
+  return { enqueue, waitForIdle: () => queue };
 }

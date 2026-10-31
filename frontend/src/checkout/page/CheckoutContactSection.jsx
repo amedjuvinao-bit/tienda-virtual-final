@@ -1,75 +1,48 @@
-import React from 'react';
-
+import { useId } from "react";
+import { CheckoutCard } from "./CheckoutMaterial";
 export default function CheckoutContactSection({ state }) {
-  const { checkoutConfig } = state;
-
-  if (!checkoutConfig.showContactSection) return null;
-
-  return (
-    <div className="co-card">
-      <h2 className="co-card-title">{checkoutConfig.contactSectionTitle}</h2>
-
-      <label className="co-field-label">{checkoutConfig.emailLabelText}</label>
+  const { checkoutConfig: c } = state,
+    id = useId();
+  const field = (key, label, autoComplete, type = "text") => (
+    <div key={key}>
+      <label className="co-field-label" htmlFor={`${id}-${key}`}>
+        {label}
+      </label>
       <input
-        type="text"
+        id={`${id}-${key}`}
+        name={key}
         className="co-input"
-        placeholder="tu@email.com o +57 300..."
-        value={state.customerEmailOrPhone}
-        onChange={(event) => state.setCustomerEmailOrPhone(event.target.value)}
-        autoComplete="email"
-        name="contact"
+        type={type}
+        autoComplete={autoComplete}
+        value={state[key]}
+        onChange={(event) =>
+          state[`set${key[0].toUpperCase() + key.slice(1)}`](event.target.value)
+        }
       />
-
-      {checkoutConfig.showNewsletterCheckbox && (
+    </div>
+  );
+  return (
+    <CheckoutCard>
+      <h2 className={c.showContactSection ? "co-card-title" : "sr-only"}>
+        {c.contactSectionTitle}
+      </h2>
+      <div className="co-grid-2">
+        {field("customerName", c.nameLabelText, "given-name")}
+        {field("customerLastname", c.lastnameLabelText, "family-name")}
+        {field("customerEmailOrPhone", c.emailLabelText, "email")}
+        {field("customerPhone", c.phoneLabelText, "tel", "tel")}
+        {field("customerId", c.documentLabelText, "off")}
+      </div>
+      {c.showNewsletterCheckbox && (
         <label className="co-newsletter">
           <input
             type="checkbox"
             checked={state.wantsNewsletter}
             onChange={(event) => state.setWantsNewsletter(event.target.checked)}
           />
-          {checkoutConfig.newsletterText}
+          {c.newsletterText}
         </label>
       )}
-
-      <div className="co-mt-4">
-        <label className="co-field-label">{checkoutConfig.documentLabelText}</label>
-        <input
-          type="text"
-          className="co-input"
-          placeholder="12345678"
-          value={state.customerId}
-          onChange={(event) => state.setCustomerId(event.target.value)}
-          autoComplete="off"
-          name="customerId"
-        />
-      </div>
-
-      <div className="co-grid-2 co-mt-4">
-        <div>
-          <label className="co-field-label">{checkoutConfig.nameLabelText}</label>
-          <input
-            type="text"
-            className="co-input"
-            placeholder="María"
-            value={state.customerName}
-            onChange={(event) => state.setCustomerName(event.target.value)}
-            autoComplete="given-name"
-            name="firstName"
-          />
-        </div>
-        <div>
-          <label className="co-field-label">Apellidos</label>
-          <input
-            type="text"
-            className="co-input"
-            placeholder="García"
-            value={state.customerLastname}
-            onChange={(event) => state.setCustomerLastname(event.target.value)}
-            autoComplete="family-name"
-            name="lastName"
-          />
-        </div>
-      </div>
-    </div>
+    </CheckoutCard>
   );
 }

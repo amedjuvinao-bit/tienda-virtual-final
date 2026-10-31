@@ -1,6 +1,7 @@
 // src/lib/api.js
 import axios from 'axios';
 import { API_BASE_URL } from '../config/apiBaseUrl';
+import { getSessionId } from '../utils/getSessionId';
 
 const API_BASE = API_BASE_URL;
 
@@ -37,7 +38,9 @@ export async function adminFetch(input, init) {
     !url.includes('/api/site-settings') && !url.includes('/api/admin/auth/');
   if (track) changeAdminRouteRequestCount(pathname, 1);
   try {
-    return await fetch(input, init);
+    // The API may use another origin (for example localhost:5000).
+    // Admin access uses an HttpOnly cookie, including for writes and uploads.
+    return await fetch(input, { credentials: 'include', ...init });
   } finally {
     if (track) changeAdminRouteRequestCount(pathname, -1);
   }
@@ -104,7 +107,7 @@ export function postIdempotent(url, data, idempotencyKey, config = {}) {
 /* ============ Interceptors ============ */
 api.interceptors.request.use((config) => {
   try {
-    const sessionId = localStorage.getItem(SESSION_ID_KEY);
+    const sessionId = getSessionId();
     const headerNames = Object.keys(config.headers || {}).map((key) =>
       String(key).toLowerCase()
     );
