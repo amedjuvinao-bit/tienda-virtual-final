@@ -26,7 +26,9 @@ Las selecciones nuevas empiezan sin ilustración hasta que el administrador carg
 3. Crear la categoría de productos si todavía no existe, cargar los productos reales, asociarlos a ella y publicarlos. Al abrir o actualizar su página aparecerán los productos correspondientes; sin productos se muestra el estado vacío.
 4. En **Apariencia → Categorías → Contenido → Nombre y enlace**, seleccionar la tarjeta de Inicio y elegir su destino en **Página del catálogo**. Guardar la apariencia. Por ejemplo, elegir **Vestidos** enlaza la tarjeta con `/categoria/vestidos` sin escribir rutas.
 
-El selector ofrece las seis páginas de la tabla. Los enlaces personalizados existentes se conservan hasta que el administrador elija otro destino. No se deduce ni se cambia un enlace guardado a partir del nombre o la fotografía de una tarjeta.
+El selector ofrece las seis páginas de la tabla. Las cinco tarjetas predeterminadas de Inicio enlazan directamente con Complementos, Bautizos, Vestidos, Jeans y Calzado usando el registro compartido. Se conservan sus identificadores, fotografías y ajustes visuales.
+
+La normalización corrige los destinos heredados `/categoria/bebe`, `/categoria/2-8` y `/categoria/9-12` únicamente cuando el nombre visible de la tarjeta corresponde a un catálogo registrado. También corrige la antigua tarjeta `cat_2` cuando ya se llama Bautizos pero todavía apunta a `/lo-nuevo`. No escribe en la base de datos. Los enlaces personalizados válidos se conservan. Si la tarjeta sigue representando una categoría por edad u otro nombre desconocido, hay que seleccionar su destino desde el panel; no se le atribuye una categoría distinta por su fotografía o posición.
 
 ## Novedades
 
@@ -64,4 +66,4 @@ Los filtros son los que ya admite el catálogo existente. La consulta conserva e
 
 Validación de Novedades: 164 pruebas de interfaz, 12 grupos de contrato de catálogos, 24 comprobaciones de páginas informativas, 16 comprobaciones de paginación pública y compilación de producción. Incluye consulta inicial sin ámbito de otra categoría, orden por fecha, edición y guardado de una selección distinta, ilustración propia y enlace desde Apariencia. Los resultados de la revisión de enlaces se documentan en `auditoria-enlaces-publicos.md`.
 
-Las pruebas usan modelos y respuestas controlados. No se accedió a la configuración ni a los productos de la instalación local del usuario; por eso el enlace guardado de su tarjeta se conserva y se elige desde el selector indicado.
+Las pruebas usan modelos y respuestas controlados. No se accedió a la configuración ni a los productos de la instalación local del usuario. La compatibilidad de destinos heredados y la revisión final de navegación están documentadas en `auditoria-enlaces-publicos.md`.

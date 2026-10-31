@@ -1,29 +1,50 @@
 # Revisión de enlaces públicos
 
-La página Novedades tiene destino propio en `/lo-nuevo` y ubicación de edición en Páginas. Los seis catálogos registrados cuentan con ruta pública, editor y opción de destino en Apariencia.
+Las cinco tarjetas predeterminadas de Categorías abren sus catálogos propios. Novedades tiene destino independiente en `/lo-nuevo`. Las seis páginas registradas cuentan con ruta pública, editor y opción de destino en Apariencia.
 
-## Resultados
+## Destinos de Categorías
 
-La comprobación estática examinó 320 archivos fuente disponibles y 67 referencias internas de navegación, con coincidencia de rutas mediante el enrutador utilizado por la aplicación. Se excluyeron imágenes, API, rutas administrativas y valores de color. Hay 64 referencias con ruta y tres referencias antiguas sin ruta.
+| Tarjeta | Ruta pública |
+| --- | --- |
+| Complementos | `/complementos` |
+| Bautizos | `/categoria/bautizos` |
+| Vestidos | `/categoria/vestidos` |
+| Jeans | `/categoria/jeans` |
+| Calzado | `/categoria/calzado` |
+
+Los valores predeterminados obtienen los nombres y destinos de `shared/catalogPages.json`, el mismo registro utilizado por las rutas, el servidor y los selectores del panel. Se conservan los identificadores, imágenes, encuadres y ajustes de presentación. Las fotografías incluidas como respaldo mantienen su posición anterior.
+
+La normalización corrige los tres destinos antiguos `/categoria/bebe`, `/categoria/2-8` y `/categoria/9-12` cuando el nombre visible coincide con un catálogo registrado. También corrige la antigua tarjeta `cat_2` si ya representa Bautizos y todavía apunta a `/lo-nuevo`. La corrección se aplica al leer la configuración, tanto en el panel como en la página pública, sin modificar registros en la base de datos ni el objeto de entrada.
+
+Los enlaces personalizados válidos, incluidos destinos externos, se conservan. Si la tarjeta continúa llamándose por una edad u otro nombre desconocido, no se le asigna un catálogo diferente. En ese caso, el administrador debe elegir su destino en **Apariencia → Categorías → Contenido → Nombre y enlace → Página del catálogo**. No se infiere una categoría a partir de la fotografía.
+
+## Revisión estática
+
+La comprobación examinó 320 archivos fuente, sin errores de análisis, y 62 referencias internas literales de navegación; todas coinciden con rutas declaradas mediante el enrutador de la aplicación. Se excluyeron imágenes, API, rutas administrativas y valores de color. Las cinco referencias predeterminadas de Categorías ahora se calculan desde el registro compartido y se comprueban mediante pruebas de componente, por separado del recuento de literales.
 
 Las rutas informativas del footer clásico y editorial tienen destino: historia, sede, contacto, envíos, cambios y devoluciones, preguntas frecuentes, privacidad y condiciones. Sus alias conservan el destino existente. Las opciones de atención al consumidor cuentan con sus rutas declaradas.
 
-El destino genérico `/categorias`, utilizado por tarjetas nuevas o enlaces inválidos, se resolvía a una página inexistente. Ahora las tarjetas nuevas utilizan `/#categorias`; el enlace genérico anterior y las entradas no válidas también regresan a esa sección de Inicio. Los enlaces válidos configurados y las imágenes de las tarjetas se conservan.
+El destino genérico anterior `/categorias` y las entradas no válidas regresan a `/#categorias`. Las tarjetas nuevas utilizan también ese anclaje hasta que el administrador elige una página específica.
 
-## Enlaces antiguos de la plantilla
+## Validación
 
-| Texto predeterminado | Destino sin ruta | Origen |
-| --- | --- | --- |
-| 0–12 meses | `/categoria/bebe` | `categoriasSectionHelpers.js`, tarjeta `cat_3` |
-| 2–8 años | `/categoria/2-8` | `categoriasSectionHelpers.js`, tarjeta `cat_4` |
-| 9–12 años | `/categoria/9-12` | `categoriasSectionHelpers.js`, tarjeta `cat_5` |
+- 171 pruebas de interfaz en 17 archivos: catálogos, consultas, tarjetas, editor, administración, carga de imágenes, destinos y sección de categorías.
+- Las pruebas cubren las cinco rutas predeterminadas, las cuatro combinaciones heredadas conocidas, los datos de imagen y encuadre, la conservación de enlaces propios y el caso de una categoría por edad sin equivalencia.
+- Compilación de producción de Vite correcta y diferencias sin errores de formato.
 
-Estas referencias proceden de valores predeterminados anteriores. No demuestran que la instalación del usuario siga utilizándolas: sus tarjetas pueden tener otro nombre, fotografía y enlace guardados. Los destinos de edad requieren su selección correspondiente; no son equivalentes a Bautizos, Vestidos, Jeans o Calzado.
+La prueba Chromium `frontend/e2e/categoryNavigation.e2e.js` completó 19 controles con respuestas controladas:
 
-Para una tarjeta que ahora represente otra categoría, abrir **Apariencia → Categorías → Contenido → Nombre y enlace**, elegir la tarjeta, seleccionar su **Página del catálogo** y guardar. La comprobación posterior debe hacerse pulsando esa tarjeta en la página pública. Si el negocio necesita conservar los catálogos por edades, habrá que definir sus páginas y selección de productos por separado.
+- Inicio sin desbordamiento horizontal a 1536, 1024, 768, 390 y 320 px.
+- Clic real en las cinco tarjetas a 1536 y 390 px, título y producto del catálogo correspondiente, y regreso con Atrás a la posición anterior.
+- Apertura y cierre con Escape de los filtros móviles.
+- Acceso a Novedades desde el menú de escritorio y el menú móvil, consulta sin categoría impuesta y orden por fecha.
+- Enlaces esperados del footer en escritorio y apertura de cada grupo de navegación móvil.
+- Ningún error de ejecución capturado ni solicitudes de escritura a la API.
 
-## Alcance y cierre
+El montaje utiliza los componentes reales de encabezado, categorías, páginas de catálogo, footer, restauración de desplazamiento y parallax, con el mismo modo de renderizado estándar de `index.html`. Sustituye las respuestas de API y los contextos de carrito y favoritos. No verifica operaciones reales de compra ni cargas externas. Se ejecuta desde `frontend` con `node e2e/categoryNavigation.e2e.js`; admite `PLAYWRIGHT_EXECUTABLE_PATH` para un Chromium ya instalado y guarda resultados y capturas en `/tmp/category-navigation-e2e` o en `CATEGORY_NAVIGATION_ARTIFACTS`.
 
-La revisión comprueba fuentes y valores predeterminados. No accede a la configuración guardada en la instalación local del usuario, a su inventario ni a cuentas de redes sociales. Los enlaces a productos, pedidos y páginas creadas por el administrador dependen de los registros reales. Los anclajes dependen de que su sección esté visible.
+## Alcance
 
-El cierre de todos los enlaces queda pendiente de comprobar los destinos guardados de esas tarjetas en la instalación del usuario. Las páginas de las categorías ya creadas y Novedades están disponibles para asignarlas desde el panel.
+La revisión comprueba el código, los valores predeterminados y respuestas controladas. No accede a la configuración guardada en la instalación local del usuario, a su inventario ni a cuentas de redes sociales. Los enlaces a productos, pedidos y páginas creadas por el administrador dependen de los registros reales. Los anclajes dependen de que su sección esté visible.
+
+El código y la plantilla quedan sin destinos internos sin ruta dentro de las referencias examinadas. Esto no certifica los enlaces personalizados guardados en otra instalación, sus procesos de pago, su operación comercial ni el cumplimiento legal completo.

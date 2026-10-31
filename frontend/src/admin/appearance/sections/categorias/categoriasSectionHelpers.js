@@ -1,5 +1,14 @@
 import { CATEGORIAS_FAN_CONFIG, CATEGORIAS_FAN_STYLE, normalizeCategoriasFanConfig, normalizeCategoriasFanStyle, normalizeCategoryPhoto } from './categoriasFanHelpers';
+import CATALOG_PAGES from '../../../../../../shared/catalogPages.json';
 // src/admin/appearance/sections/categorias/categoriasSectionHelpers.js
+
+const catalogDestination = (slug) => {
+  const page = CATALOG_PAGES.find(item => item.slug === slug);
+  return { title: page.name, href: page.publicPath };
+};
+const obsoleteCategoryPaths = new Set(['/categoria/bebe', '/categoria/2-8', '/categoria/9-12']);
+const destinationName = (value) => String(value || '').normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es');
 
 export const CATEGORIAS_SECTION_ID = "categorias";
 
@@ -20,61 +29,56 @@ export const CATEGORIAS_SECTION_DEFAULTS = {
       {
         id: "cat_1",
         image: "/SeccionCategoria/complementos.jpg",
-        title: "Complementos",
+        ...catalogDestination("complementos"),
         subtitle: "",
         review: "",
         badge: "",
         buttonImg: "/SeccionCategoria/Complementos.png",
         buttonText: "Ver más",
-        href: "/complementos",
         enabled: true,
       },
       {
         id: "cat_2",
         image: "/SeccionCategoria/lo-nuevo.jpg",
-        title: "Lo nuevo",
+        ...catalogDestination("bautizos"),
         subtitle: "",
         review: "",
         badge: "",
         buttonImg: "/SeccionCategoria/lo-nuevo.png",
         buttonText: "Ver más",
-        href: "/lo-nuevo",
         enabled: true,
       },
       {
         id: "cat_3",
         image: "/SeccionCategoria/bebe.jpg",
-        title: "0-12 meses",
+        ...catalogDestination("vestidos"),
         subtitle: "",
         review: "",
         badge: "",
         buttonImg: "/SeccionCategoria/0-12mese.png",
         buttonText: "Ver más",
-        href: "/categoria/bebe",
         enabled: true,
       },
       {
         id: "cat_4",
         image: "/SeccionCategoria/niña2-8.jpg",
-        title: "2-8 Años",
+        ...catalogDestination("jeans"),
         subtitle: "",
         review: "",
         badge: "",
         buttonImg: "/SeccionCategoria/2-8anos.png",
         buttonText: "Ver más",
-        href: "/categoria/2-8",
         enabled: true,
       },
       {
         id: "cat_5",
         image: "/SeccionCategoria/niña9-12.jpg",
-        title: "9-12 Años",
+        ...catalogDestination("calzado"),
         subtitle: "",
         review: "",
         badge: "",
         buttonImg: "/SeccionCategoria/9-12anos.png",
         buttonText: "Ver más",
-        href: "/categoria/9-12",
         enabled: true,
       },
     ],
@@ -193,17 +197,24 @@ function normalizeSlide(raw = {}, index = 0) {
       enabled: true,
     };
 
+  const title = asString(raw?.title, base.title);
+  const href = asString(raw?.href, base.href);
+  const inheritedDestination = obsoleteCategoryPaths.has(href.trim()) ||
+    (raw?.id === 'cat_2' && href.trim() === '/lo-nuevo');
+  const catalog = inheritedDestination && CATALOG_PAGES.find(page =>
+    destinationName(page.name) === destinationName(title));
+
   return {
     ...normalizeCategoryPhoto(raw),
     id: asString(raw?.id, base.id).trim() || base.id,
     image: asString(raw?.image, base.image).trim(),
-    title: asString(raw?.title, base.title),
+    title,
     subtitle: asString(raw?.subtitle, base.subtitle),
     review: asString(raw?.review, base.review),
     badge: asString(raw?.badge, base.badge),
     buttonImg: asString(raw?.buttonImg, base.buttonImg).trim(),
     buttonText: asString(raw?.buttonText, base.buttonText),
-    href: asString(raw?.href, base.href),
+    href: catalog ? catalog.publicPath : href,
     enabled: asBool(raw?.enabled, base.enabled),
   };
 }

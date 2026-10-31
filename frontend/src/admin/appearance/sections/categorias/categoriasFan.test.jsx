@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { matchRoutes } from 'react-router-dom';
+import CATALOG_PAGES from '../../../../../../shared/catalogPages.json';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CategoriasSection from '../../../../components/CategoriasSection';
 import CategoriaArtwork from '../../../../components/CategoriaArtwork';
 import CategoriasSectionUI from './CategoriasSectionUI';
 import { CATEGORIAS_SECTION_DEFAULTS, normalizeCategoriasSection } from './categoriasSectionHelpers';
-import { categoryPhotoSource, normalizeCategoriasFanStyle } from './categoriasFanHelpers';
+import { categoryArtwork, categoryPhotoSource, normalizeCategoriasFanStyle } from './categoriasFanHelpers';
 import StorefrontSectionPreview from '../ui/StorefrontSectionPreview';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -30,6 +32,39 @@ function design(group) {
 }
 
 describe('Categorías: Abanico vivo', () => {
+  it('las cinco tarjetas predeterminadas abren sus catálogos registrados', () => {
+    render(<CategoriasSection theme={{ sections: [] }} />);
+    for (const slug of ['complementos', 'bautizos', 'vestidos', 'jeans', 'calzado']) {
+      const page = CATALOG_PAGES.find(item => item.slug === slug);
+      const href = screen.getByRole('link', { name: `Explorar ${page.name}` }).getAttribute('href');
+      expect(href).toBe(page.publicPath);
+      expect(matchRoutes(CATALOG_PAGES.map(item => ({ path: item.publicPath })), href)?.at(-1)?.route.path).toBe(page.publicPath);
+    }
+  });
+  it.each([
+    ['cat_2', 'Bautizos', '/lo-nuevo', '/categoria/bautizos'],
+    ['cat_3', 'Vestidos', '/categoria/bebe', '/categoria/vestidos'],
+    ['cat_4', 'Jeans', '/categoria/2-8', '/categoria/jeans'],
+    ['cat_5', 'Calzado', '/categoria/9-12', '/categoria/calzado'],
+  ])('corrige el destino heredado de %s conservando el contenido de la tarjeta', (id, title, href, expected) => {
+    const original = { ...records[0], id, title, href, mobileImage: '/propia-movil.webp', imageScale: 1.3 };
+    const normalized = normalizeCategoriasSection({ config: { slides: [original] } }).config.slides[0];
+    expect(normalized).toMatchObject({ ...original, href: expected });
+    expect(original.href).toBe(href);
+    render(<CategoriasSection theme={makeTheme([original])} />);
+    expect(screen.getByRole('link', { name: `Explorar ${title}` })).toHaveAttribute('href', expected);
+  });
+  it('conserva destinos propios y no atribuye una categoría desconocida a otro catálogo', () => {
+    const source = [
+      { ...records[0], title: 'Vestidos', href: '/pagina/campana' },
+      { ...records[1], title: 'Una selección propia', href: 'https://example.test/coleccion' },
+      { ...records[2], title: '0-12 meses', href: '/categoria/bebe' },
+    ];
+    expect(normalizeCategoriasSection({ config: { slides: source } }).config.slides.map(item => item.href)).toEqual(source.map(item => item.href));
+  });
+  it('mantiene las fotografías de respaldo de las tarjetas predeterminadas', () => {
+    expect(CATEGORIAS_SECTION_DEFAULTS.config.slides.map(item => categoryArtwork(item).position)).toEqual(['100%', '0%', '33.333333%', '66.666667%', '50%']);
+  });
   it('mantiene todas las categorías y enlaces visibles sin temporizador ni carrusel', () => {
     const interval = vi.spyOn(globalThis, 'setInterval');
     const many = Array.from({ length: 8 }, (_, i) => ({ id: `c${i}`, title: `Colección ${i}`, href: `/coleccion/${i}` }));
