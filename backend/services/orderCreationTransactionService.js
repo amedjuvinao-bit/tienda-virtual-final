@@ -390,6 +390,9 @@ async function createOrderInTransaction({
     base.consumerContract = acceptConsumerOffer(quote.consumerOffer, rawBody.consumerAcceptance);
     base.status = base.status || 'pending';
 
+    const newsletterIntent = normalizeNewsletterIntent(cleaned.customer, cleaned.sessionId, { settings });
+    if (newsletterIntent?.proof) base.customer.newsletterConsent = newsletterIntent.proof;
+
     const customerResolution = await resolveCustomerForOrder(base, {
       session,
       source: orderSource,
@@ -475,10 +478,7 @@ async function createOrderInTransaction({
       inventoryReservation,
       fullyPaidWithStoreCredit:
         storeCreditResult.fullyPaidWithStoreCredit,
-      newsletterIntent: normalizeNewsletterIntent(
-        cleaned.customer,
-        cleaned.sessionId
-      ),
+      newsletterIntent: newsletterIntent ? { ...newsletterIntent, customerId: created.customer?.customerId } : null,
     };
   });
 

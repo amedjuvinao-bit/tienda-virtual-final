@@ -1,4 +1,5 @@
 import { useId } from "react";
+import CheckoutNewsletterChoice from "./CheckoutNewsletterChoice";
 import { CheckoutCard } from "./CheckoutMaterial";
 export default function CheckoutContactSection({ state }) {
   const { checkoutConfig: c } = state,
@@ -33,16 +34,7 @@ export default function CheckoutContactSection({ state }) {
         {field("customerPhone", c.phoneLabelText, "tel", "tel")}
         {field("customerId", c.documentLabelText, "off")}
       </div>
-      {c.showNewsletterCheckbox && (
-        <label className="co-newsletter">
-          <input
-            type="checkbox"
-            checked={state.wantsNewsletter}
-            onChange={(event) => state.setWantsNewsletter(event.target.checked)}
-          />
-          {c.newsletterText}
-        </label>
-      )}
+      {c.showNewsletterCheckbox && <CheckoutNewsletterChoice state={state}/>}
     </CheckoutCard>
   );
 }

@@ -293,7 +293,8 @@ module.exports = function validateOrderPayload(body) {
     department: trimTo(c.department, MAX_LEN.department) || undefined,
     departmentCode: trimTo(c.departmentCode || c.department, MAX_LEN.departmentCode) || undefined,
     deliveryType,
-    wantsNewsletter: !!c.wantsNewsletter,
+    wantsNewsletter: c.wantsNewsletter === true,
+    newsletterConsentVersion: trimTo(c.newsletterConsentVersion, 80),
     isFinalConsumer: c.isFinalConsumer === true,
   };
 

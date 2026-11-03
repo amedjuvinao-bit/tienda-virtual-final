@@ -99,6 +99,15 @@ describe('estados críticos de Checkout', () => {
     ).toContain('No fue posible verificar el total final con el servidor.');
   });
 
+  it('envía la versión comercial solo cuando el usuario solicita novedades', () => {
+    const {state,derived}=validFixture();
+    const build=()=>buildOrderDraft({state,derived,sessionId:'session',finalItems:[],finalSummary:{subtotal:100000}});
+    state.newsletterConsentVersion='newsletter-v1';state.wantsNewsletter=false;
+    expect(build().customer.newsletterConsentVersion).toBeUndefined();
+    state.wantsNewsletter=true;
+    expect(build().customer.newsletterConsentVersion).toBe('newsletter-v1');
+  });
+
   it('rechaza aceptación de otra oferta y conserva su huella al crear el pedido', () => {
     const { state, derived } = validFixture();
     expect(validateCheckoutState({ state: { ...state, authorizedPrivacy: 'anterior' }, derived })).toContain('Revisa y acepta las condiciones de esta compra y autoriza el tratamiento informado de tus datos.');

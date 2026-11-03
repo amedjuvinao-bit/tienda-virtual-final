@@ -22,6 +22,7 @@ export default function useCheckoutState() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [sameAddress, setSameAddress] = useState(true);
   const [wantsNewsletter, setWantsNewsletter] = useState(false);
+  const [newsletterConsentVersion, setNewsletterConsentVersion] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showEnvioModal, setShowEnvioModal] = useState(false);
   const [showPrivacidadModal, setShowPrivacidadModal] = useState(false);
@@ -99,6 +100,8 @@ export default function useCheckoutState() {
     setSameAddress,
     wantsNewsletter,
     setWantsNewsletter,
+    newsletterConsentVersion,
+    setNewsletterConsentVersion,
     showModal,
     setShowModal,
     showEnvioModal,

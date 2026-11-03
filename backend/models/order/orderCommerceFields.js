@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const newsletterConsentProof = require('../newsletterConsentProof');
 
 const {
   OrderItemSchema,
@@ -98,6 +99,7 @@ function createOrderCommerceFields() {
     departmentCode: String,
     deliveryType: String,
     wantsNewsletter: Boolean,
+    newsletterConsent: { type: newsletterConsentProof, default: undefined },
     isFinalConsumer: Boolean,
   },
 

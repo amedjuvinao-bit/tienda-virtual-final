@@ -8,6 +8,10 @@ La tienda tiene mecanismos de autorización y constancia en compras y PQR, segur
 
 Esta etapa contiene únicamente el diagnóstico. No cambia componentes, configuraciones guardadas, pedidos, inventario, autorizaciones históricas ni plazos de conservación. No introduce un banner de aceptación sin controles efectivos.
 
+## Avance: suscripciones y retiro
+
+La implementación de L-01, L-02 y L-03 está documentada en [Suscripciones y retiro](suscripciones-consentimiento.md): formulario compartido, autorización versionada, confirmación de correo, retiro verificable, constancia duradera y conexión específica del canal email con Clientes y Checkout. Se conserva el diagnóstico de la versión examinada como referencia del estado anterior. La comprobación de SMTP y base de datos en la instalación sigue siendo necesaria; L-04 a L-07 no se consideran resueltos por este cambio.
+
 ## Método y alcance
 
 Se examinaron mediante búsqueda estática 1485 archivos `.js`, `.jsx`, `.ts`, `.tsx`, `.html` y `.css` de `frontend/src`, `backend` y la entrada `frontend/index.html`, excluyendo dependencias, scripts y archivos de pruebas. Se identificaron 28 archivos con referencias a almacenamiento del navegador o emisión de cookies; se revisaron sus consumidores y los servicios relacionados. Los nombres de claves heredadas se contrastaron con las rutas de migración y limpieza.

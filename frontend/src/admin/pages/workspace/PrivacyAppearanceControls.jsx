@@ -236,6 +236,7 @@ export default function PrivacyAppearanceControls({
             {field("showRights", "Mostrar guía de derechos", "toggle")}
             {field("rightsEyebrow", "Antetítulo de derechos")}
             {field("rightsTitle", "Título de derechos")}
+            {field("communicationsTitle", "Título de comunicaciones comerciales")}
             {itemControls("rights")}
           </>,
           "Los elementos explican los derechos; las solicitudes se gestionan mediante el canal existente. Evita prometer supresión inmediata o resultados automáticos.",

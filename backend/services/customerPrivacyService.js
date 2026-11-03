@@ -263,6 +263,7 @@ function protectCustomerData(customer = {}, canViewSensitive = false) {
         }
       : {},
     notes: customer.notes ? '[NOTA INTERNA PROTEGIDA]' : '',
+    emailMarketingConsent: customer.emailMarketingConsent ? protectCustomerData({marketingConsent:customer.emailMarketingConsent}, false).marketingConsent : undefined,
     marketingConsent: customer.marketingConsent
       ? {
           ...customer.marketingConsent,

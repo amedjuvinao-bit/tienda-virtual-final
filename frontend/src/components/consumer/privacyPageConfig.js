@@ -49,6 +49,7 @@ export const PRIVACY_RIGHTS = [
 export const PRIVACY_TEXTS = {
   rightsEyebrow: "Tu información",
   rightsTitle: "Conoce tus derechos",
+  communicationsTitle: "Comunicaciones comerciales",
   rightsText: "Ejercer mis derechos",
   rightsHint: "Presenta tu solicitud por Peticiones y reclamos.",
   contactText: "Contactar tienda",

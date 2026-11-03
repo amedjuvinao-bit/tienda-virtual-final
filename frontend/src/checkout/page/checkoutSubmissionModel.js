@@ -190,6 +190,7 @@ export function buildOrderDraft({
     departmentCode: state.selectedRegion || undefined,
     deliveryType: state.deliveryType,
     wantsNewsletter: state.wantsNewsletter,
+    ...(state.wantsNewsletter ? { newsletterConsentVersion: state.newsletterConsentVersion } : {}),
   };
   const resolved = derived.resolvedDianCustomer;
   const billing = {

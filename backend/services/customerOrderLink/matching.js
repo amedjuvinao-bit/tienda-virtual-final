@@ -91,10 +91,7 @@ function fillMissingCustomerFields(customer, payload = {}) {
     }
   }
 
-  if (payload.acceptsMarketing === true && customer.acceptsMarketing !== true) {
-    customer.acceptsMarketing = true;
-    changed = true;
-  }
+  // An order supplies contact data, never a new marketing authorization.
 
   const fiscalFields = [
     'personType',

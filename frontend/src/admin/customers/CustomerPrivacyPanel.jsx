@@ -55,6 +55,7 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
     source: 'admin',
     proofReference: '',
     note: '',
+    emailMarketing: false,
   });
   const [confirmation, setConfirmation] = useState('');
 
@@ -94,9 +95,10 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
       setSaving(true);
       setError('');
       setSuccess('');
-      const response = await updateAdminCustomerConsent(customer.id, consent);
+      const { emailMarketing, ...decision } = consent;
+      const response = await updateAdminCustomerConsent(customer.id, { ...decision, ...(emailMarketing ? { emailMarketing: true } : {}) });
       setSuccess('Consentimiento registrado con trazabilidad.');
-      setConsent((current) => ({ ...current, proofReference: '', note: '' }));
+      setConsent((current) => ({ ...current, proofReference: '', note: '', emailMarketing: false }));
       if (response?.customer) onUpdated?.(response.customer);
       await load();
     } catch (err) {
@@ -142,6 +144,8 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
   const retention = privacy.retention || {};
   const events = Array.isArray(auditData?.events) ? auditData.events : [];
   const currentConsent = privacyData?.consent || customer?.marketingConsent || {};
+  const emailConsent = privacyData?.emailConsent || customer?.emailMarketingConsent || {};
+  const emailProof = privacyData?.emailEvidence?.consent;
 
   return (
     <div className="space-y-4">
@@ -170,6 +174,9 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
             <input value={consent.proofReference} onChange={(event) => setConsent((current) => ({ ...current, proofReference: event.target.value }))} placeholder="Referencia de evidencia" className="rounded-2xl border px-4 py-3 text-sm font-bold" />
             <input value={consent.note} onChange={(event) => setConsent((current) => ({ ...current, note: event.target.value }))} placeholder="Nota de soporte" className="rounded-2xl border px-4 py-3 text-sm font-bold" />
           </div>
+          {consent.status === 'granted' && <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={consent.emailMarketing} onChange={event => setConsent(current => ({...current, emailMarketing:event.target.checked}))}/><span>La evidencia incluye autorización para novedades y ofertas por correo electrónico.</span></label>}
+          <p className="mt-3 text-sm">Novedades por correo: {emailConsent.status === 'granted' ? 'Autorizadas' : emailConsent.status === 'withdrawn' ? 'Retiradas' : 'Sin autorización comprobada'}. Última decisión: {formatDate(emailConsent.updatedAt)}.</p>
+          {emailProof && <details className="mt-3 text-sm"><summary>Ver constancia de comunicaciones por correo</summary><p className="mt-2">{emailProof.text}</p><p>Registrada: {formatDate(emailProof.recordedAt)}. Método: {emailProof.method === 'email_code' ? 'Confirmación mediante código enviado al correo' : 'Referencia de evidencia aportada por administración'}.</p><p className="break-all">Referencia: {emailProof.proofReference}</p>{emailProof.privacyText && <details className="mt-2"><summary>Información de privacidad comunicada</summary><p>{emailProof.privacyText}</p></details>}</details>}
           <button type="button" onClick={saveConsent} disabled={saving || (consent.status === 'granted' && consent.proofReference.trim().length < 3)} className="mt-3 inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black text-white disabled:opacity-50" style={{ background: 'var(--admin-primary)' }}><BadgeCheck className="h-4 w-4" /> Registrar consentimiento</button>
         </section>
       ) : null}

@@ -1,3 +1,4 @@
+import NewsletterForm from '../newsletter/NewsletterForm';
 // src/components/FooterSection.jsx
 import React, { useMemo, useState } from "react";
 import ConsumerClaimsLink from "../consumer/ConsumerClaimsLink";
@@ -268,28 +269,8 @@ export default function FooterSection({ theme, inheritBackground = false, previe
                 {footer.subscribeText}
               </h3>
 
-              <form className="mx-auto mt-6 w-full max-w-[34rem] md:mx-0">
-                <div className="flex w-full items-center overflow-hidden rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-                  <input
-                    type="email"
-                    placeholder={footer.inputPlaceholder}
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-gray-700 outline-none placeholder:text-gray-400 sm:px-5 sm:text-[15px]"
-                  />
-                  <button
-                    type="submit"
-                    className="shrink-0 rounded-full px-4 font-medium transition-colors"
-                    style={{
-                      backgroundColor: footer.buttonColor,
-                      color: footer.buttonTextColor,
-                      width: `clamp(${subscribeButtonMobileWidth}px, 34vw, ${footer.subscribeButtonWidthPx}px)`,
-                      minHeight: `${footer.subscribeButtonHeightPx}px`,
-                      fontSize: `clamp(13px, 3.2vw, ${footer.subscribeButtonFontSizePx}px)`,
-                    }}
-                  >
-                    {footer.buttonText}
-                  </button>
-                </div>
-              </form>
+              <div className="mx-auto mt-6 w-full max-w-[34rem] md:mx-0" style={{'--newsletter-button-width':`clamp(${subscribeButtonMobileWidth}px, 34vw, ${footer.subscribeButtonWidthPx}px)`,'--newsletter-button-font-size':`${footer.subscribeButtonFontSizePx}px`,'--fe-button-height':`${footer.subscribeButtonHeightPx}px`,'--fe-button':footer.buttonColor,'--fe-button-ink':footer.buttonTextColor}}><NewsletterForm preview={preview} successMessage={theme?.footer?.editorial?.successMessage} errorMessage={theme?.footer?.editorial?.errorMessage} label={(typeof footer.buttonText === 'string' ? footer.buttonText : 'Suscribirme').replace(/\s*[➔→]\s*$/u,'') || 'Suscribirme'} placeholder={footer.inputPlaceholder}/></div>
+
 
               <div
                 className="mt-5 flex flex-wrap items-center justify-center md:justify-start"

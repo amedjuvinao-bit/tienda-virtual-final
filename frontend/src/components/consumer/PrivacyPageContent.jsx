@@ -1,4 +1,5 @@
 import { useState } from "react";
+import NewsletterForm from "../newsletter/NewsletterForm";
 import {
   ArrowRight,
   ChevronDown,
@@ -160,6 +161,10 @@ export default function PrivacyPageContent({
           />
         )}
       </Glass>
+          <Glass config={config} className="privacy-newsletter" id="comunicaciones-comerciales">
+            <h2>{c.communicationsTitle || "Comunicaciones comerciales"}</h2>
+            <NewsletterForm preview={preview} management initialMode="withdraw"/>
+          </Glass>
       {error ? (
         <p role="alert">
           {error}{" "}

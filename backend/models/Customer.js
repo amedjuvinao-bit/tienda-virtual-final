@@ -171,6 +171,7 @@ const CustomerSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
 
     acceptsMarketing: { type: Boolean, default: false },
+    emailMarketingConsent: { type: CustomerMarketingConsentSchema, default: () => ({}) },
     marketingConsent: {
       type: CustomerMarketingConsentSchema,
       default: () => ({}),

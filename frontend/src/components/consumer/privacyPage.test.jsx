@@ -224,7 +224,7 @@ it("conecta los derechos con el tipo existente de PQR sin preautorizar ni crear 
     screen.getByRole("link", { name: "Ejercer mis derechos" }),
   ).toHaveAttribute("href", "/pqr?tipo=privacy_query");
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", {name:"Correo electrónico"})).toHaveValue("");
   fireEvent.click(screen.getByText("Responsable y canales de contacto"));
   expect(screen.getByText(/Negocio de prueba/)).toBeVisible();
   expect(

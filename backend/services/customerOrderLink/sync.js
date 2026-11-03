@@ -161,7 +161,7 @@ async function syncCustomerMasterFromOrder(
     writableFields.forEach((field) => {
       customer[field] = payload[field] || '';
     });
-    customer.acceptsMarketing = payload.acceptsMarketing === true;
+    // Preserve the current, independently recorded marketing decision.
     customer.fiscalProfile = payload.fiscalProfile || customer.fiscalProfile;
     if (!customer.defaultBranch && payload.defaultBranch) {
       customer.defaultBranch = payload.defaultBranch;

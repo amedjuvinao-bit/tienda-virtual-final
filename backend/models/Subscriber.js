@@ -1,6 +1,15 @@
 // backend/models/Subscriber.js
 const mongoose = require('mongoose');
 
+const proofSchema = require('./newsletterConsentProof');
+const {EMAIL_INDEX_OPTIONS} = require('../services/newsletter/indexes');
+const verificationSchema = new mongoose.Schema({
+  nonce: String, hash: String, expiresAt: Date, sentAt: Date,
+  attempts: { type: Number, default: 0 },
+  intent: { type: String, enum: ['subscribe', 'withdraw'] },
+  proof: proofSchema,
+}, { _id: false });
+
 const SubscriberSchema = new mongoose.Schema(
   {
     email: {
@@ -16,6 +25,11 @@ const SubscriberSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Legacy records remain unknown; a historical email is not proof of consent.
+    status: { type: String, enum: ['unknown', 'granted', 'withdrawn'], default: 'unknown', index: true },
+    consent: { type: proofSchema, default: undefined },
+    consentHistory: { type: [proofSchema], default: [] },
+    verification: { type: verificationSchema, default: undefined, select: false },
     origen: {
       type: String,
       default: 'checkout',
@@ -49,12 +63,12 @@ SubscriberSchema.path('phone').validate(function (_v) {
 // - Búsquedas rápidas por sessionId
 SubscriberSchema.index(
   { email: 1 },
-  { unique: true, partialFilterExpression: { email: { $type: 'string', $ne: '' } } }
+  EMAIL_INDEX_OPTIONS
 );
 
 SubscriberSchema.index(
   { phone: 1 },
-  { unique: true, partialFilterExpression: { phone: { $type: 'string', $ne: '' } } }
+  { name: 'subscriber_phone_nonempty_unique_v1', unique: true, partialFilterExpression: { phone: { $type: 'string', $gt: '' } } }
 );
 
 SubscriberSchema.index({ sessionId: 1 });
