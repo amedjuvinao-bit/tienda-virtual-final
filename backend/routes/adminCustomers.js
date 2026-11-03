@@ -1026,6 +1026,8 @@ async function assessCustomerRetention(req, customer) {
 
 router.use(requireAdmin);
 
+router.use('/subscriptions', require('./adminNewsletterSubscribers'));
+
 router.get('/segments/saved', requirePermission('customers:view'), async (req, res) => {
   try {
     const admin = await loadCurrentAdminForSegments(req);
@@ -1209,6 +1211,8 @@ router.get('/', requirePermission('customers:view'), async (req, res) => {
         branchIds: access.branchIds,
         sensitive: canViewSensitive,
         masked: !canViewSensitive,
+        subscriptions: canViewSensitive && canAdminSeeAllBranches(req)
+          && await hasCustomerPermission(req, 'customers:audit'),
       },
       filters: {
         segment: segment || 'all',

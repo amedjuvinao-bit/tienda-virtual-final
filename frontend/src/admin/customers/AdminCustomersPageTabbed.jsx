@@ -55,6 +55,7 @@ import {
 import CustomerCrmWorkspace from './CustomerCrmWorkspace';
 import CustomerSavedSegments from './CustomerSavedSegments';
 import CustomerPrivacyPanel from './CustomerPrivacyPanel';
+import NewsletterSubscribersPanel from './NewsletterSubscribersPanel';
 import CustomerFollowUpResultModal from './CustomerFollowUpResultModal';
 import './customerAdminExperience.css';
 
@@ -932,6 +933,7 @@ export default function AdminCustomersPageTabbed() {
   const [crmPriorityFilter, setCrmPriorityFilterState] = useState('all');
   const [crmOwnerFilter, setCrmOwnerFilterState] = useState('all');
   const [workspaceView, setWorkspaceView] = useState('directory');
+  const [canViewSubscriptions, setCanViewSubscriptions] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1007,6 +1009,7 @@ export default function AdminCustomersPageTabbed() {
         limit: pageLimit,
       });
       setCustomers(Array.isArray(data?.customers) ? data.customers : []);
+      setCanViewSubscriptions(data?.access?.subscriptions === true);
       setSummary(data?.summary || null);
       setTotal(Number(data?.total || 0));
       setPage(Number(data?.page || requestedPage));
@@ -1014,6 +1017,7 @@ export default function AdminCustomersPageTabbed() {
     } catch (err) {
       setError(err?.message || 'No fue posible cargar los clientes.');
       setCustomers([]);
+      setCanViewSubscriptions(false);
       setSummary(null);
       setTotal(0);
       setPages(1);
@@ -1134,14 +1138,14 @@ export default function AdminCustomersPageTabbed() {
             <span><strong>3</strong> Acompaña</span>
           </div>
         </div>
-        <div className="customer-admin-hero__actions">
+        {workspaceView !== 'subscriptions' ? <div className="customer-admin-hero__actions">
             <button type="button" onClick={() => loadCustomers(page, searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', color: 'var(--admin-primary)' }}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar
             </button>
             <button type="button" onClick={() => { setWorkspaceView('directory'); setShowForm((prev) => !prev); }} className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-black text-white transition hover:brightness-95" style={{ background: 'var(--admin-primary)' }}>
               <Plus className="h-4 w-4" /> Nuevo cliente
             </button>
-        </div>
+        </div> : null}
         {workspaceView === 'directory' ? (
           <section className="customer-admin-hero__metrics customer-admin-surface overflow-hidden rounded-xl border" aria-label="Indicadores de clientes">
             <div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
@@ -1175,6 +1179,9 @@ export default function AdminCustomersPageTabbed() {
           <button type="button" onClick={() => setWorkspaceView('crm')} className={`customer-admin-view-tab${workspaceView === 'crm' ? ' is-active' : ''}`}>
             <BriefcaseBusiness className="h-4 w-4" /> Seguimientos CRM
           </button>
+          {canViewSubscriptions ? <button type="button" onClick={() => setWorkspaceView('subscriptions')} className={`customer-admin-view-tab${workspaceView === 'subscriptions' ? ' is-active' : ''}`}>
+            <Mail className="h-4 w-4" /> Suscriptores
+          </button> : null}
         </nav>
       </Card>
 
@@ -1182,6 +1189,8 @@ export default function AdminCustomersPageTabbed() {
       {success ? <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
 
       {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
+
+      {workspaceView === 'subscriptions' && canViewSubscriptions ? <NewsletterSubscribersPanel initialSearch={searchTerm} /> : null}
 
       {workspaceView === 'directory' ? (
         <>

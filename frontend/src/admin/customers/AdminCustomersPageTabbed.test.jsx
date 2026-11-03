@@ -2,6 +2,10 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../api/adminSubscriptionsApi', () => ({
+  getAdminSubscriptions: vi.fn(), getAdminSubscription: vi.fn(),
+}));
+
 vi.mock('../api/adminCustomersApi', () => ({
   createAdminCustomer: vi.fn(),
   createAdminCustomerFollowUp: vi.fn(),
@@ -30,6 +34,28 @@ import {
   getAdminCustomers,
 } from '../api/adminCustomersApi';
 import AdminCustomersPageTabbed from './AdminCustomersPageTabbed';
+import { getAdminSubscriptions } from '../api/adminSubscriptionsApi';
+
+it('permite consultar suscriptores desde Clientes aunque el directorio no tenga ese correo', async () => {
+  getAdminCustomers.mockResolvedValue({ ...responseForPage(1), customers: [], total: 0,
+    access: { subscriptions: true } });
+  getAdminSubscriptions.mockResolvedValue({
+    subscribers: [{ id: 'subscriber-1', email: 'solo-suscriptor@example.com', status: 'withdrawn' }],
+    page: 1, pages: 1, total: 1,
+  });
+  render(<AdminCustomersPageTabbed />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Suscriptores' }));
+  expect(await screen.findByText('solo-suscriptor@example.com')).toBeInTheDocument();
+  expect(screen.getByText('Retiradas', { selector: 'span' })).toBeInTheDocument();
+  expect(getAdminCustomer).not.toHaveBeenCalled();
+});
+
+it('mantiene oculto el acceso a suscripciones cuando el servidor no lo autoriza', async () => {
+  render(<AdminCustomersPageTabbed />);
+  await screen.findByText('Cliente página 1');
+  expect(screen.queryByRole('button', { name: 'Suscriptores' })).not.toBeInTheDocument();
+  expect(getAdminSubscriptions).not.toHaveBeenCalled();
+});
 
 function responseForPage(page) {
   return {
@@ -64,6 +90,7 @@ afterEach(() => cleanup());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getAdminSubscriptions.mockResolvedValue({ subscribers: [], page: 1, pages: 1, total: 0 });
   getAdminCustomers.mockImplementation(({ page }) =>
     Promise.resolve(responseForPage(page))
   );

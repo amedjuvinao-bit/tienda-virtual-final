@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test:newsletter-consent": "node scripts/testNewsletterConsent.js",
+    "test:newsletter-admin": "node --test scripts/testAdminNewsletterSubscribers.cjs",
     "test:appearance-closure": "node scripts/testAppearanceStage1.js && node scripts/testAppearanceClosure.js",
     "start": "node index.js",
     "backup:free": "node scripts/backupAtlasFree.js",

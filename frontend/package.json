@@ -34,7 +34,7 @@
     "test:orders-keyboard": "vitest run src/admin/orders/components/OrderDetailModal.keyboard.test.js src/admin/orders/components/orderDetail/hooks/useOrderDetailResources.test.jsx",
     "test:orders-whatsapp-assisted": "vitest run src/admin/orders/components/orderDetail/OrderWhatsAppPreview.test.jsx",
     "test:orders-customer-connection": "vitest run src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.test.jsx",
-    "test:customers-module": "vitest run src/admin/api/adminCustomersApi.test.js src/admin/customers/AdminCustomersPageTabbed.test.jsx src/admin/customers/CustomerCrmWorkspace.test.jsx src/admin/customers/CustomerSavedSegments.test.jsx src/admin/customers/CustomerPrivacyPanel.test.jsx",
+    "test:customers-module": "vitest run src/admin/api/adminCustomersApi.test.js src/admin/api/adminSubscriptionsApi.test.js src/admin/customers/AdminCustomersPageTabbed.test.jsx src/admin/customers/CustomerCrmWorkspace.test.jsx src/admin/customers/CustomerSavedSegments.test.jsx src/admin/customers/CustomerPrivacyPanel.test.jsx src/admin/customers/NewsletterSubscribersPanel.test.jsx",
     "test:pos-level-plus-stage2": "vitest run src/admin/pos/posCheckoutModel.test.js src/admin/pos/PosCheckoutPanel.test.jsx",
     "test:pos-level-plus-stage4": "vitest run src/admin/pos/posShiftReportModel.test.js src/admin/pos/PosShiftReportPanel.test.jsx",
     "test:cash-level-plus-stage0": "vitest run src/admin/cash/CashSessionsPageReport.test.jsx",
