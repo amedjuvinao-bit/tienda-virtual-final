@@ -6,11 +6,9 @@ import {
   buildSafeCheckoutPageConfig,
   buildSafePaymentsConfig,
 } from './checkoutPageModel';
-import { loadWompiWidgetScript } from './checkoutWompi';
 
 export default function useCheckoutConfiguration(state) {
   const {
-    paymentsConfig,
     setCheckoutConfig,
     setCheckoutConfigLoading,
     setCheckoutPageData,
@@ -132,13 +130,5 @@ export default function useCheckoutConfiguration(state) {
     }
   }, []);
 
-  useEffect(() => {
-    if (
-      paymentsConfig.provider !== 'wompi' ||
-      paymentsConfig.active === false
-    ) {
-      return;
-    }
-    loadWompiWidgetScript().catch(() => {});
-  }, [paymentsConfig.provider, paymentsConfig.active]);
+  // The payment action in useWompiCheckout loads the widget when requested.
 }

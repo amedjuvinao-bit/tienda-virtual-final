@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import "./consumer.css";
 import { normalizeEditorialOptions } from "../footer/footerEditorialConfig";
 import useStorefrontBackdrop from "../useStorefrontBackdrop";
+import { openPrivacyPreferences } from '../../lib/privacyPreferences';
 export default function ConsumerLinks() {
   const location = useLocation();
   const backdrop = useStorefrontBackdrop(
@@ -38,6 +39,7 @@ export default function ConsumerLinks() {
           {label}
         </a>
       ))}
+      <button type="button" className="consumer-privacy-preferences" onClick={openPrivacyPreferences}>Cookies y preferencias</button>
       <a
         href="https://www.sic.gov.co/"
         target="_blank"

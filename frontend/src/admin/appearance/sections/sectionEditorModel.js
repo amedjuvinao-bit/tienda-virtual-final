@@ -4,24 +4,12 @@ import { normalizeComplementosSection } from "./complementos/complementosSection
 import { normalizeTrendingPresentation } from "../../../components/trendingPresentation";
 import { DEFAULT_STYLE, DEFAULT_TENDENCIA_CONFIG, clampNumber, normalizeTendenciaConfig } from "./ui/sectionHelpers";
 
-export const GOOGLE_FONTS_HREF =
-  "https://fonts.googleapis.com/css2?" +
-  [
-    "family=Inter:wght@300;400;500;600;700;800;900",
-    "family=Poppins:wght@300;400;500;600;700;800;900",
-    "family=Montserrat:wght@300;400;500;600;700;800;900",
-    "family=Playfair+Display:wght@400;500;600;700;800;900",
-    "family=DM+Serif+Display:ital@0;1",
-    "family=Cormorant+Garamond:wght@300;400;500;600;700;800;900",
-    "family=Lora:wght@300;400;500;600;700",
-    "family=Nunito:wght@300;400;500;600;700;800;900",
-    "family=Raleway:wght@300;400;500;600;700;800;900",
-  ].join("&") +
-  "&display=swap";
+// Keep the exported name for existing consumers; fonts are now served locally.
+export const GOOGLE_FONTS_HREF = "/fonts/storefront-fonts.css";
 
 export function ensureGoogleFontsLoaded() {
   try {
-    const id = "rb-google-fonts";
+    const id = "rb-local-fonts";
     if (document.getElementById(id)) return;
     const link = document.createElement("link");
     link.id = id;

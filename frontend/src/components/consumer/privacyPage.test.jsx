@@ -62,6 +62,15 @@ const body = privacySections
     ...(section.note ? [section.note] : []),
   ])
   .join(" ");
+it('presenta también el apartado íntegro de cookies y conserva compatibilidad con las cuatro secciones anteriores', () => {
+  const cookies = { id: 'cookies', title: 'Cookies y contenidos externos', paragraphs: ['Controles opcionales reales y su información.'] };
+  const sections = [...privacySections, cookies];
+  const response = { sections: [{ id: 'privacidad', title: 'Política', body: `${body} ${cookies.paragraphs[0]}` }], privacySections: sections };
+  expect(privacyPolicySections(response)).toEqual(sections);
+  expect(privacyPolicySections({ ...response, privacySections })).toEqual([
+    { id: 'privacidad', title: 'Política', paragraphs: [response.sections[0].body] },
+  ]);
+});
 const data = {
   version: "version-original",
   seller: {

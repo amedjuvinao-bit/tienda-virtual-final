@@ -5,6 +5,7 @@ export const PRIVACY_TOPICS = {
   autorizacion: "Autorización y comunicaciones",
   conservacion: "Conservación y proveedores",
   consultas: "Consultas y reclamos",
+  cookies: "Cookies y contenidos externos",
 };
 export const PRIVACY_SUMMARIES = [
   {

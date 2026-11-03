@@ -14,6 +14,8 @@ La implementación de L-01, L-02 y L-03 está documentada en [Suscripciones y re
 
 ## Método y alcance
 
+La implementación posterior de L-04 y L-06 se documenta en [Etapa 1: almacenamiento, preferencias y conexiones externas](cumplimiento-legal-etapa-1.md): fuentes locales, widget de pago por acción y controles de contenidos sociales y mapa con rechazo, cambio de decisión y vencimiento. L-05 y L-07 continúan pendientes de sus etapas de conservación y datos reales del negocio. El inventario siguiente conserva los hallazgos de la versión inicialmente examinada.
+
 Se examinaron mediante búsqueda estática 1485 archivos `.js`, `.jsx`, `.ts`, `.tsx`, `.html` y `.css` de `frontend/src`, `backend` y la entrada `frontend/index.html`, excluyendo dependencias, scripts y archivos de pruebas. Se identificaron 28 archivos con referencias a almacenamiento del navegador o emisión de cookies; se revisaron sus consumidores y los servicios relacionados. Los nombres de claves heredadas se contrastaron con las rutas de migración y limpieza.
 
 Los resultados describen funciones disponibles en el código. No se accedió a la base de datos, las variables privadas, la configuración efectiva del negocio ni los contratos de sus proveedores. No se ejecutó un rastreo de red de la instalación desplegada. Por ello, una integración disponible no demuestra que esté activa, y una URL externa no demuestra por sí sola que instale cookies de publicidad.

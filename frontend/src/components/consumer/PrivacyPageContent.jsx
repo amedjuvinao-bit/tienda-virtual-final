@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { openPrivacyPreferences } from '../../lib/privacyPreferences';
 import NewsletterForm from "../newsletter/NewsletterForm";
 import {
   ArrowRight,
@@ -48,10 +49,21 @@ const topicIcons = {
   consultas: HelpCircle,
 };
 function PolicySection({ section, index, config, c }) {
-  const [open, setOpen] = useState(index === 0);
+  const anchor = `privacy-${section.id}`;
+  const [open, setOpen] = useState(index === 0 || window.location.hash === `#${anchor}`);
+  useEffect(() => {
+    const reveal = () => {
+      if (window.location.hash !== `#${anchor}`) return;
+      setOpen(true);
+      requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView?.({ block: 'start' }));
+    };
+    reveal();
+    window.addEventListener('hashchange', reveal);
+    return () => window.removeEventListener('hashchange', reveal);
+  }, [anchor]);
   const Icon = topicIcons[section.id] || FileText;
   return (
-    <Glass config={config} className="privacy-policy-section">
+    <Glass config={config} className="privacy-policy-section" id={anchor}>
       <details
         open={open}
         onToggle={(event) => setOpen(event.currentTarget.open)}
@@ -79,6 +91,7 @@ function PolicySection({ section, index, config, c }) {
               <p>{section.note}</p>
             </div>
           )}
+          {section.id === 'cookies' ? <button type="button" className="consumer-privacy-preferences" onClick={openPrivacyPreferences}>Gestionar mis preferencias</button> : null}
         </div>
       </details>
     </Glass>

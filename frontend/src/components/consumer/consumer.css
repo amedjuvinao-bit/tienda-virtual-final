@@ -8,10 +8,13 @@
   font-size: 12px;
 }
 .consumer-legal-links a,
+.consumer-legal-links .consumer-privacy-preferences,
 .consumer-receipt a {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.consumer-privacy-preferences { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.consumer-privacy-preferences:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 .consumer-claims-link {
   display: inline-flex;
   align-items: center;

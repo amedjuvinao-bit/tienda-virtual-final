@@ -1,4 +1,5 @@
 "use strict";
+const preferences = require("../../../shared/storefrontPrivacyPreferences.json");
 // One text source serves both the immutable purchase policy and its public reading sections.
 function privacyDocument(c) {
   const responsible = `El responsable del tratamiento es el vendedor identificado en esta página.`;
@@ -12,6 +13,9 @@ function privacyDocument(c) {
   const processors = `Encargados y tratamiento mediante proveedores: ${c.processors || "pendiente de configurar"}.`;
   const transfers = `Las transmisiones o transferencias deben cumplir las reglas aplicables.`;
   const effective = `Vigencia de esta política: ${c.privacyEffectiveDate || "pendiente de configurar"}.`;
+  const storage = [preferences.technicalNotice, preferences.notice,
+    ...Object.values(preferences.categories).map(category => `${category.label}: ${category.providers}. ${category.description}`),
+    preferences.storageNotice, preferences.providersNotice, preferences.withdrawalNotice];
   return {
     body: [
       responsible,
@@ -25,6 +29,7 @@ function privacyDocument(c) {
       processors,
       transfers,
       effective,
+      ...storage,
     ].join(" "),
     sections: [
       {
@@ -47,6 +52,11 @@ function privacyDocument(c) {
         id: "consultas",
         title: "Consultas y reclamos",
         paragraphs: [rights, contact, deadlines],
+      },
+      {
+        id: "cookies",
+        title: "Cookies, almacenamiento y contenidos externos",
+        paragraphs: storage,
       },
     ],
   };

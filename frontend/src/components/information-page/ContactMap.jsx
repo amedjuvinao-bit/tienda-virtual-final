@@ -6,6 +6,7 @@ import {
 } from "./ContactMaterial";
 import ContactGlassRim from "./ContactGlassRim";
 import { contactEmbedUrl } from "./contactPageConfig";
+import ExternalContentGate from '../privacy/ExternalContentGate';
 
 function MapIllustration() {
   const id = "contact-map-" + useId().replace(/:/g, "");
@@ -93,6 +94,7 @@ export default function ContactMap({ config, data, preview }) {
         style={{ "--contact-map-height": `${c.mapHeightPx}px` }}
       >
         {exploring && data.coordinates && !preview ? (
+          <ExternalContentGate category="maps" title="Mapa interactivo de OpenStreetMap">
           <iframe
             title={c.mapText || "Mapa de ubicación"}
             key={contactEmbedUrl(data.coordinates)}
@@ -100,6 +102,7 @@ export default function ContactMap({ config, data, preview }) {
             loading="lazy"
             referrerPolicy="no-referrer"
           />
+          </ExternalContentGate>
         ) : (
           <a
             className="contact-map__open"

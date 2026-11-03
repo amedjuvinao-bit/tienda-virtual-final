@@ -1,0 +1,23 @@
+{
+  "version": "external-content-2026-11-03-v1",
+  "storageKey": "rb_privacy_preferences_v1",
+  "maxAgeDays": 180,
+  "title": "Tu privacidad, tus decisiones",
+  "notice": "El carrito, los favoritos, la compra y la seguridad utilizan almacenamiento necesario para prestar esas funciones. Puedes decidir por separado si permites contenidos sociales y mapas interactivos de terceros. Rechazarlos no impide comprar ni contactar con la tienda.",
+  "categories": {
+    "social": {
+      "label": "Contenidos sociales",
+      "providers": "Instagram y TikTok",
+      "description": "Permite cargar las publicaciones, sus imágenes, videos y reproductores. Al cargarlos, sus proveedores de contenido pueden recibir tu dirección IP y datos de conexión y utilizar sus propias cookies o almacenamiento."
+    },
+    "maps": {
+      "label": "Mapa interactivo",
+      "providers": "OpenStreetMap",
+      "description": "Permite cargar el mapa incrustado. OpenStreetMap recibe la conexión de tu navegador, incluida la dirección IP. El dibujo local y los enlaces para consultar indicaciones siguen disponibles sin activar el mapa."
+    }
+  },
+  "storageNotice": "Las decisiones se recuerdan en este navegador durante un máximo de 180 días. Puedes cambiarlas desde Cookies y preferencias. Al vencer ese plazo o cambiar la versión de este aviso, los contenidos opcionales vuelven a quedar desactivados hasta una nueva decisión. Si el navegador impide guardar la preferencia, solo se conserva durante la visita actual.",
+  "technicalNotice": "La tienda utiliza almacenamiento del navegador para el carrito y su recuperación, los favoritos, accesos temporales a pagos y devoluciones y la presentación. El panel administrativo utiliza además cookies de sesión y seguridad. Estas funciones no se convierten en autorización para publicidad o comunicaciones comerciales.",
+  "providersNotice": "Las imágenes y videos propios pueden servirse desde el alojamiento o proveedor de medios configurado por la tienda. Las fuentes incluidas en la aplicación se sirven desde la propia tienda. Wompi se carga cuando solicitas iniciar el pago; PayU utiliza su flujo de pago. Facturación, logística y correo se gestionan mediante los proveedores configurados, identificados en esta política. Los enlaces externos solo abren el servicio cuando eliges seguirlos.",
+  "withdrawalNotice": "Retirar una preferencia detiene las nuevas cargas de los contenidos controlados y desmonta los reproductores y mapas abiertos. No puede borrar cookies o información que un proveedor ya haya recibido en su propio dominio; puedes gestionarlas desde el navegador o los canales del proveedor. Estas preferencias son independientes de la suscripción por correo."
+}

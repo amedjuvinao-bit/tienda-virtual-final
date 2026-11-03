@@ -21,11 +21,13 @@ import {
   resolveContact,
 } from "./contactPageConfig";
 import { StorefrontSettingsContext } from "../../context/StorefrontSettingsContext";
+import { savePrivacyPreference, PRIVACY_PREFERENCES_KEY } from '../../lib/privacyPreferences';
 vi.mock("../Header", () => ({ default: () => null }));
 vi.mock("../StorefrontFooter", () => ({ default: () => null }));
 vi.mock("../WhatsAppButton", () => ({ default: () => null }));
 afterEach(() => {
   cleanup();
+  localStorage.removeItem(PRIVACY_PREFERENCES_KEY);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -252,6 +254,7 @@ it("opens complete schedule and restores focus when the native dialog closes", a
   expect(document.body.style.overflow).toBe("");
 });
 it("loads an interactive map only on request with coordinates and never loads it in preview", () => {
+  savePrivacyPreference({ social: false, maps: true });
   const state = mount({ latitude: "0", longitude: "0" });
   expect(document.querySelector("iframe")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Explorar mapa" }));
@@ -262,6 +265,12 @@ it("loads an interactive map only on request with coordinates and never loads it
   mount({ latitude: "0", longitude: "0" }, { store }, true);
   fireEvent.click(screen.getByRole("button", { name: "Explorar mapa" }));
   expect(document.querySelector("iframe")).toBeNull();
+});
+it('keeps the interactive map disconnected until the visitor allows maps', () => {
+  mount({ latitude: '0', longitude: '0' });
+  fireEvent.click(screen.getByRole('button', { name: 'Explorar mapa' }));
+  expect(document.querySelector('iframe')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Configurar preferencias' })).toBeInTheDocument();
 });
 it("hides missing channels in public, isolates examples in preview and reports clipboard failures", async () => {
   const state = mount({}, {});

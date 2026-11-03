@@ -8,7 +8,7 @@ export function privacyPolicySections(data) {
     { id: "privacidad", title: policy.title, paragraphs: [policy.body] },
   ];
   const sections = data?.privacySections;
-  if (!Array.isArray(sections) || sections.length !== 4) return fallback;
+  if (!Array.isArray(sections) || ![4, 5].includes(sections.length)) return fallback;
   let remaining = policy.body;
   const seen = new Set();
   for (const section of sections) {
@@ -32,5 +32,6 @@ export function privacyPolicySections(data) {
         remaining.slice(0, index) + remaining.slice(index + fragment.length);
     }
   }
+  if (!['datos', 'autorizacion', 'conservacion', 'consultas'].every(id => seen.has(id))) return fallback;
   return remaining.trim() ? fallback : sections;
 }

@@ -74,6 +74,8 @@
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx",
     "test:pages-module": "vitest run src/checkout/page src/checkout/storeCreditCheckout.test.js src/pages/gracias src/pages/paymentPages.sensitiveLogging.test.js src/components/catalog src/components/StorefrontFooter.test.jsx src/components/not-found src/pages/NotFound.test.jsx src/lib/api.adminFetch.test.js src/admin/pages src/admin/components/adminNavigationIdentity.test.js src/pages/ProductDetail.test.jsx src/components/ProductCard.quickAdd.test.js src/components/service-pages src/pages/OrderReturnsPage.test.jsx src/pages/SearchResults.test.jsx",
     "test:e2e:pages-module": "node e2e/pagesWorkspace.e2e.js",
+    "test:privacy-preferences": "node scripts/testLocalFonts.mjs && vitest run src/lib/privacyPreferences.test.js src/components/privacy src/checkout/page/useCheckoutConfiguration.test.jsx src/components/consumer/privacyPage.test.jsx src/components/information-page/contactPage.test.jsx",
+    "test:e2e:privacy-preferences": "node e2e/privacyPreferences.e2e.js",
     "test:service-pages": "vitest run src/components/service-pages src/pages/OrderReturnsPage.test.jsx src/pages/SearchResults.test.jsx src/admin/pages/ServicePageEditors.test.jsx src/admin/pages/workspace/publicPageCoverage.test.js"
   },
   "dependencies": {

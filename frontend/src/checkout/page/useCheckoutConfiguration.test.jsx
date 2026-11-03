@@ -7,11 +7,21 @@ vi.mock("../../lib/api", () => ({
   default: { get: vi.fn() },
   setSessionId: vi.fn(),
 }));
+vi.mock('./checkoutWompi', () => ({ loadWompiWidgetScript: vi.fn() }));
+import { loadWompiWidgetScript } from './checkoutWompi';
 const useHarness = () => {
   const state = useCheckoutState();
   useCheckoutConfiguration(state);
   return state;
 };
+it('no contacta con Wompi al entrar al checkout aunque sea el proveedor activo', async () => {
+  api.get.mockResolvedValue({ data: { theme: { global: { payments: { provider: 'wompi', active: true } } } } });
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+  const { result } = renderHook(useHarness);
+  await waitFor(() => expect(result.current.paymentsConfigLoading).toBe(false));
+  expect(result.current.paymentsConfig.provider).toBe('wompi');
+  expect(loadWompiWidgetScript).not.toHaveBeenCalled();
+});
 beforeEach(() => {
   vi.clearAllMocks();
   api.get.mockResolvedValue({

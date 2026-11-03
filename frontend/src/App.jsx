@@ -1,6 +1,8 @@
 import CATALOG_PAGES from "../../shared/catalogPages.json";
 import OrdersWorkspace from "./admin/orders/OrdersWorkspace";
 import ConsumerLinks from "./components/consumer/ConsumerLinks";
+import PrivacyPreferences from './components/privacy/PrivacyPreferences';
+import ExternalContentGate from './components/privacy/ExternalContentGate';
 import 'react-toastify/dist/ReactToastify.css';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {
@@ -135,7 +137,8 @@ function Home({ theme, store }) {
         <section id="banner" className="w-full"><CarouselBanner /></section>
         {storySectionOrder(theme?.sections).filter(id=>isStorefrontSectionVisible(theme,id)).map(id=>{
           const Component=components[id];
-          return <section key={id} id={id} className="storefront-section-shell w-full"><Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/></section>;
+          const content = <Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/>;
+          return <section key={id} id={id} className="storefront-section-shell w-full">{['instagram','tiktok'].includes(id) ? <ExternalContentGate category="social" title={id === 'instagram' ? 'Instagram de la tienda' : 'Videos de TikTok'}>{content}</ExternalContentGate> : content}</section>;
         })}
         <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
       </StorefrontStory>
@@ -348,6 +351,7 @@ export default function App() {
                 </AdminLogoutGate>
 
                 {themeReady && <ConsumerLinks />}
+                {themeReady && <PrivacyPreferences />}
                 <AppToastContainer />
               </Suspense>
               </StorefrontLoadingBoundary>
