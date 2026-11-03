@@ -1,9 +1,16 @@
+import { SocialImage, SocialPlayback, useSocialContentPrivacy } from '../privacy/SocialContentPrivacy';
 import React, { useRef, useState } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize2, Clapperboard } from 'lucide-react';
 
 const time = value => `${Math.floor((Number.isFinite(value) ? value : 0) / 60)}:${String(Math.floor((Number.isFinite(value) ? value : 0) % 60)).padStart(2, '0')}`;
 
 export default function JournalReelPlayer({ post, src, onExpand }) {
+  return <SocialPlayback src={src} poster={post.image} title={post.alt || 'Reel de Instagram'} provider="Instagram">
+    {() => <JournalReelPlayerContent post={post} src={src} onExpand={onExpand} />}
+  </SocialPlayback>;
+}
+function JournalReelPlayerContent({ post, src, onExpand }) {
+  const privacy = useSocialContentPrivacy();
   const video = useRef(null);
   const [playing, setPlaying] = useState(false), [muted, setMuted] = useState(false);
   const [position, setPosition] = useState(0), [duration, setDuration] = useState(0);
@@ -17,9 +24,9 @@ export default function JournalReelPlayer({ post, src, onExpand }) {
   }
   const mute = () => { if (video.current) { video.current.muted = !video.current.muted; setMuted(video.current.muted); } };
   return <div className="ig-reel" data-playing={playing}>
-    <img className="ig-reel__ambience" src={post.image} alt="" aria-hidden="true" decoding="async" />
+    <SocialImage className="ig-reel__ambience" src={post.image} alt="" aria-hidden="true" decoding="async" />
     <div className="ig-reel__shade" aria-hidden="true" />
-    <video ref={video} src={src} poster={post.image} playsInline preload="metadata"
+    <video ref={video} src={src} poster={privacy.image(post.image)} playsInline preload="metadata"
       aria-label={`Reel: ${post.alt || 'Publicación de Instagram'}`} onClick={toggle}
       onLoadedMetadata={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
       onDurationChange={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}

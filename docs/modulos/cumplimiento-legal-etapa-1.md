@@ -8,12 +8,18 @@ La tienda permite decidir por separado sobre contenidos sociales e interacción 
 | --- | --- |
 | Fuentes | Se sirven desde `/fonts/`, con las 21 familias antes obtenidas desde Google y sus estilos de tienda y editor; Bodoni Moda conserva sus archivos locales anteriores. Los archivos WOFF2 y sus licencias OFL están incluidos en el repositorio. No se necesitan descargas de Google Fonts durante una visita o compilación. |
 | Wompi | La configuración del checkout ya no precarga el widget. La acción existente de iniciar el pago continúa cargándolo y conserva su validación y configuración. El pago no depende de aceptar contenidos sociales o mapas. |
-| Instagram y TikTok | En la portada pública, sus componentes, publicaciones, imágenes y reproductores no se montan hasta permitir contenidos sociales. Se conservan los diseños y ajustes existentes, incluidos ambos modelos de TikTok y las vistas del editor. |
+| Instagram y TikTok | La portada conserva los diseños, títulos, tarjetas y enlaces sin exigir activar redes. Las imágenes del mismo origen y las subidas al proveedor de medios actual de la tienda (HTTPS `res.cloudinary.com`) pueden mostrarse; las imágenes externas se sustituyen por una textura local de cristal. Los reproductores externos solo se montan tras permitir redes. Se conservan ambos modelos de TikTok y las vistas del editor. |
 | Mapa interactivo | El esquema local y los enlaces siguen disponibles. El iframe de OpenStreetMap se monta después de solicitar el mapa y permitir esa categoría. |
-| Retirada | Desmonta los contenidos abiertos y evita sus nuevas cargas. La decisión se propaga entre pestañas. No borra datos ya recibidos ni cookies del dominio de un proveedor. |
+| Retirada | Desmonta reproductores externos abiertos y sustituye imágenes opcionales por la textura local, conservando las secciones. La decisión se propaga entre pestañas. No borra datos ya recibidos ni cookies del dominio de un proveedor. |
 | Política pública | Datos personales incorpora el apartado Cookies y contenidos externos. El aviso del control y el documento del servidor usan el mismo contenido compartido. La política íntegra sigue formando parte del versionado y de las constancias existentes. |
 
 El acceso **Cookies y preferencias** permanece en la franja pública de información al pie de las páginas, incluso tras rechazar. El aviso inicial ofrece rechazo, aceptación y configuración; no se premarcan categorías opcionales. Cerrar la configuración sin guardar no concede permisos. El control no se muestra en las rutas del panel administrativo.
+
+El aviso inferior es compacto y usa cristal esmerilado, reflejos y textura local. La configuración presenta dos interruptores independientes y detalles desplegables. Sus botones quedan fuera del área desplazable para seguir accesibles en pantallas pequeñas. Aceptar y rechazar usan la misma presentación.
+
+Al solicitar un video externo sin permiso se muestra una explicación breve dentro de su tarjeta. **Permitir redes** autoriza la categoría social completa (Instagram y TikTok), conserva la elección del mapa y utiliza el mismo registro que la configuración general. Pulsar reproducir o cerrar ese aviso no autoriza por sí mismo. El modelo antiguo de TikTok conserva sus enlaces y no monta reproductores por hover sin permiso.
+
+La textura no es una copia de una publicación. Si una portada procede directamente de una red social o de un alojamiento desconocido, necesita permiso para mostrarse; para mantener fotografías visibles desde el inicio se deben usar portadas propias autorizadas y subidas a la tienda. No se descargan ni duplican publicaciones automáticamente. Las vistas administrativas mantienen su funcionamiento anterior.
 
 ## Registro y conservación de la preferencia
 
@@ -34,10 +40,10 @@ Cambiar los proveedores opcionales o su tratamiento requiere revisar `shared/sto
 ## Validación
 
 - Pruebas de preferencias: ausencia de autorización por visita, categorías separadas, rechazo, cambios, caducidad, datos inválidos, almacenamiento bloqueado y cambios entre pestañas.
-- Pruebas de interfaz: permisos sin premarcado, cierre sin guardar, foco y ciclo de teclado del diálogo, contenido desmontado tras el retiro y separación del panel administrativo.
+- Pruebas de interfaz: permisos sin premarcado, cierre sin guardar, foco y ciclo de teclado del diálogo, reproductores desmontados tras el retiro y separación del panel administrativo. Se verifica la permanencia de los diseños editorial/diario y TikTok, las imágenes propias, el hover antiguo sin permiso y la elección social sin alterar mapas.
 - Contratos de política: cinco apartados sin pérdida del documento íntegro; compatibilidad con respuestas anteriores; contenido dentro del límite de las constancias.
 - Integridad de las 21 familias, 134 archivos WOFF2 y licencias: hashes, formato y referencias locales.
-- Recorridos Chromium a 1440, 768, 390 y 320 px: ninguna petición a los proveedores controlados antes de elegir, mapa permitido sin redes, reproducción social después de permitir, retirada de iframes abiertos, rechazo persistente y Wompi solicitado solo al pulsar la acción. Todos los destinos de proveedor y las APIs se sustituyen por respuestas controladas: no se ejecutan cobros ni se accede a datos privados.
+- Recorridos Chromium a 1440, 768, 390 y 320 px: ninguna petición a los proveedores opcionales controlados antes de elegir, diseños sociales visibles con fotos locales, mapa permitido sin redes, reproducción social después de permitir desde la tarjeta, retirada de iframes abiertos, rechazo persistente, botones de configuración visibles con detalles cerrados y abiertos, y Wompi solicitado solo al pulsar la acción. Todos los destinos de proveedor y las APIs se sustituyen por respuestas controladas: no se ejecutan cobros ni se accede a datos privados.
 - Regresiones del formulario de suscripción, compra, PQR, páginas informativas, footers, Instagram y TikTok; contratos de backend de suscripciones y protección al consumidor; compilación de producción.
 
 Comandos: `npm run test:privacy-preferences` en frontend y backend; `npm run test:e2e:privacy-preferences` en frontend. El recorrido acepta `PLAYWRIGHT_EXECUTABLE_PATH` para usar un Chromium instalado. `vendorLocalFonts.py` es una herramienta opcional de mantenimiento de fuentes; no se ejecuta al instalar ni al compilar la tienda.

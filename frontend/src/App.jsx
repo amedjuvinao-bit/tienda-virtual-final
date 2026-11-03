@@ -2,7 +2,7 @@ import CATALOG_PAGES from "../../shared/catalogPages.json";
 import OrdersWorkspace from "./admin/orders/OrdersWorkspace";
 import ConsumerLinks from "./components/consumer/ConsumerLinks";
 import PrivacyPreferences from './components/privacy/PrivacyPreferences';
-import ExternalContentGate from './components/privacy/ExternalContentGate';
+import SocialContentPrivacy from './components/privacy/SocialContentPrivacy';
 import 'react-toastify/dist/ReactToastify.css';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {
@@ -138,7 +138,7 @@ function Home({ theme, store }) {
         {storySectionOrder(theme?.sections).filter(id=>isStorefrontSectionVisible(theme,id)).map(id=>{
           const Component=components[id];
           const content = <Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/>;
-          return <section key={id} id={id} className="storefront-section-shell w-full">{['instagram','tiktok'].includes(id) ? <ExternalContentGate category="social" title={id === 'instagram' ? 'Instagram de la tienda' : 'Videos de TikTok'}>{content}</ExternalContentGate> : content}</section>;
+          return <section key={id} id={id} className="storefront-section-shell w-full">{['instagram','tiktok'].includes(id) ? <SocialContentPrivacy>{content}</SocialContentPrivacy> : content}</section>;
         })}
         <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
       </StorefrontStory>

@@ -1,3 +1,4 @@
+import { SocialImage, useSocialContentPrivacy } from '../privacy/SocialContentPrivacy';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Play, ArrowUpRight, ChevronLeft, ChevronRight, RefreshCw, Disc3 } from 'lucide-react';
 import selection from '@shared/tiktok-selection';
@@ -14,6 +15,7 @@ import { STORY_VISIBILITY_EVENT } from '../../lib/storefrontStoryConfig';
 const videoDuration=value=>{const seconds=Math.floor(Number(value));return Number.isFinite(seconds)&&seconds>0?`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`:'';};
 
 export default function TiktokStage({theme, posts:fallback=[]}) {
+  const privacy = useSocialContentPrivacy();
   const raw = theme?.sections?.find(s=>s?.id==='tiktok'||s?.type==='tiktok');
   const section=normalizeTiktokSection(raw), c=section.config, s=normalizeStage(c);
   const editor=useContext(TiktokEditorFeed), connected=s.stageSource==='connected';
@@ -52,6 +54,7 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
   if(s.stageBackgroundMode==='included')background.image='/instagram/journal-satin.webp';
   if(s.stageBackgroundMode==='custom')background.image=safeStageAsset(s.stageBackgroundImage);
   if(['continuity','global'].includes(s.stageBackgroundMode))background=categoriasBackdrop(theme,{}, {fanBackgroundMode:s.stageBackgroundMode});
+  if(background.image) background={...background,image:privacy.image(background.image)};
   const vars={
     '--tk-ink':s.stageInk,'--tk-accent':s.stageAccent,'--tk-glass':rgba(s.stageGlassColor,s.stageGlassOpacity/100),
     '--tk-blur':`${s.stageBlur}px`,'--tk-depth':`${s.stageDepth}px`,'--tk-shadow':s.stageShadow/100,
@@ -75,7 +78,7 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
       <div className="tk-stage__grid" data-list={s.stageShowList}>
         <header className="tk-stage__intro">
           {s.stageShowBrand && <TiktokBrand/>}
-          {s.stageShowProfile && <div className="tk-stage__identity">{s.stageShowAvatar && identity.avatar && <img src={identity.avatar} alt={identity.name || 'Perfil de TikTok'}/>}<div>{identity.user && (identity.url?<a href={identity.url} target="_blank" rel="noopener noreferrer">{identity.user}</a>:<span>{identity.user}</span>)}{identity.name && <span className="tk-stage__name">{identity.name}</span>}</div></div>}
+          {s.stageShowProfile && <div className="tk-stage__identity">{s.stageShowAvatar && identity.avatar && <SocialImage src={identity.avatar} alt={identity.name || 'Perfil de TikTok'}/>}<div>{identity.user && (identity.url?<a href={identity.url} target="_blank" rel="noopener noreferrer">{identity.user}</a>:<span>{identity.user}</span>)}{identity.name && <span className="tk-stage__name">{identity.name}</span>}</div></div>}
           <div className="tk-stage__ornament" aria-hidden="true"><i/>✧<i/></div>
           {s.stageShowTitle && s.stageTitle && <h2>{s.stageTitle}</h2>}
           {s.stageShowSubtitle && s.stageSubtitle && <p className="tk-stage__subtitle">{s.stageSubtitle}</p>}
@@ -93,7 +96,7 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
           </div>
           <div className="tk-stage__items">{shown.map((post,index)=><article className="tk-stage__item" key={post.id} data-active={post.id===current?.id}>
             <button type="button" className="tk-stage__select" aria-label={`Seleccionar video: ${post.title}`} aria-pressed={post.id===current?.id} onClick={()=>choose(post.id)}>
-              <span className="tk-stage__thumb">{post.image?<img src={post.image} alt="" loading="lazy" style={{objectPosition:`${post.positionX}% ${post.positionY}%`}}/>:<span className="tk-stage__no-cover">♪</span>}<span className="tk-stage__mini-play"><Play size={13} fill="currentColor"/></span>{s.stageShowDuration && videoDuration(post.duration) && <span className="tk-stage__duration">{videoDuration(post.duration)}</span>}</span>
+              <span className="tk-stage__thumb">{post.image?<SocialImage src={post.image} alt="" loading="lazy" style={{objectPosition:`${post.positionX}% ${post.positionY}%`}}/>:<span className="tk-stage__no-cover">♪</span>}<span className="tk-stage__mini-play"><Play size={13} fill="currentColor"/></span>{s.stageShowDuration && videoDuration(post.duration) && <span className="tk-stage__duration">{videoDuration(post.duration)}</span>}</span>
               <span className="tk-stage__summary">
                 <span className="tk-stage__item-meta"><span>{String(activePage*s.stageListSize+index+1).padStart(2,'0')}</span><span className="tk-stage__item-state">{post.id===current?.id?'En pantalla':'Video'}</span></span>
                 <span className="tk-stage__item-title">{post.title}</span>

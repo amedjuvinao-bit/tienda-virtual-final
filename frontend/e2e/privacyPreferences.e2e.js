@@ -13,6 +13,9 @@ await fs.writeFile(entry, `
 import React from 'react'; import {createRoot} from 'react-dom/client'; import {BrowserRouter} from 'react-router-dom';
 import PrivacyPreferences from '/src/components/privacy/PrivacyPreferences.jsx';
 import ExternalContentGate from '/src/components/privacy/ExternalContentGate.jsx';
+import SocialContentPrivacy from '/src/components/privacy/SocialContentPrivacy.jsx';
+import InstagramSection from '/src/components/InstagramSection.jsx';
+import TiktokSection from '/src/components/TiktokSection.jsx';
 import ContactMap from '/src/components/information-page/ContactMap.jsx';
 import {buildContactConfig} from '/src/components/information-page/contactPageConfig.js';
 import TiktokPlayer from '/src/components/tiktok/TiktokPlayer.jsx';
@@ -22,10 +25,13 @@ import {loadWompiWidgetScript} from '/src/checkout/page/checkoutWompi.js';
 import {openPrivacyPreferences} from '/src/lib/privacyPreferences.js';
 import '/src/components/tiktok/tiktokStage.css';
 const post={id:'post-1',tiktokId:'1234567890123456789',image:'https://www.tiktok.com/privacy-test.jpg',title:'Video de prueba',positionX:50,positionY:50};
+const igTheme={sections:[{id:'instagram',enabled:true,config:{journalTitle:'Nuestro diario',journalMotionEnabled:false,posts:[{id:'own',image:'/instagram/journal-satin.webp',alt:'Foto de la tienda'},{id:'external',image:'https://www.instagram.com/optional.jpg',alt:'Foto externa'}]}}]};
+const tkTheme={sections:[{id:'tiktok',enabled:true,config:{stageMotionEnabled:false,posts:[{...post,title:'Video de la tienda',image:'/instagram/journal-satin.webp'}]}}]};
 const settings={stageMuted:true,stageLoop:false,stageFit:'cover',stageShowControls:true,stageShowDuration:false};
 function Fixture(){const state=useCheckoutState();useCheckoutConfiguration(state);const config={style:{cardRadiusPx:22,buttonRadiusPx:20},presentation:{borderWidth:0},contact:buildContactConfig({})};return <main>
 <h1>Privacidad de la tienda</h1><button onClick={openPrivacyPreferences}>Cookies y preferencias</button>
 <ExternalContentGate category="social" title="Redes de la tienda"><div style={{height:280,position:'relative'}}><TiktokPlayer post={post} settings={settings}/><img src="https://www.instagram.com/privacy-test.jpg" alt="Publicación de Instagram" /></div></ExternalContentGate>
+<div data-real-social><SocialContentPrivacy><InstagramSection theme={igTheme}/></SocialContentPrivacy><SocialContentPrivacy><TiktokSection theme={tkTheme}/></SocialContentPrivacy></div>
 <ContactMap config={config} data={{address:'Calle de prueba 1',coordinates:{lat:11.0,lon:-74.0},map:'https://maps.google.com',directions:'https://maps.google.com'}}/>
 <button onClick={()=>loadWompiWidgetScript().then(()=>window.paymentReady=true)}>Iniciar pago de prueba</button>
 <PrivacyPreferences/></main>}
@@ -68,26 +74,41 @@ try {
     await page.getByRole('region', { name: 'Cookies y contenidos externos' }).waitFor();
     assert.equal(requests.length, 0, 'No optional provider, font or payment requests before choosing');
     assert.equal(await page.locator('iframe').count(), 0);
+    assert.equal(await page.locator('[data-real-social] .ig-journal').count(), 1);
+    assert.equal(await page.locator('[data-real-social] .tk-stage').count(), 1);
+    assert(await page.locator('[data-real-social] img[src="/instagram/journal-satin.webp"]').count() > 0);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Horizontal overflow at ' + width);
     await page.screenshot({ path: `${artifacts}/banner-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Elegir preferencias' }).click();
     const dialog = page.getByRole('dialog');
     assert.equal(await dialog.locator('input:checked').count(), 0);
-    await dialog.getByRole('checkbox', { name: /Mapa interactivo/ }).check();
+    const footer = await dialog.locator('.privacy-dialog-footer').boundingBox();
+    assert(footer.y >= 0 && footer.y + footer.height <= 1000, 'Dialog buttons visible at ' + width);
+    await dialog.locator('summary').click();
+    const expandedFooter = await dialog.locator('.privacy-dialog-footer').boundingBox();
+    assert(expandedFooter.y + expandedFooter.height <= 1000, 'Expanded details do not hide controls');
+    await dialog.locator('summary').click();
+    await dialog.getByRole('switch', { name: /Mapa interactivo/ }).check();
     await page.screenshot({ path: `${artifacts}/preferences-${width}.png`, fullPage: true });
     await dialog.getByRole('button', { name: 'Guardar mi elección' }).click();
     await page.getByRole('button', { name: 'Explorar mapa' }).click();
     await page.locator('iframe[src*="openstreetmap"]').waitFor();
     assert(!requests.some(url => /tiktok|instagram|fonts\.(googleapis|gstatic)|wompi/.test(url)));
-    await page.getByRole('button', { name: 'Cookies y preferencias', exact: true }).click();
-    await page.getByRole('dialog').getByRole('checkbox', { name: /Contenidos sociales/ }).check();
-    await page.getByRole('dialog').getByRole('button', { name: 'Guardar mi elección' }).click();
+    await page.getByRole('button', { name: 'Ver video: Video de la tienda', exact: true }).click();
+    assert(!requests.some(url => /tiktok|instagram/.test(new URL(url).hostname)), 'Clicking play alone does not grant consent');
+    await page.getByRole('button', { name: 'Permitir redes', exact: true }).click();
+    await page.getByTitle('Video de TikTok: Video de la tienda').waitFor();
+    assert(await page.evaluate(() => JSON.parse(localStorage.getItem('rb_privacy_preferences_v1')).choices.maps));
     await page.getByAltText('Publicación de Instagram').waitFor();
     await page.getByRole('button', { name: 'Reproducir: Video de prueba', exact: true }).click();
-    await page.locator('iframe[src*="tiktok.com/player"]').waitFor();
+    await page.getByTitle('Video de TikTok: Video de prueba').waitFor();
     await page.getByRole('button', { name: 'Cookies y preferencias', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Rechazar opcionales' }).click();
     assert.equal(await page.locator('iframe').count(), 0, 'Revoking unmounts opened providers');
+    assert.equal(await page.locator('[data-real-social] .ig-journal').count(), 1, 'Withdrawal preserves Instagram design');
+    assert.equal(await page.locator('[data-real-social] .tk-stage').count(), 1, 'Withdrawal preserves TikTok design');
+    await page.locator('[data-real-social] .ig-journal').screenshot({path: `${artifacts}/instagram-${width}.png`});
+    await page.locator('[data-real-social] .tk-stage').screenshot({path: `${artifacts}/tiktok-${width}.png`});
     await page.reload({ waitUntil: 'networkidle' });
     assert.equal(await page.getByRole('region', { name: 'Cookies y contenidos externos' }).count(), 0, 'Rejection persists');
     assert.equal(await page.locator('iframe').count(), 0);
@@ -113,7 +134,7 @@ try {
       await other.close();
     }
     assert.deepEqual(errors, []);
-    results.push({ width, initialExternalRequests: 0, selectiveMap: true, socialPlayback: true, withdrawal: true, paymentOnAction: true, localFonts: true });
+    results.push({ width, initialExternalRequests: 0, selectiveMap: true, socialPlayback: true, sectionsPreserved: true, visibleDialogButtons: true, withdrawal: true, paymentOnAction: true, localFonts: true });
     await context.close();
     await browser.close();
   }
@@ -126,7 +147,7 @@ try {
   }
   throw error;
 } finally {
-  await browser?.close();
-  await server.close();
-  await fs.unlink(entry);
+  try { await browser?.close(); } finally {
+    try { await server.close(); } finally { await fs.unlink(entry); }
+  }
 }

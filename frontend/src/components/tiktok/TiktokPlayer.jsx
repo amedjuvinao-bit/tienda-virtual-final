@@ -1,8 +1,15 @@
+import { SocialImage, SocialPlayback, useSocialContentPrivacy } from '../privacy/SocialContentPrivacy';
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, ArrowUpRight } from 'lucide-react';
 const ORIGIN = 'https://www.tiktok.com';
 const clock = seconds => `${Math.floor((Number(seconds)||0)/60)}:${String(Math.floor((Number(seconds)||0)%60)).padStart(2,'0')}`;
 export default function TiktokPlayer({ post, settings:s, requestPlay = false }) {
+  return <SocialPlayback src={post.videoUrl || (post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}` : '')} poster={post.image} title={post.title} provider="TikTok" requestPlay={requestPlay}>
+    {requested => <TiktokPlayerContent post={post} settings={s} requestPlay={requestPlay || requested} />}
+  </SocialPlayback>;
+}
+function TiktokPlayerContent({ post, settings:s, requestPlay = false }) {
+  const privacy = useSocialContentPrivacy();
   const host = useRef(null), iframe = useRef(null), video = useRef(null);
   const [started,setStarted] = useState(requestPlay), [ready,setReady] = useState(false), [playing,setPlaying] = useState(false);
   const [muted,setMuted] = useState(s.stageMuted), [time,setTime] = useState(0), [duration,setDuration] = useState(Number(post.duration)||0), [error,setError] = useState('');
@@ -48,8 +55,8 @@ export default function TiktokPlayer({ post, settings:s, requestPlay = false }) 
   };
   const frame = post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}?controls=0&autoplay=1&loop=${s.stageLoop?1:0}&description=0&music_info=0&rel=0` : '';
   return <div className="tk-player" ref={host} style={{'--tk-fit':s.stageFit,'--tk-position':`${post.positionX}% ${post.positionY}%`}}>
-    {post.image && <img className="tk-player__poster" src={post.image} alt={post.title} draggable="false" style={{opacity:ready?0:1}} />}
-    {started && isDirect && <video ref={video} src={post.videoUrl} poster={post.image || undefined} autoPlay playsInline muted={muted} loop={s.stageLoop} preload="metadata" onLoadedMetadata={e=>setDuration(e.currentTarget.duration)} onPlaying={()=>{if(!chapterVisible()){video.current?.pause();setPlaying(false);return;}setReady(true);setPlaying(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onError={fail} />}
+    {post.image && <SocialImage className="tk-player__poster" src={post.image} alt={post.title} draggable="false" style={{opacity:ready?0:1}} />}
+    {started && isDirect && <video ref={video} src={post.videoUrl} poster={privacy.image(post.image) || undefined} autoPlay playsInline muted={muted} loop={s.stageLoop} preload="metadata" onLoadedMetadata={e=>setDuration(e.currentTarget.duration)} onPlaying={()=>{if(!chapterVisible()){video.current?.pause();setPlaying(false);return;}setReady(true);setPlaying(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onError={fail} />}
     {started && !isDirect && frame && <iframe ref={iframe} title={`Video de TikTok: ${post.title}`} src={frame} allow="autoplay; fullscreen; encrypted-media" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />}
     {!post.image && !started && <div className="tk-player__empty"><span>♪</span><p>{post.title}</p></div>}
     {playable && !playing && !error && <button type="button" className="tk-player__play" aria-label={`Reproducir: ${post.title}`} onClick={play}><Play fill="currentColor" size={36} /></button>}

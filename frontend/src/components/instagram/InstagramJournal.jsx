@@ -1,3 +1,4 @@
+import { SocialImage, useSocialContentPrivacy } from '../privacy/SocialContentPrivacy';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Instagram, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { normalizeInstagramSection } from '../../admin/appearance/sections/instagram/instagramSectionHelpers';
@@ -21,6 +22,7 @@ import './instagramJournalDepth.css';
 import './instagramJournalMotion.css';
 
 export default function InstagramJournal({ theme, posts: fallback = [] }) {
+  const privacy = useSocialContentPrivacy();
   const raw = theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram');
   const section = normalizeInstagramSection(raw);
   const c = section.config;
@@ -109,8 +111,8 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
   const common = { settings: j, user, onSave: id => setNotice(toggle(id)), onShare: share, onSelect: select, onExpand: setLightbox };
   return <section ref={root} className="ig-journal" aria-label="Instagram de la tienda" data-motion-enabled={j.journalMotionEnabled ? 'true' : 'false'} data-entered={motion.entered ? 'true' : 'false'} data-highlight-motion={j.journalHighlightMotion} data-glass={j.journalGlassEnabled ? 'true' : 'false'} data-finish={j.journalGlassFinish} style={{
     '--igj-motion-duration': `${j.journalMotionDuration}ms`,
-    '--igj-background': color, '--igj-backdrop': background ? `url(${JSON.stringify(background)})` : 'none',
-    '--igj-mobile-backdrop': j.journalMobileBackgroundImage ? `url(${JSON.stringify(j.journalMobileBackgroundImage)})` : background ? `url(${JSON.stringify(background)})` : 'none',
+    '--igj-background': color, '--igj-backdrop': background ? `url(${JSON.stringify(privacy.image(background))})` : 'none',
+    '--igj-mobile-backdrop': j.journalMobileBackgroundImage ? `url(${JSON.stringify(privacy.image(j.journalMobileBackgroundImage))})` : background ? `url(${JSON.stringify(privacy.image(background))})` : 'none',
     '--igj-wash': j.journalBackgroundWash / 100, '--igj-ink': j.journalInk, '--igj-accent': j.journalAccent,
     '--igj-card': j.journalCardColor, '--igj-opacity': `${j.journalCardOpacity}%`,
     '--igj-button': j.journalButtonColor, '--igj-button-text': j.journalButtonTextColor,
@@ -136,7 +138,7 @@ export default function InstagramJournal({ theme, posts: fallback = [] }) {
         {j.journalShowSidebar && <aside className="ig-journal__sidebar" data-igj-glass="sidebar" onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} aria-label={j.journalSidebarTitle || 'Más publicaciones'}>
           <JournalLiquidLens settings={j} />
           <h3>{j.journalSidebarTitle}</h3>
-          {j.journalShowHighlights && highlights.length > 0 && <div className="ig-journal__highlights" aria-label="Destacados de Instagram">{highlights.map((h, index) => <button type="button" key={h.id} style={{ '--igj-highlight-index': index }} onClick={event => select(h.postId, event)} aria-pressed={!primaryLoading && featured.id === h.postId} aria-label={`Ver destacado: ${h.title}`}><span className="ig-journal__highlight-ring"><span className="ig-journal__highlight-photo"><img src={h.image} alt="" loading="lazy" /></span><i className="ig-journal__highlight-wave" aria-hidden="true" />{!primaryLoading && featured.id === h.postId && <i className="ig-journal__highlight-check" aria-hidden="true"><Check /></i>}</span><strong>{h.title}</strong></button>)}</div>}
+          {j.journalShowHighlights && highlights.length > 0 && <div className="ig-journal__highlights" aria-label="Destacados de Instagram">{highlights.map((h, index) => <button type="button" key={h.id} style={{ '--igj-highlight-index': index }} onClick={event => select(h.postId, event)} aria-pressed={!primaryLoading && featured.id === h.postId} aria-label={`Ver destacado: ${h.title}`}><span className="ig-journal__highlight-ring"><span className="ig-journal__highlight-photo"><SocialImage src={h.image} alt="" loading="lazy" /></span><i className="ig-journal__highlight-wave" aria-hidden="true" />{!primaryLoading && featured.id === h.postId && <i className="ig-journal__highlight-check" aria-hidden="true"><Check /></i>}</span><strong>{h.title}</strong></button>)}</div>}
           {j.journalShowFilters && <div className="ig-journal__filters" role="group" aria-label="Filtrar publicaciones">{[['all', 'Todas'], ['reels', 'Reels'], ['saved', 'Guardadas']].map(([value, label]) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setView(value)}>{label}</button>)}</div>}
           <div className="ig-journal__previews">{shown.map(post => <InstagramJournalPost key={post.id} post={post} compact saved={saved.includes(post.id)} {...common} />)}</div>
           {!shown.length && <p className="ig-journal__empty">{filterPosts.some(p => p.id === featured.id) ? 'Esta publicación ya está abierta en grande.' : filter === 'saved' ? 'Guarda publicaciones con el marcador para encontrarlas aquí.' : filter === 'reels' ? (feed.nextCursor ? 'No hay reels entre las publicaciones cargadas. Puedes cargar más.' : 'Todavía no hay reels en esta selección.') : 'Pronto compartiremos más momentos.'}</p>}

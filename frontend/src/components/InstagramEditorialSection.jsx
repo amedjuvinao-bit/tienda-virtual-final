@@ -1,3 +1,4 @@
+import { SocialImage, useSocialContentPrivacy } from './privacy/SocialContentPrivacy';
 import React from 'react';
 import { Instagram, ArrowUpRight } from 'lucide-react';
 import { normalizeInstagramSection } from '../admin/appearance/sections/instagram/instagramSectionHelpers';
@@ -11,6 +12,7 @@ export default function InstagramEditorialSection({
   theme,
   posts = []
 }) {
+  const privacy = useSocialContentPrivacy();
   const section = normalizeInstagramSection(theme?.sections?.find(s => s?.id === 'instagram' || s?.type === 'instagram'));
   const c = section.config;
   const e = normalizeEditorial(c);
@@ -43,8 +45,8 @@ export default function InstagramEditorialSection({
   const profileLabel = identity.profileUser || identity.journalName;
   const vars = {
     '--ig-bg': color,
-    '--ig-backdrop': background ? `url(${JSON.stringify(background)})` : 'none',
-    '--ig-mobile-backdrop': e.editorialMobileBackgroundImage ? `url(${JSON.stringify(e.editorialMobileBackgroundImage)})` : background ? `url(${JSON.stringify(background)})` : 'none',
+    '--ig-backdrop': background ? `url(${JSON.stringify(privacy.image(background))})` : 'none',
+    '--ig-mobile-backdrop': e.editorialMobileBackgroundImage ? `url(${JSON.stringify(privacy.image(e.editorialMobileBackgroundImage))})` : background ? `url(${JSON.stringify(privacy.image(background))})` : 'none',
     '--ig-wash': e.editorialBackgroundWash / 100,
     '--ig-ink': e.editorialTextColor,
     '--ig-title-color': e.editorialTitleColor,
@@ -121,9 +123,9 @@ export default function InstagramEditorialSection({
       '--photo-fit': post.imageFit === 'cover' || post.imageFit === 'contain' ? post.imageFit : slot === 1 ? e.editorialFeaturedFit : e.editorialImageFit
     }}>
       <picture>
-        <img className="ig-editorial__image-backdrop" src={post.image} alt="" aria-hidden="true" loading="lazy" decoding="async" />
-        <img className={post.mobileImage ? "ig-editorial__image ig-editorial__desktop-image" : "ig-editorial__image"} src={post.image} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />
-        {post.mobileImage && <img className="ig-editorial__image ig-editorial__mobile-image" src={post.mobileImage} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />}
+        <SocialImage className="ig-editorial__image-backdrop" src={post.image} alt="" aria-hidden="true" loading="lazy" decoding="async" />
+        <SocialImage className={post.mobileImage ? "ig-editorial__image ig-editorial__desktop-image" : "ig-editorial__image"} src={post.image} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />
+        {post.mobileImage && <SocialImage className="ig-editorial__image ig-editorial__mobile-image" src={post.mobileImage} alt={post.alt || `Publicación de Instagram ${post.index + 1}`} loading="lazy" decoding="async" />}
       </picture>
       {href && e.editorialShowPostAction && <span className="ig-editorial__post-action" aria-hidden="true">{e.editorialPostText}<ArrowUpRight size={22} /></span>}
     </Tag>;
@@ -131,8 +133,8 @@ export default function InstagramEditorialSection({
   return <section className="ig-editorial" aria-label="Instagram de la tienda" style={vars} data-depth3d={e.editorialDepthEnabled ? 'true' : 'false'} data-motion={e.editorialMotion} data-mobile-wide-last={e.editorialMobileColumns === 2 && visible.length % 2 === 1 ? 'true' : undefined}>
     <div className="ig-editorial__canvas">
       <div className="ig-editorial__scene">
-        {e.editorialShowProfile && <div className="ig-editorial__profile">{profile ? <a href={profile} target="_blank" rel="noopener noreferrer">{e.editorialUseProfileLogo && c.instagramLogo ? <img className="ig-editorial__profile-logo" src={c.instagramLogo} alt="" /> : <Instagram aria-hidden="true" />}<span>{profileLabel}</span></a> : <span>{profileLabel}</span>}</div>}
-        {e.editorialShowTitle && <h2 className="ig-editorial__title" data-title-image={e.editorialUseTitleImage && c.titleImage ? 'true' : undefined}>{e.editorialUseTitleImage && c.titleImage ? <img src={c.titleImage} alt={c.titleAlt || e.editorialTitle} /> : e.editorialTitle}</h2>}
+        {e.editorialShowProfile && <div className="ig-editorial__profile">{profile ? <a href={profile} target="_blank" rel="noopener noreferrer">{e.editorialUseProfileLogo && c.instagramLogo ? <SocialImage className="ig-editorial__profile-logo" src={c.instagramLogo} alt="" /> : <Instagram aria-hidden="true" />}<span>{profileLabel}</span></a> : <span>{profileLabel}</span>}</div>}
+        {e.editorialShowTitle && <h2 className="ig-editorial__title" data-title-image={e.editorialUseTitleImage && c.titleImage ? 'true' : undefined}>{e.editorialUseTitleImage && c.titleImage ? <SocialImage src={c.titleImage} alt={c.titleAlt || e.editorialTitle} /> : e.editorialTitle}</h2>}
         <div className="ig-editorial__photos">{visible.slice(0, 5).map(renderPhoto)}</div>
         <div className="ig-editorial__footer">
           {e.editorialShowFollow && profile && <a className="ig-editorial__follow" href={profile} target="_blank" rel="noopener noreferrer">{e.editorialFollowText}<ArrowUpRight aria-hidden="true" /></a>}

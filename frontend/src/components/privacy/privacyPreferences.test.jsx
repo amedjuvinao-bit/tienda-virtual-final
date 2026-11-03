@@ -29,8 +29,8 @@ it('permite solo mapas y desmonta el contenido al retirar esa elección', () => 
   fixture();
   fireEvent.click(screen.getByRole('button', { name: 'Elegir preferencias' }));
   const dialog = screen.getByRole('dialog');
-  expect(within(dialog).getAllByRole('checkbox').every(input => !input.checked)).toBe(true);
-  fireEvent.click(within(dialog).getByRole('checkbox', { name: /Mapa interactivo/ }));
+  expect(within(dialog).getAllByRole('switch').every(input => !input.checked)).toBe(true);
+  fireEvent.click(within(dialog).getByRole('switch', { name: /Mapa interactivo/ }));
   fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar mi elección' }));
   expect(screen.getByTitle('Mapa de prueba')).toBeInTheDocument();
   expect(screen.queryByTitle('TikTok de prueba')).not.toBeInTheDocument();
@@ -55,7 +55,7 @@ it('Escape descarta una selección sin guardarla y devuelve el foco al botón de
   const trigger = screen.getByRole('button', { name: 'Elegir preferencias' });
   trigger.focus(); fireEvent.click(trigger);
   const dialog = screen.getByRole('dialog');
-  fireEvent.click(within(dialog).getAllByRole('checkbox')[0]);
+  fireEvent.click(within(dialog).getAllByRole('switch')[0]);
   fireEvent.keyDown(dialog, { key: 'Escape' });
   expect(getPrivacyPreference()).toBeNull();
   expect(trigger).toHaveFocus();
