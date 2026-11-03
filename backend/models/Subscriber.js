@@ -45,15 +45,28 @@ const SubscriberSchema = new mongoose.Schema(
 );
 
 // ✅ Validación: debe venir al menos uno (email o phone)
+// En validadores de actualización, `this` es Query y no el documento.
+// Se consultan únicamente los valores propuestos en la actualización.
+function contactValueForValidation(context, field) {
+  if (!(context instanceof mongoose.Query)) return context[field];
+  const update = context.getUpdate() || {};
+  if (Object.prototype.hasOwnProperty.call(update.$unset || {}, field)) {
+    return undefined;
+  }
+  return context.get(field) ?? update.$setOnInsert?.[field];
+}
+
 SubscriberSchema.path('email').validate(function (_v) {
-  const hasEmail = !!(this.email && String(this.email).trim());
-  const hasPhone = !!(this.phone && String(this.phone).trim());
+  const phone = contactValueForValidation(this, 'phone');
+  const hasEmail = !!(_v && String(_v).trim());
+  const hasPhone = !!(phone && String(phone).trim());
   return hasEmail || hasPhone;
 }, 'Debes proporcionar al menos un email o un teléfono.');
 
 SubscriberSchema.path('phone').validate(function (_v) {
-  const hasEmail = !!(this.email && String(this.email).trim());
-  const hasPhone = !!(this.phone && String(this.phone).trim());
+  const email = contactValueForValidation(this, 'email');
+  const hasEmail = !!(email && String(email).trim());
+  const hasPhone = !!(_v && String(_v).trim());
   return hasEmail || hasPhone;
 }, 'Debes proporcionar al menos un email o un teléfono.');
 
