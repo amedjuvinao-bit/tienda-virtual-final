@@ -216,6 +216,7 @@ if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboar
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
 mountInstagramRoutes(app);
 mountTiktokRoutes(app);
+app.use('/api/storefront-media', requireCritical('./routes/storefrontMedia'));
 console.log('Instagram: rutas de conexión y publicaciones registradas.');
 if (adminLoginSettingsRoutes) {
   app.use('/api/admin/login-settings', adminLoginSettingsRoutes);

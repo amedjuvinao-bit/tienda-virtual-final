@@ -53,7 +53,7 @@ try {
   await server.listen();
   for (const width of [1440, 768, 390, 320]) {
     browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
-      headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--single-process', '--no-zygote'] });
+      headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     const page = await context.newPage();
     currentPage = page;
@@ -94,7 +94,7 @@ try {
     await page.getByRole('button', { name: 'Explorar mapa' }).click();
     await page.locator('iframe[src*="openstreetmap"]').waitFor();
     assert(!requests.some(url => /tiktok|instagram|fonts\.(googleapis|gstatic)|wompi/.test(url)));
-    await page.getByRole('button', { name: 'Ver video: Video de la tienda', exact: true }).click();
+    await page.getByRole('button', { name: 'Reproducir: Video de la tienda', exact: true }).click();
     assert(!requests.some(url => /tiktok|instagram/.test(new URL(url).hostname)), 'Clicking play alone does not grant consent');
     await page.getByRole('button', { name: 'Permitir redes', exact: true }).click();
     await page.getByTitle('Video de TikTok: Video de la tienda').waitFor();

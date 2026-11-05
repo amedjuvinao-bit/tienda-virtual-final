@@ -26,7 +26,7 @@ function JournalReelPlayerContent({ post, src, onExpand }) {
   return <div className="ig-reel" data-playing={playing}>
     <SocialImage className="ig-reel__ambience" src={post.image} alt="" aria-hidden="true" decoding="async" />
     <div className="ig-reel__shade" aria-hidden="true" />
-    <video ref={video} src={src} poster={privacy.image(post.image)} playsInline preload="metadata"
+    <video ref={video} src={privacy.video(src)} poster={privacy.image(post.image)} playsInline preload="metadata"
       aria-label={`Reel: ${post.alt || 'Publicación de Instagram'}`} onClick={toggle}
       onLoadedMetadata={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
       onDurationChange={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}

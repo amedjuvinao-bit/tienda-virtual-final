@@ -353,7 +353,7 @@ function TikTokThumbnail({
     >
       {playing && hasDirectVideo && privacy.canLoad(videoUrl) ? (
         <video
-          src={videoUrl}
+          src={privacy.video(videoUrl)}
           className="absolute inset-0 w-full h-full"
           autoPlay
           muted
@@ -378,6 +378,7 @@ function TikTokThumbnail({
         >
           <iframe
             src={embedUrl}
+            referrerPolicy="no-referrer"
             className="absolute inset-0 w-full h-full border-0"
             frameBorder="0"
             scrolling="no"

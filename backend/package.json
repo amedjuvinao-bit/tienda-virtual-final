@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "test:social-media-delivery": "node --test test/socialMediaRelay.test.js",
     "test:newsletter-consent": "node scripts/testNewsletterConsent.js",
     "test:newsletter-admin": "node --test scripts/testAdminNewsletterSubscribers.cjs",
     "test:privacy-preferences": "node --test scripts/testPrivacyPreferencesPolicy.cjs",

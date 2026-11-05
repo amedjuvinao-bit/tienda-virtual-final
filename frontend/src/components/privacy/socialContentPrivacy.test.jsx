@@ -5,6 +5,8 @@ import SocialContentPrivacy, { isStoreMedia } from './SocialContentPrivacy';
 import InstagramSection from '../InstagramSection';
 import TiktokSection from '../TiktokSection';
 import { getPrivacyPreference, savePrivacyPreference, PRIVACY_PREFERENCES_KEY as key } from '../../lib/privacyPreferences';
+import { isSocialMediaFile, storeSocialMedia } from '../../lib/socialMediaDelivery';
+import JournalReelPlayer from '../instagram/JournalReelPlayer';
 
 const own = '/instagram/journal-satin.webp';
 const external = 'https://www.instagram.com/optional.jpg';
@@ -39,7 +41,8 @@ it('permite un reproductor mediante una decisión explícita sin cambiar la elec
   expect(screen.getByRole('region', { name: 'Videos de TikTok' })).toBeInTheDocument();
   expect(container.querySelector(`img[src="${own}"]`)).not.toBeNull();
   expect(container.querySelector('iframe,video')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Ver video: Nuestra colección' }));
+  expect(screen.getByRole('button', { name: 'Pantalla completa' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir: Nuestra colección' }));
   expect(container.querySelector('iframe,video')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Permitir redes' }));
   expect(getPrivacyPreference().choices).toEqual({ social: true, maps: true });
@@ -47,6 +50,49 @@ it('permite un reproductor mediante una decisión explícita sin cambiar la elec
   act(() => savePrivacyPreference({ social: false, maps: true }));
   expect(container.querySelector('iframe,video')).toBeNull();
   expect(screen.getByRole('region', { name: 'Videos de TikTok' })).toBeInTheDocument();
+});
+it('muestra las mismas fotos de las redes desde el backend antes y después de rechazar, sin cuadros de cristal', () => {
+  const source = 'https://scontent.cdninstagram.com/photo.jpg?signature=public';
+  for (const layout of ['journal', 'editorial']) {
+    const theme = ig(layout); theme.sections[0].config.posts = [{ id: 'one', image: source, alt: 'La misma foto' }];
+    theme.sections[0].config.journalAvatarImage = source; theme.sections[0].config.journalHighlights = [];
+    const { container, unmount } = mount(<InstagramSection theme={theme} />);
+    expect(container.querySelector('img')).toHaveAttribute('src', storeSocialMedia(source));
+    expect(container.querySelector('[data-privacy-placeholder]')).toBeNull();
+    act(() => savePrivacyPreference({ social: false, maps: false }));
+    expect(container.querySelector('img')).toHaveAttribute('src', storeSocialMedia(source));
+    expect(container.querySelector('.privacy-social-note')).toBeNull();
+    unmount();
+  }
+});
+it('conserva los controles del reel de Instagram y sirve su video por el backend sin permiso social', () => {
+  const source = 'https://video.cdninstagram.com/reel.mp4';
+  const { container } = mount(<JournalReelPlayer post={{ image: own, alt: 'Reel propio' }} src={source} onExpand={() => {}} />);
+  expect(container.querySelector('video')).toHaveAttribute('src', storeSocialMedia(source, 'video'));
+  expect(screen.getByRole('button', { name: 'Reproducir reel', exact: true })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ampliar reel' })).toBeInTheDocument();
+});
+it('reconoce archivos CDN y rechaza páginas, reproductores y dominios similares', () => {
+  expect(isSocialMediaFile('https://p16-sign-sg.tiktokcdn.com/cover.jpg')).toBe(true);
+  for (const value of [external, 'https://www.tiktok.com/player/v1/123', 'https://cdninstagram.com.evil.test/a', 'https://cdninstagram.com@evil.test/a', 'https://scontent.cdninstagram.com/a?access_token=private']) expect(isSocialMediaFile(value)).toBe(false);
+});
+it('cerrar la solicitud de TikTok conserva la tarjeta y no concede autorización', () => {
+  const { container } = mount(<TiktokSection theme={tk('stage')} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir: Nuestra colección' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }));
+  expect(getPrivacyPreference()).toBeNull();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(container.querySelector('iframe')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Pantalla completa' })).toBeInTheDocument();
+});
+it('cancelar la reproducción solicitada al elegir una tarjeta no deja un inicio automático pendiente', () => {
+  const { container } = mount(<TiktokSection theme={tk('stage')} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar video: Nuestra colección' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }));
+  act(() => savePrivacyPreference({ social: true, maps: false }));
+  expect(container.querySelector('iframe')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir: Nuestra colección' }));
+  expect(screen.getByTitle('Video de TikTok: Nuestra colección')).toBeInTheDocument();
 });
 it('mantiene las tarjetas antiguas y evita que pasar el mouse cargue un iframe sin permiso', () => {
   const { container } = mount(<TiktokSection theme={tk('legacy')} />);

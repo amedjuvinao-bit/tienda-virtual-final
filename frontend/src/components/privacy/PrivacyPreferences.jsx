@@ -111,7 +111,7 @@ export default function PrivacyPreferences() {
   return (
     <>
       {visible ? <><div aria-hidden="true" style={{ height: bannerHeight }} /><section className="privacy-preferences-banner" ref={banner} aria-label="Cookies y contenidos externos">
-        <div className="privacy-banner-copy"><ShieldCheck className="privacy-banner-mark" size={22} aria-hidden="true" /><div><h2>Tu privacidad</h2><p>Usamos lo necesario para que compres. Tú eliges si cargas contenidos de Instagram, TikTok y el mapa. <a className="privacy-policy-link" href="/privacidad#privacy-cookies">Más información</a></p></div>
+        <div className="privacy-banner-copy"><ShieldCheck className="privacy-banner-mark" size={22} aria-hidden="true" /><div><h2>Tu privacidad</h2><p>Usamos lo necesario para que compres. Tú eliges si conectas reproductores externos y el mapa. <a className="privacy-policy-link" href="/privacidad#privacy-cookies">Más información</a></p></div>
         </div>
         <div className="privacy-preferences-actions">
           <button type="button" aria-label="Rechazar opcionales" onClick={() => save(rejected, 'reject_optional')}>Rechazar</button>
