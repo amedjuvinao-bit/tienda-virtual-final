@@ -5,13 +5,21 @@ const ORIGIN = 'https://www.tiktok.com';
 const clock = seconds => `${Math.floor((Number(seconds)||0)/60)}:${String(Math.floor((Number(seconds)||0)%60)).padStart(2,'0')}`;
 export default function TiktokPlayer({ post, settings:s, requestPlay = false }) {
   return <SocialPlayback src={post.videoUrl || (post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}` : '')} poster={post.image} title={post.title} provider="TikTok" requestPlay={requestPlay} preserveControls>
-    {(requested, access) => <TiktokPlayerContent post={post} settings={s} requestPlay={requested} access={access} />}
+    {(requested, access) => (
+      <TiktokPlayerContent
+        key={access.allowed ? 'playback' : 'preview'}
+        post={post}
+        settings={s}
+        requestPlay={access.allowed && requested}
+        access={access}
+      />
+    )}
   </SocialPlayback>;
 }
 function TiktokPlayerContent({ post, settings:s, requestPlay = false, access }) {
   const privacy = useSocialContentPrivacy();
   const host = useRef(null), iframe = useRef(null), video = useRef(null);
-  const [started,setStarted] = useState(requestPlay && access.allowed), [ready,setReady] = useState(false), [playing,setPlaying] = useState(false);
+  const [started,setStarted] = useState(requestPlay), [ready,setReady] = useState(false), [playing,setPlaying] = useState(false);
   const [muted,setMuted] = useState(s.stageMuted), [time,setTime] = useState(0), [duration,setDuration] = useState(Number(post.duration)||0), [error,setError] = useState('');
   const mutedRef=useRef(muted);mutedRef.current=muted;
   const isDirect = Boolean(post.videoUrl), playable = isDirect || Boolean(post.tiktokId);
@@ -25,10 +33,6 @@ function TiktokPlayerContent({ post, settings:s, requestPlay = false, access }) 
     if (isDirect) { if (playing) video.current?.pause(); else video.current?.play()?.catch(fail); }
     else message(playing ? 'pause' : 'play');
   };
-  useEffect(() => {
-    if (!access.allowed) { setStarted(false); setReady(false); setPlaying(false); setError(''); }
-    else if (requestPlay) setStarted(true);
-  }, [access.allowed, requestPlay]);
   useEffect(() => {
     const receive = event => {
       if (event.origin !== ORIGIN || event.source !== iframe.current?.contentWindow || event.data?.['x-tiktok-player'] !== true) return;
