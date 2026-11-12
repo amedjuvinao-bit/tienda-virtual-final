@@ -46,7 +46,7 @@ export function SocialImage({ src, alt = '', ...props }) {
 
 // Keep the section and its own cover visible. Only mount an external player
 // after an informed choice; this boundary also unmounts it on withdrawal.
-export function SocialPlayback({ src, poster, title, provider, requestPlay = false, preserveControls = false, children }) {
+export function SocialPlayback({ src, poster, title, provider, requestPlay = false, preserveControls = false, allowLabel = 'Permitir redes', children }) {
   const privacy = useSocialContentPrivacy();
   const decision = usePrivacyPreferences();
   const allowed = !src || privacy.canLoad(src);
@@ -57,7 +57,7 @@ export function SocialPlayback({ src, poster, title, provider, requestPlay = fal
     wasAllowed.current = allowed;
   }, [allowed]);
   if (preserveControls) return <>{children(requested, { allowed, request: () => setRequested(true) })}
-    {requested && !allowed && <PlaybackConsent title={title} provider={provider} onClose={() => setRequested(false)} onAllow={() => {
+    {requested && !allowed && <PlaybackConsent title={title} provider={provider} allowLabel={allowLabel} onClose={() => setRequested(false)} onAllow={() => {
       savePrivacyPreference({ social: true, maps: decision?.choices.maps === true }, 'custom');
     }} />}</>;
   if (allowed) return children(requested);
@@ -77,7 +77,7 @@ export function SocialPlayback({ src, poster, title, provider, requestPlay = fal
   </div>;
 }
 
-function PlaybackConsent({ title, provider, onClose, onAllow }) {
+function PlaybackConsent({ title, provider, allowLabel, onClose, onAllow }) {
   const dialog = useRef(null);
   useEffect(() => {
     const previous = document.activeElement, element = dialog.current;
@@ -86,13 +86,13 @@ function PlaybackConsent({ title, provider, onClose, onAllow }) {
     element.querySelector('button')?.focus();
     return () => { element.close?.(); previous?.focus?.({ preventScroll: true }); };
   }, []);
-  return createPortal(<dialog ref={dialog} className="privacy-playback-dialog" aria-labelledby="privacy-playback-title" onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+  return createPortal(<dialog ref={dialog} className="privacy-playback-dialog" aria-labelledby="privacy-playback-title" onCancel={onClose} onClick={event => { event.stopPropagation(); if (event.target === event.currentTarget) onClose(); }}>
     <div className="privacy-video-choice">
       <button type="button" className="privacy-video-close" aria-label="Cerrar aviso del video" onClick={onClose}><X size={17} /></button>
       <ShieldCheck size={19} aria-hidden="true" />
       <strong id="privacy-playback-title">Reproducir con {provider}</strong>
-      <p>Para ver «{title}», se conectará tu navegador con {provider}. Podrá recibir tu IP y usar cookies. Permitir redes activa Instagram y TikTok; puedes cambiarlo en Cookies y preferencias.</p>
-      <div className="privacy-preferences-actions"><button type="button" onClick={onClose}>Ahora no</button><button type="button" onClick={onAllow}>Permitir redes</button></div>
+      <p>Para ver «{title}», se conectará tu navegador con {provider}. Podrá recibir tu IP y usar cookies. El permiso se aplica a Instagram y TikTok. Puedes retirarlo en Cookies y preferencias.</p>
+      <div className="privacy-preferences-actions"><button type="button" onClick={onClose}>Ahora no</button><button type="button" onClick={onAllow}>{allowLabel}</button></div>
       <a href="/privacidad#privacy-cookies">Más información</a>
     </div>
   </dialog>, document.body);

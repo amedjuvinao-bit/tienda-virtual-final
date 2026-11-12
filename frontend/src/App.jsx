@@ -138,7 +138,7 @@ function Home({ theme, store }) {
         {storySectionOrder(theme?.sections).filter(id=>isStorefrontSectionVisible(theme,id)).map(id=>{
           const Component=components[id];
           const content = <Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/>;
-          return <section key={id} id={id} className="storefront-section-shell w-full">{id === 'instagram' ? <SocialContentPrivacy>{content}</SocialContentPrivacy> : content}</section>;
+          return <section key={id} id={id} className="storefront-section-shell w-full">{['instagram', 'tiktok'].includes(id) ? <SocialContentPrivacy>{content}</SocialContentPrivacy> : content}</section>;
         })}
         <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
       </StorefrontStory>

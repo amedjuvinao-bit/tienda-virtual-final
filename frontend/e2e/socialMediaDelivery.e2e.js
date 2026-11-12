@@ -122,7 +122,7 @@ try {
     assert.equal(await page.locator('iframe').count(), 0);
     assert(await stage.getByRole('button', { name: 'Pantalla completa' }).isVisible());
     await stage.getByRole('button', { name: 'Reproducir: Video elegido', exact: true }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Permitir redes' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Permitir y reproducir' }).click();
     await stage.locator('iframe').waitFor();
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('rb_privacy_preferences_v1')).choices.maps), true);
     await page.getByRole('button', { name: 'Retirar redes' }).click();

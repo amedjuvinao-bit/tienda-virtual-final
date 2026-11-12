@@ -44,7 +44,7 @@ it('permite un reproductor mediante una decisión explícita sin cambiar la elec
   expect(screen.getByRole('button', { name: 'Pantalla completa' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Reproducir: Nuestra colección' }));
   expect(container.querySelector('iframe,video')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Permitir redes' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Permitir y reproducir' }));
   expect(getPrivacyPreference().choices).toEqual({ social: true, maps: true });
   expect(screen.getByTitle('Video de TikTok: Nuestra colección')).toBeInTheDocument();
   act(() => savePrivacyPreference({ social: false, maps: true }));
@@ -101,9 +101,58 @@ it('mantiene las tarjetas antiguas y evita que pasar el mouse cargue un iframe s
   fireEvent.mouseEnter(link);
   expect(container.querySelector('iframe,video')).toBeNull();
   expect(container.querySelector(`img[src="${own}"]`)).not.toBeNull();
+  const play = link.parentElement.querySelector('.tk-legacy-play');
+  fireEvent.click(play);
+  expect(container.querySelector('iframe')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Permitir y reproducir' }));
+  expect(container.querySelectorAll('iframe')).toHaveLength(1);
+  act(() => savePrivacyPreference({ social: false, maps: false }));
+  expect(container.querySelector('iframe')).toBeNull();
 });
 it('mantiene la vista previa del editor y sus imágenes sin aplicar el control público', () => {
   const { container } = render(<InstagramSection theme={ig('journal')} />);
   expect(container.querySelector(`img[src="${external}"]`)).not.toBeNull();
   expect(screen.queryByRole('button', { name: 'Gestionar redes' })).not.toBeInTheDocument();
+});
+
+it('conserva la portada y el enlace original si falla el reproductor autorizado de TikTok', () => {
+  const { container } = mount(<TiktokSection theme={tk('stage')} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir: Nuestra colección' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Permitir y reproducir' }));
+  const frame = screen.getByTitle('Video de TikTok: Nuestra colección');
+  expect(frame).toHaveAttribute('src', expect.stringContaining('https://www.tiktok.com/player/v1/1234567890123456789'));
+  expect(frame).toHaveAttribute('aria-hidden', 'true');
+  const sendPlayerEvent = (type, value) => fireEvent(window, new MessageEvent('message', {
+    origin: 'https://www.tiktok.com',
+    source: frame.contentWindow,
+    data: { 'x-tiktok-player': true, type, value },
+  }));
+  sendPlayerEvent('onPlayerReady');
+  expect(frame).toHaveAttribute('aria-hidden', 'false');
+  sendPlayerEvent('onPlayerError', { errorCode: 3002 });
+  expect(frame).toBeInTheDocument();
+  sendPlayerEvent('onPlayerError', { errorCode: 2001 });
+  expect(container.querySelector('iframe')).toBeNull();
+  expect(container.querySelector(`img[src="${own}"]`)).toBeInTheDocument();
+  expect(container.querySelector('.tk-player__error')).toHaveTextContent('No se pudo reproducir este video aquí.');
+  expect(screen.getByText('Ver en TikTok', { exact: false, selector: '.tk-player__error a' })).toHaveAttribute(
+    'href', 'https://www.tiktok.com/@store/video/1234567890123456789',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+  expect(screen.getByTitle('Video de TikTok: Nuestra colección')).toBeInTheDocument();
+});
+
+for (const layout of ['stage', 'legacy']) it(`muestra TikTok como texto en el diseño ${layout}`, () => {
+  const theme = tk(layout);
+  Object.assign(theme.sections[0].config, {
+    stageShowBrand: true,
+    titleImage: '/SeccionTikTok/tituloTIKTOK.png',
+    tiktokLogo: '/SeccionTikTok/LogoTiktok.svg',
+    hoverLogoImage: '/icons/Tiktok.svg',
+    watermarkEnabled: true,
+    watermarkImage: '/icons/Tiktok.svg',
+  });
+  const { container } = mount(<TiktokSection theme={theme} />);
+  expect(container.querySelector('.tk-brand')).toHaveTextContent('TikTok');
+  expect(container.querySelector('.tk-brand svg, img[src="/SeccionTikTok/tituloTIKTOK.png"], img[src="/SeccionTikTok/LogoTiktok.svg"], img[src="/icons/Tiktok.svg"]')).toBeNull();
 });
