@@ -1,27 +1,8 @@
-import { SocialImage, SocialPlayback, useSocialContentPrivacy } from '../privacy/SocialContentPrivacy';
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, ArrowUpRight } from 'lucide-react';
 const ORIGIN = 'https://www.tiktok.com';
 const clock = seconds => `${Math.floor((Number(seconds)||0)/60)}:${String(Math.floor((Number(seconds)||0)%60)).padStart(2,'0')}`;
-export default function TiktokPlayer({ post, settings, requestPlay = false }) {
-  const source = post.videoUrl || (post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}` : '');
-  return (
-    <SocialPlayback src={source} poster={post.image} title={post.title} provider="TikTok" requestPlay={requestPlay} preserveControls>
-      {(requested, access) => (
-        <TiktokPlayerContent
-          key={access.allowed ? 'playback' : 'preview'}
-          post={post}
-          settings={settings}
-          requestPlay={access.allowed && requested}
-          requestAccess={access.allowed ? undefined : access.request}
-        />
-      )}
-    </SocialPlayback>
-  );
-}
-
-function TiktokPlayerContent({ post, settings:s, requestPlay = false, requestAccess }) {
-  const privacy = useSocialContentPrivacy();
+export default function TiktokPlayer({ post, settings:s, requestPlay = false }) {
   const host = useRef(null), iframe = useRef(null), video = useRef(null);
   const [started,setStarted] = useState(requestPlay), [ready,setReady] = useState(false), [playing,setPlaying] = useState(false);
   const [muted,setMuted] = useState(s.stageMuted), [time,setTime] = useState(0), [duration,setDuration] = useState(Number(post.duration)||0), [error,setError] = useState('');
@@ -32,7 +13,6 @@ function TiktokPlayerContent({ post, settings:s, requestPlay = false, requestAcc
   const fail = () => { setPlaying(false); setError('No se pudo reproducir este video aquí.'); };
   const play = () => {
     if (!playable) return;
-    if (requestAccess) { requestAccess(); return; }
     if (!started) { setStarted(true); return; }
     if (isDirect) { if (playing) video.current?.pause(); else video.current?.play()?.catch(fail); }
     else message(playing ? 'pause' : 'play');
@@ -68,9 +48,9 @@ function TiktokPlayerContent({ post, settings:s, requestPlay = false, requestAcc
   };
   const frame = post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}?controls=0&autoplay=1&loop=${s.stageLoop?1:0}&description=0&music_info=0&rel=0` : '';
   return <div className="tk-player" ref={host} style={{'--tk-fit':s.stageFit,'--tk-position':`${post.positionX}% ${post.positionY}%`}}>
-    {post.image && <SocialImage className="tk-player__poster" src={post.image} alt={post.title} draggable="false" style={{opacity:ready?0:1}} />}
-    {started && !requestAccess && isDirect && <video ref={video} src={privacy.video(post.videoUrl)} poster={privacy.image(post.image) || undefined} autoPlay playsInline muted={muted} loop={s.stageLoop} preload="metadata" onLoadedMetadata={e=>setDuration(e.currentTarget.duration)} onPlaying={()=>{if(!chapterVisible()){video.current?.pause();setPlaying(false);return;}setReady(true);setPlaying(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onError={fail} />}
-    {started && !requestAccess && !isDirect && frame && <iframe ref={iframe} title={`Video de TikTok: ${post.title}`} src={frame} allow="autoplay; fullscreen; encrypted-media" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />}
+    {post.image && <img className="tk-player__poster" src={post.image} alt={post.title} draggable="false" style={{opacity:ready?0:1}} />}
+    {started && isDirect && <video ref={video} src={post.videoUrl} poster={post.image || undefined} autoPlay playsInline muted={muted} loop={s.stageLoop} preload="metadata" onLoadedMetadata={e=>setDuration(e.currentTarget.duration)} onPlaying={()=>{if(!chapterVisible()){video.current?.pause();setPlaying(false);return;}setReady(true);setPlaying(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onError={fail} />}
+    {started && !isDirect && frame && <iframe ref={iframe} title={`Video de TikTok: ${post.title}`} src={frame} allow="autoplay; fullscreen; encrypted-media" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />}
     {!post.image && !started && <div className="tk-player__empty"><span>♪</span><p>{post.title}</p></div>}
     {playable && !playing && !error && <button type="button" className="tk-player__play" aria-label={`Reproducir: ${post.title}`} onClick={play}><Play fill="currentColor" size={36} /></button>}
     {post.link && <a className="tk-player__external" href={post.link} target="_blank" rel="noopener noreferrer" aria-label={`${s.stageVideoText}: ${post.title}`}><ArrowUpRight size={25}/></a>}

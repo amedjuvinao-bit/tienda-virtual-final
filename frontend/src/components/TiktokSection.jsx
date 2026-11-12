@@ -1,4 +1,3 @@
-import { SocialImage, useSocialContentPrivacy } from './privacy/SocialContentPrivacy';
 // src/components/TiktokSection.jsx
 import TiktokStage from './tiktok/TiktokStage';
 import React, { useMemo, useState } from "react";
@@ -95,7 +94,7 @@ function renderHoverLogo(config) {
 
   if ((logoStyle === "custom-image" || logoStyle === "square") && customHoverLogo) {
     return (
-      <SocialImage
+      <img
         src={customHoverLogo}
         alt="TikTok"
         draggable={false}
@@ -290,7 +289,6 @@ function TikTokThumbnail({
   cardStyle,
 }) {
   const [playing, setPlaying] = useState(false);
-  const privacy = useSocialContentPrivacy();
 
   const link = post?.link || "#";
   const thumb = post?.thumb || post?.image || "";
@@ -351,9 +349,9 @@ function TikTokThumbnail({
         setPlaying(false);
       }}
     >
-      {playing && hasDirectVideo && privacy.canLoad(videoUrl) ? (
+      {playing && hasDirectVideo ? (
         <video
-          src={privacy.video(videoUrl)}
+          src={videoUrl}
           className="absolute inset-0 w-full h-full"
           autoPlay
           muted
@@ -368,7 +366,7 @@ function TikTokThumbnail({
             display: "block",
           }}
         />
-      ) : playing && embedUrl && privacy.canLoad(embedUrl) ? (
+      ) : playing && embedUrl ? (
         <div
           className="absolute inset-0 overflow-hidden"
           style={{
@@ -378,7 +376,6 @@ function TikTokThumbnail({
         >
           <iframe
             src={embedUrl}
-            referrerPolicy="no-referrer"
             className="absolute inset-0 w-full h-full border-0"
             frameBorder="0"
             scrolling="no"
@@ -395,7 +392,7 @@ function TikTokThumbnail({
           />
         </div>
       ) : thumb || image ? (
-        <SocialImage
+        <img
           src={thumb || image}
           alt="TikTok thumbnail"
           draggable={false}
@@ -452,7 +449,6 @@ function TikTokThumbnail({
 }
 
 function LegacyTiktokSection({ theme, posts = [] }) {
-  const privacy = useSocialContentPrivacy();
   const [hoveredId, setHoveredId] = useState(null);
   const [mobileActiveId, setMobileActiveId] = useState(null);
 
@@ -515,7 +511,7 @@ function LegacyTiktokSection({ theme, posts = [] }) {
 
   const watermarkEnabled =
     typeof config.watermarkEnabled === "boolean" ? config.watermarkEnabled : false;
-  const watermarkImage = privacy.image(config.watermarkImage) || "";
+  const watermarkImage = config.watermarkImage || "";
   const watermarkRepeat =
     typeof config.watermarkRepeat === "boolean" ? config.watermarkRepeat : false;
   const watermarkOpacity = clampNumber(config.watermarkOpacity ?? 0.12, 0, 1);
@@ -736,7 +732,7 @@ function LegacyTiktokSection({ theme, posts = [] }) {
               }}
             />
           ) : (
-            <SocialImage
+            <img
               src={watermarkImage}
               alt=""
               aria-hidden="true"
@@ -751,7 +747,7 @@ function LegacyTiktokSection({ theme, posts = [] }) {
       <div className="relative z-10">
         <div className="mb-4 text-center tiktok-mobile-head">
           {config.titleImage ? (
-            <SocialImage
+            <img
               src={config.titleImage}
               alt={config.titleAlt || "Síguenos en TikTok"}
               className="mx-auto w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto object-contain"
@@ -771,7 +767,7 @@ function LegacyTiktokSection({ theme, posts = [] }) {
             style={bigLogoAnimationStyle}
           >
             {config.tiktokLogo ? (
-              <SocialImage
+              <img
                 src={config.tiktokLogo}
                 alt="TikTok Logo"
                 draggable={false}
@@ -916,7 +912,7 @@ function LegacyTiktokSection({ theme, posts = [] }) {
                   }}
                 >
                   {config.tiktokLogo ? (
-                    <SocialImage
+                    <img
                       src={config.tiktokLogo}
                       alt="TikTok Logo"
                       draggable={false}
