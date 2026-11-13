@@ -39,6 +39,7 @@ import {BrowserRouter,Routes,Route} from 'react-router-dom';
 import Header from '/src/components/Header.jsx';
 import FooterSection from '/src/components/FooterSection.jsx';
 import ConsumerLinks from '/src/components/consumer/ConsumerLinks.jsx';
+import ScrollButton from '/src/components/ScrollButton.jsx';
 import CategoriasSection from '/src/components/CategoriasSection.jsx';
 import DynamicPage from '/src/pages/DynamicPage.jsx';
 import StorefrontScrollRestoration from '/src/components/StorefrontScrollRestoration.jsx';
@@ -51,8 +52,8 @@ import '/src/index.css';
 const settings=${JSON.stringify(settings)};
 settings.theme.sections=[CATEGORIAS_SECTION_DEFAULTS];
 applyTheme(settings.theme);
-function Home(){return <><Header/><StorefrontStory config={settings.theme.global.sectionMotion}><section id="banner" style={{height:520,paddingTop:150}}><h1>Mi negocio</h1></section><section id="categorias" className="storefront-section-shell w-full"><CategoriasSection theme={settings.theme}/></section><section id="footer"><FooterSection theme={settings.theme} store={settings.store}/></section></StorefrontStory></>;}
-createRoot(document.getElementById('root')).render(<BrowserRouter><StorefrontSettingsContext.Provider value={settings}><StorefrontScrollRestoration/><Routes><Route path="/" element={<Home/>}/>{CATALOG_PAGES.map(({slug,publicPath})=><Route key={slug} path={publicPath} element={<DynamicPage fixedSlug={slug} theme={settings.theme}/>}/>)}<Route path="/producto/:id" element={<h1>Detalle de prueba</h1>}/><Route path="*" element={<h1>Ruta de prueba sin resolver</h1>}/></Routes><ConsumerLinks/></StorefrontSettingsContext.Provider></BrowserRouter>);`);
+function Home(){return <><Header/>{location.search === '?legal-links' && <ScrollButton config={{sectionIds:['banner','categorias','footer'],behavior:'auto'}}/>}<StorefrontStory config={settings.theme.global.sectionMotion}><section id="banner" style={{height:520,paddingTop:150}}><h1>Mi negocio</h1></section><section id="categorias" className="storefront-section-shell w-full"><CategoriasSection theme={settings.theme}/></section><section id="footer"><FooterSection theme={settings.theme} store={settings.store}/></section></StorefrontStory></>;}
+createRoot(document.getElementById('root')).render(<BrowserRouter><StorefrontSettingsContext.Provider value={settings}><StorefrontScrollRestoration/><Routes><Route path="/" element={<Home/>}/>{CATALOG_PAGES.map(({slug,publicPath})=><Route key={slug} path={publicPath} element={<DynamicPage fixedSlug={slug} theme={settings.theme}/>}/>)}<Route path="/privacidad" element={<h1>Datos personales</h1>}/><Route path="/producto/:id" element={<h1>Detalle de prueba</h1>}/><Route path="*" element={<h1>Ruta de prueba sin resolver</h1>}/></Routes><ConsumerLinks/></StorefrontSettingsContext.Provider></BrowserRouter>);`);
 
 let browser, page;
 const results = [], queries = [], errors = [], mutations = [];
@@ -176,6 +177,26 @@ try {
     await page.evaluate(() => scrollTo({top:0, behavior:'instant'}));
     await page.screenshot({ path: `${artifactDirectory}/novedades-${width}.png`, fullPage: true });
   }
+  await page.setViewportSize({ width: 1280, height: 805 });
+  await page.goto(base + "/?legal-links");
+  const legalNav = page.getByRole("navigation", { name: "Información y protección al consumidor" });
+  const privacyLink = legalNav.getByRole("link", { name: "Datos personales", exact: true });
+  await privacyLink.scrollIntoViewIfNeeded();
+  const previousSection = page.getByRole("button", { name: "Sección anterior", exact: true });
+  await previousSection.evaluate(button => {
+    const link = document.querySelector('.consumer-legal-links a[href="/privacidad"]');
+    const { x, y, width, height } = link.getBoundingClientRect();
+    const dock = button.parentElement;
+    Object.assign(dock.style, {
+      left: `${x + (width - button.offsetWidth) / 2}px`,
+      bottom: `${innerHeight - y - (height + button.offsetHeight) / 2}px`,
+      transform: "none",
+    });
+  });
+  await privacyLink.click();
+  await page.waitForURL(base + "/privacidad");
+  await page.getByRole("heading", { name: "Datos personales", exact: true }).waitFor();
+  results.push("Datos personales abre desde el pie aunque coincida con una flecha flotante");
   for (const definition of CATALOG_PAGES.filter(item => item.category)) {
     assert(queries.some(value => new URLSearchParams(value).getAll("categoryScope").includes(definition.category)), definition.slug);
   }

@@ -1,4 +1,6 @@
 .consumer-legal-links {
+  position: relative;
+  z-index: 51; /* Keep legal links above the floating section controls. */
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
