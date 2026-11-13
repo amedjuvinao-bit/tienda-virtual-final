@@ -29,6 +29,31 @@ const INVENTORY_FILTER_VALUES = new Set([
   'low_stock',
 ]);
 
+const CATALOG_GAPS = Object.freeze({
+  category: {
+    $and: [
+      { $or: [{ category: null }, { category: '' }] },
+      { $or: [{ categories: { $exists: false } }, { categories: { $size: 0 } }] },
+      { primaryCategoryRef: null },
+      { 'categoryRefs.0': { $exists: false } },
+    ],
+  },
+  image: {
+    $and: [
+      { $or: [{ image: null }, { image: '' }] },
+      { $or: [{ images: { $exists: false } }, { images: { $size: 0 } }] },
+    ],
+  },
+});
+
+async function getCatalogAlertCounts() {
+  const filter = { archivedAt: null, active: { $ne: false } };
+  const [category, image] = await Promise.all(
+    Object.values(CATALOG_GAPS).map((gap) => Product.countDocuments({ ...filter, ...gap })),
+  );
+  return { category, image };
+}
+
 const SORT_OPTIONS = Object.freeze({
   '-createdAt': { createdAt: -1, _id: -1 },
   createdAt: { createdAt: 1, _id: 1 },
@@ -142,6 +167,7 @@ function parseAdminProductCatalogQuery(query = {}) {
     ),
     categoryId: parseOptionalObjectId(query.categoryId, 'categoryId'),
     collectionId: parseOptionalObjectId(query.collectionId, 'collectionId'),
+    missing: typeof query.missing === 'string' && Object.hasOwn(CATALOG_GAPS, query.missing) ? query.missing : '',
     tag,
     sortKey,
     sort: SORT_OPTIONS[sortKey],
@@ -195,6 +221,10 @@ function buildBaseMatch(options) {
 
   if (options.collectionId) {
     match.collectionRefs = options.collectionId;
+  }
+
+  if (options.missing) {
+    match.$and = [...(match.$and || []), { active: { $ne: false } }, CATALOG_GAPS[options.missing]];
   }
 
   if (options.tag) {
@@ -713,6 +743,7 @@ async function updateProductsInBulk({
 }
 
 module.exports = {
+  getCatalogAlertCounts,
   BULK_UPDATE_ACTIONS,
   DEFAULT_LIMIT,
   MAX_BULK_IDS,

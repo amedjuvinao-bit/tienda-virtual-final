@@ -161,3 +161,26 @@ it("no aplica una actualización iniciada antes de que el operador comience a es
   );
   await waitFor(() => expect(api.post.mock.calls[0][1].revision).toBe(2));
 });
+
+it("abre desde la campana un radicado exacto y permite responderlo sin buscar en el listado", async () => {
+  const caseId = "507f1f77bcf86cd799439011";
+  api.get.mockResolvedValue({
+    data: { cases: [{ id: caseId, reference: "PQR-ANTERIOR", status: "received", revision: 2,
+      subject: "Radicado de la campana", history: [] }], next: "" },
+  });
+  api.post.mockResolvedValue({ data: { ok: true } });
+
+  render(<ConsumerCasesPanel caseId={caseId} />);
+  const response = await screen.findByLabelText("Respuesta pública");
+  expect(api.get).toHaveBeenCalledWith("/api/consumer/admin/cases", {
+    params: { before: "", caseId },
+  });
+  expect(screen.getByRole("heading", { name: "Radicado de la campana" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Estado")).toHaveValue("in_review");
+  fireEvent.change(response, { target: { value: "Respuesta desde la campana de alertas." } });
+  fireEvent.click(screen.getByRole("button", { name: "Publicar respuesta en el radicado" }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith(
+    `/api/consumer/admin/cases/${caseId}/replies`,
+    { revision: 2, status: "in_review", message: "Respuesta desde la campana de alertas." },
+  ));
+});

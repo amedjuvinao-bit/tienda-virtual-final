@@ -7,7 +7,9 @@ import {
 } from "../../components/consumer/consumerCaseModel";
 import "../components/consumerAdmin.css";
 import ConsumerAssistedRecovery from "./ConsumerAssistedRecovery";
-export default function ConsumerCasesPanel({ order }) {
+import { ADMIN_ALERTS_CHANGED } from "../notifications/adminAlertsApi";
+
+export default function ConsumerCasesPanel({ order, caseId = "" }) {
   const [cases, setCases] = useState([]),
     [next, setNext] = useState(""),
     [selected, setSelected] = useState(""),
@@ -23,6 +25,7 @@ export default function ConsumerCasesPanel({ order }) {
     current = useRef({});
   current.current = { dirty: draft.dirty, pending, selected };
   const orderId = String(order?._id || "");
+  const linkedHeadingRef = useRef(null);
   async function load(cursor = "", background = false) {
     if (
       background &&
@@ -40,7 +43,7 @@ export default function ConsumerCasesPanel({ order }) {
     setError("");
     try {
       const { data } = await api.get("/api/consumer/admin/cases", {
-        params: { before: cursor, ...(orderId ? { orderId } : {}) },
+        params: { before: cursor, ...(caseId ? { caseId } : orderId ? { orderId } : {}) },
       });
       if (
         mounted.current &&
@@ -59,7 +62,9 @@ export default function ConsumerCasesPanel({ order }) {
         setNext(data.next);
         cursorRef.current = cursor;
         if (!background) {
-          setSelected("");
+          const linkedCase = caseId ? data.cases.find((entry) => entry.id === caseId) : null;
+          setSelected(linkedCase?.id || "");
+          if (linkedCase) setStatus(linkedCase.status === "received" ? "in_review" : linkedCase.status);
           setReply("");
           draft.initialize({ reply: "" });
         }
@@ -90,7 +95,7 @@ export default function ConsumerCasesPanel({ order }) {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, [orderId]);
+  }, [orderId, caseId]);
   async function linkOrder(event) {
     event.preventDefault();
     if (lock.current || !item) return;
@@ -127,6 +132,7 @@ export default function ConsumerCasesPanel({ order }) {
         status,
         message: reply,
       });
+      window.dispatchEvent(new CustomEvent(ADMIN_ALERTS_CHANGED, { detail: "pqr" }));
       if (mounted.current) {
         setReply("");
         draft.markSaved({ reply: "" });
@@ -144,6 +150,9 @@ export default function ConsumerCasesPanel({ order }) {
     }
   }
   const item = cases.find((c) => c.id === selected);
+  useEffect(() => {
+    if (caseId && caseId === selected) linkedHeadingRef.current?.focus();
+  }, [caseId, selected]);
   return (
     <section className="consumer-admin">
       <header>
@@ -209,7 +218,8 @@ export default function ConsumerCasesPanel({ order }) {
         </div>
         {item && (
           <article>
-            <h3>{item.subject}</h3>
+            <h3 ref={linkedHeadingRef} tabIndex={caseId ? -1 : undefined}>{item.subject}</h3>
+            {caseId && <a href="/admin/ordenes/reclamos">Ver todos los radicados</a>}
             <p>
               {item.name} · {item.contact}
             </p>

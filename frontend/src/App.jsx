@@ -146,6 +146,44 @@ function Home({ theme, store }) {
   );
 }
 
+function AdminConsumerCasesRoute() {
+  const { search } = useLocation();
+  const caseId = new URLSearchParams(search).get('radicado') || '';
+  return <ConsumerCasesPanel key={caseId} caseId={caseId} />;
+}
+
+function AdminInventoryRoute() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const openAlerts = params.get('alertas') === '1';
+  const alertTab = params.get('vista') === 'traceability' ? 'traceability' : 'priorities';
+  return <InventoryAdmin key={search} openAlerts={openAlerts} alertTab={alertTab} />;
+}
+
+function AdminFinanceRoute() {
+  const { search } = useLocation();
+  const showPendingExpenses = new URLSearchParams(search).get('gastos') === 'pendientes';
+  return <AdminFinancePage key={search} showPendingExpenses={showPendingExpenses} />;
+}
+
+function AdminCashRoute() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  return <CashSessionsPage key={search} initialBranchId={params.get('sede') || ''} initialRegisterCode={params.get('caja') || ''} />;
+}
+
+function AdminProductsRoute() {
+  const { search } = useLocation();
+  const missing = new URLSearchParams(search).get('faltante');
+  return <ProductosAdmin key={search} initialMissing={['category', 'image'].includes(missing) ? missing : ''} />;
+}
+
+function AdminCustomersRoute() {
+  const { search } = useLocation();
+  const dueScope = new URLSearchParams(search).get('seguimiento');
+  return <AdminCustomersPage key={search} initialDueScope={['overdue', 'today'].includes(dueScope) ? dueScope : ''} />;
+}
+
 function protectAdminContent(element) {
   return <AdminPermissionRoute>{element}</AdminPermissionRoute>;
 }
@@ -299,17 +337,17 @@ export default function App() {
                     }
                   >
                     <Route path="dashboard" element={protectAdminContent(<Dashboard />)} />
-                    <Route path="productos" element={protectAdminContent(<ProductosAdmin />)} />
+                    <Route path="productos" element={protectAdminContent(<AdminProductsRoute />)} />
                     <Route path="ordenes" element={protectAdminContent(<OrdersWorkspace><OrdersAdmin /></OrdersWorkspace>)} />
-                    <Route path="ordenes/reclamos" element={protectAdminContent(<OrdersWorkspace claims><ConsumerCasesPanel /></OrdersWorkspace>)} />
+                    <Route path="ordenes/reclamos" element={protectAdminContent(<OrdersWorkspace claims><AdminConsumerCasesRoute /></OrdersWorkspace>)} />
                     <Route path="facturacion" element={<Navigate to="/admin/facturacion/resumen" replace />} />
                     <Route path="facturacion/:tab" element={protectAdminContent(<AdminBillingPage />)} />
-                    <Route path="clientes" element={protectAdminContent(<AdminCustomersPage />)} />
+                    <Route path="clientes" element={protectAdminContent(<AdminCustomersRoute />)} />
                     <Route path="pos" element={protectAdminContent(<PosSalesPage />)} />
-                    <Route path="caja" element={protectAdminContent(<CashSessionsPage />)} />
-                    <Route path="finanzas" element={protectAdminContent(<AdminFinancePage />)} />
+                    <Route path="caja" element={protectAdminContent(<AdminCashRoute />)} />
+                    <Route path="finanzas" element={protectAdminContent(<AdminFinanceRoute />)} />
                     <Route path="cupones" element={protectAdminContent(<AdminCouponsPage />)} />
-                    <Route path="inventario" element={protectAdminContent(<InventoryAdmin />)} />
+                    <Route path="inventario" element={protectAdminContent(<AdminInventoryRoute />)} />
                     <Route path="productos/nuevo" element={protectAdminContent(<FormularioProducto />)} />
                     <Route path="productos/editar/:id" element={protectAdminContent(<FormularioProducto />)} />
                     <Route path="carritos" element={protectAdminContent(<CarritosAdmin />)} />

@@ -4,6 +4,7 @@ const express = require('express');
 
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
+const CashSession = require('../models/CashSession');
 const {
   serializeCashSession,
   openCashSession,
@@ -68,6 +69,27 @@ function serializeForAccess(session, access = {}) {
 }
 
 router.use(requireAdmin);
+
+router.get('/notifications', requirePermission('pos:view'), async (req, res) => {
+  try {
+    const access = buildCashSessionAccess(req);
+    res.set('Cache-Control', 'private, no-store');
+    if (!access.canSupervise) return res.json({ sessions: [] });
+    const filter = {
+      status: 'open',
+      $or: [{ 'closingReviews.status': 'pending' }, { 'cashMovements.approvalStatus': 'pending' }],
+      ...(access.branchIds ? { branch: { $in: access.branchIds } } : {}),
+    };
+    const sessions = await CashSession.find(filter)
+      .select('sessionCode branch cashRegisterCode')
+      .sort({ openedAt: -1 })
+      .limit(8)
+      .lean();
+    res.json({ sessions });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
 
 router.get('/journey-summary', requirePermission('pos:view'), async (req, res) => {
   try {

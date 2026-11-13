@@ -1,6 +1,10 @@
 // src/admin/orders/hooks/useOrdersQuickViews.js
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+const OPERATIONAL_VIEWS = new Set([
+  'attention', 'awaiting_payment', 'prepare', 'dispatch', 'transit', 'incidents', 'sla_risk', 'completed',
+]);
 
 function formatLocalDate(date) {
   const year = date.getFullYear();
@@ -32,9 +36,11 @@ export default function useOrdersQuickViews({
   setDateTo,
   setStatusFilter,
   clearStatus,
+  linkedView,
 }) {
-  const [quickView, setQuickView] = useState('all');
-  const [operationalView, setOperationalView] = useState('all');
+  const requestedView = OPERATIONAL_VIEWS.has(linkedView) ? linkedView : 'all';
+  const [quickView, setQuickView] = useState(requestedView);
+  const [operationalView, setOperationalView] = useState(requestedView);
 
   // Filtros operativos preparados para conectar luego con la consulta principal.
   const [printedFilter, setPrintedFilter] = useState('all');
@@ -133,18 +139,7 @@ export default function useOrdersQuickViews({
       return;
     }
 
-    const operationalViews = new Set([
-      'attention',
-      'awaiting_payment',
-      'prepare',
-      'dispatch',
-      'transit',
-      'incidents',
-      'sla_risk',
-      'completed',
-    ]);
-
-    if (operationalViews.has(viewKey)) {
+    if (OPERATIONAL_VIEWS.has(viewKey)) {
       clearDateFilters();
       clearStatusFilters();
       setPrintedFilter('all');
@@ -155,6 +150,10 @@ export default function useOrdersQuickViews({
 
     resetBaseFilters();
   };
+
+  useEffect(() => {
+    if (requestedView !== 'all') applyQuickView(requestedView);
+  }, [requestedView]);
 
   const clearQuickView = () => {
     applyQuickView('all');

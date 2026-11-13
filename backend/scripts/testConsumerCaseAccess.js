@@ -489,6 +489,37 @@ const failure = (e) => e.code === "CONSUMER_RECOVERY_INVALID";
       );
     },
   );
+  await check("las notificaciones PQR solo muestran el radicado y los datos mínimos", async () => {
+    const route = router.stack.find((layer) => layer.route?.path === "/admin/cases/notifications").route;
+    const saved = { find: Case.find, countDocuments: Case.countDocuments };
+    const sample = { ...original, _id: "507f1f77bcf86cd799439011", reference: "PQR-1", createdAt: now };
+    let body;
+    Case.countDocuments = async (filter) => {
+      assert.deepEqual(filter, { status: "received" });
+      return 1;
+    };
+    Case.find = (filter) => {
+      assert.deepEqual(filter, { status: "received" });
+      return {
+        select(fields) { assert.equal(fields, "reference createdAt"); return this; },
+        sort() { return this; },
+        limit(value) { assert.equal(value, 8); return this; },
+        lean: async () => [sample],
+      };
+    };
+    try {
+      await route.stack.at(-1).handle({}, {
+        set(_header, value) { assert.equal(value, "private, no-store"); return this; },
+        json(value) { body = value; },
+      });
+      assert.deepEqual(body, {
+        count: 1,
+        cases: [{ id: sample._id, reference: sample.reference, createdAt: sample.createdAt }],
+      });
+    } finally {
+      Object.assign(Case, saved);
+    }
+  });
   await check(
     "campos secretos no seleccionables y rutas administrativas conservan control de rol",
     () => {
@@ -501,7 +532,7 @@ const failure = (e) => e.code === "CONSUMER_RECOVERY_INVALID";
         "accessRecovery",
       ])
         assert.equal(Case.schema.path(field).options.select, false);
-      for (const path of ["/admin/cases", "/admin/cases/:id/order"]) {
+      for (const path of ["/admin/cases", "/admin/cases/notifications", "/admin/cases/:id/order"]) {
         const route = router.stack.find((l) => l.route?.path === path).route;
         assert(route.stack.length >= 3);
       }

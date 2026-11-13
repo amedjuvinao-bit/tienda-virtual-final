@@ -28,6 +28,7 @@ const {
 } = require('../services/productArchiveService');
 const {
   ProductCatalogInputError,
+  getCatalogAlertCounts,
   listAdminProducts,
   normalizeProductIds,
   updateProductsInBulk,
@@ -725,6 +726,16 @@ router.get('/admin/reviews', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al obtener reseñas admin:', error.message);
     res.status(500).json({ message: 'Error al obtener las reseñas' });
+  }
+});
+
+router.get('/admin/catalog-alerts', requireAdmin, requirePermission('products:view'), async (_req, res) => {
+  try {
+    const counts = await getCatalogAlertCounts();
+    res.set('Cache-Control', 'private, no-store').json(counts);
+  } catch (error) {
+    console.error('Error consultando alertas del catálogo:', error.message);
+    res.status(500).json({ message: 'No se pudieron consultar las alertas del catálogo.' });
   }
 });
 

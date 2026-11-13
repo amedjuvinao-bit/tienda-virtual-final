@@ -370,8 +370,8 @@ function AlertsAndActivity({ alerts, activity, busy, onReview, onRespond }) {
   );
 }
 
-export default function SeguridadSection() {
-  const [activeView, setActiveView] = useState('overview');
+export default function SeguridadSection({ openAlerts = false }) {
+  const [activeView, setActiveView] = useState(openAlerts ? 'alerts' : 'overview');
   const [status, setStatus] = useState(EMPTY_STATUS);
   const [security, setSecurity] = useState(EMPTY_SECURITY);
   const [loading, setLoading] = useState(true);

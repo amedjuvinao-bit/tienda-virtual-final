@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import { fmtDate, toCOP } from './orderDetailUtils';
 import { OrderDetailIcons } from './OrderDetailIcons';
@@ -93,6 +93,7 @@ function nextReconciliationStep(reconciliation = {}) {
 
 export default function OrderDetailRefundReconciliation({
   refunds = [],
+  selectedRecordId = '',
   loading = false,
   canConfirmPayment = false,
   confirmingId = '',
@@ -102,6 +103,11 @@ export default function OrderDetailRefundReconciliation({
   onAutomate,
 }) {
   const [references, setReferences] = useState({});
+
+  const recordRef = useRef(null);
+  useEffect(() => {
+    if (selectedRecordId) recordRef.current?.focus();
+  }, [selectedRecordId, loading, refunds.length]);
 
   if (!loading && refunds.length === 0) return null;
 
@@ -136,6 +142,8 @@ export default function OrderDetailRefundReconciliation({
           return (
             <article
               key={refund._id || refund.refundNumber}
+              ref={String(refund._id) === selectedRecordId ? recordRef : undefined}
+              tabIndex={String(refund._id) === selectedRecordId ? -1 : undefined}
               style={{
                 border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
                 borderRadius: 18,

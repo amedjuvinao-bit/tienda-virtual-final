@@ -161,15 +161,23 @@ function serializeAlert(alert, { isOwner, currentUserId }) {
   };
 }
 
+function securityAlertFilter(adminUser) {
+  if (String(adminUser?.role || '').toLowerCase() === 'owner') return {};
+  const username = String(adminUser?.username || '').toLowerCase();
+  return { $or: [{ adminUser: adminUser._id }, { adminUser: null, username }] };
+}
+
+function countOpenSecurityAlerts(adminUser) {
+  return AdminSecurityAlert.countDocuments({ ...securityAlertFilter(adminUser), status: 'open' });
+}
+
 async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
   const now = new Date();
   const since24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const userId = adminUser?._id;
   const username = String(adminUser?.username || '').toLowerCase();
   const isOwner = String(adminUser?.role || '').toLowerCase() === 'owner';
-  const alertFilter = isOwner
-    ? {}
-    : { $or: [{ adminUser: userId }, { adminUser: null, username }] };
+  const alertFilter = securityAlertFilter(adminUser);
 
   const [sessionDocs, loginLogs, securityLogs, alertDocs, pendingAlerts] = await Promise.all([
     AdminSession.find({ adminUser: userId })
@@ -194,7 +202,7 @@ async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
       .sort({ status: 1, lastOccurredAt: -1 })
       .limit(40)
       .lean(),
-    AdminSecurityAlert.countDocuments({ ...alertFilter, status: 'open' }),
+    countOpenSecurityAlerts(adminUser),
   ]);
 
   const sessions = sessionDocs.map((session) =>
@@ -241,6 +249,7 @@ async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
 module.exports = {
   describeUserAgent,
   getAdminSecurityCenter,
+  countOpenSecurityAlerts,
   isSessionActive,
   serializeSession,
   serializeAlert,

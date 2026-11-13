@@ -919,7 +919,7 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
     : createPortal(modal, document.body);
 }
 
-export default function AdminCustomersPageTabbed() {
+export default function AdminCustomersPageTabbed({ initialDueScope = '' }) {
   const [customers, setCustomers] = useState([]);
   const [summary, setSummary] = useState(null);
   const [total, setTotal] = useState(0);
@@ -932,7 +932,7 @@ export default function AdminCustomersPageTabbed() {
   const [crmStageFilter, setCrmStageFilterState] = useState('all');
   const [crmPriorityFilter, setCrmPriorityFilterState] = useState('all');
   const [crmOwnerFilter, setCrmOwnerFilterState] = useState('all');
-  const [workspaceView, setWorkspaceView] = useState('directory');
+  const [workspaceView, setWorkspaceView] = useState(initialDueScope ? 'crm' : 'directory');
   const [canViewSubscriptions, setCanViewSubscriptions] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1188,7 +1188,7 @@ export default function AdminCustomersPageTabbed() {
       {error ? <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
       {success ? <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
 
-      {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
+      {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} initialDueScope={initialDueScope || 'all'} /> : null}
 
       {workspaceView === 'subscriptions' && canViewSubscriptions ? <NewsletterSubscribersPanel initialSearch={searchTerm} /> : null}
 

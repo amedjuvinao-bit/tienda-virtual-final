@@ -188,10 +188,61 @@ for (const [path, section, permission] of [
     }),
   );
 }
+function adminCase(doc) {
+  return {
+    ...publicCase(doc),
+    id: String(doc._id),
+    name: doc.name,
+    contact: doc.contact,
+    orderNumber: doc.orderNumber,
+    linkedOrderId: doc.order ? String(doc.order) : "",
+    message: doc.message,
+    preferredRefundMethod: doc.preferredRefundMethod,
+    revision: doc.revision,
+  };
+}
+
+router.get(
+  "/admin/cases/notifications",
+  ...guard,
+  handle(async (_req, res) => {
+    const filter = { status: "received" };
+    const [count, cases] = await Promise.all([
+      ConsumerCase.countDocuments(filter),
+      ConsumerCase.find(filter)
+        .select("reference createdAt")
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .lean(),
+    ]);
+
+    res.set("Cache-Control", "private, no-store").json({
+      count,
+      cases: cases.map(({ _id, reference, createdAt }) => ({
+        id: String(_id),
+        reference,
+        createdAt,
+      })),
+    });
+  }),
+);
+
 router.get(
   "/admin/cases",
   ...guard,
   handle(async (req, res) => {
+    const { caseId } = req.query;
+    if (caseId !== undefined) {
+      if (typeof caseId !== "string" || !/^[a-f0-9]{24}$/i.test(caseId) || req.query.orderId)
+        throw error("Radicado no encontrado.", "CONSUMER_CASE_NOT_FOUND", 404);
+      const doc = await ConsumerCase.findById(caseId).lean();
+      if (!doc)
+        throw error("Radicado no encontrado.", "CONSUMER_CASE_NOT_FOUND", 404);
+      return res.set("Cache-Control", "private, no-store").json({
+        cases: [adminCase(doc)],
+        next: "",
+      });
+    }
     const before = typeof req.query.before === "string" ? req.query.before : "";
     let filter =
       before && /^[a-f0-9]{24}$/i.test(before) ? { _id: { $lt: before } } : {};
@@ -214,17 +265,7 @@ router.get(
       .lean();
     const page = cases.slice(0, 30);
     res.set("Cache-Control", "no-store").json({
-      cases: page.map((c) => ({
-        ...publicCase(c),
-        id: String(c._id),
-        name: c.name,
-        contact: c.contact,
-        orderNumber: c.orderNumber,
-        linkedOrderId: c.order ? String(c.order) : "",
-        message: c.message,
-        preferredRefundMethod: c.preferredRefundMethod,
-        revision: c.revision,
-      })),
+      cases: page.map(adminCase),
       next: cases.length > 30 ? String(page[29]._id) : "",
     });
   }),

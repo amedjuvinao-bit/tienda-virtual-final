@@ -2,11 +2,11 @@ import React from 'react';
 import Page from './AdminCustomersPageTabbed.jsx';
 import CustomerModalPortalFix from './CustomerModalPortalFix.jsx';
 
-export default function AdminCustomersPage() {
+export default function AdminCustomersPage(props) {
   return React.createElement(
     React.Fragment,
     null,
     React.createElement(CustomerModalPortalFix),
-    React.createElement(Page)
+    React.createElement(Page, props)
   );
 }

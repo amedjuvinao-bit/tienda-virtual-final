@@ -395,6 +395,14 @@ router.get('/queue', requirePermission('customers:view'), async (req, res) => {
     ));
     const range = bogotaDayRange();
     const summaryFilter = { ...access.filter, status: 'pending' };
+    if (req.query.summary === '1') {
+      const [overdue, today] = await Promise.all([
+        CustomerFollowUp.countDocuments(applyDueScope({ ...summaryFilter }, 'overdue', range)),
+        CustomerFollowUp.countDocuments(applyDueScope({ ...summaryFilter }, 'today', range)),
+      ]);
+      res.set('Cache-Control', 'private, no-store');
+      return res.json({ ok: true, summary: { overdue, today } });
+    }
     const queueFilter = applyDueScope({ ...access.filter }, dueScope, range);
     const skip = (page - 1) * limit;
 
