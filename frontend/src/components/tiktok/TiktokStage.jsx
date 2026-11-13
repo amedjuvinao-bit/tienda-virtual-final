@@ -24,7 +24,7 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
   const overrides=String(c.stageOverrides?.accountId)===String(account?.id) ? c.stageOverrides?.byId || {} : {};
   const posts=connected ? stagePosts(selection.visiblePosts(feed.posts,c,account?.id).map(p=>({...p,...(typeof overrides[p.id]?.title==='string'?{title:overrides[p.id].title}:{})}))) : stagePosts(raw?.config?.posts || fallback);
   const plan=stagePlan(c,account?.id,posts);
-  const [chosen,setChosen]=useState(null), [page,setPage]=useState(0), root=useRef(null), main=useRef(null), checked=useRef(new Set());
+  const [chosen,setChosen]=useState(null), [page,setPage]=useState(0), root=useRef(null), main=useRef(null), player=useRef(null), checked=useRef(new Set());
   const choice=chosen?.preferred===plan.preferred && chosen?.account===(account?.id||'') ? chosen : null;
   const current=posts.find(p=>p.id===(choice?.id || plan.preferred)) || posts[0];
   const missingPrincipal=connected && feed.connected && plan.preferred && !posts.some(p=>p.id===plan.preferred) && (feed.nextCursor || feed.loading) && !feed.error && !choice;
@@ -69,7 +69,14 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
     backgroundColor:background.color, ...(background.image?{backgroundImage:`url("${background.image.replace(/["\\\n\r]/g,'')}")`}:{}),
   };
   const maxPage=Math.max(0,Math.ceil(posts.length/s.stageListSize)-1), activePage=Math.min(page,maxPage), shown=posts.slice(activePage*s.stageListSize,(activePage+1)*s.stageListSize);
-  const choose=id=>{setChosen({id,preferred:plan.preferred,account:account?.id||'',play:true});main.current?.focus({preventScroll:true});};
+  const choose = id => {
+    if (id === current?.id && player.current) {
+      player.current.requestPlayback();
+    } else {
+      setChosen({ id, preferred: plan.preferred, account: account?.id || '', play: true });
+    }
+    main.current?.focus({ preventScroll: true });
+  };
   const state=feed.loading || connected && !feed.loaded || missingPrincipal ? 'Cargando videos…' : feed.error || 'Pronto compartiremos nuevos videos.';
   const light=e=>{if(!s.stageMotionEnabled || s.stageHover==='none' || e.pointerType==='touch')return;const r=e.currentTarget.getBoundingClientRect();e.currentTarget.style.setProperty('--tk-light-x',`${(e.clientX-r.left)/r.width*100}%`);e.currentTarget.style.setProperty('--tk-light-y',`${(e.clientY-r.top)/r.height*100}%`);};
   return <section className="tk-stage" ref={root} style={vars} data-motion={s.stageMotionEnabled} data-hover={s.stageHover} aria-label="Videos de TikTok">
@@ -86,7 +93,7 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
         </header>
         <div className="tk-stage__hero tk-glass" onPointerMove={light}>
           <div ref={main} className="tk-stage__media" tabIndex={-1}>
-            {current && !missingPrincipal ? <TiktokPlayer key={`${current.id}:${choice?.play?'play':'still'}`} post={current} settings={s} requestPlay={Boolean(choice?.play)}/> : <div className="tk-stage__empty"><TiktokBrand compact/><p role="status">{state}</p>{feed.error && <button onClick={feed.retry}>Volver a intentar</button>}{feed.nextCursor && <button disabled={feed.loading} onClick={feed.loadMore}>Cargar videos</button>}</div>}
+            {current && !missingPrincipal ? <TiktokPlayer key={`${current.id}:${choice?.play?'play':'still'}`} post={current} settings={s} requestPlay={Boolean(choice?.play)} playbackRef={player}/> : <div className="tk-stage__empty"><TiktokBrand compact/><p role="status">{state}</p>{feed.error && <button onClick={feed.retry}>Volver a intentar</button>}{feed.nextCursor && <button disabled={feed.loading} onClick={feed.loadMore}>Cargar videos</button>}</div>}
           </div>
         </div>
         {s.stageShowList && <aside className="tk-stage__playlist tk-glass" onPointerMove={light} aria-label={s.stageListTitle || 'Lista de videos'}>

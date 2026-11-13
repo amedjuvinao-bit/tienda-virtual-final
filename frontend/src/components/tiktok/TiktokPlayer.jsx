@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { SocialImage, SocialPlayback, useSocialContentPrivacy } from '../privacy/SocialContentPrivacy';
 import { Play, Pause, Volume2, VolumeX, Maximize, ArrowUpRight } from 'lucide-react';
 const ORIGIN = 'https://www.tiktok.com';
 const clock = seconds => `${Math.floor((Number(seconds)||0)/60)}:${String(Math.floor((Number(seconds)||0)%60)).padStart(2,'0')}`;
-export default function TiktokPlayer({ post, settings, requestPlay = false }) {
+export default function TiktokPlayer({ post, settings, requestPlay = false, playbackRef }) {
   const source = post.videoUrl || (post.tiktokId ? `${ORIGIN}/player/v1/${post.tiktokId}` : '');
   return (
     <SocialPlayback src={source} poster={post.image} title={post.title} provider="TikTok" requestPlay={requestPlay} preserveControls allowLabel="Permitir y reproducir">
@@ -11,6 +11,7 @@ export default function TiktokPlayer({ post, settings, requestPlay = false }) {
         <TiktokPlayerContent
           key={access.allowed ? 'allowed' : 'preview'}
           post={post}
+          playbackRef={playbackRef}
           settings={settings}
           requestPlay={access.allowed && requested}
           requestAccess={access.allowed ? undefined : access.request}
@@ -20,7 +21,7 @@ export default function TiktokPlayer({ post, settings, requestPlay = false }) {
   );
 }
 
-function TiktokPlayerContent({ post, settings:s, requestPlay, requestAccess }) {
+function TiktokPlayerContent({ post, settings:s, requestPlay, requestAccess, playbackRef }) {
   const privacy = useSocialContentPrivacy();
   const host = useRef(null), iframe = useRef(null), video = useRef(null);
   const [started,setStarted] = useState(requestPlay), [ready,setReady] = useState(false), [playing,setPlaying] = useState(false);
@@ -48,6 +49,11 @@ function TiktokPlayerContent({ post, settings:s, requestPlay, requestAccess }) {
     if (isDirect) { if (playing) video.current?.pause(); else video.current?.play()?.catch(() => fail()); }
     else if (ready) message(playing ? 'pause' : 'play');
   };
+  useImperativeHandle(playbackRef, () => ({
+    requestPlayback() {
+      if (!playing && !error) play();
+    },
+  }));
   useEffect(() => {
     const receive = event => {
       if (event.origin !== ORIGIN || event.source !== iframe.current?.contentWindow || event.data?.['x-tiktok-player'] !== true) return;

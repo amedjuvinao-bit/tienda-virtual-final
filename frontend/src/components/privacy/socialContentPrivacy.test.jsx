@@ -51,6 +51,15 @@ it('permite un reproductor mediante una decisión explícita sin cambiar la elec
   expect(container.querySelector('iframe,video')).toBeNull();
   expect(screen.getByRole('region', { name: 'Videos de TikTok' })).toBeInTheDocument();
 });
+it('reutiliza el reproductor al elegir el video que ya se está cargando desde la tarjeta', () => {
+  act(() => savePrivacyPreference({ social: true, maps: false }));
+  const { container } = mount(<TiktokSection theme={tk('stage')} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir: Nuestra colección' }));
+  const frame = screen.getByTitle('Video de TikTok: Nuestra colección');
+  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar video: Nuestra colección' }));
+  expect(screen.getByTitle('Video de TikTok: Nuestra colección')).toBe(frame);
+  expect(container.querySelectorAll('iframe')).toHaveLength(1);
+});
 it('muestra las mismas fotos de las redes desde el backend antes y después de rechazar, sin cuadros de cristal', () => {
   const source = 'https://scontent.cdninstagram.com/photo.jpg?signature=public';
   for (const layout of ['journal', 'editorial']) {
@@ -88,6 +97,9 @@ it('cerrar la solicitud de TikTok conserva la tarjeta y no concede autorización
 it('cancelar la reproducción solicitada al elegir una tarjeta no deja un inicio automático pendiente', () => {
   const { container } = mount(<TiktokSection theme={tk('stage')} />);
   fireEvent.click(screen.getByRole('button', { name: 'Seleccionar video: Nuestra colección' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar video: Nuestra colección' }));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }));
   act(() => savePrivacyPreference({ social: true, maps: false }));
   expect(container.querySelector('iframe')).toBeNull();
