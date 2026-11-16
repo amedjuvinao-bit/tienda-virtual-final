@@ -8,6 +8,7 @@ const requirePermission = require('../middleware/requirePermission');
 
 const DEFAULT_RETENTION_DAYS = 3650;
 const SENSITIVE_PATH = /(email|phone|document|address|postal|fiscal|businessname|notes|taxresponsibilities)/i;
+const CUSTOMER_NAME_PATH = /(?:^|\.)(?:name|firstName|lastName|fullName|displayName)$/i;
 
 function cleanText(value, max = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -55,6 +56,7 @@ function maskDocument(value) {
 
 function previewValue(path, value) {
   if (value === undefined || value === null || value === '') return '';
+  if (CUSTOMER_NAME_PATH.test(path)) return '[DATO PROTEGIDO]';
   if (/email/i.test(path)) return maskEmail(value);
   if (/phone/i.test(path)) return maskPhone(value);
   if (/document/i.test(path)) return maskDocument(value);
@@ -62,6 +64,15 @@ function previewValue(path, value) {
   if (Array.isArray(value)) return `[${value.length} elemento(s)]`;
   if (typeof value === 'object') return '[OBJETO ACTUALIZADO]';
   return cleanText(value, 240);
+}
+
+function protectAuditNamePreviews(change) {
+  if (!CUSTOMER_NAME_PATH.test(change?.path)) return change;
+  return {
+    ...change,
+    beforePreview: previewValue(change.path, change.beforePreview),
+    afterPreview: previewValue(change.path, change.afterPreview),
+  };
 }
 
 function buildAuditChanges(before = {}, after = {}, paths = []) {
@@ -179,7 +190,9 @@ async function recordCustomerAuditEvent({
         160
       ),
       ipHash: requestIp(req) ? hmac(requestIp(req)) : '',
-      changes: Array.isArray(changes) ? changes.slice(0, 80) : [],
+      changes: Array.isArray(changes)
+        ? changes.slice(0, 80).map(protectAuditNamePreviews)
+        : [],
       metadata: safeMetadata(metadata),
       previousHash: previous?.eventHash || '',
       createdAt,
@@ -226,7 +239,7 @@ function serializeAuditEvent(event = {}) {
       ) || raw.actorUsername || '',
       role: actor?.role || raw.actorRole || '',
     },
-    changes: raw.changes || [],
+    changes: Array.isArray(raw.changes) ? raw.changes.map(protectAuditNamePreviews) : [],
     metadata: raw.metadata || {},
     previousHash: raw.previousHash || '',
     eventHash: raw.eventHash || '',
