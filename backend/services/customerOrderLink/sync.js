@@ -3,7 +3,11 @@
 const mongoose = require('mongoose');
 
 const Customer = require('../../models/Customer');
+const Order = require('../../models/Order');
+const { buildCustomerOrdersFilter } = require('../customerOrderIdentityFilter');
+const { buildScopedOrderFilter } = require('../orderAdminScopeService');
 const {
+  buildCustomerIdentity,
   isActiveMongoTransaction,
   isMongoDuplicateKeyError,
 } = require('../../lib/customers/customerIdentity');
@@ -198,6 +202,103 @@ async function syncCustomerMasterFromOrder(
   return { customer, matchedBy, snapshot };
 }
 
+async function isVerifiedLegacyOrder(order, customer, options) {
+  if (isDemoOrder(order)) return false;
+
+  const target = buildCustomerIdentity(customer);
+  const snapshots = [
+    buildCustomerPayloadFromOrder({ customer: order.customer }),
+    buildCustomerPayloadFromOrder({ billing: order.billing }),
+  ].filter(hasCustomerIdentity);
+
+  let document = target;
+  let matchesCustomer = false;
+  for (const snapshot of snapshots) {
+    const identity = buildCustomerIdentity(snapshot);
+    if (identity.normalizedDocument) {
+      if (
+        document.normalizedDocument &&
+        (document.normalizedDocument !== identity.normalizedDocument ||
+          (document.documentType && identity.documentType &&
+            document.documentType !== identity.documentType))
+      ) {
+        return false;
+      }
+      if (!document.normalizedDocument || !document.documentType) {
+        document = identity;
+      }
+    }
+
+    const conflictingMatch = await findCustomerMatch(snapshot, {
+      ...options,
+      excludeId: customer._id,
+    });
+    if (conflictingMatch) return false;
+
+    matchesCustomer = matchesCustomer || Boolean(
+      (identity.normalizedDocument && identity.normalizedDocument === target.normalizedDocument) ||
+      (identity.normalizedEmail && identity.normalizedEmail === target.normalizedEmail) ||
+      (identity.normalizedPhone && identity.normalizedPhone === target.normalizedPhone)
+    );
+  }
+  return matchesCustomer;
+}
+
+async function preserveLegacyCustomerOrderLinks(
+  req,
+  customer,
+  { session, OrderModel = Order, CustomerModel = Customer } = {}
+) {
+  const access = buildScopedOrderFilter(
+    req,
+    {
+      $and: [
+        buildCustomerOrdersFilter(customer),
+        { 'customer.customerId': null },
+      ],
+    },
+    { requestedBranchId: '', requireWholeOrder: true }
+  );
+
+  if (!access.ok) {
+    throw createCustomerLinkError(access.message, access.error, access.status);
+  }
+
+  const orders = OrderModel.find(access.filter)
+    .select('customer billing source tags')
+    .session(session)
+    .lean()
+    .cursor();
+
+  try {
+    for await (const order of orders) {
+      const verified = await isVerifiedLegacyOrder(order, customer, {
+        session,
+        CustomerModel,
+      });
+      if (!verified) continue;
+
+      const link = order.customer == null
+        ? { customer: { customerId: customer._id } }
+        : { 'customer.customerId': customer._id };
+      const result = await OrderModel.updateOne(
+        { ...access.filter, _id: order._id },
+        { $set: link },
+        { session, timestamps: false }
+      );
+      if (result.matchedCount !== 1) {
+        throw createCustomerLinkError(
+          'Una orden cambió al vincular el historial. Recarga la ficha y vuelve a intentarlo.',
+          'CUSTOMER_LEGACY_ORDER_LINK_CHANGED'
+        );
+      }
+    }
+  } finally {
+    await orders.close();
+  }
+}
+
 module.exports = {
+  preserveLegacyCustomerOrderLinks,
   syncCustomerMasterFromOrder,
 };

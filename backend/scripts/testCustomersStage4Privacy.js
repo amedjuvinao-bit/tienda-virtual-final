@@ -21,6 +21,8 @@ const {
   getUnknownPermissionRoutes,
 } = require('../security/adminRoutePermissionMap');
 const adminAccessGate = require('../middleware/adminAccessGate');
+const { buildCustomerOrdersFilter } = require('../services/customerOrderIdentityFilter');
+const { preserveLegacyCustomerOrderLinks } = require('../services/customerOrderLinkService');
 
 let controls = 0;
 
@@ -32,6 +34,92 @@ function ok(message, condition = true) {
 
 function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, '..', '..', relativePath), 'utf8');
+}
+
+async function testLegacyCustomerOrderLinks() {
+  const customer = {
+    _id: '64c000000000000000000001',
+    email: 'cliente@example.com',
+    documentType: 'CC',
+    documentNumber: '123456789',
+  };
+  const session = {};
+  const orderFields = { email: 'cliente@example.com' };
+  const orders = [
+    { _id: 'correo', customer: { ...orderFields, name: 'Nombre de compra' } },
+    { _id: 'facturacion', customer: null, billing: orderFields },
+    { _id: 'documento-en-conflicto', customer: { ...orderFields, id: '987654321' } },
+    { _id: 'otra-ficha', customer: orderFields, billing: { phone: '3001234567' } },
+    { _id: 'sin-identidad', customer: { name: 'Nombre de compra' } },
+    { _id: 'demo', customer: orderFields, tags: ['demo'] },
+  ];
+  const writes = [];
+  let closed = 0;
+  let allowUpdate = true;
+  const OrderModel = {
+    find(filter) {
+      assert.deepEqual(filter, {
+        $and: [buildCustomerOrdersFilter(customer), { 'customer.customerId': null }],
+      });
+      return {
+        select() { return this; },
+        session(activeSession) {
+          assert.equal(activeSession, session);
+          return this;
+        },
+        lean() { return this; },
+        cursor() {
+          return {
+            async *[Symbol.asyncIterator]() { yield* orders; },
+            async close() { closed += 1; },
+          };
+        },
+      };
+    },
+    async updateOne(filter, update, options) {
+      assert.deepEqual(filter.$and[1], { 'customer.customerId': null });
+      assert.deepEqual(options, { session, timestamps: false });
+      if (!allowUpdate) return { matchedCount: 0 };
+      writes.push([filter._id, update]);
+      const order = orders.find(({ _id }) => _id === filter._id);
+      order.customer = { ...order.customer, customerId: customer._id };
+      return { matchedCount: 1 };
+    },
+  };
+  const CustomerModel = {
+    findOne(filter) {
+      return {
+        async session(activeSession) {
+          assert.equal(activeSession, session);
+          assert.equal(String(filter._id.$ne), customer._id);
+          return filter.normalizedPhone === '+573001234567'
+            ? { _id: '64c000000000000000000002' }
+            : null;
+        },
+      };
+    },
+  };
+  const req = { adminRole: 'owner', query: { branchId: '64c000000000000000000003' } };
+  const options = { session, OrderModel, CustomerModel };
+  await preserveLegacyCustomerOrderLinks(req, customer, options);
+  assert.deepEqual(writes, [
+    ['correo', { $set: { 'customer.customerId': customer._id } }],
+    ['facturacion', { $set: { customer: { customerId: customer._id } } }],
+  ]);
+  assert.equal(orders[0].customer.name, 'Nombre de compra');
+  const anonymizedFilter = buildCustomerOrdersFilter({ _id: customer._id });
+  assert.deepEqual(anonymizedFilter.$or, [{ 'customer.customerId': customer._id }]);
+  assert.equal(orders[0].customer.customerId, anonymizedFilter.$or[0]['customer.customerId']);
+  ok('conserva pedidos antiguos verificados por ID sin tocar sus datos comerciales');
+
+  delete orders[0].customer.customerId;
+  allowUpdate = false;
+  await assert.rejects(
+    preserveLegacyCustomerOrderLinks(req, customer, options),
+    { code: 'CUSTOMER_LEGACY_ORDER_LINK_CHANGED' }
+  );
+  assert.equal(closed, 2);
+  ok('aborta la vinculación cuando una orden cambió y cierra el cursor');
 }
 
 async function main() {
@@ -233,6 +321,8 @@ async function main() {
     routes.includes('relatedOrdersRetained: true') &&
       routes.includes("note: '[ANONIMIZADO]'")
   );
+
+  await testLegacyCustomerOrderLinks();
 
   const followUps = read('backend/routes/adminCustomerFollowUps.js');
   ok(

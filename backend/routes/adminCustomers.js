@@ -59,7 +59,12 @@ const {
   verifyCustomerAuditChain,
 } = require('../services/customerPrivacyService');
 
-const { saveAdministrativeConsent, subscriptionEvidence } = require('../services/newsletter/consent');
+const { preserveLegacyCustomerOrderLinks } = require('../services/customerOrderLinkService');
+const {
+  saveAdministrativeConsent,
+  subscriptionEvidence,
+  transaction,
+} = require('../services/newsletter/consent');
 
 const router = express.Router();
 
@@ -1545,8 +1550,22 @@ router.post(
       }
 
       const before = serializeCustomer(customer);
-      customer = await saveAdministrativeConsent(customer, { status: 'withdrawn', source: 'anonymization',
-        proofReference: `customer:${customer._id}:anonymization`, note: 'Retiro previo a la anonimización.', adminId: getAdminId(req) });
+      customer = await saveAdministrativeConsent(
+        customer,
+        {
+          status: 'withdrawn',
+          source: 'anonymization',
+          proofReference: `customer:${customer._id}:anonymization`,
+          note: 'Retiro previo a la anonimización.',
+          adminId: getAdminId(req),
+        },
+        {
+          runTransaction: (saveConsent) => transaction(async (session) => {
+            await preserveLegacyCustomerOrderLinks(req, customer, { session });
+            return saveConsent(session);
+          }),
+        }
+      );
       const anonymizedAt = new Date();
       const anonymousSuffix = String(customer._id).slice(-6).toUpperCase();
       customer.firstName = '';

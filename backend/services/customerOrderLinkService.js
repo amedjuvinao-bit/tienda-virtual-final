@@ -17,6 +17,7 @@ const {
   applyCustomerStatsForOrder,
 } = require('./customerOrderLink/stats');
 const {
+  preserveLegacyCustomerOrderLinks,
   syncCustomerMasterFromOrder,
 } = require('./customerOrderLink/sync');
 
@@ -28,6 +29,7 @@ module.exports = {
   hasCustomerIdentity,
   isConfirmedOrder,
   isDemoOrder,
+  preserveLegacyCustomerOrderLinks,
   resolveCustomerForOrder,
   syncCustomerMasterFromOrder,
 };
