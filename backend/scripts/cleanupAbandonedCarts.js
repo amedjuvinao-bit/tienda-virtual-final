@@ -30,6 +30,24 @@ async function deleteEligibleCart(candidate, { carts, orders, session, clock = (
   });
 }
 
+async function cleanupEligibleCarts({ client, carts, orders, report }) {
+  await client.withSession(async (session) => {
+    const candidates = carts.aggregate(
+      buildEligibleCartPipeline(new Date(), orders.collectionName),
+      { batchSize: 100, readPreference: 'primary', maxTimeMS: 60_000 }
+    );
+    try {
+      for await (const candidate of candidates) {
+        const deleted = await deleteEligibleCart(candidate, { carts, orders, session });
+        report.checkedCarts += 1;
+        report.deletedCarts += deleted;
+      }
+    } finally {
+      await candidates.close();
+    }
+  });
+}
+
 async function main(args = process.argv.slice(2)) {
   if (args.length !== 1 || args[0] !== '--apply') {
     console.error('Para ejecutar la limpieza, usa node backend/scripts/cleanupAbandonedCarts.js --apply');
@@ -66,21 +84,7 @@ async function main(args = process.argv.slice(2)) {
     const carts = mongoose.connection.db.collection(Cart.collection.name);
     const orders = mongoose.connection.db.collection(Order.collection.name);
 
-    await mongoose.connection.getClient().withSession(async (session) => {
-      const candidates = carts.aggregate(
-        buildEligibleCartPipeline(new Date(), orders.name),
-        { batchSize: 100, readPreference: 'primary', maxTimeMS: 60_000 }
-      );
-      try {
-        for await (const candidate of candidates) {
-          const deleted = await deleteEligibleCart(candidate, { carts, orders, session });
-          report.checkedCarts += 1;
-          report.deletedCarts += deleted;
-        }
-      } finally {
-        await candidates.close();
-      }
-    });
+    await cleanupEligibleCarts({ client: mongoose.connection.getClient(), carts, orders, report });
 
     report.status = 'completed';
   } finally {
@@ -96,4 +100,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { deleteEligibleCart };
+module.exports = { cleanupEligibleCarts, deleteEligibleCart };
