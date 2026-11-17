@@ -3,48 +3,49 @@
 const RETENTION_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function buildCartRetentionPreview(now, orderCollection) {
+function buildCartRetentionMatch(now) {
   const cutoff = new Date(now.getTime() - RETENTION_DAYS * DAY_MS);
-
-  return [
-    {
-      $match: {
-        sessionId: { $type: 'string', $ne: '' },
-        convertedOrderId: null,
-        convertedAt: null,
-        items: {
-          $elemMatch: {
-            $or: [
-              { qty: { $gte: 1 } },
-              { qty: null, quantity: { $gte: 1 } },
-            ],
-          },
-        },
-        $and: [
-          {
-            $or: [
-              { lastCustomerActivityAt: { $lte: cutoff } },
-              { lastCustomerActivityAt: null, updatedAt: { $lte: cutoff } },
-              { lastCustomerActivityAt: null, updatedAt: null, createdAt: { $lte: cutoff } },
-            ],
-          },
-          {
-            $or: [
-              { 'recoveryAccess.expiresAt': null },
-              { 'recoveryAccess.expiresAt': { $lte: now } },
-              { 'recoveryAccess.usedAt': { $ne: null } },
-            ],
-          },
-          {
-            $or: [
-              { recoveryEmailLockUntil: null },
-              { recoveryEmailLockUntil: { $lte: now } },
-            ],
-          },
+  return {
+    sessionId: { $type: 'string', $ne: '' },
+    convertedOrderId: null,
+    convertedAt: null,
+    items: {
+      $elemMatch: {
+        $or: [
+          { qty: { $gte: 1 } },
+          { qty: null, quantity: { $gte: 1 } },
         ],
       },
     },
-    { $project: { _id: 0, sessionId: 1 } },
+    $and: [
+      {
+        $or: [
+          { lastCustomerActivityAt: { $lte: cutoff } },
+          { lastCustomerActivityAt: null, updatedAt: { $lte: cutoff } },
+          { lastCustomerActivityAt: null, updatedAt: null, createdAt: { $lte: cutoff } },
+        ],
+      },
+      {
+        $or: [
+          { 'recoveryAccess.expiresAt': null },
+          { 'recoveryAccess.expiresAt': { $lte: now } },
+          { 'recoveryAccess.usedAt': { $ne: null } },
+        ],
+      },
+      {
+        $or: [
+          { recoveryEmailLockUntil: null },
+          { recoveryEmailLockUntil: { $lte: now } },
+        ],
+      },
+    ],
+  };
+}
+
+function buildEligibleCartPipeline(now, orderCollection) {
+  return [
+    { $match: buildCartRetentionMatch(now) },
+    { $project: { _id: 1, sessionId: 1 } },
     {
       $lookup: {
         from: orderCollection,
@@ -55,6 +56,12 @@ function buildCartRetentionPreview(now, orderCollection) {
       },
     },
     { $match: { 'linkedOrders.0': { $exists: false } } },
+  ];
+}
+
+function buildCartRetentionPreview(now, orderCollection) {
+  return [
+    ...buildEligibleCartPipeline(now, orderCollection),
     { $count: 'eligibleCarts' },
   ];
 }
@@ -102,4 +109,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildCartRetentionPreview };
+module.exports = {
+  RETENTION_DAYS,
+  buildCartRetentionMatch,
+  buildCartRetentionPreview,
+  buildEligibleCartPipeline,
+};
