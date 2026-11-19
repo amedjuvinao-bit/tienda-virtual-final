@@ -77,7 +77,7 @@ it('una pestaña anterior descarta su acceso sin retirar la selección nueva', (
   expect(localStorage.getItem('cart')).toBe('selección nueva');
   expect(() => assertSelectionCurrent('cart', generation)).toThrow();
 });
-it('el observador vence una pestaña abierta y se libera al desmontar', () => {
+it('el observador vence una pestaña abierta a los 30 días', () => {
   recordSelectionActivity('cart');
   localStorage.setItem('cart', 'selección');
   const expired = vi.fn();
@@ -87,7 +87,27 @@ it('el observador vence una pestaña abierta y se libera al desmontar', () => {
   expect(expired).toHaveBeenCalledOnce();
   expect(localStorage.getItem('cart')).toBeNull();
   stop();
-  expect(vi.getTimerCount()).toBe(0);
+});
+it('detener el observador cancela su temporizador y sus eventos', () => {
+  recordSelectionActivity('cart');
+  localStorage.setItem('cart', 'selección');
+  const expired = vi.fn();
+  const stop = watchSelectionRetention('cart', expired);
+  watchers.push(stop);
+  stop();
+
+  // jsdom also schedules storage-event timers. Verify this observer's behavior
+  // without treating every timer in the test environment as its own.
+  vi.advanceTimersByTime(30 * DAY_MS);
+  window.dispatchEvent(new Event('focus'));
+  window.dispatchEvent(new Event('online'));
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: selectionRetentionKey('cart'),
+  }));
+  window.dispatchEvent(new Event('storefront-selection-activity-cart'));
+
+  expect(expired).not.toHaveBeenCalled();
+  expect(localStorage.getItem('cart')).toBe('selección');
 });
 it('el almacenamiento bloqueado conserva el plazo durante la visita', () => {
   const blocked = {
