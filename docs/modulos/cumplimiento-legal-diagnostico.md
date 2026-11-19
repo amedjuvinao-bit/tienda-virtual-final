@@ -20,7 +20,15 @@ Favoritos dispone de `previewInactiveFavoriteRetention.js` para el conteo y `cle
 
 `testInactiveFavoriteCleanupMongo.js` crea una colección de prueba en una base temporal y comprueba el límite del plazo, las fechas anteriores, la reactivación, el vaciado posterior y la repetición de la limpieza. La comprobación inicial del cambio se realizó con un controlador simulado en memoria. La ejecución de este archivo contra MongoDB queda por verificar.
 
-L-05 sigue abierto por el vencimiento de las copias del navegador y la ejecución periódica de las limpiezas. Los procedimientos del servidor se ejecutan por comando. L-07 queda para completar los proveedores efectivos y el alojamiento definitivo.
+Las copias locales del carrito y favoritos tienen un plazo de 30 días desde la última modificación de la selección. La lectura automática de precios, disponibilidad o contenido mantiene la fecha. Una acción del cliente o la recuperación explícita del carrito por enlace renueva el plazo correspondiente.
+
+El vencimiento retira los artículos, las credenciales de selección y las operaciones pendientes de su almacenamiento local o de sesión. Se comprueba al abrir, al recuperar el foco, al volver la conexión y mediante un temporizador con la página abierta. Una generación de la selección permite descartar respuestas tardías y copias de otras pestañas que pertenecen a un periodo vencido. Las preferencias de privacidad, los accesos a pedidos y las constancias de compra conservan sus propios mecanismos.
+
+Los metadatos locales de este plazo se guardan en `rb_cart_retention_v1` y `rb_favorites_retention_v1`, con la fecha de actividad y la generación de la selección. Los datos anteriores que carecen de una fecha de actividad reciben su primer periodo fechado al acceder con esta versión. Las fechas futuras se acotan al momento de lectura. Cuando el almacenamiento falla, la página mantiene la fecha en memoria.
+
+La comprobación controlada cubre el plazo, las versiones anteriores, las credenciales, el almacenamiento bloqueado, la recuperación, las respuestas tardías y la continuación de una selección nueva. Las pruebas de navegador de esta versión y la ejecución completa de Vitest requieren comprobación en la instalación.
+
+L-05 sigue abierto por la ejecución periódica de las limpiezas del servidor, que actualmente se realizan por comando. L-07 queda para completar los proveedores efectivos y el alojamiento definitivo.
 
 ## Método y alcance
 

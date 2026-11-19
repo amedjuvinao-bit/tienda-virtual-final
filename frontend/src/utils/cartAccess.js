@@ -1,3 +1,4 @@
+import { readSelectionRetention } from './selectionRetention';
 import { setSessionId } from '../lib/api';
 import {
   CART_ACCESS_KEY,
@@ -33,7 +34,7 @@ export function getCartAccess() {
 export function storeCartAccess(sessionId, token) {
   const safeSessionId = clean(sessionId),
     safeToken = clean(token);
-  if (!safeSessionId || !safeToken) return false;
+  if (!safeSessionId || !safeToken || readSelectionRetention('cart').expired) return false;
   try {
     sessionStorage.setItem(
       CART_ACCESS_KEY,
@@ -46,6 +47,7 @@ export function storeCartAccess(sessionId, token) {
       /* ignore */
     }
     setSessionId(safeSessionId);
+    readSelectionRetention('cart');
     return true;
   } catch {
     return false;

@@ -33,6 +33,14 @@ import {
 
 import { createCartTabSync, withCartBootstrapLock } from '../utils/cartTabSync';
 import { readSharedCart } from '../utils/cartSharedAccess';
+import {
+  assertSelectionCurrent,
+  readSelectionRetention,
+  recordSelectionActivity,
+  watchSelectionRetention,
+} from '../utils/selectionRetention';
+
+const EXPIRED_CART_MESSAGE = 'Tu carrito guardado venció tras 30 días sin cambios.';
 
 function clean(value) {
   return String(value || '').trim();
@@ -165,6 +173,7 @@ function calcSummary(items) {
 }
 
 function readStoredCart() {
+  if (readSelectionRetention('cart').expired) return [];
   try {
     const access = getCartAccess();
     const saved = readCartSnapshot(access?.sessionId);
@@ -214,7 +223,9 @@ export const CartContext = createContext();
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(readStoredCart);
   const [loading, setLoading] = useState(false);
-  const [cartMessage, setCartMessage] = useState('');
+  const [cartMessage, setCartMessage] = useState(() =>
+    readSelectionRetention('cart').expired ? EXPIRED_CART_MESSAGE : ''
+  );
   const [pendingOperations, setPendingOperations] = useState(0);
   const [syncError, setSyncError] = useState(false);
   const cartRef = useRef(cart);
@@ -225,6 +236,35 @@ export function CartProvider({ children }) {
   const refreshingRef = useRef(null);
   const tabSyncRef = useRef(null);
   const refreshAgainRef = useRef(false);
+  const retentionRef = useRef(readSelectionRetention('cart'));
+
+  const resetRetainedCart = () => {
+    authoritativeRef.current = { items: [], version: '' };
+    cartRef.current = [];
+    setCart([]);
+    setSyncError(false);
+    setCartMessage(EXPIRED_CART_MESSAGE);
+  };
+  const checkRetainedCart = () => {
+    const current = readSelectionRetention('cart');
+    if ((current.expired && !retentionRef.current.expired) ||
+        current.generation !== retentionRef.current.generation)
+      resetRetainedCart();
+    retentionRef.current = current;
+    return current;
+  };
+  const assertCartCurrent = (generation) => {
+    try {
+      assertSelectionCurrent('cart', generation);
+    } catch (error) {
+      checkRetainedCart();
+      throw error;
+    }
+  };
+  const recordCartActivity = () => {
+    recordSelectionActivity('cart');
+    retentionRef.current = readSelectionRetention('cart');
+  };
 
   const getTabSync = () => {
     tabSyncRef.current ||= createCartTabSync({
@@ -238,7 +278,10 @@ export function CartProvider({ children }) {
   };
 
   const prepareSharedCart = async () => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     const candidate = await getTabSync().resolve();
+    assertCartCurrent(generation);
     const own = getCartAccess();
     if (
       !candidate ||
@@ -254,14 +297,17 @@ export function CartProvider({ children }) {
         previousSessionId: own?.sessionId,
         toBackendItem,
         normalizeItem: fromBackendItem,
+        assertCurrent: () => assertCartCurrent(generation),
       });
     } catch (cause) {
+      if (cause?.code === 'SELECTION_RETENTION_EXPIRED') throw cause;
       setSyncError(true);
       // A failed peer capability says nothing about this tab's current cart.
       throw new Error('No se pudo sincronizar el carrito compartido.', {
         cause,
       });
     }
+    assertCartCurrent(generation);
     if (!storeCartAccess(candidate.sessionId, candidate.token))
       throw new Error('CART_SHARED_ACCESS_STORAGE_FAILED');
     adoptSnapshot(snapshot);
@@ -285,10 +331,14 @@ export function CartProvider({ children }) {
   };
 
   const createRemoteCart = async (items) => {
-    if (creatingRef.current) return creatingRef.current;
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
+    if (creatingRef.current?.generation === generation)
+      return creatingRef.current.promise;
     const creation = api
       .post('/api/cart', { items })
       .then(({ data }) => {
+        assertCartCurrent(generation);
         const sessionId = String(
           data?.sessionId || data?.cart?.sessionId || ''
         ).trim();
@@ -306,13 +356,15 @@ export function CartProvider({ children }) {
         return { sessionId, token, version: snapshot.version };
       })
       .finally(() => {
-        creatingRef.current = null;
+        if (creatingRef.current?.promise === creation) creatingRef.current = null;
       });
-    creatingRef.current = creation;
+    creatingRef.current = { generation, promise: creation };
     return creation;
   };
 
   const loadRemoteCart = async (access = getCartAccess()) => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
     const response = await api.get(
       `/api/cart/${encodeURIComponent(access.sessionId)}`,
@@ -321,13 +373,17 @@ export function CartProvider({ children }) {
         headers: buildCartAccessHeaders(access),
       }
     );
+    assertCartCurrent(generation);
     return adoptSnapshot(response.data || {});
   };
 
   const createValidatedCart = async (items) => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     const { data } = items.length
       ? await api.post('/api/cart/validate', { items, mode: 'soft' })
       : { data: { items: [], adjustments: [] } };
+    assertCartCurrent(generation);
     if (!Array.isArray(data?.items))
       throw new Error('No se pudo validar el carrito guardado.');
     const restored = data.items.filter(
@@ -338,6 +394,9 @@ export function CartProvider({ children }) {
   };
 
   const ensureCartReady = async (items) => {
+    const retained = checkRetainedCart();
+    assertCartCurrent(retained.generation);
+    if (!retained.generation) recordCartActivity();
     await prepareSharedCart();
     const existing = getCartAccess();
     if (existing) {
@@ -362,6 +421,8 @@ export function CartProvider({ children }) {
   };
 
   const renewCartAccess = async () => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     const access = getCartAccess();
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
     const { data } = await api.post(
@@ -369,6 +430,7 @@ export function CartProvider({ children }) {
       null,
       { headers: buildCartAccessHeaders(access) }
     );
+    assertCartCurrent(generation);
     const sessionId = clean(data?.sessionId);
     const token = clean(data?.cartAccessToken);
     if (!storeCartAccess(sessionId, token)) {
@@ -385,6 +447,8 @@ export function CartProvider({ children }) {
   };
 
   const writeCartVersion = async ({ items, version }) => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     const access = getCartAccess();
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
     const response = await writeVersionedCart({
@@ -393,6 +457,7 @@ export function CartProvider({ children }) {
       version,
       items: items.map(toBackendItem),
     });
+    assertCartCurrent(generation);
     return {
       cart: response?.data?.cart,
       version: response?.data?.version,
@@ -400,6 +465,8 @@ export function CartProvider({ children }) {
   };
 
   const recoverMissingCart = async (operation) => {
+    const generation = operation.retentionGeneration;
+    assertCartCurrent(generation);
     // A privacy-preserving 404 means missing OR unauthorized. It is never proof
     // that the customer's selection should be erased. Rebuild a new capability
     // from the last confirmed local items, without reading the inaccessible cart.
@@ -416,6 +483,7 @@ export function CartProvider({ children }) {
       toast.info(message, { toastId: 'cart-recovered' });
       return { ...authoritativeRef.current, recoveredMissingCart: true };
     } catch (error) {
+      assertCartCurrent(generation);
       adoptSnapshot(previous);
       setSyncError(true);
       const message =
@@ -427,12 +495,15 @@ export function CartProvider({ children }) {
   };
 
   coordinatorRef.current ||= createCartMutationCoordinator({
+    beforeExecute: (operation) => assertCartCurrent(operation.retentionGeneration),
     getSnapshot: async () => {
       await ensureCartReady(authoritativeRef.current.items.map(toBackendItem));
       return authoritativeRef.current;
     },
     write: writeCartVersion,
     reload: async () => {
+      const retentionGeneration = checkRetainedCart().generation;
+      assertCartCurrent(retentionGeneration);
       await prepareSharedCart();
       if (!getCartAccess() && !authoritativeRef.current.items.length)
         return { items: [], version: '' };
@@ -448,9 +519,11 @@ export function CartProvider({ children }) {
           headers: buildCartAccessHeaders(access),
         }
       );
+      assertCartCurrent(retentionGeneration);
       return response.data || {};
     },
     adopt: (snapshot, metadata = {}) => {
+      assertCartCurrent(metadata.operation.retentionGeneration);
       const adopted = adoptSnapshot(snapshot);
       if (metadata.operation?.type === 'refresh') getTabSync().publishReady();
       if (
@@ -505,6 +578,12 @@ export function CartProvider({ children }) {
   });
 
   const enqueueCartOperation = (operation, { optimistic = true } = {}) => {
+    checkRetainedCart();
+    if (operation.type !== 'replace_validated') recordCartActivity();
+    const retainedOperation = {
+      ...operation,
+      retentionGeneration: retentionRef.current.generation,
+    };
     if (optimistic) {
       const optimisticCart = applyCartOperation(cartRef.current, operation);
       cartRef.current = optimisticCart;
@@ -513,7 +592,7 @@ export function CartProvider({ children }) {
     setPendingOperations((value) => value + 1);
     setCartMessage('');
     return coordinatorRef.current
-      .enqueue(operation)
+      .enqueue(retainedOperation)
       .catch((error) => {
         if (error?.code !== 'CART_WRITE_CONFLICT') {
           console.error('Error al sincronizar carrito:', error?.message);
@@ -531,6 +610,12 @@ export function CartProvider({ children }) {
     };
   }, []);
 
+  useEffect(() => watchSelectionRetention('cart', (retained) => {
+    retentionRef.current = retained;
+    resetRetainedCart();
+    if (!retained.expired) void syncCart();
+  }), []);
+
   // Asegura que el header X-Session-Id esté siempre presente
   useEffect(() => {
     try {
@@ -543,6 +628,9 @@ export function CartProvider({ children }) {
     if (recoveryClaimRef.current) return;
     const recovery = readCartRecoveryFragment();
     if (!recovery) return;
+    checkRetainedCart();
+    recordCartActivity();
+    const generation = retentionRef.current.generation;
     recoveryClaimRef.current = true;
     clearCartRecoveryFragment();
     setLoading(true);
@@ -551,6 +639,7 @@ export function CartProvider({ children }) {
         headers: buildCartRecoveryHeaders(recovery),
       })
       .then(({ data }) => {
+        assertCartCurrent(generation);
         const sessionId = clean(data?.sessionId);
         const token = clean(data?.cartAccessToken);
         if (!storeCartAccess(sessionId, token)) {
@@ -575,15 +664,18 @@ export function CartProvider({ children }) {
 
   // Refreshes share the mutation queue and one in-flight request.
   const syncCart = () => {
+    const retained = checkRetainedCart();
+    if (retained.expired) return Promise.resolve(true);
     if (refreshingRef.current) return refreshingRef.current;
     setLoading(true);
     const request = coordinatorRef.current
-      .enqueue({ type: 'refresh' })
+      .enqueue({ type: 'refresh', retentionGeneration: retained.generation })
       .then(() => {
         setCartMessage('');
         return true;
       })
-      .catch(() => {
+      .catch((error) => {
+        if (error?.code === 'SELECTION_RETENTION_EXPIRED') return true;
         setSyncError(true);
         setCartMessage(
           'No se pudo actualizar el carrito. Revisa tu conexión e inténtalo de nuevo.'
@@ -616,6 +708,7 @@ export function CartProvider({ children }) {
   useEffect(() => {
     cartRef.current = cart;
     try {
+      assertSelectionCurrent('cart', retentionRef.current.generation);
       localStorage.setItem('cart', JSON.stringify(cart));
     } catch {}
   }, [cart]);
@@ -721,6 +814,8 @@ export function CartProvider({ children }) {
   const validateCart = async (mode = 'soft') => {
     await coordinatorRef.current.waitForIdle();
     try {
+      const { generation } = checkRetainedCart();
+      assertCartCurrent(generation);
       const access = await ensureCartReady(cartRef.current.map(toBackendItem));
       const { data } = await api.post(
         '/api/cart/validate',
@@ -732,6 +827,7 @@ export function CartProvider({ children }) {
           headers: buildCartAccessHeaders(access),
         }
       );
+      assertCartCurrent(generation);
       const items = Array.isArray(data?.items) ? data.items : [];
       const local = items.map(fromBackendItem).filter((x) => x._id);
 

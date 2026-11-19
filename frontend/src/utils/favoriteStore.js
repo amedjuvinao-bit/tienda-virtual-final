@@ -1,4 +1,10 @@
 import {
+  assertSelectionCurrent,
+  readSelectionRetention,
+  recordSelectionActivity,
+  watchSelectionRetention,
+} from './selectionRetention';
+import {
   FAVORITE_ACCESS_KEY,
   buildFavoriteAccessHeaders,
   getFavoriteAccess,
@@ -14,6 +20,7 @@ import {
 } from './favoriteModel';
 const SNAPSHOT = 'favorite_snapshot';
 const OUTBOX = 'favorite_pending';
+const EXPIRED_FAVORITES_MESSAGE = 'Tus favoritos guardados vencieron tras 30 días sin cambios.';
 function read(storage, key) {
   try {
     return JSON.parse(storage.getItem(key) || 'null');
@@ -38,6 +45,8 @@ function safeStorage(view, name) {
 export function createFavoriteStore(api, view = window) {
   const local = safeStorage(view, 'localStorage'),
     session = safeStorage(view, 'sessionStorage');
+  let retained = readSelectionRetention('favorites', view);
+  let unwatch;
   let access = getFavoriteAccess();
   const cached = read(local, SNAPSHOT);
   let confirmed = normalizeFavorites(
@@ -67,7 +76,7 @@ export function createFavoriteStore(api, view = window) {
   let initialized = false,
     busy = false,
     error = '',
-    message = '',
+    message = retained.expired ? EXPIRED_FAVORITES_MESSAGE : '',
     flight,
     again = false,
     active = false,
@@ -86,11 +95,31 @@ export function createFavoriteStore(api, view = window) {
     };
     for (const listener of listeners) listener(state);
   };
-  const savePending = () =>
+  const resetRetainedFavorites = () => {
+    confirmed = [];
+    pending = [];
+    access = null;
+    initialized = true;
+    error = '';
+    message = EXPIRED_FAVORITES_MESSAGE;
+    emit();
+  };
+  const checkRetainedFavorites = () => {
+    const current = readSelectionRetention('favorites', view);
+    if ((current.expired && !retained.expired) || current.generation !== retained.generation)
+      resetRetainedFavorites();
+    retained = current;
+    return current;
+  };
+  const assertCurrent = (generation) =>
+    assertSelectionCurrent('favorites', generation, view);
+  const savePending = () => {
+    assertCurrent(retained.generation);
     write(session, OUTBOX, {
       sessionId: access?.sessionId || '',
       operations: pending,
     });
+  };
   const accept = (data) => {
     confirmed = normalizeFavorites(data?.items);
     write(local, SNAPSHOT, {
@@ -110,10 +139,14 @@ export function createFavoriteStore(api, view = window) {
     headers: buildFavoriteAccessHeaders(access),
   });
   const url = () => `/api/favorites/${encodeURIComponent(access.sessionId)}`;
-  const readServer = async () => {
+  const readServer = async (generation) => {
+    assertCurrent(generation);
     try {
-      return (await api.get(url(), requestOptions())).data;
+      const { data } = await api.get(url(), requestOptions());
+      assertCurrent(generation);
+      return data;
     } catch (failure) {
+      assertCurrent(generation);
       if (
         failure?.response?.status !== 404 ||
         failure?.response?.data?.error !== 'FAVORITE_ACCESS_NOT_FOUND'
@@ -122,11 +155,13 @@ export function createFavoriteStore(api, view = window) {
       // An authenticated empty list is HTTP 200. This 404 means the signed
       // access expired/changed, not that the customer removed all products.
       const restoredAccess = await issueFavoriteAccess(api);
+      assertCurrent(generation);
       const { data } = await api.put(
         `/api/favorites/${encodeURIComponent(restoredAccess.sessionId)}`,
         { items: confirmed, revision: null },
         { headers: buildFavoriteAccessHeaders(restoredAccess) }
       );
+      assertCurrent(generation);
       if (!storeFavoriteAccess(restoredAccess.sessionId, restoredAccess.token))
         throw new Error('No se pudo conservar el acceso recuperado.');
       access = restoredAccess;
@@ -137,6 +172,8 @@ export function createFavoriteStore(api, view = window) {
     }
   };
   const perform = async () => {
+    const { generation, expired } = checkRetainedFavorites();
+    if (expired) return;
     access = getFavoriteAccess();
     if (!access && !pending.length) {
       initialized = true;
@@ -144,6 +181,7 @@ export function createFavoriteStore(api, view = window) {
     }
     if (!access) {
       const issued = await issueFavoriteAccess(api);
+      assertCurrent(generation);
       const concurrent = getFavoriteAccess();
       if (!concurrent && !storeFavoriteAccess(issued.sessionId, issued.token))
         throw new Error(
@@ -152,8 +190,9 @@ export function createFavoriteStore(api, view = window) {
       access = concurrent || issued;
       savePending();
     }
-    let server = await readServer();
+    let server = await readServer(generation);
     const adoptConcurrentAccess = async () => {
+      assertCurrent(generation);
       const current = getFavoriteAccess();
       if (
         !current ||
@@ -163,10 +202,11 @@ export function createFavoriteStore(api, view = window) {
         return false;
       access = current;
       savePending();
-      server = await readServer();
+      server = await readServer(generation);
       return true;
     };
     await adoptConcurrentAccess();
+    assertCurrent(generation);
     accept(server);
     initialized = true;
     emit();
@@ -193,6 +233,7 @@ export function createFavoriteStore(api, view = window) {
             { items, revision: server.revision },
             requestOptions()
           );
+          assertCurrent(generation);
           server = data.favorites;
           if (!server || !Array.isArray(server.items))
             throw new Error('No se pudo confirmar el guardado de favoritos.');
@@ -215,7 +256,7 @@ export function createFavoriteStore(api, view = window) {
           break;
         } catch (failure) {
           if (failure?.response?.status !== 409 || attempt === 3) throw failure;
-          server = await readServer();
+          server = await readServer(generation);
           accept(server);
         }
       }
@@ -224,6 +265,11 @@ export function createFavoriteStore(api, view = window) {
   };
   const sync = () => {
     if (!active) return Promise.resolve(false);
+    if (checkRetainedFavorites().expired) {
+      initialized = true;
+      emit();
+      return Promise.resolve(true);
+    }
     if (flight) {
       again = true;
       return flight;
@@ -239,6 +285,8 @@ export function createFavoriteStore(api, view = window) {
         } while (again && active);
         return true;
       } catch (failure) {
+        checkRetainedFavorites();
+        if (failure?.code === 'SELECTION_RETENTION_EXPIRED') return false;
         error = pending.length
           ? 'Tus cambios están pendientes. Conservamos tu selección; vuelve a intentar sincronizar.'
           : 'No pudimos actualizar tus favoritos. Conservamos tu lista; vuelve a intentarlo.';
@@ -248,6 +296,7 @@ export function createFavoriteStore(api, view = window) {
         initialized = true;
         busy = false;
         emit();
+        if (again && active) void sync();
       }
     })();
     return flight;
@@ -255,6 +304,7 @@ export function createFavoriteStore(api, view = window) {
   const change = (type, raw) => {
     const item = normalizeFavoriteItem(raw);
     if (!item.productId) return;
+    checkRetainedFavorites();
     const current = applyFavoriteOperations(confirmed, pending);
     if (
       type === 'add' &&
@@ -271,6 +321,8 @@ export function createFavoriteStore(api, view = window) {
       emit();
       return;
     }
+    recordSelectionActivity('favorites', view);
+    retained = readSelectionRetention('favorites', view);
     pending.push({ type, item });
     message = '';
     savePending();
@@ -300,6 +352,12 @@ export function createFavoriteStore(api, view = window) {
     },
     start() {
       active = true;
+      unwatch?.();
+      unwatch = watchSelectionRetention('favorites', (current) => {
+        retained = current;
+        resetRetainedFavorites();
+        if (!current.expired) void sync();
+      }, view);
       view.addEventListener('storage', changed);
       view.addEventListener('focus', changed);
       view.addEventListener('online', changed);
@@ -313,6 +371,8 @@ export function createFavoriteStore(api, view = window) {
     },
     stop() {
       active = false;
+      unwatch?.();
+      unwatch = null;
       view.removeEventListener('storage', changed);
       view.removeEventListener('focus', changed);
       view.removeEventListener('online', changed);

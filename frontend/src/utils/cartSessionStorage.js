@@ -1,9 +1,12 @@
+import { readSelectionRetention } from './selectionRetention';
+
 // Keep the capability and its cart identifier in one tab-scoped record. A shared
 // localStorage identifier must never be paired with another tab's access token.
 export const CART_ACCESS_KEY = 'cart_access';
 export const LEGACY_CART_ACCESS_TOKEN_KEY = 'cart_access_token';
 
 export function readCartSession() {
+  if (readSelectionRetention('cart').expired) return null;
   try {
     const value = JSON.parse(sessionStorage.getItem(CART_ACCESS_KEY) || 'null');
     const sessionId =

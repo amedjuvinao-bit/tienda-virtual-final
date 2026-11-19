@@ -169,6 +169,7 @@ export function writeVersionedCart({ api, access, version, items }) {
 }
 
 export function createCartMutationCoordinator({
+  beforeExecute,
   getSnapshot,
   write,
   reload,
@@ -295,6 +296,7 @@ export function createCartMutationCoordinator({
 
   async function execute(operation) {
     try {
+      await beforeExecute?.(operation);
       return await executeAgainstCurrentCart(operation);
     } catch (error) {
       if (isCartAccessNotFound(error) && onMissingCart) {

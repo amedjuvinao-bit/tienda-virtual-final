@@ -1,3 +1,4 @@
+import { readSelectionRetention } from './selectionRetention';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createFavoriteStore } from './favoriteStore';
 import { getFavoriteAccess, storeFavoriteAccess } from './favoriteAccess';
@@ -218,4 +219,68 @@ it('descarta filas dañadas del respaldo sin impedir abrir la tienda', async () 
   await settled(store);
   expect(store.getState().favorites).toHaveLength(1);
   expect(store.getState().syncError).toBe(false);
+});
+
+it('las lecturas del servidor conservan la fecha y un cambio del cliente renueva el plazo', async () => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  const store = create(apiFor([a]));
+  await settled(store);
+  const initial = readSelectionRetention('favorites');
+  clock.mockReturnValue(now + 29 * 86_400_000);
+  await store.sync();
+  expect(readSelectionRetention('favorites').expiresAt).toBe(initial.expiresAt);
+  store.add(b);
+  await settled(store);
+  expect(readSelectionRetention('favorites').expiresAt).toBe(now + 59 * 86_400_000);
+});
+it('el vencimiento vacía la vista y un favorito nuevo inicia otra selección', async () => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  const api = apiFor([a]);
+  const store = create(api);
+  await settled(store);
+  clock.mockReturnValue(now + 30 * 86_400_000);
+  window.dispatchEvent(new Event('focus'));
+  await settled(store);
+  expect(store.getState().favorites).toEqual([]);
+  expect(getFavoriteAccess()).toBeNull();
+  api.replace([]);
+  store.add(b);
+  await settled(store);
+  expect(store.getState().favorites.map(favoriteKey)).toEqual([favoriteKey(b)]);
+});
+it('una lectura vencida no reconstruye la selección después de un 404', async () => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  let reject;
+  const api = apiFor();
+  api.get.mockImplementation(() => new Promise((_resolve, failure) => { reject = failure; }));
+  const store = create(api);
+  await vi.waitFor(() => expect(reject).toBeDefined());
+  clock.mockReturnValue(now + 30 * 86_400_000);
+  window.dispatchEvent(new Event('focus'));
+  reject({ response: { status: 404, data: { error: 'FAVORITE_ACCESS_NOT_FOUND' } } });
+  await settled(store);
+  expect(store.getState().favorites).toEqual([]);
+  expect(api.post).not.toHaveBeenCalled();
+  expect(api.put).not.toHaveBeenCalled();
+});
+
+it('una acción nueva se confirma aunque termine después una lectura de la selección vencida', async () => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  let release;
+  const api = apiFor([a]);
+  api.get.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  const store = create(api);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  clock.mockReturnValue(now + 30 * 86_400_000);
+  window.dispatchEvent(new Event('focus'));
+  api.replace([]);
+  store.add(b);
+  release({ data: { items: [a], revision: 'doc:0' } });
+  await settled(store);
+  expect(store.getState().favorites.map(favoriteKey)).toEqual([favoriteKey(b)]);
+  expect(api.rows().map(favoriteKey)).toEqual([favoriteKey(b)]);
 });

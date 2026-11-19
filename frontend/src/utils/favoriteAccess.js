@@ -1,3 +1,5 @@
+import { readSelectionRetention, recordSelectionActivity } from './selectionRetention';
+
 export const FAVORITE_ACCESS_KEY = 'favorite_access';
 const FAVORITE_SESSION_KEY = 'favorite_session_id';
 const FAVORITE_ACCESS_TOKEN_KEY = 'favorite_access_token';
@@ -7,6 +9,7 @@ const safeAccess = (value) =>
     ? { sessionId: clean(value.sessionId), token: clean(value.token) }
     : null;
 export function getFavoriteAccess() {
+  if (readSelectionRetention('favorites').expired) return null;
   try {
     const atomic = safeAccess(
       JSON.parse(localStorage.getItem(FAVORITE_ACCESS_KEY) || 'null')
@@ -25,9 +28,10 @@ export function getFavoriteAccess() {
 }
 export function storeFavoriteAccess(sessionId, token) {
   const access = safeAccess({ sessionId, token });
-  if (!access) return false;
+  if (!access || readSelectionRetention('favorites').expired) return false;
   try {
     localStorage.setItem(FAVORITE_ACCESS_KEY, JSON.stringify(access));
+    readSelectionRetention('favorites');
     try {
       localStorage.removeItem(FAVORITE_SESSION_KEY);
       localStorage.removeItem(FAVORITE_ACCESS_TOKEN_KEY);
@@ -72,6 +76,7 @@ export function withFavoriteLock(task) {
     : task();
 }
 export async function ensureFavoriteAccess(api) {
+  recordSelectionActivity('favorites');
   const existing = getFavoriteAccess();
   if (existing) return existing;
   if (!issuing)

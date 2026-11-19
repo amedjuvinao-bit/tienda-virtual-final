@@ -31,12 +31,14 @@ export async function readSharedCart({
   previousSessionId,
   toBackendItem,
   normalizeItem = (item) => item,
+  assertCurrent = () => {},
 }) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const response = await api.get(
       `/api/cart/${encodeURIComponent(access.sessionId)}`,
       { params: { populate: 1 }, headers: buildCartAccessHeaders(access) }
     );
+    assertCurrent();
     const current = normalizeCartSnapshot(response.data);
     if (!Array.isArray(response.data?.items) || !current.version)
       throw new Error('CART_SHARED_RESPONSE_INVALID');
@@ -66,6 +68,7 @@ export async function readSharedCart({
       items: merged.map(toBackendItem),
       mode: 'soft',
     });
+    assertCurrent();
     if (!Array.isArray(data?.items))
       throw new Error('CART_SHARED_VALIDATION_INVALID');
     try {
@@ -77,6 +80,7 @@ export async function readSharedCart({
           (item) => Number(item.qty ?? item.quantity) > 0
         ),
       });
+      assertCurrent();
       const snapshot = normalizeCartSnapshot(written.data);
       if (!Array.isArray(written.data?.cart?.items) || !snapshot.version)
         throw new Error('CART_SHARED_RESPONSE_INVALID');

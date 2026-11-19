@@ -1,3 +1,4 @@
+import { selectionRetentionKey } from '../utils/selectionRetention';
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
@@ -421,5 +422,77 @@ it("retira el último artículo durante una pérdida de acceso sin enviar una va
   expect(
     api.post.mock.calls.some(([path]) => path === "/api/cart/validate"),
   ).toBe(false);
+  expect(snapshot().syncError).toBe(false);
+});
+
+it("al abrir una selección vencida retira el respaldo y el acceso antes de consultar el servidor", async () => {
+  seed();
+  const now = Date.now();
+  localStorage.setItem(selectionRetentionKey('cart'), JSON.stringify({
+    version: 1, generation: now - 31 * 86_400_000, lastActivityAt: now - 31 * 86_400_000,
+  }));
+  render(<CartProvider><Harness /></CartProvider>);
+  await waitFor(() => expect(snapshot().loading).toBe(false));
+  expect(snapshot().cart).toEqual([]);
+  expect(sessionStorage.getItem('cart_access_token')).toBeNull();
+  expect(api.get).not.toHaveBeenCalled();
+  expect(api.post).not.toHaveBeenCalled();
+});
+it("una respuesta tardía después del vencimiento conserva el carrito vacío", async () => {
+  seed();
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  let release;
+  api.get.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+  render(<CartProvider><Harness /></CartProvider>);
+  await waitFor(() => expect(release).toBeDefined());
+  clock.mockReturnValue(now + 30 * 86_400_000);
+  fireEvent(window, new Event('focus'));
+  await act(async () => release({
+    data: { items: [item], version: 'respuesta-anterior' },
+  }));
+  await waitFor(() => expect(snapshot().loading).toBe(false));
+  expect(snapshot().cart).toEqual([]);
+  expect(snapshot().syncError).toBe(false);
+  expect(api.post).not.toHaveBeenCalled();
+});
+
+it("una creación anterior que termina después del vencimiento no impide guardar una selección nueva", async () => {
+  localStorage.setItem("cart", JSON.stringify([item]));
+  const now = Date.now();
+  const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+  let release;
+  api.post.mockImplementation(async (path, body) => {
+    if (path === "/api/cart/validate")
+      return { data: { items: body.items, adjustments: [] } };
+    return new Promise((resolve) => {
+      release = () => resolve({
+        data: {
+          sessionId: "creacion-vencida",
+          cartAccessToken: "token-vencido",
+          cart: { items: body.items },
+          version: "v1",
+        },
+      });
+    });
+  });
+  render(<CartProvider><Harness /></CartProvider>);
+  await waitFor(() => expect(release).toBeDefined());
+  clock.mockReturnValue(now + 30 * 86_400_000);
+  fireEvent(window, new Event("focus"));
+  fireEvent.click(screen.getByText("Añadir"));
+  api.post.mockImplementation(async (path, body) =>
+    path === "/api/cart/validate"
+      ? { data: { items: body.items, adjustments: [] } }
+      : { data: {
+          sessionId: "creacion-nueva", cartAccessToken: "token-nuevo",
+          cart: { items: body.items }, version: "v2",
+        } }
+  );
+  await act(async () => release());
+  await waitFor(() => expect(snapshot().pendingOperations).toBe(0));
+  expect(snapshot().cart).toHaveLength(1);
+  expect(snapshot().cart[0].quantity).toBe(1);
+  expect(JSON.parse(sessionStorage.getItem("cart_access")).sessionId).toBe("creacion-nueva");
   expect(snapshot().syncError).toBe(false);
 });

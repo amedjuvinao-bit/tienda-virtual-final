@@ -1,8 +1,11 @@
+import { readSelectionRetention } from './selectionRetention';
+
 const CART_SNAPSHOT_KEY = 'cart_snapshot';
 const itemsOf = (value) =>
   Array.isArray(value) ? value.filter((item) => item && item._id) : [];
 
 export function readCartSnapshot(sessionId) {
+  if (readSelectionRetention('cart').expired) return null;
   try {
     const saved = JSON.parse(
       sessionStorage.getItem(CART_SNAPSHOT_KEY) || 'null'
@@ -18,7 +21,7 @@ export function readCartSnapshot(sessionId) {
 }
 
 export function storeCartSnapshot(sessionId, items) {
-  if (!sessionId) return;
+  if (!sessionId || readSelectionRetention('cart').expired) return;
   try {
     sessionStorage.setItem(
       CART_SNAPSHOT_KEY,
