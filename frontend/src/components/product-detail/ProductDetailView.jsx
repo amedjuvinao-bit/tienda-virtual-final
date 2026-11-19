@@ -427,7 +427,7 @@ export default function ProductDetailView({
     Number(cfg.animationDurationMs) > 0 ? Number(cfg.animationDurationMs) : 350;
 
   const pickupTitle = cfg.pickupTitle || "✓ Recogida disponible en Tienda";
-  const pickupText = cfg.pickupText || "Normalmente está listo en 24 horas";
+  const pickupText = cfg.pickupText || "Confirma con la tienda el plazo de recogida";
   const pickupLinkText = cfg.pickupLinkText || "Ver información de la tienda";
   const fulfillment = product?.fulfillment || null;
   const fulfillmentKind = fulfillment?.kind || "";
@@ -452,7 +452,7 @@ export default function ProductDetailView({
     {
       icon: <Leaf className="w-5 h-5" />,
       image: cfg.benefit2Icon,
-      title: cfg.benefit2Title || "Materiales hipoalergénicos",
+      title: cfg.benefit2Title || "Consulta los materiales del producto",
     },
     {
       icon: <Truck className="w-5 h-5" />,

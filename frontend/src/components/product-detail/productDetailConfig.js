@@ -322,7 +322,7 @@ export function buildSafeProductDetailConfig(raw) {
     pickupText:
       typeof cfg.pickupText === "string" && cfg.pickupText.trim()
         ? cfg.pickupText
-        : "Normalmente está listo en 24 horas",
+        : "Confirma con la tienda el plazo de recogida",
     pickupLinkText:
       typeof cfg.pickupLinkText === "string" && cfg.pickupLinkText.trim()
         ? cfg.pickupLinkText
@@ -341,7 +341,7 @@ export function buildSafeProductDetailConfig(raw) {
     benefit2Title:
       typeof cfg.benefit2Title === "string" && cfg.benefit2Title.trim()
         ? cfg.benefit2Title
-        : "Materiales hipoalergénicos",
+        : "Consulta los materiales del producto",
     benefit2Icon:
       typeof cfg.benefit2Icon === "string"
         ? cfg.benefit2Icon

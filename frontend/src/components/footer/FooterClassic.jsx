@@ -50,10 +50,10 @@ function buildFooterConfig(theme) {
       16
     ),
 
-    facebook: footer.facebook || "https://facebook.com/andreamilano.co",
-    instagram: footer.instagram || "https://instagram.com/andreamilano.co",
-    tiktok: footer.tiktok || "https://tiktok.com/@andreamilano.co",
-    whatsapp: footer.whatsapp || "https://wa.me/3154101276",
+    facebook: footer.facebook || "",
+    instagram: footer.instagram || "",
+    tiktok: footer.tiktok || "",
+    whatsapp: footer.whatsapp || "",
 
     facebookIcon: footer.facebookIcon || "",
     instagramIcon: footer.instagramIcon || "",
