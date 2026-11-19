@@ -56,4 +56,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildFavoriteRetentionMatch };
+module.exports = { RETENTION_DAYS, buildFavoriteRetentionMatch };

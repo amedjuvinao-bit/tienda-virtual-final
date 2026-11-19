@@ -12,6 +12,16 @@ Esta etapa contiene únicamente el diagnóstico. No cambia componentes, configur
 
 La implementación de L-01, L-02 y L-03 está documentada en [Suscripciones y retiro](suscripciones-consentimiento.md): formulario compartido, autorización versionada, confirmación de correo, retiro verificable, constancia duradera y conexión específica del canal email con Clientes y Checkout. Se conserva el diagnóstico de la versión examinada como referencia del estado anterior. La comprobación de SMTP y base de datos en la instalación sigue siendo necesaria; L-04 a L-07 no se consideran resueltos por este cambio.
 
+## Avance de conservación
+
+Los carritos disponen de conteo y limpieza manual con 30 días de inactividad. La limpieza vuelve a comprobar los pedidos vinculados, las conversiones, las recuperaciones y la actividad antes de borrar.
+
+Favoritos dispone de `previewInactiveFavoriteRetention.js` para el conteo y `cleanupInactiveFavorites.js --apply` para la limpieza manual con el mismo plazo. Cada borrado comprueba de nuevo la fecha de actividad y que la lista tenga contenido. Las listas anteriores usan `updatedAt` o `createdAt` cuando falta `lastCustomerActivityAt`. Los informes contienen totales.
+
+`testInactiveFavoriteCleanupMongo.js` crea una colección de prueba en una base temporal y comprueba el límite del plazo, las fechas anteriores, la reactivación, el vaciado posterior y la repetición de la limpieza. La comprobación inicial del cambio se realizó con un controlador simulado en memoria. La ejecución de este archivo contra MongoDB queda por verificar.
+
+L-05 sigue abierto por el vencimiento de las copias del navegador y la ejecución periódica de las limpiezas. Los procedimientos del servidor se ejecutan por comando. L-07 queda para completar los proveedores efectivos y el alojamiento definitivo.
+
 ## Método y alcance
 
 La implementación posterior de L-04 y L-06 se documenta en [Etapa 1: almacenamiento, preferencias y conexiones externas](cumplimiento-legal-etapa-1.md): fuentes locales, widget de pago por acción y controles de contenidos sociales y mapa con rechazo, cambio de decisión y vencimiento. L-05 y L-07 continúan pendientes de sus etapas de conservación y datos reales del negocio. El inventario siguiente conserva los hallazgos de la versión inicialmente examinada.
