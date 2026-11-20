@@ -169,7 +169,7 @@ describe('imagen principal independiente de Looks', () => {
       thumbTitleColor: '#5d3446', thumbPriceColor: '#c54a69',
       thumbTitleFontFamily: '"Cormorant Garamond", Georgia, serif',
       thumbPriceFontFamily: '"Manrope", system-ui, sans-serif',
-      thumbTitleSizePx: 12, thumbPriceSizePx: 13, editorialCardTextVersion: 3,
+      thumbTitleSizePx: 12, thumbPriceSizePx: 13, editorialCardTextVersion: 4,
     });
 
     const chosen = normalizeLookSection({ style: { ...migrated, thumbTitleColor: '#1f2937',
@@ -178,18 +178,24 @@ describe('imagen principal independiente de Looks', () => {
 
     const fromLastRelease = normalizeLookSection({ style: { layoutPreset: 'editorialGlass', editorialCardTextVersion: 1,
       thumbTitleColor: '#000000', thumbPriceColor: '#a34e66', thumbTitleFontFamily: "Georgia, 'Times New Roman', serif" } }).style;
-    expect(fromLastRelease).toMatchObject({ editorialCardTextVersion: 3, thumbTitleColor: '#5d3446',
+    expect(fromLastRelease).toMatchObject({ editorialCardTextVersion: 4, thumbTitleColor: '#5d3446',
       thumbPriceColor: '#c54a69', thumbTitleFontFamily: '"Cormorant Garamond", Georgia, serif' });
 
     const previousDesign = normalizeLookSection({ style: { ...migrated, editorialCardTextVersion: 2,
       thumbTitleSizePx: 17, thumbPriceColor: '#a45f68', thumbPriceWeight: 500 } }).style;
-    expect(previousDesign).toMatchObject({ editorialCardTextVersion: 3, thumbTitleSizePx: 12,
+    expect(previousDesign).toMatchObject({ editorialCardTextVersion: 4, thumbTitleSizePx: 12,
       thumbPriceColor: '#c54a69', thumbPriceWeight: 600 });
 
     const personalized = normalizeLookSection({ style: { ...migrated, editorialCardTextVersion: 2,
       thumbTitleColor: '#222222', thumbTitleSizePx: 17, thumbPriceColor: '#a45f68' } }).style;
-    expect(personalized).toMatchObject({ editorialCardTextVersion: 3, thumbTitleColor: '#222222',
+    expect(personalized).toMatchObject({ editorialCardTextVersion: 4, thumbTitleColor: '#222222',
       thumbTitleSizePx: 17, thumbPriceColor: '#a45f68' });
+
+    const readable = normalizeLookSection({ style: { ...migrated, editorialCardTextVersion: 3,
+      thumbTitleColor: '#ffffff', thumbPriceColor: '#c54a69' } }).style;
+    expect(readable).toEqual({ ...migrated, thumbTitleColor: '#5d3446', thumbPriceColor: '#c54a69' });
+    expect(normalizeLookSection({ style: { ...readable, thumbTitleColor: '#ffffff' } }).style)
+      .toEqual({ ...readable, thumbTitleColor: '#ffffff' });
 
     expect(normalizeLookSection({ style: { layoutPreset: 'classic' } }).style)
       .toMatchObject({ thumbTitleColor: '#1f2937', thumbPriceColor: '#e11d48' });
