@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -49,6 +50,25 @@ async function authorize() {
 }
 const submit = () => fireEvent.submit(screen.getByRole("form"));
 describe("suscripción y retiro verificables", () => {
+  it("no mueve el foco al montar el formulario y guía hacia el correo al confirmar sin contacto", async () => {
+    render(<button type="button">Continuar comprando</button>);
+    const outside = screen.getByRole("button", { name: "Continuar comprando" });
+    outside.focus();
+    render(<NewsletterForm initialMode="withdraw" />);
+    await act(async () => {});
+    expect(outside).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar un código" }));
+    expect(screen.getByRole("textbox", { name: "Correo electrónico" })).toHaveFocus();
+  });
+  it("sitúa el teclado en el código solicitado y vuelve al correo al pedir otro", async () => {
+    render(<NewsletterForm initialMode="withdraw" />);
+    email("persona@example.com");
+    submit();
+    const code = await screen.findByLabelText("Código de confirmación");
+    expect(code).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar otro código" }));
+    expect(screen.getByRole("textbox", { name: "Correo electrónico" })).toHaveFocus();
+  });
   it.each(["editorial", "classic"])(
     "utiliza el mismo formulario funcional y autorización en footer %s",
     async (layout) => {
@@ -88,12 +108,14 @@ describe("suscripción y retiro verificables", () => {
     email("persona@example.com");
     submit();
     const code = await screen.findByLabelText("Código de confirmación");
+    expect(code).toHaveFocus();
     fireEvent.change(code, { target: { value: "123456" } });
     post.mockResolvedValueOnce({
       data: { ok: true, status: "granted", message: "Suscripción confirmada." },
     });
     submit();
     expect(await screen.findByText("Suscripción confirmada.")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveFocus();
     expect(post).toHaveBeenLastCalledWith("/api/newsletter/confirm", {
       email: "persona@example.com",
       code: "123456",
@@ -234,3 +256,4 @@ describe("suscripción y retiro verificables", () => {
     expect(post).not.toHaveBeenCalled();
   });
 });
+

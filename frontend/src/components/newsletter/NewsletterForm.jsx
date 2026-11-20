@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Mail } from "lucide-react";
 import api from "../../lib/api";
 import useNewsletterPolicy from "./useNewsletterPolicy";
@@ -23,6 +23,20 @@ export default function NewsletterForm({
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [failed, setFailed] = useState(false);
+  const emailRef = useRef(null),
+    codeRef = useRef(null),
+    messageRef = useRef(null),
+    previousStep = useRef(step);
+  useEffect(() => {
+    if (busy || previousStep.current === step) return;
+    previousStep.current = step;
+    const target = step === "done"
+      ? messageRef.current
+      : step === "confirm" && email.trim()
+        ? codeRef.current
+        : emailRef.current;
+    target?.focus();
+  }, [step, busy, email]);
   const { policy, error, retry } = useNewsletterPolicy(
     !preview && mode === "subscribe",
   );
@@ -146,6 +160,7 @@ export default function NewsletterForm({
             <label className="footer-ed__email newsletter-email" htmlFor={id}>
               <Mail size={22} aria-hidden="true" />
               <input
+                ref={emailRef}
                 id={id}
                 name="email"
                 type="email"
@@ -229,6 +244,7 @@ export default function NewsletterForm({
             <div className="newsletter-code">
               <label htmlFor={`${id}-code`}>Código de confirmación</label>
               <input
+                ref={codeRef}
                 id={`${id}-code`}
                 inputMode="numeric"
                 autoComplete="one-time-code"
@@ -269,7 +285,7 @@ export default function NewsletterForm({
         </>
       )}
       {message && (
-        <p className="newsletter-message" role={failed ? "alert" : "status"}>
+        <p ref={messageRef} tabIndex={step === "done" ? -1 : undefined} className="newsletter-message" role={failed ? "alert" : "status"}>
           {message}
         </p>
       )}
