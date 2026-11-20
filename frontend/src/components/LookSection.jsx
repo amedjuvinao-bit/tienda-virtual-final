@@ -558,7 +558,7 @@ export default function LookSection({ theme, previewProducts }) {
             <div className="mb-3 px-1">
               <img
                 src={config.titleImage}
-                alt="Título de la sección look"
+                alt={config.titleText.trim() || "Looks"}
                 className="mx-auto h-auto"
                 style={{ maxWidth: Math.min(style.titleImageWidthPx, 260) }}
                 draggable={false}
@@ -673,7 +673,7 @@ export default function LookSection({ theme, previewProducts }) {
               <div className="mb-2 px-1">
                 <img
                   src={config.titleImage}
-                  alt="Título de la sección look"
+                  alt={config.titleText.trim() || "Looks"}
                   className="mx-auto h-auto"
                   style={{ maxWidth: style.titleImageWidthPx }}
                   draggable={false}

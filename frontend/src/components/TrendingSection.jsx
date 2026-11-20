@@ -458,7 +458,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                 {String(config?.title || "EN TENDENCIA")}
               </h2>
             ) : (
-              <img src={titleImage} alt="En tendencia" className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none" />
+              <img src={titleImage} alt={String(config?.title || "En tendencia")} className="w-[230px] md:w-[280px] object-contain pointer-events-none select-none" />
             )}
           </div>
         </div>
@@ -574,7 +574,8 @@ export default function TrendingSection({ theme, previewProducts }) {
                     />
                     <img
                       src={product.image2}
-                      alt={product.name}
+                      alt=""
+                      aria-hidden="true"
                       className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition duration-300"
                       draggable={false}
                     />
@@ -610,7 +611,7 @@ export default function TrendingSection({ theme, previewProducts }) {
                         <div className={floatingGlass ? "trending-card__price-line" : "flex items-end gap-1.5 md:gap-2 min-w-0"}>
                           {product.hasDiscount ? (
                             <>
-                              <span className="text-[9px] md:text-[12px] text-gray-400 line-through font-bold" style={floatingGlass ? { color: presentation.cardMutedColor, fontSize: presentation.oldPriceSizePx } : undefined}>
+                              <span className="text-[9px] md:text-[12px] text-gray-500 line-through font-bold" style={floatingGlass ? { color: presentation.cardMutedColor, fontSize: presentation.oldPriceSizePx } : undefined}>
                                 {moneyCOP(product.price)}
                               </span>
                               <span

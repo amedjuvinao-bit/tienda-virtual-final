@@ -95,7 +95,7 @@ export default function ProductDetailGallery({
             >
               <img
                 src={source}
-                alt={`Miniatura ${index + 1}`}
+                alt=""
                 style={{ objectFit: config.imageFit }}
               />
               <PolishedGlassRim
