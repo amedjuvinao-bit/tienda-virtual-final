@@ -81,11 +81,14 @@ curl --fail --silent --max-time 10 "$url/api/products" >/dev/null
 docker exec "$api" node -e '
 const fs = require("node:fs"); const assert = require("node:assert/strict");
 const pid = fs.readdirSync("/proc").find(p => /^\d+$/.test(p) && (() => {
-  try { return fs.readFileSync(`/proc/${p}/cmdline`, "utf8").split("\0").includes("index.js"); } catch { return false; }
+  try {
+    const args = fs.readFileSync(`/proc/${p}/cmdline`, "utf8").split("\0");
+    return require("node:path").basename(args[0]) === "node" && args[1] === "index.js";
+  } catch { return false; }
 })());
 assert.ok(pid, "application process exists");
 assert.match(fs.readFileSync(`/proc/${pid}/status`, "utf8"), /^Uid:\s+1000\s+1000\s+1000\s+1000$/m);
-for (const file of ["/app/backend/.env", "/app/.env", "/app/backend/backups", "/app/.git"]) assert.equal(fs.existsSync(file), false);
+for (const file of ["/app/backend/.env", "/app/.env", "/app/backend/backups", "/app/.git", "/var/data/uploads/index.js"]) assert.equal(fs.existsSync(file), false);
 for (const file of ["/app/shared/tiktokSelection.cjs", "/usr/local/bin/mongodump", "/usr/local/bin/mongorestore"]) assert.ok(fs.existsSync(file));
 '
 
@@ -105,6 +108,18 @@ assert.equal(JSON.parse(fs.readFileSync(`${dir}/${records[0]}`, "utf8")).status,
 '
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$url/backups/")" = 404
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$url/uploads/.backup-maintenance.json")" = 404
+# Simulate the persisted maintenance gate after an interrupted backup. The
+# business API must pause while the infrastructure probe remains healthy.
+docker exec --user node "$api" node -e '
+require("node:fs").writeFileSync("/var/data/backups/.backup-maintenance.json", JSON.stringify({id:"111111111111111111111111",kind:"database"}));
+'
+docker restart --time 120 "$api" >/dev/null
+wait_health
+test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$url/api/products")" = 503
+docker exec --user node "$api" node -e 'require("node:fs").unlinkSync("/var/data/backups/.backup-maintenance.json")'
+docker restart --time 120 "$api" >/dev/null
+wait_health
+curl --fail --silent --max-time 10 "$url/api/products" >/dev/null
 docker stop --time 120 "$source_db" >/dev/null
 test "$(curl --silent --max-time 10 --output "$temp/offline.json" --write-out '%{http_code}' "$url/healthz")" = 503
 test "$(cat "$temp/offline.json")" = '{"ok":false}'
@@ -112,4 +127,4 @@ docker start "$source_db" >/dev/null
 wait_health
 docker stop --time 120 "$api" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$api")" = 0
-echo 'OK: arranque en producción, usuario sin privilegios, rutas, copia cifrada y restaurada, persistencia, caída de MongoDB y cierre ordenado.'
+echo 'OK: arranque en producción, usuario sin privilegios, rutas, copia cifrada y restaurada, persistencia, mantenimiento, caída de MongoDB y cierre ordenado.'

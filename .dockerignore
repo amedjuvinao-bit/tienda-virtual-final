@@ -25,7 +25,13 @@
 !backend/validators/
 !backend/validators/**
 !backend/uploads/
-!backend/uploads/**
+!backend/uploads/**/
+!backend/uploads/**/*.jpg
+!backend/uploads/**/*.jpeg
+!backend/uploads/**/*.png
+!backend/uploads/**/*.webp
+!backend/uploads/**/*.gif
+!backend/uploads/**/*.avif
 !backend/scripts/
 !backend/scripts/backupAtlasFree.js
 !backend/scripts/backupMedia.js

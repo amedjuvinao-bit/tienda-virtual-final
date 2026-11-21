@@ -49,7 +49,7 @@ bash deploy/smoke-backend.sh tienda-backend:local
 La prueba Docker se ejecuta en Linux/amd64 y crea sus propias bases, red,
 contraseñas temporales y disco. Prueba arranque en modo producción, respuesta de
 productos, permisos del proceso, exclusión de secretos, copia cifrada, restauración
-en otro servidor, persistencia después de reiniciar, caída de MongoDB y cierre
+en otro servidor, persistencia después de reiniciar, mantenimiento, caída de MongoDB y cierre
 ordenado. Elimina únicamente los recursos temporales que ella misma creó.
 En Windows puede ejecutarse en WSL con Docker; también se ejecuta en GitHub Actions.
 
