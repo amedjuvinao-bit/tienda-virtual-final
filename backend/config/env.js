@@ -153,6 +153,9 @@ const env = {
     intervalMs: toNumber(process.env.INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS, 60_000, { min: 30_000 }),
     limit: toNumber(process.env.INVENTORY_RESERVATION_LIMIT || process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT, 50, { min: 1 }),
   },
+  selectionRetention: {
+    enabled: toBoolean(process.env.SELECTION_RETENTION_ENABLED, true),
+  },
   orderPostCommitOutbox: {
     enabled: toBoolean(process.env.ORDER_POST_COMMIT_OUTBOX_ENABLED, true),
     intervalMs: toNumber(
@@ -411,6 +414,7 @@ function getSafeEnvSummary() {
     cloudinaryConfigured: cloudinaryBackendConfigured,
     smtpConfigured: Boolean(env.mail.host && env.mail.user && env.mail.pass),
     inventoryReservation: env.inventoryReservation,
+    selectionRetention: env.selectionRetention,
     orderPostCommitOutbox: env.orderPostCommitOutbox,
     shipping: {
       defaultProvider: env.shipping.defaultProvider,

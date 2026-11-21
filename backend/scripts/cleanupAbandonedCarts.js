@@ -30,14 +30,15 @@ async function deleteEligibleCart(candidate, { carts, orders, session, clock = (
   });
 }
 
-async function cleanupEligibleCarts({ client, carts, orders, report }) {
-  await client.withSession(async (session) => {
+async function cleanupEligibleCarts({ client, carts, orders, report, shouldContinue = () => true }) {
+  return client.withSession(async (session) => {
     const candidates = carts.aggregate(
       buildEligibleCartPipeline(new Date(), orders.collectionName),
       { batchSize: 100, readPreference: 'primary', maxTimeMS: 60_000 }
     );
     try {
       for await (const candidate of candidates) {
+        if (!await shouldContinue()) return false;
         const deleted = await deleteEligibleCart(candidate, { carts, orders, session });
         report.checkedCarts += 1;
         report.deletedCarts += deleted;
@@ -45,6 +46,7 @@ async function cleanupEligibleCarts({ client, carts, orders, report }) {
     } finally {
       await candidates.close();
     }
+    return true;
   });
 }
 

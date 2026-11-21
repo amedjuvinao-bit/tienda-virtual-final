@@ -30,6 +30,10 @@ const {
 
 const adminAccessGate = require('./middleware/adminAccessGate');
 const backupMaintenance = require('./services/backupMaintenanceService');
+const {
+  createSelectionRetentionWorker,
+  COLLECTION_NAME: SELECTION_RETENTION_COLLECTION,
+} = require('./services/selectionRetentionWorkerService');
 const { listenHttpServer, startupErrorMessage } = require('./lib/listenHttpServer');
 
 const app = express();
@@ -250,6 +254,7 @@ let billingRecoveryRunning = false;
 let shippingWebhookRecoveryTimer = null;
 let shippingWebhookRecoveryRunning = false;
 let orderPostCommitOutboxWorker = null;
+let selectionRetentionWorker = null;
 let httpServer = null;
 
 function startInventoryReservationExpirationJob() {
@@ -423,6 +428,30 @@ function startOrderPostCommitOutboxWorker() {
   });
 }
 
+function startSelectionRetentionJob() {
+  if (!env.selectionRetention.enabled) {
+    console.log('Limpieza automática de carritos y favoritos desactivada.');
+    return;
+  }
+  if (selectionRetentionWorker) return;
+  const Cart = require('./models/Cart');
+  const Order = require('./models/Order');
+  const Favorite = require('./models/Favorite');
+  selectionRetentionWorker = createSelectionRetentionWorker({
+    getResources: () => ({
+      jobs: mongoose.connection.db.collection(SELECTION_RETENTION_COLLECTION),
+      client: mongoose.connection.getClient(),
+      carts: mongoose.connection.db.collection(Cart.collection.name),
+      orders: mongoose.connection.db.collection(Order.collection.name),
+      favorites: mongoose.connection.db.collection(Favorite.collection.name),
+    }),
+    isReady: () => mongoose.connection.readyState === 1 && !backupMaintenance.isActive(),
+    logger: console,
+  });
+  selectionRetentionWorker.start();
+  console.log('Limpieza automática diaria iniciada: 30 días de inactividad.');
+}
+
 mongoose
   .connect(env.mongoUri, {
     autoIndex: mongooseIndexPolicy.autoIndex && !backupMaintenance.isActive(),
@@ -433,12 +462,14 @@ mongoose
     console.log(`Servidor corriendo en http://localhost:${PORT} | PID ${process.pid}`);
     backupMaintenance.setWorkersIdle(() =>
       !inventoryReservationExpirationRunning && !billingRecoveryRunning &&
-      !shippingWebhookRecoveryRunning && !orderPostCommitOutboxWorker?.metrics().running
+      !shippingWebhookRecoveryRunning && !orderPostCommitOutboxWorker?.metrics().running &&
+      !selectionRetentionWorker?.metrics().running
     );
     startInventoryReservationExpirationJob();
     startBillingInvoiceRecoveryJob();
     startShippingWebhookRecoveryJob();
     startOrderPostCommitOutboxWorker();
+    startSelectionRetentionJob();
   })
   .catch(async err => {
     console.error(startupErrorMessage(err, PORT));
@@ -446,6 +477,7 @@ mongoose
     clearInterval(billingRecoveryTimer);
     clearInterval(shippingWebhookRecoveryTimer);
     orderPostCommitOutboxWorker?.stop();
+    selectionRetentionWorker?.stop();
     if (httpServer) await new Promise(resolve => httpServer.close(resolve));
     await mongoose.disconnect().catch(() => {});
     process.exitCode = 1;

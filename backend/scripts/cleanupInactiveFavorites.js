@@ -13,7 +13,7 @@ async function deleteEligibleFavoriteList(candidate, { favorites, cutoff }) {
   return result.deletedCount;
 }
 
-async function cleanupEligibleFavoriteLists({ favorites, report, now = new Date() }) {
+async function cleanupEligibleFavoriteLists({ favorites, report, now = new Date(), shouldContinue = () => true }) {
   const cutoff = new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const candidates = favorites.find(buildFavoriteRetentionMatch(cutoff), {
     projection: { _id: 1 },
@@ -24,6 +24,7 @@ async function cleanupEligibleFavoriteLists({ favorites, report, now = new Date(
 
   try {
     for await (const candidate of candidates) {
+      if (!await shouldContinue()) return false;
       const deleted = await deleteEligibleFavoriteList(candidate, { favorites, cutoff });
       report.checkedFavoriteLists += 1;
       report.deletedFavoriteLists += deleted;
@@ -31,6 +32,7 @@ async function cleanupEligibleFavoriteLists({ favorites, report, now = new Date(
   } finally {
     await candidates.close();
   }
+  return true;
 }
 
 async function main(args = process.argv.slice(2)) {

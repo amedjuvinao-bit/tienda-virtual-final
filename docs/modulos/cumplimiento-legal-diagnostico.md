@@ -36,11 +36,17 @@ Los metadatos locales de este plazo se guardan en `rb_cart_retention_v1` y `rb_f
 
 La comprobación controlada cubre el plazo, las versiones anteriores, las credenciales, el almacenamiento bloqueado, la recuperación, las respuestas tardías y la continuación de una selección nueva. Las pruebas de navegador de esta versión y la ejecución completa de Vitest requieren comprobación en la instalación.
 
-L-05 sigue abierto por la ejecución periódica de las limpiezas del servidor, que actualmente se realizan por comando. L-07 queda para completar los proveedores efectivos y el alojamiento definitivo.
+El backend inicia ahora una tarea automática para ambas limpiezas. Comprueba al arrancar y cada hora si corresponde ejecutarlas; después de completar un ciclo programa el siguiente para 24 horas más tarde. La fecha queda en `selection_retention_jobs`, junto con una reserva de ejecución renovada antes de cada borrado, para coordinar instancias y conservar la programación entre reinicios. Este registro contiene fechas, estado y totales; no contiene contactos ni credenciales de los visitantes.
+
+La tarea reutiliza los limpiadores manuales y sus comprobaciones de pedidos, actividad, recuperaciones y contenido. No desconecta MongoDB al finalizar. Espera conexión y se pausa ante mantenimiento; los respaldos esperan a que termine la operación en curso. Ante una interrupción o error deja un reintento para una hora después. Si el proceso termina sin liberar su reserva, otra ejecución puede recuperarla al vencer. Los comandos manuales mantienen su funcionamiento.
+
+La automatización está activa por defecto y puede suspenderse con `SELECTION_RETENTION_ENABLED=false`. Depende de que el backend esté en ejecución; si el alojamiento lo suspende, comprueba el trabajo pendiente al arrancar de nuevo. Carritos conserva el requisito de una conexión MongoDB con soporte para transacciones. Los fallos se registran con un código y los totales, sin el contenido de las selecciones.
+
+El pendiente de ejecución periódica de estas dos limpiezas de L-05 queda implementado. La comprobación del cambio usa `node --test backend/scripts/testSelectionRetentionWorker.js backend/scripts/testAbandonedCartCleanup.js`: 19 pruebas con adaptadores en memoria, incluidos los limpiadores reales, coordinación, reinicios, reintentos, mantenimiento y conservación de las comprobaciones antes de borrar. No se ejecutó el worker contra la base del negocio. L-07 continúa para completar los proveedores efectivos y el alojamiento definitivo.
 
 ## Método y alcance
 
-La implementación posterior de L-04 y L-06 se documenta en [Etapa 1: almacenamiento, preferencias y conexiones externas](cumplimiento-legal-etapa-1.md): fuentes locales, widget de pago por acción y controles de contenidos sociales y mapa con rechazo, cambio de decisión y vencimiento. L-05 y L-07 continúan pendientes de sus etapas de conservación y datos reales del negocio. El inventario siguiente conserva los hallazgos de la versión inicialmente examinada.
+La implementación posterior de L-04 y L-06 se documenta en [Etapa 1: almacenamiento, preferencias y conexiones externas](cumplimiento-legal-etapa-1.md): fuentes locales, widget de pago por acción y controles de contenidos sociales y mapa con rechazo, cambio de decisión y vencimiento. El avance de L-05 se describe arriba; L-07 continúa sujeto a los datos reales del negocio. El inventario siguiente conserva los hallazgos de la versión inicialmente examinada.
 
 Se examinaron mediante búsqueda estática 1485 archivos `.js`, `.jsx`, `.ts`, `.tsx`, `.html` y `.css` de `frontend/src`, `backend` y la entrada `frontend/index.html`, excluyendo dependencias, scripts y archivos de pruebas. Se identificaron 28 archivos con referencias a almacenamiento del navegador o emisión de cookies; se revisaron sus consumidores y los servicios relacionados. Los nombres de claves heredadas se contrastaron con las rutas de migración y limpieza.
 
