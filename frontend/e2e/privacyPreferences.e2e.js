@@ -96,7 +96,7 @@ try {
     assert(!requests.some(url => /tiktok|instagram|fonts\.(googleapis|gstatic)|wompi/.test(url)));
     await page.getByRole('button', { name: 'Reproducir: Video de la tienda', exact: true }).click();
     assert(!requests.some(url => /tiktok|instagram/.test(new URL(url).hostname)), 'Clicking play alone does not grant consent');
-    await page.getByRole('button', { name: 'Permitir redes', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Permitir y reproducir', exact: true }).click();
     await page.getByTitle('Video de TikTok: Video de la tienda').waitFor();
     assert(await page.evaluate(() => JSON.parse(localStorage.getItem('rb_privacy_preferences_v1')).choices.maps));
     await page.getByAltText('Publicación de Instagram').waitFor();
