@@ -60,7 +60,7 @@ for (const [key, value] of Object.entries(values)) console.log(`${key}=${value}`
 NODE
 
 docker exec "$source_db" mongosh --quiet --eval \
-  "db.getSiblingDB('ci_store').deployment_probe.insertOne({_id:'deployment-smoke',synthetic:true})" >/dev/null
+  "const store=db.getSiblingDB('ci_store'); store.deployment_probe.insertOne({_id:'deployment-smoke',synthetic:true}); store.adminusers.insertOne({username:'ci_owner',email:'ci-owner@example.invalid',role:'owner',status:'inactive',synthetic:true})" >/dev/null
 docker run --detach --name "$api" --network "$test_run" \
   --env-file "$temp/runtime.env" --mount "source=$volume,target=/var/data" \
   -p 127.0.0.1::10000 "$image" >/dev/null
