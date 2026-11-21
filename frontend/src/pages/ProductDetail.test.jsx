@@ -50,7 +50,7 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
     onAddToCart,
     inventoryTracked,
     selectedAvailableStock,
-    isVariantOptionAvailable, quantity, setQuantity, purchaseUnavailable,config,reviewName,setReviewName,reviewComment,setReviewComment,onSubmitReview,reviewSuccess,
+    isVariantOptionAvailable, quantity, setQuantity, purchaseUnavailable,config,reviewName,setReviewName,reviewComment,setReviewComment,onSubmitReview,reviewSuccess,reviewError,reviewPrivacy,
   }) => (
     <div>
       <img
@@ -71,6 +71,9 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
       <span data-testid="config">{JSON.stringify(config)}</span>
       <span data-testid="reviews">{product.reviews?.length||0}</span>
       <span data-testid="review-success">{reviewSuccess}</span>
+      <span data-testid="review-error">{reviewError}</span>
+      <input type="checkbox" aria-label="Autorización reseña" disabled={!reviewPrivacy?.policy?.ready}
+        checked={reviewPrivacy?.authorized || false} onChange={event=>reviewPrivacy.setAuthorized(event.target.checked)}/>
       <input aria-label="Nombre reseña" value={reviewName} onChange={event=>setReviewName(event.target.value)}/>
       <input aria-label="Comentario reseña" value={reviewComment} onChange={event=>setReviewComment(event.target.value)}/>
       <button onClick={onSubmitReview}>Enviar reseña</button>
@@ -98,6 +101,7 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
   ),
 }));
 
+const REVIEW_POLICY = { ready: true, version: 'review-privacy-1', text: 'Autorizo la publicación de mi nombre, calificación y comentario.', seller: { legalName: 'Tienda de prueba' } };
 const DEMO_PRODUCT = {
   _id: "demo-smartphone",
   title: "DEMO Smartphone X Pro",
@@ -354,12 +358,52 @@ it('distingue un fallo de conexión y permite reintentar',async()=>{
 });
 it('evita reseñas duplicadas y no las mezcla si cambia el producto mientras se envían',async()=>{
   let complete;api.post.mockReturnValue(new Promise(resolve=>{complete=resolve;}));
-  api.get.mockImplementation(async url=>({data:url==='/api/pages'?[]:{...DEMO_PRODUCT,_id:url.includes('nuevo')?'nuevo':DEMO_PRODUCT._id,reviews:[]}}));
+  api.get.mockImplementation(async url=>({data:url==='/api/products/review-privacy'?{policy:REVIEW_POLICY}:url==='/api/pages'?[]:{...DEMO_PRODUCT,_id:url.includes('nuevo')?'nuevo':DEMO_PRODUCT._id,reviews:[]}}));
   const view=render(<ProductDetail/>);await screen.findByTestId('title');
+  await waitFor(()=>expect(screen.getByRole('checkbox',{name:'Autorización reseña'})).toBeEnabled());
+  fireEvent.click(screen.getByRole('checkbox',{name:'Autorización reseña'}));
   fireEvent.change(screen.getByLabelText('Nombre reseña'),{target:{value:'Ana'}});fireEvent.change(screen.getByLabelText('Comentario reseña'),{target:{value:'Comentario'}});
   fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));expect(api.post).toHaveBeenCalledTimes(1);
   route.id='nuevo';view.rerender(<ProductDetail/>);await screen.findByTestId('reviews');complete({data:{reviews:[{name:'Ana',comment:'Comentario'}]}});
   await waitFor(()=>expect(screen.getByTestId('reviews')).toHaveTextContent(/^0$/));expect(screen.getByTestId('review-success')).toBeEmptyDOMElement();
+});
+
+it('exige una decisión expresa y envía la versión mostrada al publicar una reseña',async()=>{
+  api.get.mockImplementation(async url=>({data:url==='/api/products/review-privacy'?{policy:REVIEW_POLICY}:url==='/api/pages'?[]:DEMO_PRODUCT}));
+  api.post.mockResolvedValue({data:{privacyRecorded:true,reviews:[{name:'Ana',comment:'Comentario',rating:5}]}});
+  render(<ProductDetail/>);
+  await waitFor(()=>expect(screen.getByRole('checkbox',{name:'Autorización reseña'})).toBeEnabled());
+  fireEvent.change(screen.getByLabelText('Nombre reseña'),{target:{value:'Ana'}});
+  fireEvent.change(screen.getByLabelText('Comentario reseña'),{target:{value:'Comentario'}});
+  fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));
+  expect(api.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId('review-error')).toHaveTextContent('autoriza');
+  fireEvent.click(screen.getByRole('checkbox',{name:'Autorización reseña'}));
+  fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));
+  await waitFor(()=>expect(api.post).toHaveBeenCalledWith('/api/products/demo-smartphone/reviews',{
+    name:'Ana',comment:'Comentario',rating:5,privacyAuthorized:true,privacyVersion:REVIEW_POLICY.version,
+  }));
+  await waitFor(()=>expect(screen.getByTestId('review-success')).toHaveTextContent('Reseña enviada correctamente'));
+  expect(screen.getByRole('checkbox',{name:'Autorización reseña'})).not.toBeChecked();
+});
+
+it('un cambio de privacidad conserva el comentario y exige autorizar la información nueva',async()=>{
+  let version=REVIEW_POLICY.version;
+  api.get.mockImplementation(async url=>({data:url==='/api/products/review-privacy'?{policy:{...REVIEW_POLICY,version}}:url==='/api/pages'?[]:DEMO_PRODUCT}));
+  api.post.mockRejectedValue({response:{data:{error:'REVIEW_PRIVACY_CHANGED',message:'La información cambió.'}}});
+  render(<ProductDetail/>);
+  await waitFor(()=>expect(screen.getByRole('checkbox',{name:'Autorización reseña'})).toBeEnabled());
+  fireEvent.change(screen.getByLabelText('Nombre reseña'),{target:{value:'Ana'}});
+  fireEvent.change(screen.getByLabelText('Comentario reseña'),{target:{value:'Conservar este comentario'}});
+  fireEvent.click(screen.getByRole('checkbox',{name:'Autorización reseña'}));
+  version='review-privacy-2';
+  fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));
+  await waitFor(()=>expect(screen.getByTestId('review-error')).toHaveTextContent('La información cambió'));
+  await waitFor(()=>expect(screen.getByRole('checkbox',{name:'Autorización reseña'})).toBeEnabled());
+  expect(screen.getByRole('checkbox',{name:'Autorización reseña'})).not.toBeChecked();
+  expect(screen.getByLabelText('Comentario reseña')).toHaveValue('Conservar este comentario');
+  fireEvent.click(screen.getByRole('button',{name:'Enviar reseña'}));
+  expect(api.post).toHaveBeenCalledTimes(1);
 });
 
 

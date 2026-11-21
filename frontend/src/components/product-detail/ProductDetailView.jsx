@@ -12,6 +12,7 @@ import { normalizeToCss } from "../catalog/catalogColors";
 import { getColorDisplayName } from "../../utils/colorDisplay";
 import PolishedGlassRim from "../PolishedGlassRim";
 import ProductDetailGallery from "./ProductDetailGallery";
+import ReviewPrivacyNotice from "./ReviewPrivacyNotice";
 import ProductDetailInformation from "./ProductDetailInformation";
 import ProductDetailRelatedProducts from "./ProductDetailRelatedProducts";
 import useProductDetailBackdrop from "./useProductDetailBackdrop";
@@ -205,6 +206,7 @@ export default function ProductDetailView({
   reviewLoading,
   reviewError,
   reviewSuccess,
+  reviewPrivacy,
   onSubmitReview,
 }) {
   const cfg = useMemo(() => buildSafeProductDetailConfig(config), [config]);
@@ -726,6 +728,7 @@ export default function ProductDetailView({
 
               {reviewError && (
                 <div
+                  role="alert"
                   style={{
                     marginBottom: 16,
                     padding: "10px 14px",
@@ -743,6 +746,7 @@ export default function ProductDetailView({
 
               {reviewSuccess && (
                 <div
+                  role="status"
                   style={{
                     marginBottom: 16,
                     padding: "10px 14px",
@@ -882,10 +886,13 @@ export default function ProductDetailView({
                   />
                 </div>
 
+                <div style={{ color: reviewTextColor, fontSize: Math.max(12, reviewFontSize), fontFamily: reviewFontFamily }}>
+                  <ReviewPrivacyNotice state={reviewPrivacy} preview={preview} disabled={reviewLoading} />
+                </div>
                 <button
                   type="button"
                   onClick={onSubmitReview}
-                  disabled={reviewLoading}
+                  disabled={preview || reviewLoading || !reviewPrivacy?.policy?.ready || !reviewPrivacy?.authorized}
                   className="pd-add-btn"
                   style={{
                     height: 46,

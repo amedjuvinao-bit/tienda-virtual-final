@@ -13,6 +13,7 @@ import {
 } from "../components/product-detail/productDetailModel";
 import useProductDetailSelection from "../components/product-detail/useProductDetailSelection";
 import { buildSafeProductDetailConfig } from "../components/product-detail/productDetailConfig";
+import useReviewPrivacy from "../components/product-detail/useReviewPrivacy";
 
 import StorefrontLoadingScreen from "../components/StorefrontLoadingScreen";
 import { StorefrontSettingsContext } from "../context/StorefrontSettingsContext";
@@ -58,6 +59,10 @@ export default function ProductDetail() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [reviewSuccess, setReviewSuccess] = useState("");
+  const reviewPrivacy = useReviewPrivacy(
+    Boolean(product && !configLoading && config?.showReviewsSection !== false && config?.showReviewForm !== false),
+    String(product?._id || product?.slug || ''),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -223,6 +228,11 @@ export default function ProductDetail() {
       );
       return;
     }
+    if (!reviewPrivacy.policy?.ready || !reviewPrivacy.authorized) {
+      setReviewError("Lee y autoriza la información antes de publicar tu reseña.");
+      setReviewSuccess("");
+      return;
+    }
     const requestGeneration = generation.current;
     reviewPending.current = true;
     try {
@@ -236,6 +246,8 @@ export default function ProductDetail() {
         name,
         comment,
         rating,
+        privacyAuthorized: true,
+        privacyVersion: reviewPrivacy.policy.version,
       };
 
       const res = await api.post(
@@ -260,9 +272,13 @@ export default function ProductDetail() {
       setReviewName("");
       setReviewComment("");
       setReviewRating(5);
+      reviewPrivacy.setAuthorized(false);
       setReviewSuccess("Reseña enviada correctamente");
     } catch (err) {
       if (requestGeneration !== generation.current) return;
+      if (err?.response?.data?.error === "REVIEW_PRIVACY_CHANGED" || err?.response?.data?.error === "REVIEW_PRIVACY_UNAVAILABLE") {
+        reviewPrivacy.retry();
+      }
       setReviewError(
         err?.response?.data?.message || "No se pudo guardar la reseña",
       );
@@ -338,6 +354,7 @@ export default function ProductDetail() {
       reviewLoading={reviewLoading}
       reviewError={reviewError}
       reviewSuccess={reviewSuccess}
+      reviewPrivacy={reviewPrivacy}
       onSubmitReview={handleSubmitReview}
     />
   );

@@ -10,6 +10,7 @@ const PUBLIC_PRODUCT_PRIVATE_FIELDS = Object.freeze([
   'warehouseLocation',
   'archivedAt',
   'archivedBy',
+  'reviews.privacyAuthorization',
   'digitalDelivery.assetUrl',
   'digitalDelivery.customerMessage',
   'serviceDelivery.bookingUrl',
@@ -64,6 +65,14 @@ function removeFields(target, fields) {
   return target;
 }
 
+function serializePublicReviews(reviews) {
+  return (Array.isArray(reviews) ? reviews : []).map((review) => {
+    const plain = typeof review?.toObject === 'function' ? review.toObject() : { ...review };
+    delete plain.privacyAuthorization;
+    return plain;
+  });
+}
+
 function serializePublicProduct(product) {
   if (!product) return null;
 
@@ -96,6 +105,7 @@ function serializePublicProduct(product) {
       plain.primaryCategoryRef.slug)
       ? plain.primaryCategoryRef
       : null;
+  if (Array.isArray(plain.reviews)) safeProduct.reviews = serializePublicReviews(plain.reviews);
   const categories = Array.isArray(plain.categoryRefs)
     ? plain.categoryRefs.filter(
         (item) =>
@@ -154,4 +164,5 @@ module.exports = {
   PUBLIC_PRODUCT_PROJECTION,
   buildPublicProductFilter,
   serializePublicProduct,
+  serializePublicReviews,
 };

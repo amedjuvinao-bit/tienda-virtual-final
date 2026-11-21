@@ -3,6 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 const Product = require('../models/Product');
+const SiteSettings = require('../models/SiteSettings');
+const { reviewPrivacyPolicy, addProductReview } = require('../services/productReviewPrivacyService');
 const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
@@ -1172,66 +1174,27 @@ router.post(
 
 // ✅ POST /api/products/:id/reviews
 //    Guarda una reseña en el producto por id o slug
+router.get('/review-privacy', async (_req, res) => {
+  try {
+    const settings = await SiteSettings.findOne().lean();
+    res.set('Cache-Control', 'no-store').json({ policy: reviewPrivacyPolicy(settings || {}) });
+  } catch {
+    res.status(503).json({ message: 'No pudimos cargar la información de privacidad para reseñas.' });
+  }
+});
+
 router.post('/:id/reviews', async (req, res) => {
   try {
-    const { id } = req.params;
-    const value = String(id || '').trim();
-
-    if (!value) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
-
-    const name = String(req.body?.name || '').trim();
-    const comment = String(req.body?.comment || '').trim();
-    const rating = Number(req.body?.rating);
-
-    if (!name) {
-      return res.status(400).json({ message: 'El nombre es obligatorio' });
-    }
-
-    if (!comment) {
-      return res.status(400).json({ message: 'El comentario es obligatorio' });
-    }
-
-    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: 'La calificación debe estar entre 1 y 5' });
-    }
-
-    const isValidObjectId =
-      value.length === 24 && /^[0-9a-fA-F]+$/.test(value);
-
-    const identityFilter = isValidObjectId
-      ? { $or: [{ _id: value }, { slug: value }] }
-      : { slug: value };
-
-    const product = await Product.findOne(
-      buildPublicProductFilter(identityFilter)
-    );
-
-    if (!product) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
-
-    if (!Array.isArray(product.reviews)) {
-      product.reviews = [];
-    }
-
-    product.reviews.push({
-      name,
-      rating,
-      comment,
-      createdAt: new Date(),
-    });
-
-    await product.save();
-
-    res.status(201).json({
-      message: 'Reseña guardada correctamente',
-      reviews: product.reviews,
-    });
+    const result = await addProductReview({ Product, SiteSettings, productKey: req.params.id, body: req.body });
+    res.set('Cache-Control', 'no-store').status(201).json(result);
   } catch (error) {
-    console.error('❌ Error al guardar reseña:', error.message);
-    res.status(500).json({ message: 'Error al guardar la reseña' });
+    const known = (Number.isInteger(error.statusCode) && error.statusCode >= 400 && error.statusCode < 500)
+      || error.code === 'REVIEW_PRIVACY_UNAVAILABLE';
+    if (!known) console.error('❌ Error al guardar reseña:', error.message);
+    res.status(known ? error.statusCode : 500).json({
+      error: known ? error.code : 'REVIEW_SAVE_FAILED',
+      message: known ? error.message : 'Error al guardar la reseña',
+    });
   }
 });
 

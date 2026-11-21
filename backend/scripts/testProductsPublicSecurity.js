@@ -20,6 +20,10 @@ const listServiceSource = fs.readFileSync(
   path.join(__dirname, '..', 'services', 'productListQueryService.js'),
   'utf8'
 );
+const reviewServiceSource = fs.readFileSync(
+  path.join(__dirname, '..', 'services', 'productReviewPrivacyService.js'),
+  'utf8'
+);
 const adminFormSource = fs.readFileSync(
   path.join(__dirname, '..', '..', 'frontend', 'src', 'admin', 'FormularioProducto.jsx'),
   'utf8'
@@ -133,7 +137,7 @@ check('La serialización no modifica el documento original', () => {
 });
 
 check('Todas las lecturas públicas usan filtro y serialización protegidos', () => {
-  const publicReadSource = `${routeSource}\n${listServiceSource}`;
+  const publicReadSource = `${routeSource}\n${listServiceSource}\n${reviewServiceSource}`;
   const filterUses = publicReadSource.match(/buildPublicProductFilter\(/g) || [];
   const serializerUses = publicReadSource.match(/serializePublicProduct/g) || [];
 

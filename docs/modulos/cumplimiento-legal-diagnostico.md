@@ -12,6 +12,14 @@ Esta etapa contiene únicamente el diagnóstico. No cambia componentes, configur
 
 La implementación de L-01, L-02 y L-03 está documentada en [Suscripciones y retiro](suscripciones-consentimiento.md): formulario compartido, autorización versionada, confirmación de correo, retiro verificable, constancia duradera y conexión específica del canal email con Clientes y Checkout. Se conserva el diagnóstico de la versión examinada como referencia del estado anterior. La comprobación de SMTP y base de datos en la instalación sigue siendo necesaria; L-04 a L-07 no se consideran resueltos por este cambio.
 
+## Avance: autorización para reseñas
+
+El formulario de reseñas informa que el nombre elegido, la calificación y el comentario serán públicos, presenta el responsable y enlaza la política vigente. La decisión empieza desmarcada y se comprueba también en el servidor. Un cambio de política exige revisarla de nuevo; se conserva el comentario escrito.
+
+Cada reseña nueva conserva una constancia privada con el texto autorizado, la política, el responsable, la fecha del servidor y la referencia de integridad de su contenido. Las respuestas públicas excluyen esa constancia. Las reseñas anteriores no reciben autorizaciones reconstruidas. Este flujo no concede permisos comerciales ni acredita una compra verificada.
+
+Validación dirigida: `node backend/scripts/testProductReviewPrivacy.js`, `node backend/scripts/testProductsPublicSecurity.js` y las pruebas de ProductDetail, ProductDetailView y ReviewPrivacyNotice. La comprobación utiliza datos controlados y no escribe en la instalación del negocio.
+
 ## Avance de conservación
 
 Los carritos disponen de conteo y limpieza manual con 30 días de inactividad. La limpieza vuelve a comprobar los pedidos vinculados, las conversiones, las recuperaciones y la actividad antes de borrar.
