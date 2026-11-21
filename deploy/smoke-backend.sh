@@ -88,7 +88,7 @@ const pid = fs.readdirSync("/proc").find(p => /^\d+$/.test(p) && (() => {
 })());
 assert.ok(pid, "application process exists");
 assert.match(fs.readFileSync(`/proc/${pid}/status`, "utf8"), /^Uid:\s+1000\s+1000\s+1000\s+1000$/m);
-for (const file of ["/app/backend/.env", "/app/.env", "/app/backend/backups", "/app/.git", "/var/data/uploads/index.js"]) assert.equal(fs.existsSync(file), false);
+for (const file of ["/app/backend/.env", "/app/.env", "/app/backend/backups", "/app/.git", "/var/data/uploads/index.js", "/app/backend/test", "/app/backend/scripts/testEnvConfig.js"]) assert.equal(fs.existsSync(file), false, file);
 for (const file of ["/app/shared/tiktokSelection.cjs", "/usr/local/bin/mongodump", "/usr/local/bin/mongorestore"]) assert.ok(fs.existsSync(file));
 '
 

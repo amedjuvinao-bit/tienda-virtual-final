@@ -1,6 +1,7 @@
 # Only production runtime sources enter the backend build context.
 **
 !backend/
+backend/*
 !backend/index.js
 !backend/package.json
 !backend/package-lock.json
@@ -25,7 +26,7 @@
 !backend/validators/
 !backend/validators/**
 !backend/uploads/
-!backend/uploads/**/
+backend/uploads/**
 !backend/uploads/**/*.jpg
 !backend/uploads/**/*.jpeg
 !backend/uploads/**/*.png
@@ -33,6 +34,7 @@
 !backend/uploads/**/*.gif
 !backend/uploads/**/*.avif
 !backend/scripts/
+backend/scripts/*
 !backend/scripts/backupAtlasFree.js
 !backend/scripts/backupMedia.js
 !backend/scripts/decryptFreeBackup.js
@@ -42,10 +44,12 @@
 !backend/scripts/previewAbandonedCartRetention.js
 !backend/scripts/previewInactiveFavoriteRetention.js
 !backend/scripts/data/
+backend/scripts/data/*
 !backend/scripts/data/factusMunicipalities.json
 !shared/
 !shared/**
 !deploy/
+deploy/*
 !deploy/backend.Dockerfile
 !deploy/backend-entrypoint.sh
 # These exclusions also apply to otherwise allowed source directories.
@@ -57,3 +61,4 @@
 **/*.key
 **/*.p12
 **/.DS_Store
+backend/uploads/**/*.js
