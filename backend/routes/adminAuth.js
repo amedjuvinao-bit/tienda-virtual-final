@@ -34,6 +34,7 @@ const {
 } = require('../security/adminSessionService');
 const {
   getAdminSecurityCenter,
+  countOpenSecurityAlerts,
 } = require('../security/adminSecurityCenterService');
 const {
   recordLoginAlert,
@@ -2385,6 +2386,12 @@ router.get('/security-center', requireAdmin, async (req, res) => {
     });
     if (!adminUser) {
       return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    if (req.query.summary === '1') {
+      const pendingAlerts = await countOpenSecurityAlerts(adminUser);
+      res.set('Cache-Control', 'private, no-store');
+      return res.json({ ok: true, security: { summary: { pendingAlerts } } });
     }
 
     const security = await getAdminSecurityCenter({

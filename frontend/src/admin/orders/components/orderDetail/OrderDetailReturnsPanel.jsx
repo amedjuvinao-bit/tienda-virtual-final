@@ -16,6 +16,7 @@ import useOrderReturnsPanel from './hooks/useOrderReturnsPanel';
 
 export default function OrderDetailReturnsPanel({
   data = {},
+  selectedRecordId = '',
   loading = false,
   busyId = '',
   canManage = false,
@@ -89,6 +90,7 @@ export default function OrderDetailReturnsPanel({
           return (
             <OrderReturnCaseCard
               key={id}
+              selected={selectedRecordId === id}
               busyId={busyId}
               canManage={canManage}
               canRefund={canRefund}

@@ -14,6 +14,8 @@ const {
 const { createOrder } = require('../controllers/orderCreationController');
 const {
   listAdminOrders,
+  getOrderOperationalAlerts,
+  getOrderPostSaleAlerts,
 } = require('../controllers/orderAdminQueryController');
 const {
   getOrderOperationalHealth,
@@ -95,6 +97,10 @@ router.post('/admin/manual/quote', requirePermission('orders:create'), previewMa
 router.post('/admin/manual', requirePermission('orders:create'), postManualOrder);
 
 router.get('/admin/operations/health', getOrderOperationalHealth);
+
+router.get('/admin/operational-alerts', requirePermission('orders:view'), getOrderOperationalAlerts);
+
+router.get('/admin/post-sale-alerts', requirePermission('orders:view'), getOrderPostSaleAlerts);
 
 router.get(
   '/admin/shipping/providers',

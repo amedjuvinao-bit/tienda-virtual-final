@@ -39,6 +39,9 @@ export default function StorefrontScrollRestoration({ ready = true }) {
         isReady: () => readyRef.current,
         onFinish: () => { pending = false; record(); },
       });
+    } else if (navigation !== 'POP' && location.state?.preserveStorefrontScroll && prior?.pathname === pathname && prior?.hash === hash) {
+      // Filters change the current view's query, not its scroll destination.
+      record();
     } else {
       const top = target ? Math.max(0, storefrontSectionTop(target) - (parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0)) : 0;
       window.scrollTo({ top, behavior: target && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'smooth' : 'instant' });

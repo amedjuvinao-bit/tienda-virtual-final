@@ -6,17 +6,19 @@ import FooterNavigation from './FooterNavigation';
 import FooterSocials from './FooterSocials';
 import './footerEditorial.css';
 import { footerClickFeedback } from './footerClickFeedback';
+import PolishedGlassRim from '../PolishedGlassRim';
+import ConsumerClaimsLink from '../consumer/ConsumerClaimsLink';
 
-export default function FooterEditorial({ theme, store, preview=false }) {
+export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false, inheritBackground=false }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
   const [failedLogo,setFailedLogo]=useState('');
   const signatureId='footer-signature-'+useId().replace(/:/g,'');
   if(footer.enabled===false && !preview)return null;
   const columns=footerColumns(footer).filter(col=>c[col.id+'Enabled']);
   const logo=resolveFooterLogo(footer,theme), showLogo=c.brandMode!=='text' && logo && failedLogo!==logo;
-  const image=c.backgroundMode==='satin'?'/footer/editorial-satin-v2.webp':c.backgroundMode==='image'?c.backgroundImage:'';
+  const image=inheritBackground?'':c.backgroundMode==='satin'?'/footer/editorial-satin-v2.webp':c.backgroundMode==='image'?c.backgroundImage:'';
   const style={
-    backgroundColor:c.backgroundMode==='inherit'?'transparent':c.backgroundColor,
+    backgroundColor:inheritBackground || c.backgroundMode==='inherit'?'transparent':c.backgroundColor,
     backgroundImage:image?'url('+JSON.stringify(image)+')':'none',
     backgroundPosition:c.backgroundX+'% '+c.backgroundY+'%',
     backgroundSize:c.backgroundZoom===100?'cover':c.backgroundZoom+'% auto',
@@ -33,11 +35,12 @@ export default function FooterEditorial({ theme, store, preview=false }) {
     const view=root.current?.ownerDocument.defaultView;
     view?.scrollTo({top:0,behavior:view.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   }
-  return <div className="footer-ed-viewport"><footer ref={root} onClickCapture={footerClickFeedback} className="footer-ed" aria-label="Pie de página" style={style} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
+  return <div className="footer-ed-viewport"><footer ref={root} onClickCapture={footerClickFeedback} className="footer-ed" aria-label="Pie de página" style={style} data-glass={polishedGlass ? 'polished' : undefined} data-motion={c.hoverMotion} data-mobile-nav={c.mobileNavigation} data-newsletter={c.newsletterEnabled}>
+    {polishedGlass && <PolishedGlassRim radius={c.radius} width={Math.min(6,c.depth / 4)}/>}
     <div className="footer-ed__inner">
       {c.newsletterEnabled && <div className="footer-ed__top">
         <header className="footer-ed__invitation">{c.headline && <h2>{c.headline}</h2>}{c.description && <p>{c.description}</p>}</header>
-        <FooterNewsletter config={c} footer={footer} preview={preview}/>
+        <FooterNewsletter config={c} footer={footer} preview={preview} polishedGlass={polishedGlass}/>
       </div>}
       <div className="footer-ed__body">
         {c.brandEnabled && (showLogo || c.brandName || c.brandTagline) && <div className="footer-ed__brand">
@@ -47,6 +50,7 @@ export default function FooterEditorial({ theme, store, preview=false }) {
         </div>}
         <FooterNavigation columns={columns} mobileNavigation={c.mobileNavigation}/>
       </div>
+      <div className="footer-ed__claims"><ConsumerClaimsLink footer={footer} preview={preview}/></div>
       <div className="footer-ed__utility">
         <FooterSocials footer={footer} theme={theme} config={c}/>
         {c.backToTopEnabled && <button type="button" className="footer-ed__top-button" aria-label={c.backToTopLabel || 'Volver arriba'} onClick={backToTop}><ArrowUp size={30} aria-hidden="true"/></button>}

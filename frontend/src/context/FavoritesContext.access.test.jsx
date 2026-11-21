@@ -45,12 +45,13 @@ function renderProvider() {
 describe('FavoritesContext con propiedad segura', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     Object.values(state.api).forEach((mock) => mock.mockReset());
     state.api.post.mockResolvedValue({
       data: { sessionId, favoriteAccessToken: token },
     });
-    state.api.get.mockRejectedValue({ response: { status: 404 } });
-    state.api.put.mockResolvedValue({ data: { persisted: true } });
+    state.api.get.mockResolvedValue({data:{items:[],revision:null}});
+    state.api.put.mockImplementation(async (_url, body) => ({data:{favorites:{items:body.items,revision:'doc:1'}}}));
   });
 
   afterEach(() => cleanup());

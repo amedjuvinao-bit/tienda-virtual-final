@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from 'react-dom';
 import {
@@ -35,6 +35,14 @@ function Header() {
   const menuPressTimerRef = useRef(null);
   const desktopSearchAnchorRef = useRef(null);
   const mobileSearchAnchorRef = useRef(null);
+  const headerRef = useRef(null);
+  const mobileMenuRef = useRef(null);
+  const menuTriggerRef = useRef(null);
+  const mobileCartTriggerRef = useRef(null);
+  const closeMenu = useCallback((restoreFocus = true) => {
+    setMenuOpen(false);
+    if (restoreFocus) menuTriggerRef.current?.focus();
+  }, []);
   const [pressedMenuIndex, setPressedMenuIndex] = useState(null);
   useEffect(() => () => {
     window.clearTimeout(searchCloseTimerRef.current);
@@ -96,7 +104,7 @@ function Header() {
     let previousY = window.scrollY;
     function handleScroll() {
       const currentY = window.scrollY;
-      if (!menuOpen && !cartOpen && !searchOpen && Math.abs(currentY - previousY) > 4) {
+      if (!menuOpen && !cartOpen && !searchOpen && !headerRef.current?.contains(document.activeElement) && Math.abs(currentY - previousY) > 4) {
         setShowHeader(currentY < 80 || currentY < previousY);
       }
       previousY = currentY;
@@ -128,12 +136,46 @@ function Header() {
 
   useEffect(() => {
     if (!menuOpen) return;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setMenuOpen(false);
+    const panel = mobileMenuRef.current;
+    const desktop = window.matchMedia?.('(min-width: 1024px)');
+    const onDesktop = () => {
+      if (!desktop?.matches) return;
+      closeMenu(false);
+      headerRef.current?.querySelector('a[href]')?.focus();
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [menuOpen]);
+    if (desktop?.matches) {
+      onDesktop();
+      return;
+    }
+    panel?.querySelector('button')?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMenu();
+      }
+      if (event.key !== 'Tab' || !panel) return;
+      const controls = [...panel.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+        .filter((node) => node.tabIndex >= 0 && node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden');
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first) {
+        event.preventDefault();
+        panel.focus();
+      } else if (event.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    desktop?.addEventListener?.('change', onDesktop);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      desktop?.removeEventListener?.('change', onDesktop);
+    };
+  }, [menuOpen, closeMenu]);
 
   const navStyle = useMemo(
     () => ({
@@ -332,11 +374,11 @@ function Header() {
   };
 
   const closeMenuAndNavigate = (to) => {
-    setMenuOpen(false);
+    closeMenu(false);
     navigate(to);
   };
   const selectAtelierItem = (item) => {
-    setMenuOpen(false);
+    closeMenu(item.isExternal);
     if (item.isExternal) window.open(item.to, '_blank', 'noopener,noreferrer');
     else navigate(item.to);
   };
@@ -393,6 +435,8 @@ function Header() {
   return createPortal(
     <>
       <header
+        ref={headerRef}
+        onFocusCapture={() => setShowHeader(true)}
         style={headerInlineStyle}
         data-shape={headerSurface.shape}
         data-glass={headerSurface.glass}
@@ -485,7 +529,11 @@ function Header() {
           <div className="lg:hidden h-full">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20">
               <MobileMenuTrigger config={headerConfig} expanded={menuOpen}
-                onClick={() => setMenuOpen(true)} aria-label="Abrir menú"
+                onClick={(event) => {
+                  menuTriggerRef.current = event.currentTarget;
+                  setSearchOpen(false);
+                  setMenuOpen(true);
+                }} aria-label="Abrir menú"
                 aria-controls="storefront-mobile-menu" />
             </div>
 
@@ -513,7 +561,7 @@ function Header() {
                 )}
               </button>
 
-              <button type="button" aria-label="Abrir carrito"
+              <button ref={mobileCartTriggerRef} type="button" aria-label="Abrir carrito"
                 onClick={() => setCartOpen(true)}
                 className="storefront-action-button"
               >
@@ -540,13 +588,17 @@ function Header() {
           menuOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
         style={overlayStyle}
-        onClick={() => setMenuOpen(false)}
+        onClick={() => closeMenu()}
       />
 
       <aside
+        ref={mobileMenuRef}
         id="storefront-mobile-menu"
         className="lg:hidden fixed z-[80] shadow-2xl flex flex-col transition-all"
         aria-label="Menú móvil"
+        role="dialog"
+        aria-modal={menuOpen ? true : undefined}
+        tabIndex={-1}
         aria-hidden={!menuOpen}
         inert={!menuOpen ? '' : undefined}
         style={asideStyle}
@@ -554,11 +606,20 @@ function Header() {
         {isAtelierSheet ? <AtelierMobileMenu
           items={menuItems}
           storeName={storeName}
-          onClose={() => setMenuOpen(false)}
+          onClose={() => closeMenu()}
           onSelect={selectAtelierItem}
-          onSearch={() => { setMenuOpen(false); setSearchTarget('mobile'); setSearchOpen(true); }}
+          onSearch={() => {
+            searchTriggerRef.current = mobileSearchAnchorRef.current?.querySelector('button');
+            closeMenu(false);
+            setSearchTarget('mobile');
+            setSearchOpen(true);
+          }}
           onFavorites={() => closeMenuAndNavigate('/favoritos')}
-          onCart={() => { setMenuOpen(false); setCartOpen(true); }}
+          onCart={() => {
+            closeMenu(false);
+            mobileCartTriggerRef.current?.focus();
+            setCartOpen(true);
+          }}
           cartCount={cart.length}
           featureImage={mobileMenuFeatureImage}
           featureLink={headerConfig?.mobileMenuFeatureRef}
@@ -576,7 +637,7 @@ function Header() {
 
           <button
             type="button"
-            onClick={() => setMenuOpen(false)}
+            onClick={() => closeMenu()}
             className="flex items-center justify-center shadow-sm"
             style={closeButtonStyle}
             aria-label="Cerrar menú"
@@ -605,7 +666,7 @@ function Header() {
                       href={item.to}
                       target="_blank"
                       rel="noreferrer"
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => closeMenu()}
                       className="flex items-center justify-between py-4 text-[17px] font-semibold transition"
                       style={itemStyle}
                     >
@@ -633,7 +694,7 @@ function Header() {
                 No hay opciones de menú configuradas.
               </div>
             )}
-            {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}
+            {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" onClick={() => closeMenu()}
               className="flex items-center gap-3 py-4 text-[17px] font-semibold transition"
               style={{ color: mobileMenuTextColor, borderBottom: `${mobileMenuItemBorderWidthPx}px solid ${mobileMenuItemBorderColor}` }}
               aria-label="Contactar por WhatsApp">

@@ -1,3 +1,4 @@
+import { pageEditorPath } from "./workspace/pageModel";
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/PageEditor.jsx
 import { ADMIN_SECTION_LABELS } from "../appearance/appearanceLabels";
@@ -87,6 +88,11 @@ export default function PageEditor() {
       }
 
       const data = await res.json();
+      const editorPath = pageEditorPath(data);
+      if (editorPath !== `/admin/paginas/${encodeURIComponent(id)}`) {
+        navigate(editorPath, { replace: true });
+        return;
+      }
       setPage(data);
     } catch (error) {
       console.error("❌ Error cargando página:", error);

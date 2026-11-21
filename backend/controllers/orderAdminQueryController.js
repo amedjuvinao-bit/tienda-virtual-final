@@ -1,5 +1,10 @@
 'use strict';
 
+const { getPostSaleAlerts } = require('../services/adminPostSaleAlerts');
+const Order = require('../models/Order');
+const { buildScopedOrderFilter } = require('../services/orderAdminScopeService');
+const { buildOperationalSummaryPipeline } = require('../services/orderAdminQueryService');
+
 const {
   queryAdminOrders,
 } = require('../services/orderAdminQueryService');
@@ -43,6 +48,33 @@ async function listAdminOrders(req, res) {
   }
 }
 
+async function getOrderOperationalAlerts(req, res) {
+  try {
+    const scope = buildScopedOrderFilter(req, { archived: { $ne: true } });
+    if (!scope.ok) return res.status(scope.status || 403).json({ message: scope.message });
+    const [operational] = await Order.aggregate([
+      { $match: scope.filter },
+      ...buildOperationalSummaryPipeline(new Date()),
+    ]).allowDiskUse(true);
+    res.set('Cache-Control', 'private, no-store').json({ operational: operational || {} });
+  } catch (error) {
+    console.error('Error consultando alertas de órdenes:', error.message);
+    res.status(500).json({ message: 'No se pudieron consultar las alertas de órdenes.' });
+  }
+}
+
+async function getOrderPostSaleAlerts(req, res) {
+  try {
+    const alerts = await getPostSaleAlerts(req);
+    res.set('Cache-Control', 'private, no-store').json(alerts);
+  } catch (error) {
+    console.error('Error consultando alertas de posventa:', error.message);
+    res.status(500).json({ message: 'No se pudieron consultar las alertas de posventa.' });
+  }
+}
+
 module.exports = {
   listAdminOrders,
+  getOrderOperationalAlerts,
+  getOrderPostSaleAlerts,
 };

@@ -65,6 +65,15 @@ export function normalizeCategoryPhoto(input = {}) {
   };
 }
 export function categoryArtwork(slide) {
+  // Keep the included fallback photographs when a default card changes its destination.
+  const originalArtwork = {
+    '/SeccionCategoria/complementos.jpg': { image: '/categorias/collection-atlas.webp', position: '100%', atlas: true },
+    '/SeccionCategoria/lo-nuevo.jpg': { image: '/categorias/collection-atlas.webp', position: '0%', atlas: true },
+    '/SeccionCategoria/bebe.jpg': { image: '/categorias/collection-atlas.webp', position: '33.333333%', atlas: true },
+    '/SeccionCategoria/niña2-8.jpg': { image: '/categorias/collection-atlas.webp', position: '66.666667%', atlas: true },
+    '/SeccionCategoria/niña9-12.jpg': { image: '/categorias/collection-older.webp', position: '50%', atlas: false },
+  };
+  if (Object.hasOwn(originalArtwork, slide?.image)) return originalArtwork[slide.image];
   const value = `${slide?.title || ''} ${slide?.href || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/complement|accesorio/.test(value)) return { image: '/categorias/collection-atlas.webp', position: '100%', atlas: true };
   if (/lo.nuevo|novedad/.test(value)) return { image: '/categorias/collection-atlas.webp', position: '0%', atlas: true };
@@ -79,7 +88,8 @@ export function categoryPhotoSource(value) {
 }
 export function safeCategoryHref(value) {
   const href = typeof value === 'string' ? value.trim() : '';
-  return /^\/(?![\/\\])[^\\\s]*$/.test(href) || /^https?:\/\/[^\s]+$/i.test(href) ? href : '/categorias';
+  if (href === '/categorias') return '/#categorias';
+  return /^\/(?![\/\\])[^\\\s]*$/.test(href) || /^https?:\/\/[^\s]+$/i.test(href) ? href : '/#categorias';
 }
 export function categoriasBackdrop(theme, config, style) {
   if (style.fanBackgroundMode === 'global') return { color: theme?.colors?.background || '#ffffff', image: '' };

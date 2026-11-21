@@ -1,4 +1,6 @@
-import React from 'react';
+import paymentMethodsFallback from "../../assets/LogosMetodosDePago.png";
+import { CheckoutCard, CheckoutButton } from "./CheckoutMaterial";
+import React, { useState } from "react";
 
 export default function CheckoutPaymentSection({
   state,
@@ -6,24 +8,51 @@ export default function CheckoutPaymentSection({
   onPreviewStoreCredit,
 }) {
   const { checkoutConfig, paymentsConfig, storeCreditPreview } = state;
+  const [failedMethods, setFailedMethods] = useState("");
 
   return (
-    <div className="co-card">
-      <h2 className="co-card-title">Pago</h2>
-      <p style={{ fontSize: '13px', color: checkoutConfig.style.textSecondaryColor, marginBottom: '16px' }}>
+    <CheckoutCard>
+      <h2 className="co-card-title">{checkoutConfig.paymentSectionTitle}</h2>
+      <p
+        style={{
+          fontSize: "13px",
+          color: checkoutConfig.style.textSecondaryColor,
+          marginBottom: "16px",
+        }}
+      >
         Todas las transacciones son seguras y están encriptadas.
       </p>
 
       {checkoutConfig.showPaymentMethodsImage && (
-        <div style={{ marginBottom: '16px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+        <div className="co-methods-image" style={{ marginBottom: "16px" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "var(--co-text-secondary)",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
             Métodos de pago aceptados
           </span>
-          <div style={{ marginTop: '10px' }}>
+          <div style={{ marginTop: "10px" }}>
             <img
-              src={checkoutConfig.paymentMethodsImage || '/src/assets/LogosMetodosDePago.png'}
-              alt={checkoutConfig.paymentMethodsImageAlt || 'Métodos de pago'}
-              style={{ height: `${checkoutConfig.style.paymentMethodsImageHeightPx}px`, objectFit: 'contain' }}
+              src={
+                checkoutConfig.paymentMethodsImage &&
+                failedMethods !== checkoutConfig.paymentMethodsImage
+                  ? checkoutConfig.paymentMethodsImage
+                  : paymentMethodsFallback
+              }
+              onError={() =>
+                setFailedMethods(checkoutConfig.paymentMethodsImage)
+              }
+              alt={checkoutConfig.paymentMethodsImageAlt || "Métodos de pago"}
+              style={{
+                maxHeight: `${checkoutConfig.style.paymentMethodsImageHeightPx}px`,
+                objectFit: "contain",
+                maxWidth: "100%",
+              }}
             />
           </div>
         </div>
@@ -31,7 +60,9 @@ export default function CheckoutPaymentSection({
 
       <div className="co-payment-redirect">
         <div className="co-payment-provider-badge">
-          {state.paymentsConfigLoading ? 'Cargando pago...' : derived.paymentBlockTitle}
+          {state.paymentsConfigLoading
+            ? "Cargando pago..."
+            : derived.paymentBlockTitle}
         </div>
 
         <div className="co-payment-icon">
@@ -41,123 +72,152 @@ export default function CheckoutPaymentSection({
           </svg>
         </div>
 
-        <div style={{ marginBottom: '8px', fontSize: '12px', color: '#9ca3af' }}>
-          Ambiente: <strong>{derived.paymentEnvironmentLabel}</strong> · Moneda: <strong>{paymentsConfig.currency}</strong>
+        <div
+          style={{
+            marginBottom: "8px",
+            fontSize: "12px",
+            color: "var(--co-text-secondary)",
+          }}
+        >
+          Ambiente: <strong>{derived.paymentEnvironmentLabel}</strong> · Moneda:{" "}
+          <strong>{paymentsConfig.currency}</strong>
         </div>
 
         <div>{derived.paymentBlockMessage}</div>
       </div>
 
-      {paymentsConfig.active !== false && paymentsConfig.provider === 'wompi' && (
-        <div
-          style={{
-            marginTop: 14,
-            border: `1px solid ${checkoutConfig.style.sectionCardBorderColor}`,
-            borderRadius: 14,
-            padding: 14,
-            background: checkoutConfig.style.inputBg,
-          }}
-        >
+      {paymentsConfig.active !== false &&
+        paymentsConfig.provider === "wompi" && (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              flexWrap: 'wrap',
+              marginTop: 14,
+              border: `1px solid ${checkoutConfig.style.sectionCardBorderColor}`,
+              borderRadius: 14,
+              padding: 14,
+              background: `color-mix(in srgb, ${checkoutConfig.style.inputBg} ${checkoutConfig.presentation.glassOpacity * 100}%, transparent)`,
             }}
           >
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>
-                ¿Tienes saldo a favor?
-              </div>
-              <div
-                style={{
-                  marginTop: 3,
-                  fontSize: 12,
-                  color: checkoutConfig.style.textSecondaryColor,
-                }}
-              >
-                Compruébalo con la cédula y el contacto escritos arriba.
-              </div>
-            </div>
-            <button
-              type="button"
-              className="co-btn-secondary"
-              onClick={onPreviewStoreCredit}
-              disabled={storeCreditPreview.status === 'checking'}
-            >
-              {storeCreditPreview.status === 'checking' ? 'Comprobando...' : 'Consultar saldo'}
-            </button>
-          </div>
-
-          {storeCreditPreview.message && (
             <div
-              role={storeCreditPreview.status === 'error' ? 'alert' : 'status'}
               style={{
-                marginTop: 12,
-                fontSize: 12,
-                fontWeight: 600,
-                color:
-                  storeCreditPreview.eligible === true
-                    ? '#047857'
-                    : storeCreditPreview.status === 'error'
-                      ? '#be123c'
-                      : checkoutConfig.style.textSecondaryColor,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
               }}
             >
-              {storeCreditPreview.message}
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>
+                  ¿Tienes saldo a favor?
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 12,
+                    color: checkoutConfig.style.textSecondaryColor,
+                  }}
+                >
+                  Compruébalo con la cédula y el contacto escritos arriba.
+                </div>
+              </div>
+              <CheckoutButton
+                className="co-btn-secondary"
+                onClick={onPreviewStoreCredit}
+                disabled={storeCreditPreview.status === "checking"}
+              >
+                {storeCreditPreview.status === "checking"
+                  ? "Comprobando..."
+                  : "Consultar saldo"}
+              </CheckoutButton>
             </div>
-          )}
 
-          {storeCreditPreview.eligible === true && (
-            <div style={{ marginTop: 12 }}>
-              <label
+            {storeCreditPreview.message && (
+              <div
+                role={
+                  storeCreditPreview.status === "error" ? "alert" : "status"
+                }
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 13,
-                  fontWeight: 650,
-                  cursor: 'pointer',
+                  marginTop: 12,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color:
+                    storeCreditPreview.eligible === true
+                      ? "#047857"
+                      : storeCreditPreview.status === "error"
+                        ? "#be123c"
+                        : checkoutConfig.style.textSecondaryColor,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={state.useStoreCredit}
-                  onChange={(event) => state.setUseStoreCredit(event.target.checked)}
-                />
-                Usar saldo disponible: {storeCreditPreview.currency}{' '}
-                ${Number(storeCreditPreview.balance || 0).toLocaleString('es-CO')}
-              </label>
+                {storeCreditPreview.message}
+              </div>
+            )}
 
-              {state.useStoreCredit && (
-                <div style={{ marginTop: 10 }}>
-                  <label className="co-field-label">Saldo que quieres usar</label>
+            {storeCreditPreview.eligible === true && (
+              <div style={{ marginTop: 12 }}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 13,
+                    fontWeight: 650,
+                    cursor: "pointer",
+                  }}
+                >
                   <input
-                    type="number"
-                    className="co-input"
-                    min="1"
-                    max={Math.min(Number(storeCreditPreview.balance || 0), derived.total)}
-                    step="1"
-                    value={state.storeCreditAmount}
-                    onChange={(event) => state.setStoreCreditAmount(event.target.value)}
+                    type="checkbox"
+                    checked={state.useStoreCredit}
+                    onChange={(event) =>
+                      state.setUseStoreCredit(event.target.checked)
+                    }
                   />
-                  <div
-                    style={{
-                      marginTop: 8,
-                      fontSize: 12,
-                      color: checkoutConfig.style.textSecondaryColor,
-                    }}
-                  >
-                    Saldo aplicado: ${derived.appliedStoreCreditAmount.toLocaleString('es-CO')} · A pagar ahora: ${derived.amountDue.toLocaleString('es-CO')}
+                  Usar saldo disponible: {storeCreditPreview.currency} $
+                  {Number(storeCreditPreview.balance || 0).toLocaleString(
+                    "es-CO",
+                  )}
+                </label>
+
+                {state.useStoreCredit && (
+                  <div style={{ marginTop: 10 }}>
+                    <label
+                      className="co-field-label"
+                      htmlFor="checkout-credit-amount"
+                    >
+                      Saldo que quieres usar
+                    </label>
+                    <input
+                      id="checkout-credit-amount"
+                      type="number"
+                      className="co-input"
+                      min="1"
+                      max={Math.min(
+                        Number(storeCreditPreview.balance || 0),
+                        derived.total,
+                      )}
+                      step="1"
+                      value={state.storeCreditAmount}
+                      onChange={(event) =>
+                        state.setStoreCreditAmount(event.target.value)
+                      }
+                    />
+                    <div
+                      style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        color: checkoutConfig.style.textSecondaryColor,
+                      }}
+                    >
+                      Saldo aplicado: $
+                      {derived.appliedStoreCreditAmount.toLocaleString("es-CO")}{" "}
+                      · A pagar ahora: $
+                      {derived.amountDue.toLocaleString("es-CO")}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+    </CheckoutCard>
   );
 }

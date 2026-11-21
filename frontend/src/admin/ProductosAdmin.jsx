@@ -279,7 +279,7 @@ const EMPTY_SUMMARY = {
   saleValue: 0,
 };
 
-export default function ProductosAdmin() {
+export default function ProductosAdmin({ initialMissing = '' }) {
   const { can } = useAdminPermissions();
 
   const canUpdateProduct = can('products:update');
@@ -295,6 +295,7 @@ export default function ProductosAdmin() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [inventoryFilter, setInventoryFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [missing, setMissing] = useState(initialMissing);
   const [collectionFilter, setCollectionFilter] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tagFilter, setTagFilter] = useState('');
@@ -360,6 +361,7 @@ export default function ProductosAdmin() {
     statusFilter,
     inventoryFilter,
     categoryFilter,
+    missing,
     collectionFilter,
     tagFilter,
     sort,
@@ -376,6 +378,7 @@ export default function ProductosAdmin() {
     statusFilter,
     inventoryFilter,
     categoryFilter,
+    missing,
     collectionFilter,
     tagFilter,
     sort,
@@ -398,6 +401,7 @@ export default function ProductosAdmin() {
             status: statusFilter,
             inventory: inventoryFilter,
             categoryId: categoryFilter,
+            ...(missing ? { missing } : {}),
             collectionId: collectionFilter,
             tag: tagFilter,
             sort,
@@ -457,6 +461,7 @@ export default function ProductosAdmin() {
     statusFilter,
     inventoryFilter,
     categoryFilter,
+    missing,
     collectionFilter,
     tagFilter,
     sort,
@@ -477,6 +482,7 @@ export default function ProductosAdmin() {
     statusFilter !== 'all' ||
     inventoryFilter !== 'all' ||
     Boolean(categoryFilter) ||
+    Boolean(missing) ||
     Boolean(collectionFilter) ||
     Boolean(tagInput.trim()) ||
     sort !== '-createdAt';
@@ -488,6 +494,7 @@ export default function ProductosAdmin() {
     setStatusFilter('all');
     setInventoryFilter('all');
     setCategoryFilter('');
+    setMissing('');
     setCollectionFilter('');
     setTagInput('');
     setTagFilter('');
@@ -733,7 +740,10 @@ export default function ProductosAdmin() {
 
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                if (event.target.value !== 'all' && event.target.value !== 'active') setMissing('');
+              }}
               className="h-12 w-full px-4 text-sm font-semibold"
               style={styles.input}
             >
@@ -770,7 +780,21 @@ export default function ProductosAdmin() {
             </button>
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <div className="mt-3 grid gap-3 md:grid-cols-4">
+            <select
+              aria-label="Información del producto"
+              value={missing}
+              onChange={(event) => {
+                setMissing(event.target.value);
+                if (event.target.value) setStatusFilter('all');
+              }}
+              className="h-10 w-full px-4 text-xs font-bold"
+              style={styles.input}
+            >
+              <option value="">Toda la información</option>
+              <option value="category">Sin categoría</option>
+              <option value="image">Sin imagen</option>
+            </select>
             <select
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}

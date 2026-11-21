@@ -12,7 +12,7 @@ export function RangeField({label,value,onChange,min=0,max=100}) {
 export function SelectField({label,value,onChange,options}) {return <FooterField label={label}><select value={value} onChange={e=>onChange(e.target.value)}>{options.map(([key,text])=><option key={key} value={key}>{text}</option>)}</select></FooterField>;}
 export function CheckField({label,checked,onChange}) {return <label className="footer-editor__check"><span>{label}</span><input type="checkbox" checked={!!checked} onChange={e=>onChange(e.target.checked)}/></label>;}
 export function ImageField({label,value,onChange,onUpload,pending}) {
-  return <div className="footer-editor__image"><TextField label={label} value={value} onChange={onChange} placeholder="https://…"/><FooterField label="Subir imagen"><input type="file" accept="image/*" disabled={pending} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';onUpload(file);}}/></FooterField></div>;
+  return <div className="footer-editor__image"><strong>{label}</strong>{(value) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => onChange("")}>Quitar imagen</button>}<FooterField label="Subir imagen"><input type="file" accept="image/*" disabled={pending} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';onUpload(file);}}/></FooterField></div>;
 }
 export function FooterLinkEditor({links,onChange}) {
   const [selected,setSelected]=useState(0), index=Math.max(0,Math.min(selected,links.length-1)), current=links[index];

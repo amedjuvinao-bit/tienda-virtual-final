@@ -108,7 +108,7 @@ export default function InstagramEditorialUI({
       return;
     }
     if (typeof uploadToCloudinary !== 'function') {
-      setError('La carga de imágenes no está disponible. Puedes pegar la URL.');
+      setError('La carga de imágenes no está disponible. Recarga la página e inténtalo de nuevo.');
       return;
     }
     setPending(true);
@@ -123,7 +123,7 @@ export default function InstagramEditorialUI({
       if (mounted.current) setPending(false);
     }
   }
-  const imageField = (label, key, value, id) => <Field label={label}><Input aria-label={label} value={value || ''} onChange={ev => id ? patchPost(id, key, ev.target.value) : patch(key, ev.target.value)} placeholder="https://… o /imagen.webp" />
+  const imageField = (label, key, value, id) => <Field label={label}>{value && <Button kind="outline" disabled={pending || uploading} onClick={() => id ? patchPost(id,key,'') : patch(key,'')}>Quitar imagen</Button>}
     <label className="inline-flex mt-2 cursor-pointer rounded-lg border p-2 text-sm">{pending ? 'Subiendo…' : 'Subir imagen'}<input aria-label={`Subir ${label.toLowerCase()}`} type="file" accept="image/png,image/jpeg,image/webp,image/avif" className="hidden" disabled={pending || uploading} onChange={ev => {
         upload(ev.target.files?.[0], key, id);
         ev.target.value = '';

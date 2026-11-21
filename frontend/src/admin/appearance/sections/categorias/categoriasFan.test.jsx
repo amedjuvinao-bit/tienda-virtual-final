@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { matchRoutes } from 'react-router-dom';
+import CATALOG_PAGES from '../../../../../../shared/catalogPages.json';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CategoriasSection from '../../../../components/CategoriasSection';
 import CategoriaArtwork from '../../../../components/CategoriaArtwork';
 import CategoriasSectionUI from './CategoriasSectionUI';
 import { CATEGORIAS_SECTION_DEFAULTS, normalizeCategoriasSection } from './categoriasSectionHelpers';
-import { categoryPhotoSource, normalizeCategoriasFanStyle } from './categoriasFanHelpers';
+import { categoryArtwork, categoryPhotoSource, normalizeCategoriasFanStyle } from './categoriasFanHelpers';
 import StorefrontSectionPreview from '../ui/StorefrontSectionPreview';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -30,6 +32,39 @@ function design(group) {
 }
 
 describe('Categorías: Abanico vivo', () => {
+  it('las cinco tarjetas predeterminadas abren sus catálogos registrados', () => {
+    render(<CategoriasSection theme={{ sections: [] }} />);
+    for (const slug of ['complementos', 'bautizos', 'vestidos', 'jeans', 'calzado']) {
+      const page = CATALOG_PAGES.find(item => item.slug === slug);
+      const href = screen.getByRole('link', { name: `Explorar ${page.name}` }).getAttribute('href');
+      expect(href).toBe(page.publicPath);
+      expect(matchRoutes(CATALOG_PAGES.map(item => ({ path: item.publicPath })), href)?.at(-1)?.route.path).toBe(page.publicPath);
+    }
+  });
+  it.each([
+    ['cat_2', 'Bautizos', '/lo-nuevo', '/categoria/bautizos'],
+    ['cat_3', 'Vestidos', '/categoria/bebe', '/categoria/vestidos'],
+    ['cat_4', 'Jeans', '/categoria/2-8', '/categoria/jeans'],
+    ['cat_5', 'Calzado', '/categoria/9-12', '/categoria/calzado'],
+  ])('corrige el destino heredado de %s conservando el contenido de la tarjeta', (id, title, href, expected) => {
+    const original = { ...records[0], id, title, href, mobileImage: '/propia-movil.webp', imageScale: 1.3 };
+    const normalized = normalizeCategoriasSection({ config: { slides: [original] } }).config.slides[0];
+    expect(normalized).toMatchObject({ ...original, href: expected });
+    expect(original.href).toBe(href);
+    render(<CategoriasSection theme={makeTheme([original])} />);
+    expect(screen.getByRole('link', { name: `Explorar ${title}` })).toHaveAttribute('href', expected);
+  });
+  it('conserva destinos propios y no atribuye una categoría desconocida a otro catálogo', () => {
+    const source = [
+      { ...records[0], title: 'Vestidos', href: '/pagina/campana' },
+      { ...records[1], title: 'Una selección propia', href: 'https://example.test/coleccion' },
+      { ...records[2], title: '0-12 meses', href: '/categoria/bebe' },
+    ];
+    expect(normalizeCategoriasSection({ config: { slides: source } }).config.slides.map(item => item.href)).toEqual(source.map(item => item.href));
+  });
+  it('mantiene las fotografías de respaldo de las tarjetas predeterminadas', () => {
+    expect(CATEGORIAS_SECTION_DEFAULTS.config.slides.map(item => categoryArtwork(item).position)).toEqual(['100%', '0%', '33.333333%', '66.666667%', '50%']);
+  });
   it('mantiene todas las categorías y enlaces visibles sin temporizador ni carrusel', () => {
     const interval = vi.spyOn(globalThis, 'setInterval');
     const many = Array.from({ length: 8 }, (_, i) => ({ id: `c${i}`, title: `Colección ${i}`, href: `/coleccion/${i}` }));
@@ -92,7 +127,13 @@ describe('Categorías: Abanico vivo', () => {
   });
   it.each(['javascript:alert(1)', 'data:text/html,hello', '//example.com', '/\\example.com'])('rechaza destinos no válidos: %s', (href) => {
     render(<CategoriasSection theme={makeTheme([{ ...records[0], href }])} />);
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/categorias');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/#categorias');
+  });
+  it('el destino genérico anterior vuelve a la sección de categorías sin alterar la configuración', () => {
+    const slides = [{ ...records[0], href: '/categorias' }];
+    render(<CategoriasSection theme={makeTheme(slides)} />);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/#categorias');
+    expect(slides[0].href).toBe('/categorias');
   });
   it('sustituye una imagen averiada y vuelve a intentar al cambiar de imagen', () => {
     const slide = normalizeCategoriasSection(makeTheme().sections[0]).config.slides[0];
@@ -150,6 +191,22 @@ describe('Categorías: Abanico vivo', () => {
     const slides = save.mock.calls[0][0].sections[0].config.slides;
     expect(slides).toHaveLength(4); expect(slides.slice(0, 3).map((r) => r.id)).toEqual(['one', 'two', 'three']);
     expect(slides[3].title).toBe('Nueva colección');
+    expect(slides[3].href).toBe('/#categorias');
+  });
+  it.each(['bautizos', 'vestidos', 'jeans', 'calzado', 'lo-nuevo'])('enlaza una tarjeta con el catálogo %s sin modificar las demás categorías', (slug) => {
+    const save = vi.fn(); render(<Harness save={save} />);
+    content('Nombre y enlace'); category('two');
+    expect(screen.getByLabelText('Enlace de la galería')).toHaveValue('/coleccion/dos');
+    const destination = slug === 'lo-nuevo' ? '/lo-nuevo' : `/categoria/${slug}`;
+    fireEvent.change(screen.getByLabelText('Página del catálogo'), { target: { value: destination } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar prueba' }));
+    const slides = save.mock.calls[0][0].sections[0].config.slides;
+    expect(slides[1]).toMatchObject({ ...records[1], href: destination });
+    expect(slides[0]).toMatchObject(records[0]);
+    expect(slides[2]).toMatchObject(records[2]);
+    cleanup();
+    render(<CategoriasSection theme={makeTheme(slides)} />);
+    expect(screen.getByRole('link', { name: 'Explorar Segunda categoría' })).toHaveAttribute('href', destination);
   });
   it('restaura el diseño conservando textos, imágenes y galerías', () => {
     const save = vi.fn(); render(<Harness save={save} />);

@@ -1,5 +1,7 @@
+import NewsletterForm from '../newsletter/NewsletterForm';
 // src/components/FooterSection.jsx
 import React, { useMemo, useState } from "react";
+import ConsumerClaimsLink from "../consumer/ConsumerClaimsLink";
 
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
@@ -48,10 +50,10 @@ function buildFooterConfig(theme) {
       16
     ),
 
-    facebook: footer.facebook || "https://facebook.com/andreamilano.co",
-    instagram: footer.instagram || "https://instagram.com/andreamilano.co",
-    tiktok: footer.tiktok || "https://tiktok.com/@andreamilano.co",
-    whatsapp: footer.whatsapp || "https://wa.me/3154101276",
+    facebook: footer.facebook || "",
+    instagram: footer.instagram || "",
+    tiktok: footer.tiktok || "",
+    whatsapp: footer.whatsapp || "",
 
     facebookIcon: footer.facebookIcon || "",
     instagramIcon: footer.instagramIcon || "",
@@ -73,7 +75,7 @@ function buildFooterConfig(theme) {
       ? footer.column2Links
       : [
           { label: "Contáctanos", href: "/contacto" },
-          { label: "Cambio y devoluciones", href: "/cambios-devoluciones" },
+          { label: "Cambio y devoluciones", href: "/cambios-y-devoluciones" },
           { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },
         ],
 
@@ -81,7 +83,7 @@ function buildFooterConfig(theme) {
     column3Links: Array.isArray(footer.column3Links)
       ? footer.column3Links
       : [
-          { label: "Políticas de compra, despacho y envío", href: "/politicas" },
+          { label: "Envíos y entregas", href: "/envios" },
           { label: "Términos y condiciones", href: "/terminos" },
         ],
 
@@ -196,7 +198,7 @@ function FooterAccordionSection({
   );
 }
 
-export default function FooterSection({ theme }) {
+export default function FooterSection({ theme, inheritBackground = false, preview = false }) {
   const footer = useMemo(() => buildFooterConfig(theme), [theme]);
 
   const column1Links = sanitizeLinks(footer.column1Links);
@@ -234,7 +236,7 @@ export default function FooterSection({ theme }) {
     <footer
       className="relative mt-16 overflow-hidden rounded-[28px] sm:rounded-[32px]"
       style={{
-        backgroundColor: footer.bgColor,
+        backgroundColor: inheritBackground ? "transparent" : footer.bgColor,
         color: footer.textColor,
         "--footer-height": `${footer.footerHeightPx}px`,
       }}
@@ -267,28 +269,8 @@ export default function FooterSection({ theme }) {
                 {footer.subscribeText}
               </h3>
 
-              <form className="mx-auto mt-6 w-full max-w-[34rem] md:mx-0">
-                <div className="flex w-full items-center overflow-hidden rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-                  <input
-                    type="email"
-                    placeholder={footer.inputPlaceholder}
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-gray-700 outline-none placeholder:text-gray-400 sm:px-5 sm:text-[15px]"
-                  />
-                  <button
-                    type="submit"
-                    className="shrink-0 rounded-full px-4 font-medium transition-colors"
-                    style={{
-                      backgroundColor: footer.buttonColor,
-                      color: footer.buttonTextColor,
-                      width: `clamp(${subscribeButtonMobileWidth}px, 34vw, ${footer.subscribeButtonWidthPx}px)`,
-                      minHeight: `${footer.subscribeButtonHeightPx}px`,
-                      fontSize: `clamp(13px, 3.2vw, ${footer.subscribeButtonFontSizePx}px)`,
-                    }}
-                  >
-                    {footer.buttonText}
-                  </button>
-                </div>
-              </form>
+              <div className="mx-auto mt-6 w-full max-w-[34rem] md:mx-0" style={{'--newsletter-button-width':`clamp(${subscribeButtonMobileWidth}px, 34vw, ${footer.subscribeButtonWidthPx}px)`,'--newsletter-button-font-size':`${footer.subscribeButtonFontSizePx}px`,'--fe-button-height':`${footer.subscribeButtonHeightPx}px`,'--fe-button':footer.buttonColor,'--fe-button-ink':footer.buttonTextColor}}><NewsletterForm preview={preview} successMessage={theme?.footer?.editorial?.successMessage} errorMessage={theme?.footer?.editorial?.errorMessage} label={(typeof footer.buttonText === 'string' ? footer.buttonText : 'Suscribirme').replace(/\s*[➔→]\s*$/u,'') || 'Suscribirme'} placeholder={footer.inputPlaceholder}/></div>
+
 
               <div
                 className="mt-5 flex flex-wrap items-center justify-center md:justify-start"
@@ -434,11 +416,15 @@ export default function FooterSection({ theme }) {
           </div>
         </div>
 
+        <div className="px-4 pb-6 text-center sm:px-6 md:px-8">
+          <ConsumerClaimsLink footer={theme?.footer} preview={preview} />
+        </div>
+
         {/* Barra inferior */}
         <div
           className="mt-auto px-4 py-4 text-center text-xs leading-6 sm:px-6 sm:text-sm md:px-8"
           style={{
-            backgroundColor: footer.bottomBarBg,
+            backgroundColor: inheritBackground ? "transparent" : footer.bottomBarBg,
             color: footer.bottomBarTextColor,
           }}
         >

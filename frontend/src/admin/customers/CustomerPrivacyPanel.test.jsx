@@ -88,6 +88,18 @@ describe('CustomerPrivacyPanel Etapa 4', () => {
     });
   });
 
+  it('distingue email del permiso general y permite consultar su constancia', async () => {
+    getAdminCustomerPrivacy.mockResolvedValue({ok:true,consent:{status:'withdrawn'},emailConsent:{status:'granted',updatedAt:'2026-11-02T20:00:00Z'},emailEvidence:{consent:{text:'Autorización específica por correo.',method:'email_code',recordedAt:'2026-11-02T20:00:00Z',proofReference:'newsletter:proof-1',privacyText:'Política comunicada.'}}});
+    render(<CustomerPrivacyPanel customer={{id:'customer-1'}} access={{audit:true,consent:true}}/>);
+    expect(await screen.findByText(/Novedades por correo: Autorizadas/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Ver constancia de comunicaciones por correo'));
+    expect(screen.getByText('Autorización específica por correo.')).toBeVisible();
+    const choice=screen.getByRole('checkbox',{name:/La evidencia incluye/});expect(choice).not.toBeChecked();
+    fireEvent.click(choice);fireEvent.change(screen.getByPlaceholderText('Referencia de evidencia'),{target:{value:'acta-email'}});
+    fireEvent.click(screen.getByRole('button',{name:'Registrar consentimiento'}));
+    await waitFor(()=>expect(updateAdminCustomerConsent).toHaveBeenCalledWith('customer-1',expect.objectContaining({emailMarketing:true,proofReference:'acta-email'})));
+  });
+
   it('no consulta información cuando falta customers:audit', () => {
     render(
       <CustomerPrivacyPanel

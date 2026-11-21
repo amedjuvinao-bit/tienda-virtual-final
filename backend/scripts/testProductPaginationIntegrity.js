@@ -325,8 +325,11 @@ async function run() {
       path.join(root, 'frontend', 'src', 'admin', 'ProductosAdmin.jsx'),
       'utf8'
     );
-    assert.match(catalog, /normalizeProductPageResponse/);
-    assert.match(catalog, /page:\s*String\(catalogPage\)/);
+    const query = fs.readFileSync(path.join(root, 'frontend/src/components/catalog/catalogQuery.js'), 'utf8');
+    const request = fs.readFileSync(path.join(root, 'frontend/src/components/catalog/useCatalogProducts.js'), 'utf8');
+    assert.match(catalog, /useCatalogProducts/);
+    assert.match(request, /normalizeProductPageResponse/);
+    assert.match(query, /params\.set\(["']page["'], String\(state.page\)\)/);
     assert.ok(!catalog.includes('products.filter((product)'));
     assert.match(admin, /productPage\.products/);
   });

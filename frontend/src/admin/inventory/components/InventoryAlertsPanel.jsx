@@ -901,7 +901,7 @@ function TransferActivityCard({ item }) {
   );
 }
 
-export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer }) {
+export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer, initialTab = 'priorities' }) {
   const [alerts, setAlerts] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -980,9 +980,9 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
 
     setAlerts(null);
     setError('');
-    setActiveTab('priorities');
+    setActiveTab(initialTab);
     loadAlerts();
-  }, [open, loadAlerts]);
+  }, [open, loadAlerts, initialTab]);
 
   useEffect(() => {
     if (!open) return undefined;

@@ -73,7 +73,12 @@ function run() {
     'backend/services/orderReturns/storeCreditResolution.js',
   ].map(read).join('\n');
   const accessService = read('backend/services/orderReturnAccessService.js');
-  const customerPage = read('frontend/src/pages/OrderReturnsPage.jsx');
+  const customerPage = [
+    read('frontend/src/pages/OrderReturnsPage.jsx'),
+    readSourceTree('frontend/src/pages/returns'),
+    readSourceTree('frontend/src/components/service-pages'),
+    read('frontend/src/components/service-pages/servicePages.css'),
+  ].join('\n');
   const adminPanel = readSourceTree(
     'frontend/src/admin/orders/components/orderDetail'
   );
@@ -227,8 +232,8 @@ function run() {
       'Centro de posventa',
       'Enviar solicitud',
       'Descargar etiqueta RMA',
-      "var(--color-primary)",
-      "var(--color-bg)",
+      'cartVariables(config)',
+      'var(--color-bg, Canvas)',
     ],
     'Portal del cliente'
   );

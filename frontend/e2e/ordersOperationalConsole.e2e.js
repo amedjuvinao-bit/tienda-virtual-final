@@ -282,7 +282,8 @@ async function ownerDesktopScenario(browser) {
 
   const dialog = page.getByRole('dialog');
   await dialog.waitFor();
-  assert.equal(await dialog.getByRole('tab').count(), 6, 'El detalle debe conservar sus seis secciones.');
+  assert.equal(await dialog.getByRole('tab').count(), 7, 'El detalle conserva sus seis secciones y el acceso a PQR.');
+  await dialog.getByRole('tab', { name: 'Peticiones y reclamos', exact: true }).waitFor();
   await dialog.getByRole('button', { name: 'Gestionar', exact: true }).click();
   await dialog.getByRole('heading', { name: 'Gestionar orden' }).waitFor();
   assert.deepEqual(pageErrors, [], `Errores de navegador para owner: ${pageErrors.join(' | ')}`);

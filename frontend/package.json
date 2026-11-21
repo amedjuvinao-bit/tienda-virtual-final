@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:e2e:social-media-delivery": "node e2e/socialMediaDelivery.e2e.js",
     "test:appearance-closure": "vitest run src/admin/appearance src/admin/AppearancePage.initialLoad.test.jsx src/admin/AppearancePage.save.test.jsx src/admin/AppearancePage.generalUpload.test.jsx src/components src/lib/storefront src/theme",
     "dev": "vite",
     "build": "vite build",
@@ -17,7 +18,7 @@
     "test:product-variant-images": "vitest run src/pages/ProductDetail.test.jsx",
     "test:product-pagination": "vitest run src/utils/productPagination.test.js",
     "test:cart-module": "vitest run src/utils/cartMutationConcurrency.test.js src/utils/cartRecoveryAccess.test.js src/admin/cartAdminApi.test.js src/admin/CarritosAdmin.auth.test.jsx src/admin/CarritosAdmin.operations.test.jsx",
-    "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/admin/favoriteAdminApi.test.js src/admin/FavoritosAdmin.operations.test.jsx",
+    "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/utils/favoriteStore.test.js src/components/favorites src/admin/pages/FavoritesPageEditor.test.jsx src/admin/favoriteAdminApi.test.js src/admin/FavoritosAdmin.operations.test.jsx",
     "test:orders-security": "vitest run src/admin/OrdersAdmin.security.test.jsx src/admin/orders/components/OrderSecurityControls.test.jsx",
     "test:orders-architecture": "vitest run src/admin/orders/hooks/useOrdersAdminQuery.test.jsx src/admin/orders/electronicInvoice/InvoiceSummaryTab.test.jsx",
     "test:orders-logistics": "vitest run src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.test.jsx src/admin/orders/components/orderDetail/orderLogisticsViewModel.test.js",
@@ -25,6 +26,8 @@
     "test:orders-stage4": "vitest run src/utils/orderReturnAccess.test.js src/pages/OrderReturnsPage.test.jsx src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.test.jsx",
     "test:orders-return-risk": "vitest run src/pages/OrderReturnsPage.test.jsx src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.test.jsx",
     "test:checkout-store-credit": "vitest run src/checkout/storeCreditCheckout.test.js src/admin/orders/components/orderDetail/OrderDetailStoryOverview.test.jsx",
+    "test:checkout-module": "vitest run src/checkout/page src/checkout/storeCreditCheckout.test.js src/pages/paymentPages.sensitiveLogging.test.js src/admin/pages/CheckoutPageEditor.test.jsx",
+    "test:thanks-module": "vitest run src/pages/gracias src/pages/paymentPages.sensitiveLogging.test.js src/admin/pages/ThanksPageEditor.test.jsx",
     "test:checkout-architecture": "vitest run src/checkout/page/checkoutPageArchitecture.test.js src/checkout/page/checkoutSubmissionModel.test.js src/checkout/page/useCheckoutSubmission.test.js src/pages/gracias/graciasPageArchitecture.test.jsx src/pages/paymentPages.sensitiveLogging.test.js",
     "test:payu-redirect": "vitest run src/lib/payuRedirect.test.js",
     "test:orders-operations": "vitest run src/admin/orders/components/OrdersOperationsCenter.test.jsx src/admin/orders/hooks/useOrdersQuickViews.test.jsx",
@@ -32,7 +35,7 @@
     "test:orders-keyboard": "vitest run src/admin/orders/components/OrderDetailModal.keyboard.test.js src/admin/orders/components/orderDetail/hooks/useOrderDetailResources.test.jsx",
     "test:orders-whatsapp-assisted": "vitest run src/admin/orders/components/orderDetail/OrderWhatsAppPreview.test.jsx",
     "test:orders-customer-connection": "vitest run src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.test.jsx",
-    "test:customers-module": "vitest run src/admin/api/adminCustomersApi.test.js src/admin/customers/AdminCustomersPageTabbed.test.jsx src/admin/customers/CustomerCrmWorkspace.test.jsx src/admin/customers/CustomerSavedSegments.test.jsx src/admin/customers/CustomerPrivacyPanel.test.jsx",
+    "test:customers-module": "vitest run src/admin/api/adminCustomersApi.test.js src/admin/api/adminSubscriptionsApi.test.js src/admin/customers/AdminCustomersPageTabbed.test.jsx src/admin/customers/CustomerCrmWorkspace.test.jsx src/admin/customers/CustomerSavedSegments.test.jsx src/admin/customers/CustomerPrivacyPanel.test.jsx src/admin/customers/NewsletterSubscribersPanel.test.jsx",
     "test:pos-level-plus-stage2": "vitest run src/admin/pos/posCheckoutModel.test.js src/admin/pos/PosCheckoutPanel.test.jsx",
     "test:pos-level-plus-stage4": "vitest run src/admin/pos/posShiftReportModel.test.js src/admin/pos/PosShiftReportPanel.test.jsx",
     "test:cash-level-plus-stage0": "vitest run src/admin/cash/CashSessionsPageReport.test.jsx",
@@ -69,7 +72,12 @@
     "test:admin-security-stage4": "vitest run src/admin/security/AdminTwoFactorSecurity.test.jsx src/admin/security/AdminSecurityCenterStage4.test.jsx src/admin/security/AdminOwnerTwoFactorManagement.test.jsx",
     "test:admin-security-stage5": "vitest run src/admin/security/AdminSecurityAlertsStage5.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",
-    "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
+    "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx",
+    "test:pages-module": "vitest run src/checkout/page src/checkout/storeCreditCheckout.test.js src/pages/gracias src/pages/paymentPages.sensitiveLogging.test.js src/components/catalog src/components/StorefrontFooter.test.jsx src/components/not-found src/pages/NotFound.test.jsx src/lib/api.adminFetch.test.js src/admin/pages src/admin/components/adminNavigationIdentity.test.js src/pages/ProductDetail.test.jsx src/components/ProductCard.quickAdd.test.js src/components/service-pages src/pages/OrderReturnsPage.test.jsx src/pages/SearchResults.test.jsx",
+    "test:e2e:pages-module": "node e2e/pagesWorkspace.e2e.js",
+    "test:privacy-preferences": "node scripts/testLocalFonts.mjs && vitest run src/lib/privacyPreferences.test.js src/components/privacy src/checkout/page/useCheckoutConfiguration.test.jsx src/components/consumer/privacyPage.test.jsx src/components/information-page/contactPage.test.jsx",
+    "test:e2e:privacy-preferences": "node e2e/privacyPreferences.e2e.js",
+    "test:service-pages": "vitest run src/components/service-pages src/pages/OrderReturnsPage.test.jsx src/pages/SearchResults.test.jsx src/admin/pages/ServicePageEditors.test.jsx src/admin/pages/workspace/publicPageCoverage.test.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

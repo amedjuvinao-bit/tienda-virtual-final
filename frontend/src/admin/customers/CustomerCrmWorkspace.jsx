@@ -71,13 +71,13 @@ function SummaryCard({ label, value, active, onClick, icon: Icon }) {
   );
 }
 
-export default function CustomerCrmWorkspace({ onOpenCustomer }) {
+export default function CustomerCrmWorkspace({ onOpenCustomer, initialDueScope = 'all' }) {
   const [queue, setQueue] = useState([]);
   const [summary, setSummary] = useState({});
   const [assignees, setAssignees] = useState([]);
   const [filters, setFilters] = useState({
     q: '',
-    dueScope: 'all',
+    dueScope: initialDueScope,
     priority: 'all',
     assignedTo: 'all',
     status: 'pending',

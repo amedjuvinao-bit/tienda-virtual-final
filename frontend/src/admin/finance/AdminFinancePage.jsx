@@ -853,7 +853,7 @@ function ExpenseHistoryModal({ expense, onClose }) {
   );
 }
 
-export default function AdminFinancePage() {
+export default function AdminFinancePage({ showPendingExpenses = false }) {
   const { can, adminUser, role } = useAdminPermissions();
   const canManageExpenses = can('finance:expenses');
   const canApproveExpenses = can('finance:expenses:approve');
@@ -864,9 +864,9 @@ export default function AdminFinancePage() {
   const canCertifyPeriods = can('finance:periods:certify');
   const canOverridePeriods = can('finance:periods:override');
   const canExport = can('finance:export');
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState(showPendingExpenses ? 'expenses' : 'overview');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
-  const [expenseStatus, setExpenseStatus] = useState('all');
+  const [expenseStatus, setExpenseStatus] = useState(showPendingExpenses ? 'pending' : 'all');
   const [summary, setSummary] = useState(null);
   const [sales, setSales] = useState(null);
   const [profit, setProfit] = useState(null);

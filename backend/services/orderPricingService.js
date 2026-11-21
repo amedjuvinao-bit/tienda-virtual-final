@@ -1,4 +1,6 @@
 'use strict';
+const { buildConsumerOffer } = require('./consumer/checkoutContract');
+const { withReturnPolicy } = require('./consumer/settingsService');
 
 const mongoose = require('mongoose');
 
@@ -108,7 +110,7 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
 
   let query = ProductModel.find({ _id: { $in: productIds } })
     .select(
-      'title price image images sku barcode category categories variants visible active archivedAt productType trackInventory allowBackorder customs digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
+      'title description features price image images sku barcode category categories variants visible active archivedAt productType trackInventory allowBackorder customs digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
     );
 
   if (session && typeof query.session === 'function') query = query.session(session);
@@ -184,6 +186,7 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       product: product._id,
       productId,
       title: clean(product.title || item.title, 160),
+      consumerProductInfo: { description: clean(product.description, 12000), features: (Array.isArray(product.features) ? product.features : []).slice(0, 50).map(v => clean(v, 500)) },
       image: clean(commercial?.image || item.image || product.image, 1000),
       color: clean(item.colorValue || item.color, 80),
       colorLabel: clean(item.colorLabel || item.color, 80),
@@ -459,6 +462,7 @@ async function buildOrderQuote(input = {}, options = {}) {
     couponCode,
     couponValidation,
     pricing,
+    consumerOffer: buildConsumerOffer({ settings: await withReturnPolicy(settings || {}, { session, returnPolicy: options.returnPolicy }), pricing, customer }),
   };
 }
 

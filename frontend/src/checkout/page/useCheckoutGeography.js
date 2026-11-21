@@ -24,6 +24,7 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
   useEffect(() => {
     let cancel = false;
     setCountriesLoading(true);
+    state.setGeographyError('');
     api
       .get('/api/geo/countries')
       .then((response) => {
@@ -40,12 +41,19 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
           setCustomerCountry(colombia ? colombia.name : '');
         }
       })
-      .catch(() => setCountries([]))
+      .catch(() => {
+        if (!cancel) {
+          setCountries([]);
+          state.setGeographyError(
+            'No pudimos cargar los países. Reintenta para completar tu compra.'
+          );
+        }
+      })
       .finally(() => !cancel && setCountriesLoading(false));
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [state.geographyAttempt]);
 
   useEffect(() => {
     if (!selectedCountry || selectedCountry.code !== 'CO') {
@@ -64,7 +72,12 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
         }
       })
       .catch(() => {
-        if (!cancel) setRegions([]);
+        if (!cancel) {
+          setRegions([]);
+          state.setGeographyError(
+            'No pudimos cargar los departamentos. Reintenta para completar tu compra.'
+          );
+        }
       })
       .finally(() => {
         if (!cancel) setRegionsLoading(false);
@@ -78,6 +91,7 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
     setRegions,
     setRegionsLoading,
     setSelectedRegion,
+    state.geographyAttempt,
   ]);
 
   useEffect(() => {
@@ -97,7 +111,12 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
         }
       })
       .catch(() => {
-        if (!cancel) setCitiesList([]);
+        if (!cancel) {
+          setCitiesList([]);
+          state.setGeographyError(
+            'No pudimos cargar las ciudades. Reintenta para completar tu compra.'
+          );
+        }
       })
       .finally(() => {
         if (!cancel) setCitiesLoading(false);
@@ -110,10 +129,13 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
     selectedRegion,
     setCitiesList,
     setCitiesLoading,
+    state.geographyAttempt,
   ]);
 
   useEffect(() => {
-    const countryCode = String(dianCustomer.country || '').trim().toUpperCase();
+    const countryCode = String(dianCustomer.country || '')
+      .trim()
+      .toUpperCase();
     if (sameAddress || countryCode !== 'CO') {
       setBillingRegions([]);
       setBillingCities([]);
@@ -129,7 +151,12 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
         }
       })
       .catch(() => {
-        if (!cancel) setBillingRegions([]);
+        if (!cancel) {
+          setBillingRegions([]);
+          state.setGeographyError(
+            'No pudimos cargar los departamentos de facturación. Reintenta.'
+          );
+        }
       })
       .finally(() => {
         if (!cancel) setBillingRegionsLoading(false);
@@ -143,10 +170,13 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
     setBillingCities,
     setBillingRegions,
     setBillingRegionsLoading,
+    state.geographyAttempt,
   ]);
 
   useEffect(() => {
-    const countryCode = String(dianCustomer.country || '').trim().toUpperCase();
+    const countryCode = String(dianCustomer.country || '')
+      .trim()
+      .toUpperCase();
     const departmentCode = String(dianCustomer.departmentCode || '').trim();
     if (sameAddress || countryCode !== 'CO' || !departmentCode) {
       setBillingCities([]);
@@ -164,7 +194,12 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
         }
       })
       .catch(() => {
-        if (!cancel) setBillingCities([]);
+        if (!cancel) {
+          setBillingCities([]);
+          state.setGeographyError(
+            'No pudimos cargar las ciudades de facturación. Reintenta.'
+          );
+        }
       })
       .finally(() => {
         if (!cancel) setBillingCitiesLoading(false);
@@ -178,5 +213,6 @@ export default function useCheckoutGeography({ state, selectedCountry }) {
     dianCustomer.departmentCode,
     setBillingCities,
     setBillingCitiesLoading,
+    state.geographyAttempt,
   ]);
 }

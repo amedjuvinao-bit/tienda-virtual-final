@@ -4,21 +4,30 @@ const Page = require("../models/Page");
 
 const router = express.Router();
 
+const { CATALOG_PAGES, ensureCatalogPages } = require("../services/pages/catalogPages");
 const SYSTEM_CART_SLUG = "carrito";
 const SYSTEM_CHECKOUT_SLUG = "checkout";
 const SYSTEM_THANKS_SLUG = "gracias";
 const SYSTEM_FAVORITES_SLUG = "favoritos";
 const SYSTEM_NOT_FOUND_SLUG = "not-found";
+const { SERVICE_PAGES, ensureServicePages } = require("../services/pages/servicePages");
+const { ABOUT_SLUG, ensureAboutPage } = require("../services/pages/aboutPage");
+const { CONTACT_SLUG, ensureContactPage } = require("../services/pages/contactPage");
+const { HELP_SLUG, ensureHelpPage } = require("../services/pages/helpPage");
+const { CONSUMER_PAGES, ensureConsumerPages } = require("../services/pages/consumerPages");
+const INFORMATION_ROLE_SLUGS = new Map([["about", ABOUT_SLUG], ["contact", CONTACT_SLUG], ["help", HELP_SLUG], ...CONSUMER_PAGES.map(p => [p.role, p.slug])]);
 
 function normalizePageType(value) {
   const safe = String(value || "").trim().toLowerCase();
   if (safe === "catalog") return "catalog";
+  if (safe === "information") return "information";
   if (safe === "product-detail") return "product-detail";
   if (safe === "cart-page") return "cart-page";
   if (safe === "checkout-page") return "checkout-page";
   if (safe === "thanks-page") return "thanks-page";
   if (safe === "favorites-page") return "favorites-page";
   if (safe === "notfound-page") return "notfound-page";
+  if (SERVICE_PAGES.some((page) => page.pageType === safe)) return safe;
   return "custom";
 }
 
@@ -376,6 +385,12 @@ router.get("/", async (req, res) => {
     await ensureSystemThanksPage();
     await ensureSystemFavoritesPage();
     await ensureSystemNotFoundPage();
+    await ensureServicePages(Page);
+    await ensureAboutPage(Page);
+    await ensureContactPage(Page);
+    await ensureHelpPage(Page);
+    await ensureConsumerPages(Page);
+    await ensureCatalogPages(Page);
     const pages = await Page.find().sort({ createdAt: -1 });
     res.json(pages);
   } catch (error) {
@@ -392,11 +407,20 @@ router.get("/:value", async (req, res) => {
     await ensureSystemThanksPage();
     await ensureSystemFavoritesPage();
     await ensureSystemNotFoundPage();
+    await ensureServicePages(Page);
+    await ensureAboutPage(Page);
+    await ensureContactPage(Page);
+    await ensureHelpPage(Page);
+    await ensureConsumerPages(Page);
+    await ensureCatalogPages(Page);
 
     const rawValue = String(req.params.value || "").trim();
     const slug = rawValue.toLowerCase();
 
     let page = await Page.findOne({ slug });
+    if (!page && slug === "nuestra-historia") page = await Page.findOne({ slug: ABOUT_SLUG });
+    if (!page && slug === "nuestra-sede") page = await Page.findOne({ slug: CONTACT_SLUG });
+    if (!page && ["ayuda", "centro-ayuda"].includes(slug)) page = await Page.findOne({ slug: HELP_SLUG });
 
     if (!page && mongoose.Types.ObjectId.isValid(rawValue)) {
       page = await Page.findById(rawValue);
@@ -421,6 +445,11 @@ router.post("/", async (req, res) => {
     const name = String(body.name || "").trim();
     const slug = String(body.slug || "").trim().toLowerCase();
     const pageType = normalizePageType(body.pageType);
+    if (Object.prototype.hasOwnProperty.call(body, "informationPageConfig") &&
+      (!body.informationPageConfig || typeof body.informationPageConfig !== "object" || Array.isArray(body.informationPageConfig))) {
+      return res.status(400).json({ message: "La configuración informativa debe ser un objeto." });
+    }
+
 
     if (!name) {
       return res.status(400).json({ message: "El nombre es obligatorio" });
@@ -431,6 +460,11 @@ router.post("/", async (req, res) => {
     }
 
     if (
+      CATALOG_PAGES.some(page => page.slug === slug) ||
+      slug === ABOUT_SLUG ||
+      slug === CONTACT_SLUG ||
+      slug === HELP_SLUG ||
+      CONSUMER_PAGES.some(p => p.slug === slug) ||
       slug === SYSTEM_CART_SLUG ||
       pageType === "cart-page" ||
       slug === SYSTEM_CHECKOUT_SLUG ||
@@ -440,14 +474,16 @@ router.post("/", async (req, res) => {
       slug === SYSTEM_FAVORITES_SLUG ||
       pageType === "favorites-page" ||
       slug === SYSTEM_NOT_FOUND_SLUG ||
-      pageType === "notfound-page"
+      pageType === "notfound-page" ||
+      SERVICE_PAGES.some((page) => page.slug === slug || page.pageType === pageType)
     ) {
       return res.status(400).json({
         message:
-          'Las páginas "Carrito", "Checkout", "Gracias", "Favoritos" y "Not Found" son fijas del sistema y no se pueden crear manualmente',
+          'Las páginas del sistema se crean automáticamente y no se pueden duplicar',
       });
     }
 
+    if (pageType === "information" && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return res.status(400).json({ message: "La dirección debe usar letras minúsculas, números y guiones." });
     const exists = await Page.findOne({ slug });
     if (exists) {
       return res.status(400).json({ message: "Ya existe una página con ese slug" });
@@ -461,6 +497,9 @@ router.post("/", async (req, res) => {
       useHeader: body.useHeader !== false,
       useFooter: body.useFooter !== false,
       blocks: Array.isArray(body.blocks) ? body.blocks : [],
+      informationPageConfig:
+        pageType === "information" && body.informationPageConfig && typeof body.informationPageConfig === "object" && !Array.isArray(body.informationPageConfig)
+          ? body.informationPageConfig : {},
       catalogConfig:
         pageType === "catalog" && typeof body.catalogConfig === "object"
           ? body.catalogConfig
@@ -508,6 +547,11 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ message: "ID de página inválido" });
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "informationPageConfig") &&
+      (!body.informationPageConfig || typeof body.informationPageConfig !== "object" || Array.isArray(body.informationPageConfig))) {
+      return res.status(400).json({ message: "La configuración informativa debe ser un objeto." });
+    }
+
     const existingPage = await Page.findById(id);
 
     if (!existingPage) {
@@ -524,8 +568,31 @@ router.put("/:id", async (req, res) => {
     const existingIsSystemNotFound =
       String(existingPage.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG;
 
-    const requestedPageType = normalizePageType(body.pageType);
-    const finalPageType = existingIsSystemCart
+    const catalogPage = CATALOG_PAGES.find(page => page.slug === existingPage.slug);
+    if (CATALOG_PAGES.some(page =>
+      page.slug === String(body.slug || "").trim().toLowerCase() &&
+      page.slug !== existingPage.slug
+    )) {
+      return res.status(400).json({ message: "Esta dirección pertenece a un catálogo del sistema." });
+    }
+    const service = SERVICE_PAGES.find((page) => page.slug === existingPage.slug);
+    const requestedPageType = normalizePageType(body.pageType === undefined ? existingPage.pageType : body.pageType);
+    if (existingPage.slug !== ABOUT_SLUG && String(body.slug || "").trim().toLowerCase() === ABOUT_SLUG) {
+      return res.status(400).json({ message: "La dirección de Nosotros está reservada para su página." });
+    }
+    if (existingPage.slug !== CONTACT_SLUG && String(body.slug || "").trim().toLowerCase() === CONTACT_SLUG) {
+      return res.status(400).json({ message: "La dirección de Contacto está reservada para su página." });
+    }
+    if (existingPage.slug !== HELP_SLUG && String(body.slug || "").trim().toLowerCase() === HELP_SLUG) {
+      return res.status(400).json({ message: "La dirección del Centro de ayuda está reservada para su página." });
+    }
+    if (!service && SERVICE_PAGES.some((page) => page.slug === String(body.slug || "").trim().toLowerCase() || page.pageType === requestedPageType)) {
+      return res.status(400).json({ message: "No se puede convertir otra página en una página fija del sistema." });
+    }
+    if (CONSUMER_PAGES.some(p => p.slug === String(body.slug || "").trim().toLowerCase() && p.slug !== existingPage.slug)) return res.status(400).json({ message: "Esta dirección pertenece a una página de atención al consumidor." });
+    if (String(existingPage.systemRole || "").startsWith("consumer-") && body.enabled === false) return res.status(400).json({ message: "La información para el consumidor debe permanecer disponible. Puedes editar su presentación y condiciones complementarias." });
+    const informationSlug = INFORMATION_ROLE_SLUGS.get(existingPage.systemRole);
+    const finalPageType = catalogPage ? "catalog" : informationSlug ? "information" : service ? service.pageType : existingIsSystemCart
       ? "cart-page"
       : existingIsSystemCheckout
       ? "checkout-page"
@@ -537,7 +604,7 @@ router.put("/:id", async (req, res) => {
       ? "notfound-page"
       : requestedPageType;
 
-    const finalSlug = existingIsSystemCart
+    const finalSlug = catalogPage?.slug || informationSlug || (service ? service.slug : existingIsSystemCart
       ? SYSTEM_CART_SLUG
       : existingIsSystemCheckout
       ? SYSTEM_CHECKOUT_SLUG
@@ -547,9 +614,9 @@ router.put("/:id", async (req, res) => {
       ? SYSTEM_FAVORITES_SLUG
       : existingIsSystemNotFound
       ? SYSTEM_NOT_FOUND_SLUG
-      : String(body.slug || "").trim().toLowerCase();
+      : String(body.slug || "").trim().toLowerCase());
 
-    const finalName = existingIsSystemCart
+    const finalName = service ? service.name : existingIsSystemCart
       ? "Carrito"
       : existingIsSystemCheckout
       ? "Checkout"
@@ -573,7 +640,7 @@ router.put("/:id", async (req, res) => {
         existingIsSystemCheckout ||
         existingIsSystemThanks ||
         existingIsSystemFavorites ||
-        existingIsSystemNotFound
+        existingIsSystemNotFound || service
           ? []
           : Array.isArray(body.blocks)
           ? body.blocks
@@ -602,12 +669,20 @@ router.put("/:id", async (req, res) => {
         finalPageType === "favorites-page" && typeof body.favoritesPageConfig === "object"
           ? body.favoritesPageConfig
           : {},
+      ...(service ? { [service.configKey]:
+        body[service.configKey] && typeof body[service.configKey] === "object" && !Array.isArray(body[service.configKey])
+          ? body[service.configKey] : existingPage[service.configKey] || {} } : {}),
+      informationPageConfig: finalPageType === "information"
+        ? (body.informationPageConfig && typeof body.informationPageConfig === "object" && !Array.isArray(body.informationPageConfig)
+          ? body.informationPageConfig : existingPage.informationPageConfig || {})
+        : existingPage.informationPageConfig || {},
       notFoundPageConfig:
         finalPageType === "notfound-page" && typeof body.notFoundPageConfig === "object"
           ? body.notFoundPageConfig
           : {},
     };
 
+    if (finalPageType === "information" && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(finalSlug)) return res.status(400).json({ message: "La dirección debe usar letras minúsculas, números y guiones." });
     if (!dataToUpdate.name) {
       return res.status(400).json({ message: "El nombre es obligatorio" });
     }
@@ -657,14 +732,17 @@ router.delete("/:id", async (req, res) => {
     }
 
     if (
+      CATALOG_PAGES.some(definition => definition.slug === page.slug) ||
+      INFORMATION_ROLE_SLUGS.has(page.systemRole) ||
       String(page.slug || "").toLowerCase() === SYSTEM_CART_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_CHECKOUT_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_THANKS_SLUG ||
       String(page.slug || "").toLowerCase() === SYSTEM_FAVORITES_SLUG ||
-      String(page.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG
+      String(page.slug || "").toLowerCase() === SYSTEM_NOT_FOUND_SLUG ||
+      SERVICE_PAGES.some((definition) => definition.slug === page.slug || definition.pageType === page.pageType)
     ) {
       return res.status(400).json({
-        message: 'Las páginas "Carrito", "Checkout", "Gracias", "Favoritos" y "Not Found" son fijas del sistema y no se pueden eliminar',
+        message: 'Las páginas del sistema no se pueden eliminar',
       });
     }
 

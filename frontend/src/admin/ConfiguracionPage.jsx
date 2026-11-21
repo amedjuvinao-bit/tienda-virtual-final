@@ -131,7 +131,7 @@ export default function ConfiguracionPage() {
       case 'perfiles':
         return <PerfilesSection />;
       case 'seguridad':
-        return <SeguridadSection />;
+        return <SeguridadSection key={location.search} openAlerts={new URLSearchParams(location.search).get('alertas') === '1'} />;
       case 'respaldos':
         return <RespaldosSection />;
       case 'logs':

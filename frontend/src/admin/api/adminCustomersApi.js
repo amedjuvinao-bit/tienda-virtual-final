@@ -399,6 +399,7 @@ export async function updateAdminCustomerConsent(customerId, payload = {}) {
       source: cleanText(payload.source || 'admin').toLowerCase(),
       proofReference: cleanText(payload.proofReference),
       note: cleanText(payload.note),
+      ...(payload.emailMarketing === true ? { emailMarketing: true } : {}),
     });
     return response.data;
   } catch (error) {

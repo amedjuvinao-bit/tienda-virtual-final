@@ -1,10 +1,11 @@
 import React, {useState} from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import FooterSection from '../FooterSection';
 import FooterPanel from '../../admin/appearance/footer/FooterPanel';
 import api from '../../lib/api';
 
+beforeEach(()=>{vi.spyOn(api,'get').mockResolvedValue({data:{policy:{ready:false,version:'unconfigured',text:'Información de suscripción',seller:{}}}});});
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 const makeTheme=footer=>({sections:[],footer});
 describe('footer Firma editorial',()=>{
@@ -22,15 +23,17 @@ describe('footer Firma editorial',()=>{
     expect(document.getElementById(support.getAttribute('aria-controls'))).toHaveAttribute('aria-labelledby',support.id);
     fireEvent.click(support);expect(support).toHaveAttribute('aria-expanded','false');
   });
-  it('confirma la suscripción solo después del guardado y muestra un error cuando falla',async()=>{
-    const post=vi.spyOn(api,'post').mockResolvedValueOnce({data:{ok:true}}).mockRejectedValueOnce(new Error('offline'));
+  it('solicita confirmación sin activar la suscripción y conserva errores recuperables',async()=>{
+    vi.spyOn(api,'get').mockResolvedValue({data:{policy:{ready:true,version:'v1',text:'Autorizo novedades por correo.',seller:{legalName:'Mi negocio'}}}});
+    const post=vi.spyOn(api,'post').mockResolvedValueOnce({data:{ok:true,message:'Revisa tu correo.'}}).mockRejectedValueOnce(new Error('offline'));
     render(<FooterSection theme={makeTheme({})}/>);
-    const email=screen.getByRole('textbox',{name:'Correo electrónico'}), submit=screen.getByRole('button',{name:'Suscribirme'});
-    fireEvent.change(email,{target:{value:' USER@EXAMPLE.COM '}});fireEvent.submit(submit.closest('form'));
-    await screen.findByRole('status');expect(post).toHaveBeenCalledWith('/api/newsletter/subscribe',{email:'user@example.com',consent:true});
-    expect(email).toHaveValue('');
-    fireEvent.change(email,{target:{value:'other@example.com'}});fireEvent.submit(submit.closest('form'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos guardar tu correo');
+    fireEvent.click(await screen.findByRole('checkbox'));
+    const email=screen.getByRole('textbox',{name:'Correo electrónico'});
+    fireEvent.change(email,{target:{value:' USER@EXAMPLE.COM '}});fireEvent.submit(screen.getByRole('form',{name:'Suscripción a novedades'}));
+    const code=await screen.findByLabelText('Código de confirmación');expect(post).toHaveBeenCalledWith('/api/newsletter/subscribe',{email:'user@example.com',consent:true,version:'v1'});
+    fireEvent.change(code,{target:{value:'123456'}});fireEvent.submit(code.closest('form'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos');
+    expect(email.value.trim()).toBe('USER@EXAMPLE.COM');
   });
   it('prueba la suscripción en el editor sin registrar datos',async()=>{
     const post=vi.spyOn(api,'post');render(<FooterSection theme={makeTheme({})} preview/>);

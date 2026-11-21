@@ -1,9 +1,10 @@
-// src/utils/getSessionId.js
-const SESSION_ID_KEY = 'session_id';
+import { readCartSession } from './cartSessionStorage';
 
 export function getSessionId() {
+  const access = readCartSession();
+  if (access) return access.sessionId;
   try {
-    return String(localStorage.getItem(SESSION_ID_KEY) || '').trim();
+    return String(localStorage.getItem('session_id') || '').trim();
   } catch {
     return '';
   }

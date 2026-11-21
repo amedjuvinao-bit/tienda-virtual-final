@@ -6,8 +6,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import SearchResults from './SearchResults';
 
 vi.mock('../components/Header', () => ({ default: () => <div>Header</div> }));
-vi.mock('../components/FooterSection', () => ({ default: () => <div>Footer</div> }));
-vi.mock('../components/ProductCard', () => ({ default: ({ product }) => <article>{product.title}</article> }));
+vi.mock('../components/StorefrontFooter', () => ({ default: () => <div>Footer</div> }));
+vi.mock('../components/service-pages/useServicePage', async () => { const { buildServicePageConfig } = await import('../components/service-pages/servicePageConfig'); return { default: () => ({ page: {}, config: buildServicePageConfig({}, 'search-page'), loading: false }) }; });
+vi.mock('../components/catalog/CatalogEditorialCard', () => ({ default: ({ product }) => <article>{product.title}</article> }));
 
 beforeEach(() => { global.fetch = vi.fn(); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });

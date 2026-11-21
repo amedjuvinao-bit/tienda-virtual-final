@@ -1,6 +1,6 @@
 // frontend/src/admin/OrdersAdmin.jsx
 import React, { Suspense, lazy, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import OrdersActiveFilters from './orders/components/OrdersActiveFilters';
@@ -35,11 +35,16 @@ const ManualOrderModal = lazy(() => import('./orders/components/ManualOrderModal
 
 export default function OrdersAdmin() {
   const [searchParams] = useSearchParams();
+  const { key: locationKey } = useLocation();
   const requestedOrderId = String(searchParams.get('openOrder') || '').trim();
   const linkedOrderId = /^[a-f0-9]{24}$/i.test(requestedOrderId)
     ? requestedOrderId
     : '';
   const linkedOrderNumber = String(searchParams.get('q') || '').trim();
+  const requestedTab = searchParams.get('pestana');
+  const requestedRecord = searchParams.get('registro') || '';
+  const linkedRecord = /^[a-f0-9]{24}$/i.test(requestedRecord) ? requestedRecord : '';
+  const linkedTab = ['returns', 'payment'].includes(requestedTab) ? requestedTab : 'summary';
   const openedLinkedOrderRef = useRef('');
   const manualOrderDialog = useManualOrderDialog();
   const { isAuthenticated, adminToken, authLoading } = useAuth();
@@ -93,11 +98,12 @@ export default function OrdersAdmin() {
       openedLinkedOrderRef.current = '';
       return;
     }
+    const linkKey = `${locationKey}:${linkedOrderId}`;
     if (
       authLoading ||
       !hasSession ||
       !capabilities.canView ||
-      openedLinkedOrderRef.current === linkedOrderId
+      openedLinkedOrderRef.current === linkKey
     ) return;
 
     const linkedOrder = query.data.find(
@@ -107,7 +113,7 @@ export default function OrdersAdmin() {
       orderNumber: linkedOrderNumber,
     };
 
-    openedLinkedOrderRef.current = linkedOrderId;
+    openedLinkedOrderRef.current = linkKey;
     detail.openOrderDetail(linkedOrder);
   }, [
     authLoading,
@@ -115,6 +121,7 @@ export default function OrdersAdmin() {
     hasSession,
     linkedOrderId,
     linkedOrderNumber,
+    locationKey,
     query.data,
   ]);
 
@@ -306,6 +313,8 @@ export default function OrdersAdmin() {
             open={detail.showDetail}
             onClose={detail.closeOrderDetail}
             order={detail.orderSelected}
+            initialTab={String(detail.orderSelected?._id) === linkedOrderId ? linkedTab : 'summary'}
+            initialRecord={String(detail.orderSelected?._id) === linkedOrderId ? linkedRecord : ''}
             onSaveStatus={capabilities.canUpdateStatus ? detail.saveStatus : null}
             onSaveTags={capabilities.canUpdateTags ? detail.saveTags : null}
             onTogglePrinted={capabilities.canMarkPrinted ? detail.togglePrinted : null}

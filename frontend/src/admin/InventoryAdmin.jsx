@@ -432,8 +432,8 @@ function getMovementQuantity(movement) {
   return quantity;
 }
 
-export default function InventoryAdmin() {
-  const [activeView, setActiveView] = useState('summary');
+export default function InventoryAdmin({ openAlerts = false, alertTab = 'priorities' }) {
+  const [activeView, setActiveView] = useState(openAlerts ? 'alerts' : 'summary');
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [openRowMenuId, setOpenRowMenuId] = useState('');
   const [stockRows, setStockRows] = useState([]);
@@ -451,7 +451,7 @@ export default function InventoryAdmin() {
   const [movementsModalRow, setMovementsModalRow] = useState(null);
   const [movementsModalOpen, setMovementsModalOpen] = useState(false);
   const [kardexModalRow, setKardexModalRow] = useState(null);
-  const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
+  const [alertsPanelOpen, setAlertsPanelOpen] = useState(openAlerts);
   const [exporting, setExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -912,7 +912,7 @@ export default function InventoryAdmin() {
       <InventoryTransferModal open={transferModalOpen} onClose={closeTransferModal} stockRows={stockRows} initialStockRow={initialTransferStockRow} initialSuggestion={initialTransferSuggestion} onSaved={loadInventory} />
       <InventoryMovementsModal open={movementsModalOpen} onClose={closeMovements} stockRow={movementsModalRow} onChanged={loadInventory} />
       <InventoryKardexModal open={Boolean(kardexModalRow)} onClose={() => setKardexModalRow(null)} stockRow={kardexModalRow} />
-      <InventoryAlertsPanel open={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} onPrepareTransfer={openSuggestedTransfer} />
+      <InventoryAlertsPanel initialTab={alertTab} open={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} onPrepareTransfer={openSuggestedTransfer} />
     </section>
   );
 }

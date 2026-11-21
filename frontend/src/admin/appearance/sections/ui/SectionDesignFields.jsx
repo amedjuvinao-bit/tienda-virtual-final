@@ -21,7 +21,7 @@ export function SectionImageUpload({ label, value, onChange, uploadToCloudinary,
     setError('');
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) { setError('Elige una imagen JPG, PNG, WebP o AVIF.'); return; }
     if (file.size > 10 * 1024 * 1024) { setError('La imagen debe pesar máximo 10 MB.'); return; }
-    if (!uploadToCloudinary) { setError('La carga no está disponible. Puedes pegar la dirección de la imagen.'); return; }
+    if (!uploadToCloudinary) { setError('La carga no está disponible. Recarga la página e inténtalo de nuevo.'); return; }
     const id = ++request.current; setBusy(true); onBusyChange?.(true);
     try {
       const url = await uploadToCloudinary(file);
@@ -36,7 +36,7 @@ export function SectionImageUpload({ label, value, onChange, uploadToCloudinary,
     {fallback && <div className="section-design-upload__preview">{fallback}</div>}
     {hint && <p className="section-design-hint">{hint}</p>}
     <label className="section-design-upload__button"><Upload size={16} aria-hidden="true" />{busy ? 'Cargando…' : 'Cargar o cambiar imagen'}<input type="file" aria-label={`Cargar ${label.toLowerCase()}`} accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={upload} /></label>
-    <DesignText label={`Dirección de ${label.toLowerCase()}`} value={value} disabled={busy} placeholder="https://…" onChange={(e) => { setError(''); onChange(e.target.value); }} />
+    {value && <Button kind="ghost" disabled={busy} onClick={() => onChange('')}>Quitar imagen</Button>}
     {busy && <p role="status">Espera a que termine la carga antes de guardar.</p>}
     {error && <p role="alert" className="section-design-error">{error}</p>}
   </div>;

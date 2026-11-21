@@ -21,6 +21,86 @@ beforeEach(() => { vi.clearAllMocks(); fetchSiteSettings.mockResolvedValue(setti
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('encabezado de la tienda', () => {
+  it.each(['atelier-sheet', 'drawer-left'])('mantiene el teclado dentro del menú %s y devuelve el foco al cerrarlo', async (layout) => {
+    const rects = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 100, height: 40 }]);
+    try {
+      fetchSiteSettings.mockResolvedValue({ ...settings('Lo Nuevo'), theme: { header: { mobileMenuLayout: layout } } });
+      const user = userEvent.setup();
+      render(<MemoryRouter><Header /></MemoryRouter>);
+      const trigger = await screen.findByRole('button', { name: 'Abrir menú' });
+      trigger.focus();
+      await user.keyboard('{Enter}');
+      const drawer = screen.getByRole('dialog', { name: 'Menú móvil' });
+      const close = within(drawer).getByRole('button', { name: 'Cerrar menú' });
+      expect(close).toHaveFocus();
+      const controls = [...drawer.querySelectorAll('button:not(:disabled), a[href]')];
+      await user.tab({ shift: true });
+      expect(controls.at(-1)).toHaveFocus();
+      await user.tab();
+      expect(close).toHaveFocus();
+      await user.tab();
+      expect(controls[1]).toHaveFocus();
+      await user.keyboard('{Escape}');
+      expect(drawer).toHaveAttribute('aria-hidden', 'true');
+      expect(trigger).toHaveFocus();
+      await user.keyboard('{Enter}');
+      await user.click(within(drawer).getByRole('button', { name: 'Cerrar menú' }));
+      expect(trigger).toHaveFocus();
+    } finally {
+      rects.mockRestore();
+    }
+  });
+
+  it('pasa del menú al buscador y Escape devuelve el foco al buscador móvil visible', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
+    await user.click(screen.getByRole('button', { name: 'Buscar desde el menú' }));
+    expect(screen.getByRole('combobox', { name: 'Buscar productos' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(document.querySelector('[data-search-placement="mobile"]')).toHaveFocus();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('vuelve a mostrar el encabezado cuando un enlace recibe foco de teclado', async () => {
+    vi.stubGlobal('scrollY', 0);
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    const header = await screen.findByRole('banner');
+    vi.stubGlobal('scrollY', 200);
+    fireEvent.scroll(window);
+    expect(header).toHaveAttribute('data-visible', 'false');
+    act(() => within(header).getByRole('link', { name: 'Lo Nuevo' }).focus());
+    expect(header).toHaveAttribute('data-visible', 'true');
+    vi.stubGlobal('scrollY', 300);
+    fireEvent.scroll(window);
+    expect(header).toHaveAttribute('data-visible', 'true');
+  });
+
+  it('entrega al carrito un botón visible al salir del menú', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
+    await user.click(screen.getByRole('button', { name: 'Carrito desde el menú' }));
+    expect(document.getElementById('storefront-mobile-menu')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getAllByRole('button', { name: 'Abrir carrito' }).at(-1)).toHaveFocus();
+  });
+
+  it('libera el menú al pasar a escritorio y retira su observador al cerrar', async () => {
+    const media = { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    vi.stubGlobal('matchMedia', vi.fn(() => media));
+    const user = userEvent.setup();
+    render(<MemoryRouter><Header /></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: 'Abrir menú' }));
+    const listener = media.addEventListener.mock.calls.find(([event]) => event === 'change')?.[1];
+    expect(listener).toBeTypeOf('function');
+    media.matches = true;
+    act(() => listener(media));
+    expect(document.getElementById('storefront-mobile-menu')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(screen.getByRole('banner')).getAllByRole('link')[0]).toHaveFocus();
+    expect(document.body.style.overflow).toBe('');
+    expect(media.removeEventListener).toHaveBeenCalledWith('change', listener);
+  });
+
   it('espera la configuración antes de mostrar el encabezado', async () => {
     let resolve;
     fetchSiteSettings.mockReturnValue(new Promise((done) => { resolve = done; }));
@@ -429,3 +509,4 @@ describe('encabezado de la tienda', () => {
     });
   });
 });
+

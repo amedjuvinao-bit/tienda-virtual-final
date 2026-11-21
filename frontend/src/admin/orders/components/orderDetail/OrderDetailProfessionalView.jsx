@@ -18,9 +18,14 @@ import OrderDetailActionToolbar from './OrderDetailActionToolbar';
 import OrderDetailTabs from './OrderDetailTabs';
 import { OrderDetailIcons } from './OrderDetailIcons';
 import { OrderDetailPanel, SectionTitle } from './OrderDetailPrimitives';
+import ConsumerCasesPanel from '../../ConsumerCasesPanel';
+import { useAuth } from '../../../../context/AuthContext';
+import { getAdminUserRole } from '../../../security/adminPermissions';
 
 export default function OrderDetailProfessionalView({
   order,
+  initialTab = 'summary',
+  initialRecord = '',
   onClose,
 
   onDownloadPdf,
@@ -98,8 +103,11 @@ export default function OrderDetailProfessionalView({
   onSaveCustomerData,
   savingCustomerData = false,
 }) {
-  const [activeTab, setActiveTab] = useState('summary');
+  const auth = useAuth();
+  const canViewClaims = ['owner', 'admin'].includes(getAdminUserRole(auth?.adminUser || auth?.currentAdminUser));
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [managementOpen, setManagementOpen] = useState(false);
+  const canLeaveClaims = () => activeTab !== 'claims' || document.documentElement.dataset.pageDraftDirty !== 'true' || window.confirm('Tienes una respuesta sin guardar. ¿Quieres descartarla?');
   const hasManagementActions = [
     onSaveStatus,
     onSaveTags,
@@ -110,9 +118,9 @@ export default function OrderDetailProfessionalView({
   ].some((handler) => typeof handler === 'function');
 
   useEffect(() => {
-    setActiveTab('summary');
+    setActiveTab(initialTab);
     setManagementOpen(false);
-  }, [order?._id]);
+  }, [order?._id, initialTab, initialRecord]);
 
   const managementPanel = hasManagementActions ? (
     <OrderDetailActionToolbar
@@ -147,11 +155,13 @@ export default function OrderDetailProfessionalView({
     { id: 'products', label: 'Pedido', icon: OrderDetailIcons.Package },
     { id: 'operation', label: 'Operación', icon: OrderDetailIcons.Settings2 },
     { id: 'returns', label: 'Posventa', icon: OrderDetailIcons.RotateCcw },
+    ...(canViewClaims ? [{ id: 'claims', label: 'Peticiones y reclamos', icon: OrderDetailIcons.History }] : []),
     { id: 'payment', label: 'Pago y factura', icon: OrderDetailIcons.WalletCards },
     { id: 'customer', label: 'Cliente e historial', icon: OrderDetailIcons.User },
   ];
 
   const tabContent = {
+    claims: canViewClaims ? <ConsumerCasesPanel key={order?._id} order={order}/> : null,
     summary: (
       <OrderDetailStoryOverview
         order={order}
@@ -182,6 +192,7 @@ export default function OrderDetailProfessionalView({
     returns: (
       <OrderDetailReturnsPanel
         data={returnsData}
+        selectedRecordId={initialTab === 'returns' ? initialRecord : ''}
         loading={returnsLoading}
         busyId={returnBusyId}
         canManage={canManageReturns}
@@ -207,6 +218,7 @@ export default function OrderDetailProfessionalView({
         />
         <OrderDetailRefundReconciliation
           refunds={refunds}
+          selectedRecordId={initialTab === 'payment' ? initialRecord : ''}
           loading={refundsLoading}
           canConfirmPayment={canConfirmRefundPayment}
           confirmingId={confirmingRefundId}
@@ -245,6 +257,7 @@ export default function OrderDetailProfessionalView({
   };
 
   const handleTabChange = (tabId) => {
+    if (tabId !== activeTab && !canLeaveClaims()) return;
     setManagementOpen(false);
     setActiveTab(tabId);
   };
@@ -267,7 +280,7 @@ export default function OrderDetailProfessionalView({
     >
       <OrderDetailHeader
         order={order}
-        onClose={onClose}
+        onClose={() => { if (canLeaveClaims()) onClose?.(); }}
         onDownloadPdf={onDownloadPdf}
         onOpenInvoice={onOpenInvoice}
         downloadingPdf={downloadingPdf}

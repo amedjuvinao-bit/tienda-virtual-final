@@ -84,7 +84,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
         </div>
         <div className={panel}>
           <Field label="Origen del icono"><Select value={current.iconType==='image'?'image':'lucide'} onChange={value=>card(current.id,{iconType:value})} options={options([['lucide','Biblioteca de iconos'],['image','Imagen personalizada']])}/></Field>
-          {current.iconType==='image'?<><Field label="URL de la imagen"><Input value={current.iconUrl || ''} onChange={e=>card(current.id,{iconUrl:e.target.value})}/></Field><Field label="Subir icono"><input type="file" accept="image/*" disabled={uploading||pending} onChange={e=>upload(e.target.files?.[0],current.id)}/></Field></>:
+          {current.iconType==='image'?<>{(current.iconUrl || '') && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => card(current.id,{iconUrl:""})}>Quitar imagen</button>}<Field label="Subir icono"><input type="file" accept="image/*" disabled={uploading||pending} onChange={e=>upload(e.target.files?.[0],current.id)}/></Field></>:
             <Field label="Icono"><Select value={current.icon} onChange={value=>card(current.id,{icon:value})} options={INFO_ICON_OPTIONS}/></Field>}
           <Field label="Estilo de iconos"><Select value={c.iconStyle} onChange={value=>glass({iconStyle:value})} options={options([['relief','Relieve de la referencia'],['line','Líneas con color editable']])}/></Field>
           <p className="text-xs opacity-65">Camión, atención y tienda incluyen el relieve del modelo. Los otros iconos usan trazos con volumen.</p>
@@ -119,7 +119,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
       <div className={panel}>
         <Field label="Fondo de la sección"><Select value={c.backgroundMode} onChange={value=>glass({backgroundMode:value})} options={options([['satin','Satén del modelo'],['inherit','Continuar fondo de la página'],['color','Color liso'],['image','Imagen personalizada']])}/></Field>
         {colors([['backgroundColor','Color de fondo']])}
-        {c.backgroundMode==='image' && <><Field label="URL del fondo"><Input value={c.backgroundImage} onChange={e=>glass({backgroundImage:e.target.value})}/></Field><Field label="Subir fondo"><input type="file" accept="image/*" disabled={uploading||pending} onChange={e=>upload(e.target.files?.[0])}/></Field></>}
+        {c.backgroundMode==='image' && <>{(c.backgroundImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => glass({backgroundImage:""})}>Quitar imagen</button>}<Field label="Subir fondo"><input type="file" accept="image/*" disabled={uploading||pending} onChange={e=>upload(e.target.files?.[0])}/></Field></>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{[['backgroundPositionX','Posición horizontal (%)',0,100],['backgroundPositionY','Posición vertical (%)',0,100],['backgroundZoom','Zoom del fondo (%)',100,180]].map(([key,label,min,max])=><Field key={key} label={label}><Input type="number" min={min} max={max} value={c[key]} onChange={e=>glass({[key]:Number(e.target.value)})}/></Field>)}</div>
       </div>
       <div className={panel}>

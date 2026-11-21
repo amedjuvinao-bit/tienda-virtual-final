@@ -31,6 +31,7 @@ const InventoryMovement = require('../models/InventoryMovement');
 const InventoryReservation = require('../models/InventoryReservation');
 const IdempotencyKey = require('../models/IdempotencyKey');
 const SiteSettings = require('../models/SiteSettings');
+const { buildOrderQuote } = require('../services/orderPricingService');
 const {
   saveProductWithInventoryTransaction,
 } = require('../services/productInventoryPersistenceService');
@@ -299,6 +300,19 @@ async function startHttpServer() {
 async function createSettings() {
   await SiteSettings.collection.insertOne({
     publicUrl: 'https://store.example',
+    store: {
+      businessName: 'Tienda de prueba integral', address: 'Calle de prueba 1',
+      city: 'Santa Marta', email: 'atencion@example.com', phone: '3001234567',
+    },
+    consumerProtection: {
+      privacyEffectiveDate: '2026-10-27',
+      retention: 'Conservación del escenario aislado de prueba.',
+      processors: 'Proveedores simulados; sin comunicaciones reales.',
+    },
+    shippingDelivery: {
+      revision: 1, deliveryDays: 5, shippingCountries: 'CO',
+      pickupEnabled: true, pickupInstructions: 'Recogida en el punto de prueba.',
+    },
     theme: {
       global: {
         payments: {
@@ -319,6 +333,7 @@ async function createSettings() {
       },
     },
     billing: {
+      fiscalInfo: { nit: '900123456-7', businessName: 'Tienda de prueba integral' },
       dian: {
         enabled: false,
         mode: 'internal',
@@ -595,6 +610,15 @@ async function run() {
     ...buildCheckoutPayload(product),
     sessionId: checkoutAccess.sessionId,
   };
+  const quote = await buildOrderQuote({
+    items: checkoutPayload.cart, customer: checkoutPayload.customer,
+    billing: checkoutPayload.billing, sessionId: checkoutAccess.sessionId,
+    channel: 'web',
+  }, { deferBranchValidation: true });
+  assert.equal(quote.consumerOffer.ready, true, JSON.stringify(quote.consumerOffer.missing));
+  checkoutPayload.consumerAcceptance = {
+    terms: true, privacy: true, fingerprint: quote.consumerOffer.fingerprint,
+  };
   const idempotencyKey = `${PREFIX}-CHECKOUT`;
 
   const missingOrderAccess = await requestJson(baseUrl, '/api/orders', {
@@ -653,6 +677,21 @@ async function run() {
   assert.strictEqual(await Order.countDocuments({}), 0);
   assert.strictEqual(await InventoryReservation.countDocuments({}), 0);
   ok('POST /api/orders rechaza credenciales ausentes, alteradas, vencidas o de otro carrito');
+
+  for (const [name, acceptance, status] of [
+    ['SIN-ACEPTACION', undefined, 422],
+    ['OFERTA-ANTERIOR', { terms: true, privacy: true, fingerprint: 'otra-oferta' }, 409],
+  ]) {
+    const rejected = await requestJson(baseUrl, '/api/orders', {
+      method: 'POST',
+      headers: { ...checkoutOrderHeaders, 'Idempotency-Key': `${PREFIX}-${name}` },
+      body: { ...checkoutPayload, consumerAcceptance: acceptance },
+    });
+    assert.equal(rejected.status, status, JSON.stringify(rejected.data));
+    assert.equal(await Order.countDocuments({}), 0);
+    assert.equal(await InventoryReservation.countDocuments({}), 0);
+  }
+  ok('Sin aceptación o con una oferta distinta no crea pedidos ni reservas');
 
   const created = await requestJson(
     baseUrl,

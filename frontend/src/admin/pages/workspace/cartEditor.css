@@ -1,0 +1,22 @@
+/* Keep the preview inside the visible editor even when the admin menu is taller. */
+@media (min-width: 768px) {
+  .admin-content-card:has(.cart-editor),
+  .admin-content-card:has(.favorites-editor),
+  .admin-content-card:has(.system-page-editor),
+  .system-page-editor,
+  .system-page-editor > .pages-workspace,
+  .favorites-editor,
+  .favorites-editor > .pages-workspace,
+  .cart-editor,
+  .cart-editor > .pages-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .cart-editor .pages-workspace__grid,
+  .favorites-editor .pages-workspace__grid,
+  .system-page-editor .pages-workspace__grid {
+    flex: 1;
+  }
+}

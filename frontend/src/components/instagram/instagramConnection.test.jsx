@@ -27,6 +27,7 @@ describe('Cuenta conectada y fotos manuales', () => {
     render(<InstagramJournal theme={theme({ journalSource: 'connected', posts: [], journalFeaturedPostId: 'ig_two', journalFeaturedAccountId: '123' })} />);
     await screen.findByText('Cargando la publicación principal elegida…');
     expect(screen.getByLabelText('Publicación principal').querySelector('article')).toBeNull();
+    await waitFor(() => expect(typeof finish).toBe('function'));
     await act(async () => finish({ data: { connected: true, account: business, posts: [post('two')], nextCursor: '' } }));
     expect(screen.getByLabelText('Publicación principal').querySelector('article')).toHaveAttribute('data-post-id', 'ig_two');
     expect(api.get).toHaveBeenCalledTimes(2);

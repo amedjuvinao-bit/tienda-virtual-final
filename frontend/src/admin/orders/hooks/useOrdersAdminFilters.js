@@ -111,6 +111,7 @@ export default function useOrdersAdminFilters({
     setDateTo,
     setStatusFilter,
     clearStatus,
+    linkedView: searchParams.get('vista'),
   });
   const invoiceFilters = useOrdersInvoiceFilters({ setPage });
 

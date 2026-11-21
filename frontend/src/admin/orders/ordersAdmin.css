@@ -613,3 +613,7 @@
     font-weight: 900;
   }
 }
+
+.orders-workspace-nav { display:flex; gap:10px; flex-wrap:wrap; padding:12px 16px; }
+.orders-workspace-nav a { padding:10px 16px; border:1px solid var(--admin-card-border); border-radius:12px; color:var(--admin-card-text); background:var(--admin-card-bg); text-decoration:none; font-size:13px; }
+.orders-workspace-nav a[aria-current=page] { color:var(--admin-primary); border-color:var(--admin-primary); }

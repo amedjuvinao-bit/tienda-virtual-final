@@ -1,18 +1,31 @@
 import { adminFetch } from '../../lib/api';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import PageLoadState from "./workspace/PageLoadState";
+import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
+import SectionCard from "./workspace/EditorSection";
+import {
+  Input, Textarea, Select, Toggle, ColorInput, RangeInput,
+} from './workspace/ProductDetailEditorFields';
+import ProductDetailPurchaseControls from './workspace/ProductDetailPurchaseControls';
+import ProductDetailTypographyControls from './workspace/ProductDetailTypographyControls';
+import ProductDetailAppearanceControls from "./workspace/ProductDetailAppearanceControls";
+import usePageDraft from "./workspace/usePageDraft";
+import {buildSafeStyleConfig, buildSafeProductDetailConfig} from "../../components/product-detail/productDetailConfig";
 import { API_BASE_URL } from "../../config/apiBaseUrl";
 
 const API_BASE = API_BASE_URL;
 
 const EDITOR_TABS = [
-  { id: "general", label: "General" },
-  { id: "layout", label: "Estructura" },
-  { id: "gallery", label: "Galería" },
-  { id: "info", label: "Información" },
-  { id: "style", label: "Estilo" },
-  { id: "reviews", label: "Reseñas" },
-  { id: "extra", label: "Bloques extra" },
+  { id: "gallery", label: "Galería", group: "content" },
+  { id: "info", label: "Información y compra", group: "content" },
+  { id: "extra", label: "Bloques de apoyo", group: "content" },
+  { id: "presentation", label: "Fondo y cristal", group: "design" },
+  { id: "layout", label: "Distribución", group: "design" },
+  { id: "style", label: "Colores y botones", group: "design" },
+  { id: "typography", label: "Tipografía", group: "design" },
+  { id: "reviews", label: "Reseñas", group: "options" },
+  { id: "general", label: "Datos y título", group: "settings" },
 ];
 
 const SHADOW_OPTIONS = [
@@ -28,6 +41,7 @@ const GALLERY_POSITION_OPTIONS = [
 ];
 
 const THUMBNAIL_POSITION_OPTIONS = [
+  { value: "overlay", label: "Sobre la imagen (diseño aprobado)" },
   { value: "left", label: "Miniaturas a la izquierda" },
   { value: "bottom", label: "Miniaturas abajo" },
 ];
@@ -38,8 +52,8 @@ const TITLE_MODE_OPTIONS = [
 ];
 
 const IMAGE_FIT_OPTIONS = [
-  { value: "cover", label: "Cubrir (cover)" },
-  { value: "contain", label: "Contener (contain)" },
+  { value: "cover", label: "Cubrir el espacio" },
+  { value: "contain", label: "Mostrar imagen completa" },
 ];
 
 const ANIMATION_OPTIONS = [
@@ -51,7 +65,7 @@ const ANIMATION_OPTIONS = [
 ];
 
 const THUMB_HOVER_OPTIONS = [
-  { value: "none", label: "Sin hover especial" },
+  { value: "none", label: "Sin efecto al pasar el cursor" },
   { value: "scale", label: "Escalar miniatura" },
   { value: "lift", label: "Elevar miniatura" },
   { value: "glow", label: "Brillo miniatura" },
@@ -80,113 +94,6 @@ const REVIEW_STAR_STYLE_OPTIONS = [
   { value: "outline", label: "Contorno" },
 ];
 
-const FAVORITE_ICON_OPTIONS = [
-  { value: "star", label: "Estrella" },
-  { value: "heart", label: "Corazón" },
-  { value: "sparkles", label: "Destello" },
-];
-
-const CART_ICON_OPTIONS = [
-  { value: "shopping-cart", label: "Carrito clásico" },
-  { value: "shopping-bag", label: "Bolsa" },
-  { value: "bag-heart", label: "Bolsa con corazón" },
-];
-
-const Input = ({ label, ...rest }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <input
-      className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-      {...rest}
-    />
-  </label>
-);
-
-const Textarea = ({ label, ...rest }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <textarea
-      className="min-h-[110px] w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-      {...rest}
-    />
-  </label>
-);
-
-const Select = ({ label, children, ...rest }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <select
-      className="w-full min-w-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-200"
-      {...rest}
-    >
-      {children}
-    </select>
-  </label>
-);
-
-const Toggle = ({ label, checked, onChange }) => (
-  <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-    <span className="text-sm text-gray-700">{label}</span>
-    <input
-      type="checkbox"
-      checked={!!checked}
-      onChange={(e) => onChange(e.target.checked)}
-      className="h-4 w-4 shrink-0 accent-pink-600"
-    />
-  </label>
-);
-
-const ColorInput = ({ label, value, onChange }) => (
-  <label className="block min-w-0">
-    <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-    <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
-      <input
-        type="color"
-        value={isHexColor(value) ? value : "#ec4899"}
-        onChange={onChange}
-        className="h-10 w-12 cursor-pointer rounded border border-gray-200 bg-white"
-      />
-      <input
-        type="text"
-        value={value || ""}
-        onChange={onChange}
-        className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none"
-        placeholder="#ec4899"
-      />
-    </div>
-  </label>
-);
-
-const RangeInput = ({
-  label,
-  value,
-  onChange,
-  min = 0,
-  max = 1,
-  step = 0.05,
-}) => (
-  <label className="block min-w-0">
-    <div className="mb-1 flex items-center justify-between gap-3">
-      <span className="block text-sm font-medium text-gray-700">{label}</span>
-      <span className="text-xs font-medium text-pink-700">
-        {Number(value || 0).toFixed(2)}
-      </span>
-    </div>
-
-    <div className="rounded-xl border border-gray-300 bg-white px-3 py-3">
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={onChange}
-        className="w-full accent-pink-600"
-      />
-    </div>
-  </label>
-);
-
 const TabButton = ({ active, onClick, children }) => (
   <button
     type="button"
@@ -202,26 +109,6 @@ const TabButton = ({ active, onClick, children }) => (
   </button>
 );
 
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
-
-function SectionCard({ title, text, children, className = "" }) {
-  return (
-    <section
-      className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 md:p-5 ${className}`}
-    >
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {text ? <p className="mt-1 text-sm text-gray-500">{text}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function IconUploadField({
   label,
@@ -239,12 +126,7 @@ function IconUploadField({
 
   return (
     <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-      <Input
-        label={label}
-        value={value || ""}
-        onChange={onUrlChange}
-        placeholder="https://... o sube una imagen"
-      />
+      <strong>{label}</strong>{(value || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => onUrlChange({ target: { value: "" } })}>Quitar imagen</button>}
 
       <input
         ref={inputRef}
@@ -260,7 +142,7 @@ function IconUploadField({
           onClick={onPick}
           className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
         >
-          Escoger imagen
+          Elegir imagen
         </button>
 
         <button
@@ -269,7 +151,7 @@ function IconUploadField({
           disabled={uploading || disabledUpload}
           className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-50"
         >
-          {uploading ? "Subiendo..." : "Subir a Cloudinary"}
+          {uploading ? "Subiendo..." : "Cargar imagen"}
         </button>
       </div>
 
@@ -314,363 +196,6 @@ function clampFloat(value, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
-function isHexColor(value) {
-  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
-}
-
-function buildSafeStyleConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-  return {
-    pageBg: typeof cfg.pageBg === "string" ? cfg.pageBg : "#fff1f2",
-    cardBg: typeof cfg.cardBg === "string" ? cfg.cardBg : "#ffffff",
-    primaryTextColor:
-      typeof cfg.primaryTextColor === "string" ? cfg.primaryTextColor : "#111827",
-    secondaryTextColor:
-      typeof cfg.secondaryTextColor === "string" ? cfg.secondaryTextColor : "#6b7280",
-    accentColor: typeof cfg.accentColor === "string" ? cfg.accentColor : "#ec4899",
-    accentColor2: typeof cfg.accentColor2 === "string" ? cfg.accentColor2 : "#d4af37",
-    borderColor: typeof cfg.borderColor === "string" ? cfg.borderColor : "#e5e7eb",
-    radiusPx: clampInt(cfg.radiusPx, 8, 40, 18),
-    borderWidthPx: clampInt(cfg.borderWidthPx, 1, 4, 1),
-    shadowStyle:
-      cfg.shadowStyle === "none" ||
-      cfg.shadowStyle === "soft" ||
-      cfg.shadowStyle === "medium" ||
-      cfg.shadowStyle === "strong"
-        ? cfg.shadowStyle
-        : "soft",
-    titleSizePx: clampInt(cfg.titleSizePx, 20, 52, 32),
-    priceSizePx: clampInt(cfg.priceSizePx, 20, 48, 30),
-    buttonRadiusPx: clampInt(cfg.buttonRadiusPx, 8, 40, 999),
-    thumbRadiusPx: clampInt(cfg.thumbRadiusPx, 4, 24, 10),
-    thumbBorderColor:
-      typeof cfg.thumbBorderColor === "string" ? cfg.thumbBorderColor : "#d4af37",
-    selectedThumbBorderColor:
-      typeof cfg.selectedThumbBorderColor === "string"
-        ? cfg.selectedThumbBorderColor
-        : "#ec4899",
-
-    favoriteButtonBg:
-      typeof cfg.favoriteButtonBg === "string" ? cfg.favoriteButtonBg : "#ffffff",
-    favoriteButtonOpacity: clampFloat(cfg.favoriteButtonOpacity, 0, 1, 1),
-    favoriteBorderColor:
-      typeof cfg.favoriteBorderColor === "string"
-        ? cfg.favoriteBorderColor
-        : "#e5e7eb",
-    favoriteBorderWidthPx: clampInt(cfg.favoriteBorderWidthPx, 0, 4, 1),
-
-    addToCartButtonBg:
-      typeof cfg.addToCartButtonBg === "string"
-        ? cfg.addToCartButtonBg
-        : "#ec4899",
-    addToCartButtonOpacity: clampFloat(cfg.addToCartButtonOpacity, 0, 1, 1),
-    addToCartBorderColor:
-      typeof cfg.addToCartBorderColor === "string"
-        ? cfg.addToCartBorderColor
-        : "#ec4899",
-    addToCartBorderWidthPx: clampInt(cfg.addToCartBorderWidthPx, 0, 4, 0),
-    addToCartTextColor:
-      typeof cfg.addToCartTextColor === "string"
-        ? cfg.addToCartTextColor
-        : "#ffffff",
-    addToCartIconColor:
-      typeof cfg.addToCartIconColor === "string"
-        ? cfg.addToCartIconColor
-        : "#ffffff",
-
-    reviewSectionBg:
-      typeof cfg.reviewSectionBg === "string" ? cfg.reviewSectionBg : "#ffffff",
-    reviewFormBg:
-      typeof cfg.reviewFormBg === "string" ? cfg.reviewFormBg : "#ffffff",
-    reviewListBg:
-      typeof cfg.reviewListBg === "string" ? cfg.reviewListBg : "#ffffff",
-    reviewTitleColor:
-      typeof cfg.reviewTitleColor === "string"
-        ? cfg.reviewTitleColor
-        : "#111827",
-    reviewTextColor:
-      typeof cfg.reviewTextColor === "string"
-        ? cfg.reviewTextColor
-        : "#374151",
-    reviewMutedColor:
-      typeof cfg.reviewMutedColor === "string"
-        ? cfg.reviewMutedColor
-        : "#6b7280",
-    reviewInputBg:
-      typeof cfg.reviewInputBg === "string" ? cfg.reviewInputBg : "#ffffff",
-    reviewInputBorderColor:
-      typeof cfg.reviewInputBorderColor === "string"
-        ? cfg.reviewInputBorderColor
-        : "#e5e7eb",
-    reviewButtonBg:
-      typeof cfg.reviewButtonBg === "string" ? cfg.reviewButtonBg : "#ec4899",
-    reviewButtonTextColor:
-      typeof cfg.reviewButtonTextColor === "string"
-        ? cfg.reviewButtonTextColor
-        : "#ffffff",
-    reviewStarActiveColor:
-      typeof cfg.reviewStarActiveColor === "string"
-        ? cfg.reviewStarActiveColor
-        : "#d4af37",
-    reviewStarInactiveColor:
-      typeof cfg.reviewStarInactiveColor === "string"
-        ? cfg.reviewStarInactiveColor
-        : "#d1d5db",
-    reviewSuccessBg:
-      typeof cfg.reviewSuccessBg === "string" ? cfg.reviewSuccessBg : "#f0fdf4",
-    reviewSuccessText:
-      typeof cfg.reviewSuccessText === "string"
-        ? cfg.reviewSuccessText
-        : "#166534",
-    reviewErrorBg:
-      typeof cfg.reviewErrorBg === "string" ? cfg.reviewErrorBg : "#fff1f2",
-    reviewErrorText:
-      typeof cfg.reviewErrorText === "string"
-        ? cfg.reviewErrorText
-        : "#be123c",
-    reviewSectionRadiusPx: clampInt(cfg.reviewSectionRadiusPx, 8, 40, 18),
-    reviewInputRadiusPx: clampInt(cfg.reviewInputRadiusPx, 6, 30, 10),
-    reviewTitleSizePx: clampInt(cfg.reviewTitleSizePx, 18, 40, 24),
-    reviewBodySizePx: clampInt(cfg.reviewBodySizePx, 12, 22, 14),
-    reviewFontFamily:
-      typeof cfg.reviewFontFamily === "string" && cfg.reviewFontFamily.trim()
-        ? cfg.reviewFontFamily
-        : "inherit",
-    reviewFontSize: clampInt(cfg.reviewFontSize, 12, 26, 14),
-    reviewBorderRadius: clampInt(cfg.reviewBorderRadius, 0, 40, 18),
-    reviewBorderColor:
-      typeof cfg.reviewBorderColor === "string"
-        ? cfg.reviewBorderColor
-        : "#e5e7eb",
-    reviewBgOpacity: clampFloat(cfg.reviewBgOpacity, 0, 1, 1),
-    reviewFormBgImage:
-      typeof cfg.reviewFormBgImage === "string" ? cfg.reviewFormBgImage : "",
-    reviewFormBgImageOpacity: clampFloat(
-      cfg.reviewFormBgImageOpacity,
-      0,
-      1,
-      0.35
-    ),
-  };
-}
-
-function buildSafeProductDetailConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  const imageFit =
-    cfg.imageFit === "contain" || cfg.imageFit === "cover"
-      ? cfg.imageFit
-      : "cover";
-
-  const imageAnimation =
-    ["none", "fade-up", "fade-right", "fade-left", "zoom-in"].includes(
-      cfg.imageAnimation
-    )
-      ? cfg.imageAnimation
-      : "none";
-
-  const contentAnimation =
-    ["none", "fade-up", "fade-right", "fade-left", "zoom-in"].includes(
-      cfg.contentAnimation
-    )
-      ? cfg.contentAnimation
-      : "none";
-
-  const thumbHoverEffect =
-    ["none", "scale", "lift", "glow"].includes(cfg.thumbHoverEffect)
-      ? cfg.thumbHoverEffect
-      : "none";
-
-  const thumbnailPosition =
-    cfg.thumbnailPosition === "bottom" || cfg.thumbnailPosition === "left"
-      ? cfg.thumbnailPosition
-      : "left";
-
-  const reviewSectionAnimation =
-    ["none", "fade-up", "fade-right", "fade-left", "zoom-in"].includes(
-      cfg.reviewSectionAnimation
-    )
-      ? cfg.reviewSectionAnimation
-      : "none";
-
-  const reviewStarType =
-    ["star", "heart", "fire", "thumb"].includes(cfg.reviewStarType)
-      ? cfg.reviewStarType
-      : "star";
-
-  const reviewStarStyle =
-    ["fill", "outline"].includes(cfg.reviewStarStyle)
-      ? cfg.reviewStarStyle
-      : "fill";
-
-  return {
-    titleMode:
-      cfg.titleMode === "image" || cfg.titleMode === "text" ? cfg.titleMode : "text",
-    titleImage: typeof cfg.titleImage === "string" ? cfg.titleImage : "",
-    titleImageAlt: typeof cfg.titleImageAlt === "string" ? cfg.titleImageAlt : "",
-    titleOverride: typeof cfg.titleOverride === "string" ? cfg.titleOverride : "",
-    subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : "",
-    showBreadcrumb: cfg.showBreadcrumb !== false,
-    showHeader: cfg.showHeader !== false,
-    showFooter: cfg.showFooter !== false,
-
-    galleryPosition:
-      cfg.galleryPosition === "right" || cfg.galleryPosition === "left"
-        ? cfg.galleryPosition
-        : "left",
-    thumbnailPosition,
-    showMainImage: cfg.showMainImage !== false,
-    showThumbnails: cfg.showThumbnails !== false,
-    showArrows: cfg.showArrows !== false,
-    thumbCount: clampInt(cfg.thumbCount, 1, 10, 5),
-    mainImageMaxWidthPx: clampInt(cfg.mainImageMaxWidthPx, 240, 1000, 380),
-    mainImageMaxHeightPx: clampInt(cfg.mainImageMaxHeightPx, 260, 1200, 700),
-    thumbWidthPx: clampInt(cfg.thumbWidthPx, 40, 180, 64),
-    thumbHeightPx: clampInt(cfg.thumbHeightPx, 40, 180, 64),
-    thumbGapPx: clampInt(cfg.thumbGapPx, 4, 40, 12),
-    imageFit,
-    imageAnimation,
-    contentAnimation,
-    thumbHoverEffect,
-    imageHoverZoom: cfg.imageHoverZoom !== false,
-    animationDurationMs: clampInt(cfg.animationDurationMs, 100, 3000, 350),
-
-    showFavoriteButton: cfg.showFavoriteButton !== false,
-    showPrice: cfg.showPrice !== false,
-    showOriginalPrice: cfg.showOriginalPrice !== false,
-    showSizes: cfg.showSizes !== false,
-    showColors: cfg.showColors !== false,
-    showQuantity: cfg.showQuantity !== false,
-    showAddToCart: cfg.showAddToCart !== false,
-    addToCartText:
-      typeof cfg.addToCartText === "string" && cfg.addToCartText.trim()
-        ? cfg.addToCartText
-        : "Añadir al carrito",
-    addToCartIconName:
-      cfg.addToCartIconName === "shopping-bag" ||
-      cfg.addToCartIconName === "bag-heart" ||
-      cfg.addToCartIconName === "shopping-cart"
-        ? cfg.addToCartIconName
-        : "shopping-cart",
-    favoriteIconName:
-      cfg.favoriteIconName === "heart" ||
-      cfg.favoriteIconName === "sparkles" ||
-      cfg.favoriteIconName === "star"
-        ? cfg.favoriteIconName
-        : "star",
-    favoriteIconColor:
-      typeof cfg.favoriteIconColor === "string" ? cfg.favoriteIconColor : "#ec4899",
-    favoriteActiveColor:
-      typeof cfg.favoriteActiveColor === "string"
-        ? cfg.favoriteActiveColor
-        : "#d4af37",
-
-    pickupTitle:
-      typeof cfg.pickupTitle === "string" && cfg.pickupTitle.trim()
-        ? cfg.pickupTitle
-        : "✓ Recogida disponible en Tienda",
-    pickupText:
-      typeof cfg.pickupText === "string" && cfg.pickupText.trim()
-        ? cfg.pickupText
-        : "Normalmente está listo en 24 horas",
-    pickupLinkText:
-      typeof cfg.pickupLinkText === "string" && cfg.pickupLinkText.trim()
-        ? cfg.pickupLinkText
-        : "Ver información de la tienda",
-    showPickupBlock: cfg.showPickupBlock !== false,
-
-    showBenefits: cfg.showBenefits !== false,
-    benefit1Title:
-      typeof cfg.benefit1Title === "string" && cfg.benefit1Title.trim()
-        ? cfg.benefit1Title
-        : "Hecho con amor",
-    benefit1Icon:
-      typeof cfg.benefit1Icon === "string"
-        ? cfg.benefit1Icon
-        : "/icons/HechoConamor.png",
-    benefit2Title:
-      typeof cfg.benefit2Title === "string" && cfg.benefit2Title.trim()
-        ? cfg.benefit2Title
-        : "Materiales hipoalergénicos",
-    benefit2Icon:
-      typeof cfg.benefit2Icon === "string"
-        ? cfg.benefit2Icon
-        : "/icons/Hipoalergenico.png",
-    benefit3Title:
-      typeof cfg.benefit3Title === "string" && cfg.benefit3Title.trim()
-        ? cfg.benefit3Title
-        : "Envíos a toda Colombia",
-    benefit3Icon:
-      typeof cfg.benefit3Icon === "string" ? cfg.benefit3Icon : "/icons/Envios.png",
-
-    showAccordionBlock: cfg.showAccordionBlock !== false,
-    accordionTitle1:
-      typeof cfg.accordionTitle1 === "string" && cfg.accordionTitle1.trim()
-        ? cfg.accordionTitle1
-        : "1. Conoce más información sobre nuestros envíos",
-    accordionText1:
-      typeof cfg.accordionText1 === "string" ? cfg.accordionText1 : "",
-    accordionTitle2:
-      typeof cfg.accordionTitle2 === "string" && cfg.accordionTitle2.trim()
-        ? cfg.accordionTitle2
-        : "2. Conoce más información sobre nuestras políticas de cambios y garantías",
-    accordionText2:
-      typeof cfg.accordionText2 === "string" ? cfg.accordionText2 : "",
-
-    showReviewsSection: cfg.showReviewsSection !== false,
-    showReviewForm: cfg.showReviewForm !== false,
-    showReviewList: cfg.showReviewList !== false,
-    showReviewStars: cfg.showReviewStars !== false,
-    showReviewDate: cfg.showReviewDate !== false,
-    reviewSectionAnimation,
-    reviewSectionTitle:
-      typeof cfg.reviewSectionTitle === "string" && cfg.reviewSectionTitle.trim()
-        ? cfg.reviewSectionTitle
-        : "Reseñas y opiniones",
-    reviewFormTitle:
-      typeof cfg.reviewFormTitle === "string" && cfg.reviewFormTitle.trim()
-        ? cfg.reviewFormTitle
-        : "Escribe tu reseña",
-    reviewListTitle:
-      typeof cfg.reviewListTitle === "string" && cfg.reviewListTitle.trim()
-        ? cfg.reviewListTitle
-        : "Opiniones de clientes",
-    reviewNameLabel:
-      typeof cfg.reviewNameLabel === "string" && cfg.reviewNameLabel.trim()
-        ? cfg.reviewNameLabel
-        : "Nombre",
-    reviewNamePlaceholder:
-      typeof cfg.reviewNamePlaceholder === "string"
-        ? cfg.reviewNamePlaceholder
-        : "Escribe tu nombre",
-    reviewRatingLabel:
-      typeof cfg.reviewRatingLabel === "string" && cfg.reviewRatingLabel.trim()
-        ? cfg.reviewRatingLabel
-        : "Calificación",
-    reviewCommentLabel:
-      typeof cfg.reviewCommentLabel === "string" && cfg.reviewCommentLabel.trim()
-        ? cfg.reviewCommentLabel
-        : "Comentario",
-    reviewCommentPlaceholder:
-      typeof cfg.reviewCommentPlaceholder === "string"
-        ? cfg.reviewCommentPlaceholder
-        : "Cuéntanos tu experiencia con este producto",
-    reviewSubmitText:
-      typeof cfg.reviewSubmitText === "string" && cfg.reviewSubmitText.trim()
-        ? cfg.reviewSubmitText
-        : "Publicar reseña",
-    reviewEmptyText:
-      typeof cfg.reviewEmptyText === "string" && cfg.reviewEmptyText.trim()
-        ? cfg.reviewEmptyText
-        : "Este producto aún no tiene reseñas.",
-    reviewStarType,
-    reviewStarStyle,
-    reviewStarSizePx: clampInt(cfg.reviewStarSizePx, 12, 48, 20),
-
-    style: buildSafeStyleConfig(cfg.style),
-  };
-}
-
 export default function ProductDetailPageEditor() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -683,10 +208,14 @@ export default function ProductDetailPageEditor() {
 
   const [page, setPage] = useState(null);
   const [form, setForm] = useState(null);
+  const draft = usePageDraft(form);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const loadSequence = useRef(0);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("general");
+  const [extraImageUploads, setExtraImageUploads] = useState({});
+  const [activeTab, setActiveTab] = useState("gallery");
 
   const [titleImageFile, setTitleImageFile] = useState(null);
   const [titleImagePreview, setTitleImagePreview] = useState("");
@@ -715,12 +244,15 @@ export default function ProductDetailPageEditor() {
   }, [form?.slug, page?.slug]);
 
   const fetchPage = async () => {
+    const sequence = ++loadSequence.current;
     try {
       setLoading(true);
       setNotFound(false);
+      setLoadError("");
 
       const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
+      if (sequence !== loadSequence.current) return;
       if (res.status === 404) {
         setPage(null);
         setForm(null);
@@ -733,10 +265,11 @@ export default function ProductDetailPageEditor() {
       }
 
       const data = await res.json();
+      if (sequence !== loadSequence.current) return;
       const safeConfig = buildSafeProductDetailConfig(data?.productDetailConfig);
 
       setPage(data);
-      setForm({
+      const loadedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "product-detail",
@@ -744,7 +277,9 @@ export default function ProductDetailPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         productDetailConfig: safeConfig,
-      });
+      };
+      setForm(loadedForm);
+      draft.initialize(loadedForm);
       setTitleImagePreview(String(safeConfig?.titleImage || ""));
       setTitleImageFile(null);
 
@@ -760,17 +295,20 @@ export default function ProductDetailPageEditor() {
       setBenefit3IconFile(null);
       setReviewFormBgImageFile(null);
     } catch (error) {
+      if (sequence !== loadSequence.current) return;
+      setLoadError(error.message || "Error de conexión");
       console.error("Error cargando página detalle:", error);
       setPage(null);
       setForm(null);
       setNotFound(true);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (id) fetchPage();
+    return () => { loadSequence.current++; };
   }, [id]);
 
   const updateRoot = (patch) => {
@@ -800,18 +338,7 @@ export default function ProductDetailPageEditor() {
     }));
   };
 
-  const handleNameChange = (value) => {
-    setForm((prev) => {
-      const currentSlug = String(prev?.slug || "").trim();
-      const autoSlug = slugify(value);
-
-      return {
-        ...prev,
-        name: value,
-        slug: currentSlug ? currentSlug : autoSlug,
-      };
-    });
-  };
+  const handleNameChange = (value) => setForm(previous => ({ ...previous, name: value }));
 
   const handlePickTitleImage = () => {
     titleImageInputRef.current?.click();
@@ -828,7 +355,7 @@ export default function ProductDetailPageEditor() {
 
   const handleUploadTitleImage = async () => {
     if (!titleImageFile) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -857,10 +384,10 @@ export default function ProductDetailPageEditor() {
         titleImageInputRef.current.value = "";
       }
 
-      alert("Imagen subida correctamente ✅");
+      draft.inform("Imagen subida correctamente ✅");
     } catch (error) {
       console.error("Error subiendo imagen de título:", error);
-      alert(error.message || "No se pudo subir la imagen a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir la imagen a Cloudinary.");
     } finally {
       setUploadingTitleImage(false);
     }
@@ -903,7 +430,7 @@ export default function ProductDetailPageEditor() {
         : benefit3IconFile;
 
     if (!file) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -953,10 +480,10 @@ export default function ProductDetailPageEditor() {
         }
       }
 
-      alert("Ícono subido correctamente ✅");
+      draft.inform("Ícono subido correctamente ✅");
     } catch (error) {
       console.error("Error subiendo ícono del beneficio:", error);
-      alert(error.message || "No se pudo subir el ícono a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir el ícono a Cloudinary.");
     } finally {
       if (index === 1) setUploadingBenefit1Icon(false);
       if (index === 2) setUploadingBenefit2Icon(false);
@@ -979,7 +506,7 @@ export default function ProductDetailPageEditor() {
 
   const handleUploadReviewFormBgImage = async () => {
     if (!reviewFormBgImageFile) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -1008,10 +535,10 @@ export default function ProductDetailPageEditor() {
         reviewFormBgImageInputRef.current.value = "";
       }
 
-      alert("Fondo del formulario subido correctamente ✅");
+      draft.inform("Fondo del formulario subido correctamente ✅");
     } catch (error) {
       console.error("Error subiendo fondo del formulario de reseñas:", error);
-      alert(error.message || "No se pudo subir la imagen a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir la imagen a Cloudinary.");
     } finally {
       setUploadingReviewFormBgImage(false);
     }
@@ -1024,12 +551,12 @@ export default function ProductDetailPageEditor() {
     const slug = slugify(form.slug || form.name);
 
     if (!name) {
-      alert("El nombre de la página es obligatorio.");
+      draft.notify("El nombre de la página es obligatorio.");
       return;
     }
 
     if (!slug) {
-      alert("El slug de la página es obligatorio.");
+      draft.notify("Escribe una dirección válida para la página.");
       return;
     }
 
@@ -1059,8 +586,12 @@ export default function ProductDetailPageEditor() {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
 
+      if (JSON.stringify(buildSafeProductDetailConfig(data?.productDetailConfig)) !== JSON.stringify(payload.productDetailConfig)) {
+        throw new Error("El servidor no conservó todos los ajustes. Tus cambios siguen en el editor; vuelve a intentarlo.");
+      }
+
       setPage(data);
-      setForm({
+      const savedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "product-detail",
@@ -1068,7 +599,9 @@ export default function ProductDetailPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         productDetailConfig: buildSafeProductDetailConfig(data?.productDetailConfig),
-      });
+      };
+      setForm(savedForm);
+      draft.markSaved(savedForm);
 
       setBenefit1IconPreview(String(data?.productDetailConfig?.benefit1Icon || ""));
       setBenefit2IconPreview(String(data?.productDetailConfig?.benefit2Icon || ""));
@@ -1077,29 +610,17 @@ export default function ProductDetailPageEditor() {
         String(data?.productDetailConfig?.style?.reviewFormBgImage || "")
       );
 
-      alert("Página detalle guardada correctamente ✅");
     } catch (error) {
       console.error("Error guardando página detalle:", error);
-      alert(error.message || "No se pudo guardar la página detalle.");
+      draft.notify(error.message || "No se pudo guardar la página detalle.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleOpenPreview = () => {
-    if (!previewUrl) {
-      alert("La página todavía no tiene un slug válido para vista previa.");
-      return;
-    }
-    window.open(previewUrl, "_blank", "noopener,noreferrer");
-  };
 
-  if (loading) {
-    return <div className="p-6 text-gray-500">Cargando página detalle...</div>;
-  }
-
-  if (notFound || !page || !form) {
-    return <div className="p-6 text-red-500">Página detalle no encontrada</div>;
+  if (loading || notFound || !page || !form) {
+    return <PageLoadState loading={loading} error={loadError} onRetry={fetchPage} onBack={() => navigate("/admin/paginas")}/>;
   }
 
   if (String(page?.pageType || "").toLowerCase() !== "product-detail") {
@@ -1118,66 +639,19 @@ export default function ProductDetailPageEditor() {
   }
 
   return (
-    <div className="min-w-0 space-y-6 p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/paginas")}
-            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
-          >
-            ← Volver
-          </button>
-
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Editor de página detalle de producto
-            </h1>
-            <p className="text-sm text-gray-500">
-              Configura estructura y estilo de un molde para la vista detalle.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleOpenPreview}
-            className="inline-flex items-center gap-2 rounded-xl border border-pink-300 bg-pink-50 px-4 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100"
-          >
-            Vista previa
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-60"
-          >
-            {saving ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
-      </div>
-
-      <InfoCard
-        title="Molde detalle de producto"
-        text="Desde aquí controlas galería, información, botones, estilos, bloques de beneficios, acordeones y ahora también el bloque de reseñas."
-      />
-
-      <div className="rounded-3xl border border-pink-100 bg-gradient-to-br from-white to-pink-50/60 p-3 md:p-4">
-        <div className="flex flex-wrap gap-2">
-          {EDITOR_TABS.map((tab) => (
-            <TabButton
-              key={tab.id}
-              active={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </TabButton>
-          ))}
-        </div>
-      </div>
-
+    <PageEditorWorkspace
+      form={form}
+      tabs={EDITOR_TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onBack={() => draft.leave(() => navigate("/admin/paginas"))}
+      onSave={handleSave}
+      saving={saving}
+      uploading={uploadingTitleImage || uploadingBenefit1Icon || uploadingBenefit2Icon || uploadingBenefit3Icon || uploadingReviewFormBgImage || Object.values(extraImageUploads).some(Boolean)}
+      draft={draft}
+      pageTypeLabel="Detalle del producto"
+    >
+      <fieldset disabled={saving} className="pages-editor-fields">
       {activeTab === "general" && (
         <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
           <SectionCard
@@ -1193,7 +667,7 @@ export default function ProductDetailPageEditor() {
             />
 
             <Input
-              label="Slug / ruta"
+              label="Dirección de la página"
               value={form.slug}
               onChange={(e) => updateRoot({ slug: slugify(e.target.value) })}
               placeholder="Ej: detalle-principal"
@@ -1206,13 +680,13 @@ export default function ProductDetailPageEditor() {
             />
 
             <Toggle
-              label="Usar header"
+              label="Mostrar encabezado"
               checked={form.useHeader}
               onChange={(value) => updateRoot({ useHeader: value })}
             />
 
             <Toggle
-              label="Usar footer"
+              label="Mostrar pie de página"
               checked={form.useFooter}
               onChange={(value) => updateRoot({ useFooter: value })}
             />
@@ -1254,17 +728,10 @@ export default function ProductDetailPageEditor() {
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <Input
-                  label="URL imagen de título"
-                  value={form.productDetailConfig.titleImage}
-                  onChange={(e) =>
-                    updateDetailConfig({ titleImage: e.target.value })
-                  }
-                  placeholder="https://..."
-                />
+                {(form.productDetailConfig.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateDetailConfig({ titleImage: "" })}>Quitar imagen</button>}
 
                 <Input
-                  label="Alt imagen de título"
+                  label="Descripción de la imagen"
                   value={form.productDetailConfig.titleImageAlt}
                   onChange={(e) =>
                     updateDetailConfig({ titleImageAlt: e.target.value })
@@ -1286,7 +753,7 @@ export default function ProductDetailPageEditor() {
                     onClick={handlePickTitleImage}
                     className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
                   >
-                    Escoger imagen
+                    Elegir imagen
                   </button>
 
                   <button
@@ -1295,7 +762,7 @@ export default function ProductDetailPageEditor() {
                     disabled={uploadingTitleImage || !titleImageFile}
                     className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-50"
                   >
-                    {uploadingTitleImage ? "Subiendo..." : "Subir a Cloudinary"}
+                    {uploadingTitleImage ? "Subiendo..." : "Cargar imagen"}
                   </button>
                 </div>
               </div>
@@ -1324,6 +791,7 @@ export default function ProductDetailPageEditor() {
         </div>
       )}
 
+      {activeTab === "presentation" && <ProductDetailAppearanceControls config={form.productDetailConfig} onChange={change => setForm(previous => ({...previous,productDetailConfig:buildSafeProductDetailConfig(typeof change === "function" ? change(previous.productDetailConfig) : change)}))} onUploadingChange={(key,busy) => setExtraImageUploads(previous => ({...previous,[key]:busy}))}/>}
       {activeTab === "layout" && (
         <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
           <SectionCard
@@ -1554,7 +1022,7 @@ export default function ProductDetailPageEditor() {
               </Select>
 
               <Toggle
-                label="Zoom hover en imagen principal"
+                label="Ampliar imagen al pasar el cursor"
                 checked={form.productDetailConfig.imageHoverZoom}
                 onChange={(value) =>
                   updateDetailConfig({ imageHoverZoom: value })
@@ -1579,123 +1047,17 @@ export default function ProductDetailPageEditor() {
       )}
 
       {activeTab === "info" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            title="Información de compra"
-            text="Controla qué se muestra al lado de la galería."
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              <Toggle
-                label="Mostrar botón favorito"
-                checked={form.productDetailConfig.showFavoriteButton}
-                onChange={(value) =>
-                  updateDetailConfig({ showFavoriteButton: value })
-                }
-              />
-              <Toggle
-                label="Mostrar precio"
-                checked={form.productDetailConfig.showPrice}
-                onChange={(value) => updateDetailConfig({ showPrice: value })}
-              />
-              <Toggle
-                label="Mostrar precio original"
-                checked={form.productDetailConfig.showOriginalPrice}
-                onChange={(value) =>
-                  updateDetailConfig({ showOriginalPrice: value })
-                }
-              />
-              <Toggle
-                label="Mostrar tamaños"
-                checked={form.productDetailConfig.showSizes}
-                onChange={(value) => updateDetailConfig({ showSizes: value })}
-              />
-              <Toggle
-                label="Mostrar colores"
-                checked={form.productDetailConfig.showColors}
-                onChange={(value) => updateDetailConfig({ showColors: value })}
-              />
-              <Toggle
-                label="Mostrar cantidad"
-                checked={form.productDetailConfig.showQuantity}
-                onChange={(value) => updateDetailConfig({ showQuantity: value })}
-              />
-
-              <Toggle
-                label="Mostrar bloque de recogida"
-                checked={form.productDetailConfig.showPickupBlock}
-                onChange={(value) =>
-                  updateDetailConfig({ showPickupBlock: value })
-                }
-              />
-            </div>
-
-            <Select
-              label="Animación de entrada del contenido"
-              value={form.productDetailConfig.contentAnimation}
-              onChange={(e) =>
-                updateDetailConfig({ contentAnimation: e.target.value })
-              }
-            >
-              {ANIMATION_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select
-                label="Ícono de favorito"
-                value={form.productDetailConfig.favoriteIconName}
-                onChange={(e) =>
-                  updateDetailConfig({ favoriteIconName: e.target.value })
-                }
-              >
-                {FAVORITE_ICON_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Bloque de recogida"
-            text="Textos debajo del botón de compra."
-          >
-            <Input
-              label="Título recogida"
-              value={form.productDetailConfig.pickupTitle}
-              onChange={(e) =>
-                updateDetailConfig({ pickupTitle: e.target.value })
-              }
-            />
-
-            <Input
-              label="Texto secundario"
-              value={form.productDetailConfig.pickupText}
-              onChange={(e) =>
-                updateDetailConfig({ pickupText: e.target.value })
-              }
-            />
-
-            <Input
-              label="Texto del link"
-              value={form.productDetailConfig.pickupLinkText}
-              onChange={(e) =>
-                updateDetailConfig({ pickupLinkText: e.target.value })
-              }
-            />
-          </SectionCard>
-        </div>
+        <ProductDetailPurchaseControls config={form.productDetailConfig} onChange={updateDetailConfig}/>
+      )}
+      {activeTab === "typography" && (
+        <ProductDetailTypographyControls style={form.productDetailConfig.style} onChange={updateStyleConfig}/>
       )}
 
       {activeTab === "style" && (
         <div className="space-y-6">
           <SectionCard
             title="Estilo general"
-            text="Colores, bordes, radios, tamaños y sombras del molde detalle."
+            text="Personaliza los colores, textos y acabados de la ficha del producto."
           >
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -1752,7 +1114,7 @@ export default function ProductDetailPageEditor() {
 
               <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-sm font-semibold text-gray-800">
-                  Tamaños y bordes
+                  Marcos y profundidad
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1772,58 +1134,22 @@ export default function ProductDetailPageEditor() {
                   <Input
                     label="Ancho borde (px)"
                     type="number"
-                    min="1"
+                    min="0"
+                    step="0.25"
                     max="4"
                     value={form.productDetailConfig.style.borderWidthPx}
                     onChange={(e) =>
                       updateStyleConfig({
-                        borderWidthPx: clampInt(e.target.value, 1, 4, 1),
+                        borderWidthPx: clampFloat(e.target.value, 0, 4, 1.25),
                       })
                     }
                   />
 
-                  <Input
-                    label="Tamaño título (px)"
-                    type="number"
-                    min="20"
-                    max="52"
-                    value={form.productDetailConfig.style.titleSizePx}
-                    onChange={(e) =>
-                      updateStyleConfig({
-                        titleSizePx: clampInt(e.target.value, 20, 52, 32),
-                      })
-                    }
-                  />
 
-                  <Input
-                    label="Tamaño precio (px)"
-                    type="number"
-                    min="20"
-                    max="48"
-                    value={form.productDetailConfig.style.priceSizePx}
-                    onChange={(e) =>
-                      updateStyleConfig({
-                        priceSizePx: clampInt(e.target.value, 20, 48, 30),
-                      })
-                    }
-                  />
 
-                  <Input
-                    label="Radio botón carrito"
-                    type="number"
-                    min="8"
-                    max="40"
-                    value={
-                      form.productDetailConfig.style.buttonRadiusPx === 999
-                        ? 40
-                        : form.productDetailConfig.style.buttonRadiusPx
-                    }
-                    onChange={(e) =>
-                      updateStyleConfig({
-                        buttonRadiusPx: clampInt(e.target.value, 8, 40, 40),
-                      })
-                    }
-                  />
+
+
+
 
                   <Select
                     label="Tipo de sombra"
@@ -2697,6 +2023,7 @@ export default function ProductDetailPageEditor() {
           </SectionCard>
         </div>
       )}
-    </div>
+      </fieldset>
+    </PageEditorWorkspace>
   );
 }

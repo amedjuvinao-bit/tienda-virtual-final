@@ -115,7 +115,7 @@ function canonicalFavoriteItem(product, requested = {}, previous = null) {
     (variant) => variant.active !== false
   );
   const selectionWasExplicit = Boolean(
-    clean(requested.variantKey || requested.variantId) ||
+    (clean(requested.variantKey || requested.variantId) && identity.variantKey !== 'default__default') ||
       clean(requested.size) ||
       clean(requested.color || requested.colorValue) ||
       (Array.isArray(requested.variantAttributes) && requested.variantAttributes.length) ||
@@ -168,9 +168,12 @@ async function canonicalizeFavoriteItems(
   for (const requested of source) {
     const product = productMap.get(readProductId(requested));
     const key = itemIdentity(requested);
-    if (!product || !key || seen.has(key)) continue;
+    if (!key || seen.has(key)) continue;
 
-    const canonical = canonicalFavoriteItem(product, requested, previousMap.get(key));
+    // Keep an already saved unavailable product until its owner removes it.
+    // Only an existing server snapshot may supply this fallback.
+    const previous = previousMap.get(key);
+    const canonical = (product && canonicalFavoriteItem(product, requested, previous)) || previous;
     if (!canonical) continue;
 
     const canonicalKey = `${canonical.productId}|||${canonical.variantKey}`;
@@ -474,7 +477,7 @@ function mapAvailabilityAlert(reason) {
 
 async function buildFavoriteDetail(
   favorite,
-  { canonicalValidationService = defaultCartCanonicalValidationService } = {}
+  { canonicalValidationService = defaultCartCanonicalValidationService, ProductModel = Product } = {}
 ) {
   const plain = favorite?.toObject
     ? favorite.toObject({ virtuals: true })
@@ -484,8 +487,28 @@ async function buildFavoriteDetail(
     storedItems.map((item) => ({ ...item, qty: 1, quantity: 1 })),
     { mode: 'soft' }
   );
+  const needsOptions = storedItems.filter((stored, index) =>
+    readRequestedIdentity(stored).variantKey === 'default__default' &&
+      validation.items[index]?.invalidReason === 'INVALID_VARIANT'
+  );
+  const optionProducts = await loadProductMap(needsOptions, ProductModel);
   const items = storedItems.map((stored, index) => {
-    const current = validation.items[index] || null;
+    let current = validation.items[index] || null;
+    const product = optionProducts.get(readProductId(stored));
+    if (product && isProductAvailable(product) && readRequestedIdentity(stored).variantKey === 'default__default') {
+      current = {
+        ...current,
+        valid: true,
+        requiresSelection: true,
+        invalidReason: null,
+        title: product.title,
+        image: product.image,
+        price: product.price,
+        inventoryTracked: false,
+        availableStock: null,
+        validationMessage: 'Selecciona las opciones del producto.',
+      };
+    }
     const alerts = [];
     if (!current?.valid) {
       alerts.push(mapAvailabilityAlert(current?.invalidReason || 'PRODUCT_NOT_AVAILABLE'));

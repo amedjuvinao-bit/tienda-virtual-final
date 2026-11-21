@@ -1,28 +1,56 @@
-'use strict';
+"use strict";
 
-const Subscriber = require('../models/Subscriber');
+const {
+  createNewsletterService,
+} = require("../services/newsletter/verification");
+const { normalizeEmail } = require("../services/newsletter/policy");
 
-function normalizeEmail(value) {
-  if(typeof value!=='string')return '';
-  const email=value.trim().toLowerCase();
-  return email.length<=254 && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)?email:'';
-}
-
-function createSubscribeHandler({ SubscriberModel=Subscriber }={}) {
-  return async function subscribe(req,res) {
-    const email=normalizeEmail(req.body?.email);
-    if(!email || req.body?.consent!==true)return res.status(400).json({ok:false,error:'INVALID_SUBSCRIPTION',message:'Escribe un correo válido y solicita la suscripción.'});
+function createNewsletterHandlers({
+  service = createNewsletterService(),
+} = {}) {
+  const handle = (action) => async (req, res) => {
     try {
-      // Insert only: repeat subscriptions preserve the existing checkout/contact metadata.
-      const result=await SubscriberModel.findOneAndUpdate({email},{$setOnInsert:{email,origen:'footer',fecha:new Date()}},{upsert:true,new:true,setDefaultsOnInsert:true});
-      if(!result)throw new Error('SUBSCRIPTION_NOT_PERSISTED');
-      return res.status(200).json({ok:true});
-    } catch(error) {
-      if(Number(error?.code)===11000) {
-        try { if(await SubscriberModel.exists({email}))return res.status(200).json({ok:true}); } catch { /* Return the same retry response. */ }
-      }
-      return res.status(503).json({ok:false,error:'SUBSCRIPTION_UNAVAILABLE',message:'No pudimos guardar tu suscripción. Intenta de nuevo.'});
+      return res.json({ ok: true, ...(await action(req)) });
+    } catch (error) {
+      return res
+        .status(error.statusCode || 503)
+        .json({
+          ok: false,
+          error: error.code || "NEWSLETTER_UNAVAILABLE",
+          message: error.statusCode
+            ? error.message
+            : "No pudimos tramitar la solicitud. Intenta de nuevo o utiliza Peticiones y reclamos.",
+        });
     }
   };
+  return {
+    policy: handle(async () => ({ policy: await service.getPolicy() })),
+    subscribe: handle((req) =>
+      service.request({
+        email: req.body?.email,
+        consent: req.body?.consent,
+        version: req.body?.version,
+        intent: "subscribe",
+        source: "web",
+      }),
+    ),
+    requestWithdrawal: handle((req) =>
+      service.request({ email: req.body?.email, intent: "withdraw" }),
+    ),
+    confirm: handle((req) =>
+      service.confirm({
+        email: req.body?.email,
+        code: req.body?.code,
+        intent: req.body?.intent,
+      }),
+    ),
+  };
 }
-module.exports={normalizeEmail,createSubscribeHandler};
+function createSubscribeHandler(options) {
+  return createNewsletterHandlers(options).subscribe;
+}
+module.exports = {
+  createNewsletterHandlers,
+  createSubscribeHandler,
+  normalizeEmail,
+};

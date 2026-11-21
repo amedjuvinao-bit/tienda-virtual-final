@@ -6,6 +6,7 @@ on:
       - main
       - 'feature/carritos-*'
       - 'feature/favoritos-*'
+      - 'feature/paginas-nivel-plus'
   pull_request:
     branches:
       - main
@@ -58,7 +59,9 @@ jobs:
           npm --prefix backend run test:cart-admin-routes
 
       - name: Validar integridad y seguridad de Favoritos
-        run: npm --prefix backend run test:favorites-module
+        run: |
+          npm --prefix backend run test:favorites-module
+          npm --prefix backend run test:favorites-public-plus
 
       - name: Validar interfaces de Carritos y Favoritos
         run: |

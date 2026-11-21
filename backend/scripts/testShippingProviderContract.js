@@ -833,7 +833,7 @@ async function main() {
     ),
     'utf8'
   );
-  assert(checkoutSource.includes("'Estado / provincia'"));
+  assert(/["']Estado \/ provincia["']/.test(checkoutSource));
   assert(checkoutSource.includes('autoComplete="address-level1"'));
   assert(branchesSource.includes('form.address.postalCode'));
   assert(branchesSource.includes('autoComplete="postal-code"'));

@@ -910,12 +910,12 @@ function HistoryTable({ sessions, onReport }) {
   );
 }
 
-export default function CashSessionsPageReport() {
+export default function CashSessionsPageReport({ initialBranchId = '', initialRegisterCode = '' }) {
   const [activeView, setActiveView] = useState('operation');
   const [operationDialog, setOperationDialog] = useState(null);
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [cashRegisterCode, setCashRegisterCode] = useState(REGISTER_CODE);
+  const [cashRegisterCode, setCashRegisterCode] = useState(initialRegisterCode || REGISTER_CODE);
   const [openingAmount, setOpeningAmount] = useState('50000');
   const [openingNotes, setOpeningNotes] = useState('');
   const [countedCash, setCountedCash] = useState('');
@@ -992,7 +992,8 @@ export default function CashSessionsPageReport() {
       setError('');
       const bootstrap = await getPosBootstrap();
       const branchRows = Array.isArray(bootstrap?.branches) ? bootstrap.branches : [];
-      const defaultBranchId = selectedBranchId || bootstrap?.defaultBranch?.id || branchRows.find((branch) => branch.isMain)?.id || branchRows[0]?.id || '';
+      const linkedBranch = branchRows.find((branch) => branch.id === initialBranchId);
+      const defaultBranchId = selectedBranchId || linkedBranch?.id || bootstrap?.defaultBranch?.id || branchRows.find((branch) => branch.isMain)?.id || branchRows[0]?.id || '';
 
       setBranches(branchRows);
       setSelectedBranchId(defaultBranchId);
@@ -1002,7 +1003,7 @@ export default function CashSessionsPageReport() {
     } finally {
       setLoading(false);
     }
-  }, [cashRegisterCode, refreshForBranch, selectedBranchId]);
+  }, [cashRegisterCode, initialBranchId, refreshForBranch, selectedBranchId]);
 
   useEffect(() => {
     if (initialLoadRef.current) return;

@@ -1483,6 +1483,32 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
       deletedAt: null,
       type: 'transfer',
     });
+    if (req.query.summary === '1') {
+      if (!scopedStock.ok) return sendAccessError(res, scopedStock);
+      if (!scopedReservations.ok) return sendAccessError(res, scopedReservations);
+      if (!scopedMovements.ok) return sendAccessError(res, scopedMovements);
+      const [stocks, expiredReservations, pendingTransfers] = await Promise.all([
+        InventoryStock.find(scopedStock.filter)
+          .select('availableStock reservedStock stock reorderPoint productSnapshot product')
+          .populate('product', 'stock reorderPoint stockMin')
+          .sort({ 'productSnapshot.title': 1, 'branchSnapshot.name': 1, 'variant.size': 1, 'variant.color': 1 })
+          .limit(1000)
+          .lean({ virtuals: true }),
+        InventoryReservation.countDocuments({
+          ...scopedReservations.filter, status: 'pending', expiresAt: { $lte: now },
+        }),
+        InventoryMovement.countDocuments({ ...scopedMovements.filter, status: 'draft' }),
+      ]);
+      let lowStock = 0;
+      let outOfStock = 0;
+      for (const row of stocks) {
+        const available = getAvailableStockForAlert(row);
+        if (available <= 0) outOfStock++;
+        else if (available <= getLowStockLimitForAlert(row)) lowStock++;
+      }
+      res.set('Cache-Control', 'private, no-store');
+      return res.json({ ok: true, data: { summary: { lowStock, outOfStock, expiredReservations, pendingTransfers } } });
+    }
     const intelligenceThreshold = new Date(now.getTime() - 30 * 86400000);
     const scopedIntelligenceMovements = buildScopedInventoryMovementFilter(req, {
       deletedAt: null,

@@ -59,6 +59,13 @@ const {
   verifyCustomerAuditChain,
 } = require('../services/customerPrivacyService');
 
+const { preserveLegacyCustomerOrderLinks } = require('../services/customerOrderLinkService');
+const {
+  saveAdministrativeConsent,
+  subscriptionEvidence,
+  transaction,
+} = require('../services/newsletter/consent');
+
 const router = express.Router();
 
 function escapeRegex(value) {
@@ -139,6 +146,7 @@ function serializeCustomer(customer = {}, options = {}) {
     active: raw.active !== false,
     acceptsMarketing: raw.acceptsMarketing === true,
     marketingConsent: raw.marketingConsent || {},
+    emailMarketingConsent: raw.emailMarketingConsent || {},
     notes: raw.notes || '',
     tags: Array.isArray(raw.tags) ? raw.tags : [],
     crmStage: raw.crmStage || 'new',
@@ -1023,6 +1031,8 @@ async function assessCustomerRetention(req, customer) {
 
 router.use(requireAdmin);
 
+router.use('/subscriptions', require('./adminNewsletterSubscribers'));
+
 router.get('/segments/saved', requirePermission('customers:view'), async (req, res) => {
   try {
     const admin = await loadCurrentAdminForSegments(req);
@@ -1206,6 +1216,8 @@ router.get('/', requirePermission('customers:view'), async (req, res) => {
         branchIds: access.branchIds,
         sensitive: canViewSensitive,
         masked: !canViewSensitive,
+        subscriptions: canViewSensitive && canAdminSeeAllBranches(req)
+          && await hasCustomerPermission(req, 'customers:audit'),
       },
       filters: {
         segment: segment || 'all',
@@ -1292,6 +1304,7 @@ router.get('/:id/privacy', requirePermission('customers:audit'), async (req, res
     ]);
     const canAnonymize = canViewSensitive && hasAnonymizePermission;
     const consentSnapshot = serializeCustomer(customer).marketingConsent || {};
+    const emailEvidence = canViewSensitive ? await subscriptionEvidence(customer.email) : null;
     await recordCustomerAuditEvent({
       req,
       customer,
@@ -1319,6 +1332,8 @@ router.get('/:id/privacy', requirePermission('customers:audit'), async (req, res
           ? `ANONIMIZAR ${customer.customerCode}`
           : '',
       },
+      emailEvidence,
+      emailConsent: protectCustomerData({ marketingConsent: customer.emailMarketingConsent?.toObject?.() || customer.emailMarketingConsent || {} }, canViewSensitive).marketingConsent,
       consent: protectCustomerData(
         { marketingConsent: consentSnapshot },
         canViewSensitive
@@ -1411,6 +1426,7 @@ router.get(
         ok: true,
         exportedAt,
         customer: serializeCustomer(customer),
+        emailSubscription: await subscriptionEvidence(customer.email),
         orders,
         followUps: followUps.map((item) => ({
           id: String(item._id),
@@ -1444,7 +1460,7 @@ router.get(
 
 router.post('/:id/consent', requirePermission('customers:consent'), async (req, res) => {
   try {
-    const customer = await loadCustomer(req, req.params.id);
+    let customer = await loadCustomer(req, req.params.id);
     const status = cleanLower(req.body?.status || '');
     const source = cleanLower(req.body?.source || 'admin');
     const proofReference = cleanText(req.body?.proofReference || '').slice(0, 240);
@@ -1479,29 +1495,9 @@ router.post('/:id/consent', requirePermission('customers:consent'), async (req, 
     }
 
     const before = serializeCustomer(customer);
-    const recordedAt = new Date();
-    const history = Array.isArray(customer.marketingConsent?.history)
-      ? customer.marketingConsent.history
-      : [];
-    history.push({
-      status,
-      source,
-      proofReference,
-      note,
-      recordedAt,
-      recordedByAdmin: getAdminId(req),
+    customer = await saveAdministrativeConsent(customer, {
+      status, source, proofReference, note, adminId: getAdminId(req), emailMarketing: req.body?.emailMarketing === true,
     });
-    customer.marketingConsent = {
-      status,
-      source,
-      proofReference,
-      updatedAt: recordedAt,
-      updatedByAdmin: getAdminId(req),
-      history: history.slice(-50),
-    };
-    customer.acceptsMarketing = status === 'granted';
-    customer.updatedByAdmin = getAdminId(req);
-    await customer.save();
     const after = serializeCustomer(customer);
     await recordCustomerAuditEvent({
       req,
@@ -1534,7 +1530,7 @@ router.post(
   requirePermission(['customers:anonymize', 'customers:sensitive']),
   async (req, res) => {
     try {
-      const customer = await loadCustomer(req, req.params.id);
+      let customer = await loadCustomer(req, req.params.id);
       const retention = await assessCustomerRetention(req, customer);
       const expectedConfirmation = `ANONIMIZAR ${customer.customerCode}`;
       if (cleanText(req.body?.confirmation) !== expectedConfirmation) {
@@ -1554,6 +1550,22 @@ router.post(
       }
 
       const before = serializeCustomer(customer);
+      customer = await saveAdministrativeConsent(
+        customer,
+        {
+          status: 'withdrawn',
+          source: 'anonymization',
+          proofReference: `customer:${customer._id}:anonymization`,
+          note: 'Retiro previo a la anonimización.',
+          adminId: getAdminId(req),
+        },
+        {
+          runTransaction: (saveConsent) => transaction(async (session) => {
+            await preserveLegacyCustomerOrderLinks(req, customer, { session });
+            return saveConsent(session);
+          }),
+        }
+      );
       const anonymizedAt = new Date();
       const anonymousSuffix = String(customer._id).slice(-6).toUpperCase();
       customer.firstName = '';

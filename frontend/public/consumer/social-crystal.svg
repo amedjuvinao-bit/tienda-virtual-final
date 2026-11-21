@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="960" viewBox="0 0 720 960">
+  <defs>
+    <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#fff7f2"/><stop offset=".48" stop-color="#ecd0cc"/><stop offset="1" stop-color="#faeae4"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="28"/></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <path fill="url(#glass)" d="M0 0h720v960H0z"/>
+  <ellipse cx="140" cy="140" rx="440" ry="390" fill="url(#light)"/>
+  <g fill="none" stroke="#fff" filter="url(#blur)" opacity=".5"><path stroke-width="75" d="M-100 800 800-50"/><path stroke-width="25" d="M-100 990 850 120"/></g>
+  <g fill="none" stroke="#fff" opacity=".45"><path d="M-40 835 770 40"/><path d="M-40 885 770 90"/></g>
+  <path fill="#fff" opacity=".035" filter="url(#grain)" d="M0 0h720v960H0z"/>
+</svg>

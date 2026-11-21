@@ -59,11 +59,12 @@ async function main() {
     'hasCustomerIdentity',
     'isConfirmedOrder',
     'isDemoOrder',
+    'preserveLegacyCustomerOrderLinks',
     'resolveCustomerForOrder',
     'syncCustomerMasterFromOrder',
   ];
   ok(
-    'la fachada conserva exactamente sus nueve exports públicos',
+    'la fachada conserva sus diez exports públicos, incluida la preservación de vínculos históricos',
     JSON.stringify(Object.keys(customerOrderLinkModule)) ===
       JSON.stringify(expectedCustomerOrderLinkExports)
   );
@@ -77,6 +78,8 @@ async function main() {
         customerOrderResolution.resolveCustomerForOrder &&
       customerOrderLinkModule.applyCustomerStatsForOrder ===
         customerOrderStats.applyCustomerStatsForOrder &&
+      customerOrderLinkModule.preserveLegacyCustomerOrderLinks ===
+        customerOrderSync.preserveLegacyCustomerOrderLinks &&
       customerOrderLinkModule.syncCustomerMasterFromOrder ===
         customerOrderSync.syncCustomerMasterFromOrder
   );

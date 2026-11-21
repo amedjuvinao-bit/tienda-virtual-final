@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import { fmtDate, toCOP } from './orderDetailUtils';
 import { SoftBadge } from './OrderDetailPrimitives';
@@ -30,6 +31,7 @@ export default function OrderReturnCaseCard({
   onShipping,
   policy,
   returnCase,
+  selected = false,
   shippingDestinations,
   shippingProviders,
   setDraft,
@@ -48,9 +50,13 @@ export default function OrderReturnCaseCard({
     0
   );
   const risk = returnCase.riskAssessment || {};
+  const recordRef = useRef(null);
+  useEffect(() => {
+    if (selected) recordRef.current?.focus();
+  }, [selected]);
 
   return (
-    <article style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg, borderRadius: 19, padding: 14 }}>
+    <article ref={recordRef} tabIndex={selected ? -1 : undefined} style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg, borderRadius: 19, padding: 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <strong style={{ display: 'block', fontSize: 14 }}>{returnCase.returnNumber}</strong>

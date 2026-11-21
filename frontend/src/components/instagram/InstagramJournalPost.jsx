@@ -1,3 +1,4 @@
+import { SocialImage } from '../privacy/SocialContentPrivacy';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Bookmark, Clapperboard, Heart, MessageCircle, MoreHorizontal, Send, Copy, Maximize2 } from 'lucide-react';
 import { photoCrop, safeInstagramLink } from '../../admin/appearance/sections/instagram/instagramEditorialHelpers';
@@ -9,7 +10,7 @@ import JournalReelPlayer from './JournalReelPlayer';
 export function JournalAvatar({ settings, small = false }) {
   const [failed, setFailed] = useState('');
   return <span className={`ig-journal__avatar${small ? ' ig-journal__avatar--small' : ''}`} aria-hidden="true">
-    {settings.journalAvatarImage && failed !== settings.journalAvatarImage ? <img src={settings.journalAvatarImage} alt="" onError={() => setFailed(settings.journalAvatarImage)} /> : settings.journalMonogram}
+    {settings.journalAvatarImage && failed !== settings.journalAvatarImage ? <SocialImage src={settings.journalAvatarImage} alt="" onError={() => setFailed(settings.journalAvatarImage)} /> : settings.journalMonogram}
   </span>;
 }
 export default function InstagramJournalPost({ post, settings: j, user, compact = false, saved, onSave, onShare, onSelect, onExpand }) {
@@ -24,8 +25,8 @@ export default function InstagramJournalPost({ post, settings: j, user, compact 
   const crop = photoCrop(post);
   const description = post.alt || 'Publicación de Instagram';
   const picture = <picture>
-    <img className={post.mobileImage ? "ig-journal__desktop-image" : undefined} src={post.image} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />
-    {post.mobileImage && <img className="ig-journal__mobile-image" src={post.mobileImage} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />}
+    <SocialImage className={post.mobileImage ? "ig-journal__desktop-image" : undefined} src={post.image} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />
+    {post.mobileImage && <SocialImage className="ig-journal__mobile-image" src={post.mobileImage} alt={description} loading="lazy" decoding="async" style={{ objectFit: post.imageFit === 'contain' ? 'contain' : 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />}
   </picture>;
   return <article className={`ig-journal__post${compact ? ' ig-journal__post--compact' : ' ig-journal__post--featured'}`} data-video={video ? 'true' : undefined} data-igj-glass={compact ? 'preview' : 'featured'} onPointerMove={event => moveJournalGlass(event, j)} onPointerLeave={resetJournalGlass} onPointerCancel={resetJournalGlass} data-post-id={post.id} aria-label={description}>
     <JournalLiquidLens settings={j} strength={compact ? .7 : 1} />

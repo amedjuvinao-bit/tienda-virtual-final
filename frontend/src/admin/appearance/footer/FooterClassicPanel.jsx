@@ -348,15 +348,7 @@ function UploadField({
         </div>
 
         <div className="min-w-0 flex flex-col gap-3">
-          <label className="block min-w-0">
-            <span className="block text-sm mb-1 text-gray-700">URL</span>
-            <input
-              className="w-full min-w-0 rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-400"
-              value={value || ""}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder="https://..."
-            />
-          </label>
+          {(value || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => onChange("")}>Quitar imagen</button>}
 
           <label
             className={[
@@ -420,12 +412,7 @@ function SocialCard({
           </div>
 
           <div className="min-w-0 space-y-3">
-            <Input
-              label="URL del ícono"
-              value={iconValue || ""}
-              onChange={(e) => onIconChange(e.target.value)}
-              placeholder="https://..."
-            />
+            {(iconValue || "") && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => onIconChange("")}>Quitar imagen</button>}
 
             <label className="inline-flex w-full sm:w-auto items-center justify-center h-10 px-4 rounded-2xl bg-neutral-900 text-white text-sm font-medium cursor-pointer hover:bg-neutral-800 transition">
               <span>{uploading ? "Subiendo..." : "Subir ícono"}</span>
@@ -828,7 +815,7 @@ export default function FooterPanel({
             <>
               <PanelCard
                 title="Logo del footer"
-                subtitle="Puedes pegar una URL o subir la imagen desde el equipo del usuario."
+                subtitle="Selecciona una imagen desde tu equipo para cargarla a Cloudinary."
               >
                 <div className="space-y-4">
                   <UploadField

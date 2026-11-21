@@ -91,52 +91,23 @@ function createFakeOrderModel(state) {
 }
 
 async function testExistingSubscriberDoesNotAbortCheckout() {
-  const intent = normalizeNewsletterIntent(
-    {
-      wantsNewsletter: true,
-      emailOrPhone: ' EXISTING@EXAMPLE.COM ',
-      phone: '+573001112233',
-    },
-    'checkout-session'
-  );
-  assert.strictEqual(intent.email, 'existing@example.com');
-
-  const calls = [];
-  const SubscriberModel = {
-    async findOneAndUpdate(filter, update, options) {
-      calls.push({ filter, update, options });
-      return { _id: 'subscriber-existing' };
-    },
-  };
-  const result = await persistNewsletterSubscription(intent, {
-    SubscriberModel,
-  });
-  assert.strictEqual(result.persisted, true);
-  assert.strictEqual(calls.length, 1);
-  assert.strictEqual(calls[0].options.upsert, true);
-  assert.deepStrictEqual(calls[0].filter.$or, [
-    { email: 'existing@example.com' },
-    { phone: '+573001112233' },
-  ]);
-  ok('un cliente ya suscrito se reutiliza mediante upsert fuera de la transacción');
-
-  let attempt = 0;
-  const racingSubscriberModel = {
-    async findOneAndUpdate() {
-      attempt += 1;
-      if (attempt === 1) {
-        throw Object.assign(new Error('duplicate'), { code: 11000 });
-      }
-      return { _id: 'subscriber-race-winner' };
-    },
-  };
-  const raced = await persistNewsletterSubscription(intent, {
-    SubscriberModel: racingSubscriberModel,
-  });
-  assert.strictEqual(raced.persisted, true);
-  assert.strictEqual(raced.reused, true);
-  assert.strictEqual(attempt, 2);
-  ok('una carrera de índice único reintenta la suscripción sin afectar la orden');
+  const intent = { email: 'existing@example.com', requested: true,
+    proof: {version:'policy-1',text:'Autorización de prueba',source:'checkout'} };
+  const calls=[];
+  const result = await persistNewsletterSubscription(intent, {reconcile:async()=>{},service:{request:async value=>calls.push(value)}});
+  assert.strictEqual(result.pendingVerification,true);
+  assert.strictEqual(result.persisted,false);
+  assert.strictEqual(calls.length,1);
+  assert.strictEqual(calls[0].email,'existing@example.com');
+  assert.strictEqual(calls[0].version,'policy-1');
+  ok('la suscripción opcional solicita verificación fuera de la transacción de compra');
+  const failed = await persistNewsletterSubscription(intent,{reconcile:async()=>{},service:{request:async()=>{throw Error('correo no disponible');}},logger:{warn(){}}});
+  assert.strictEqual(failed.retryable,true);
+  assert.strictEqual(failed.persisted,false);
+  const historical = normalizeNewsletterIntent({emailOrPhone:'existing@example.com',wantsNewsletter:true},'session');
+  assert.strictEqual(historical.proof,null);
+  assert.strictEqual((await persistNewsletterSubscription(historical,{reconcile:async()=>{},service:{request:async()=>assert.fail('no debe autorizar sin versión')}})).reason,'policy_changed');
+  ok('un fallo de correo no aborta la compra y una intención histórica no otorga permiso');
 }
 
 async function testDurablePostCommitRetry() {

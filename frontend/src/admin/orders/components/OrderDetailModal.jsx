@@ -29,6 +29,8 @@ export default function OrderDetailModal({
   open,
   onClose,
   order,
+  initialTab,
+  initialRecord,
   onSaveStatus,
   onSaveTags,
   onTogglePrinted,
@@ -203,6 +205,8 @@ export default function OrderDetailModal({
       <div className="relative z-[100000]">
         <OrderDetailProfessionalView
           order={order}
+          initialTab={initialTab}
+          initialRecord={initialRecord}
           onClose={onClose}
           onDownloadPdf={canDownloadBilling ? documents.openPdf : null}
           onOpenInvoice={

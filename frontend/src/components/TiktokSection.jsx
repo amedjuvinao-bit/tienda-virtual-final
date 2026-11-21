@@ -1,7 +1,9 @@
 // src/components/TiktokSection.jsx
 import TiktokStage from './tiktok/TiktokStage';
 import React, { useMemo, useState } from "react";
-import { Music2 } from "lucide-react";
+import { Play } from "lucide-react";
+import TiktokBrand from './tiktok/TiktokBrand';
+import { SocialImage, SocialPlayback, useSocialContentPrivacy } from './privacy/SocialContentPrivacy';
 import { normalizeTiktokSection } from "../admin/appearance/sections/tiktok/tiktokSectionHelpers";
 
 function clampNumber(value, min, max) {
@@ -77,52 +79,16 @@ function getBigLogoAnimationStyle(config, hasHover) {
   };
 }
 
-function renderHoverLogo(config) {
-  const logoStyle = (config.hoverLogoStyle || "glyph").toLowerCase();
-  const logoSizePx = clampNumber(config.hoverLogoSizePx ?? 64, 20, 220);
-  const logoOpacity = clampNumber(config.hoverLogoOpacity ?? 0.8, 0.05, 1);
-  const logoColor = config.hoverLogoColor || "#ffffff";
-  const customHoverLogo = config.hoverLogoImage || config.tiktokLogo || "";
-
-  const sharedStyle = {
-    width: `${logoSizePx}px`,
-    height: `${logoSizePx}px`,
-    opacity: logoOpacity,
-    objectFit: "contain",
-    filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.18))",
-  };
-
-  if ((logoStyle === "custom-image" || logoStyle === "square") && customHoverLogo) {
-    return (
-      <img
-        src={customHoverLogo}
-        alt="TikTok"
-        draggable={false}
-        style={sharedStyle}
-      />
-    );
-  }
-
-  if (logoStyle === "outline") {
-    return (
-      <Music2
-        strokeWidth={1.8}
-        style={{
-          ...sharedStyle,
-          color: logoColor,
-        }}
-      />
-    );
-  }
-
+function renderHoverBrand(config) {
   return (
-    <Music2
-      strokeWidth={2}
-      style={{
-        ...sharedStyle,
-        color: logoColor,
-      }}
-    />
+    <span aria-hidden="true" style={{
+      color: config.hoverLogoColor || "#ffffff",
+      fontFamily: config.titleFontFamily || "inherit",
+      fontSize: `${clampNumber((config.hoverLogoSizePx ?? 64) * .32, 10, 72)}px`,
+      fontWeight: 600,
+      opacity: clampNumber(config.hoverLogoOpacity ?? .8, 0, 1),
+      textShadow: "0 2px 10px rgba(0,0,0,0.18)",
+    }}>TikTok</span>
   );
 }
 
@@ -287,8 +253,10 @@ function TikTokThumbnail({
   overlayOpacity,
   hoverScale,
   cardStyle,
+  isPlaybackSelected,
+  onRequestPlayback,
 }) {
-  const [playing, setPlaying] = useState(false);
+  const privacy = useSocialContentPrivacy();
 
   const link = post?.link || "#";
   const thumb = post?.thumb || post?.image || "";
@@ -328,129 +296,147 @@ function TikTokThumbnail({
     cardTranslate = "translateY(-6px)";
   }
 
+  const source = hasDirectVideo ? videoUrl : embedUrl;
+  const title = post?.title || post?.alt || "Video de TikTok";
   return (
-    <a
-      href={link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative overflow-hidden block bg-black"
-      style={{
-        ...cardStyle,
-        transform: cardTranslate,
-        transition: `transform ${hoverTransitionMs}ms ease, box-shadow ${hoverTransitionMs}ms ease, width ${hoverTransitionMs}ms ease, flex-basis ${hoverTransitionMs}ms ease, filter ${hoverTransitionMs}ms ease`,
-        boxShadow: isHovered ? "0 14px 34px rgba(0,0,0,0.14)" : "0 4px 14px rgba(0,0,0,0.05)",
-      }}
-      onMouseEnter={(e) => {
-        onMouseEnter?.(e);
-        setPlaying(true);
-      }}
-      onMouseLeave={(e) => {
-        onMouseLeave?.(e);
-        setPlaying(false);
-      }}
-    >
-      {playing && hasDirectVideo ? (
-        <video
-          src={videoUrl}
-          className="absolute inset-0 w-full h-full"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "center center",
-            display: "block",
-          }}
-        />
-      ) : playing && embedUrl ? (
-        <div
-          className="absolute inset-0 overflow-hidden"
-          style={{
-            width: "100%",
-            height: "100%",
-          }}
-        >
-          <iframe
-            src={embedUrl}
-            className="absolute inset-0 w-full h-full border-0"
-            frameBorder="0"
-            scrolling="no"
-            allow="autoplay; encrypted-media; fullscreen"
-            allowFullScreen
-            title={`TikTok ${post?.id || ""}`}
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "none",
-              overflow: "hidden",
-              display: "block",
-            }}
-          />
-        </div>
-      ) : thumb || image ? (
-        <img
-          src={thumb || image}
-          alt="TikTok thumbnail"
-          draggable={false}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "center center",
-            transform: imageTransform,
-            opacity: imageOpacity,
-            transition: `transform ${hoverTransitionMs}ms ease, opacity ${hoverTransitionMs}ms ease`,
-          }}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400 bg-black">
-          Sin imagen
-        </div>
-      )}
-
-      {config.overlayEnabled && !playing ? (
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundColor: config.overlayColor || "#000000",
-            opacity: isHovered ? overlayOpacity : 0,
-            transition: `opacity ${hoverTransitionMs}ms ease`,
-          }}
-        />
-      ) : null}
-
-      {config.hoverLogoEnabled ? (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            opacity: isHovered ? 1 : 0,
-            transition: `opacity ${hoverTransitionMs}ms ease`,
-            zIndex: 5,
-          }}
-        >
+    <SocialPlayback src={source} poster={thumb || image} title={title} provider="TikTok" preserveControls allowLabel="Permitir y reproducir">
+      {(requested, access) => {
+        const playing = access.allowed && (
+          (requested && isPlaybackSelected) || (isHovered && (hasDirectVideo || !privacy.managed))
+        );
+        return (
           <div
+            className="relative overflow-hidden bg-black"
             style={{
-              position: "absolute",
-              left: `${hoverLogoXPercent}%`,
-              top: `${hoverLogoYPercent}%`,
-              transform: "translate(-50%, -50%)",
+              ...cardStyle,
+              transform: cardTranslate,
+              transition: `transform ${hoverTransitionMs}ms ease, box-shadow ${hoverTransitionMs}ms ease, width ${hoverTransitionMs}ms ease, flex-basis ${hoverTransitionMs}ms ease, filter ${hoverTransitionMs}ms ease`,
+              boxShadow: isHovered ? "0 14px 34px rgba(0,0,0,0.14)" : "0 4px 14px rgba(0,0,0,0.05)",
             }}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
           >
-            {renderHoverLogo(config)}
+            <a href={link} target="_blank" rel="noopener noreferrer" className="group relative block h-full w-full overflow-hidden">
+              {playing && hasDirectVideo ? (
+                <video
+                  src={privacy.video(videoUrl)}
+                  className="absolute inset-0 w-full h-full"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center center",
+                    display: "block",
+                  }}
+                />
+              ) : playing && embedUrl ? (
+                <div
+                  className="absolute inset-0 overflow-hidden"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  <iframe
+                    src={embedUrl}
+                    className="absolute inset-0 w-full h-full border-0"
+                    frameBorder="0"
+                    scrolling="no"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowFullScreen
+                    title={`Video de TikTok: ${title}`}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                      overflow: "hidden",
+                      display: "block",
+                    }}
+                  />
+                </div>
+              ) : thumb || image ? (
+                <SocialImage
+                  src={thumb || image}
+                  alt="TikTok thumbnail"
+                  draggable={false}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center center",
+                    transform: imageTransform,
+                    opacity: imageOpacity,
+                    transition: `transform ${hoverTransitionMs}ms ease, opacity ${hoverTransitionMs}ms ease`,
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400 bg-black">
+                  Sin imagen
+                </div>
+              )}
+
+              {config.overlayEnabled && !playing ? (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundColor: config.overlayColor || "#000000",
+                    opacity: isHovered ? overlayOpacity : 0,
+                    transition: `opacity ${hoverTransitionMs}ms ease`,
+                  }}
+                />
+              ) : null}
+
+              {config.hoverLogoEnabled ? (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    opacity: isHovered ? 1 : 0,
+                    transition: `opacity ${hoverTransitionMs}ms ease`,
+                    zIndex: 5,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: `${hoverLogoXPercent}%`,
+                      top: `${hoverLogoYPercent}%`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    {renderHoverBrand(config)}
+                  </div>
+                </div>
+              ) : null}
+            </a>
+            {source && !playing && (
+              <button
+                type="button"
+                className="tk-legacy-play"
+                aria-label={`Reproducir: ${title}`}
+                onClick={event => {
+                  event.stopPropagation();
+                  onRequestPlayback();
+                  access.request();
+                }}
+              ><Play size={20} fill="currentColor" aria-hidden="true" /></button>
+            )}
           </div>
-        </div>
-      ) : null}
-    </a>
+        );
+      }}
+    </SocialPlayback>
   );
 }
 
 function LegacyTiktokSection({ theme, posts = [] }) {
   const [hoveredId, setHoveredId] = useState(null);
   const [mobileActiveId, setMobileActiveId] = useState(null);
+  const [playbackId, setPlaybackId] = useState(null);
+  const privacy = useSocialContentPrivacy();
 
   const section = useMemo(() => getTiktokSectionFromTheme(theme), [theme]);
   const config = section?.config || {};
@@ -511,7 +497,10 @@ function LegacyTiktokSection({ theme, posts = [] }) {
 
   const watermarkEnabled =
     typeof config.watermarkEnabled === "boolean" ? config.watermarkEnabled : false;
-  const watermarkImage = config.watermarkImage || "";
+  const watermarkSource = config.watermarkImage || "";
+  const watermarkImage = /(?:^|\/)(?:tiktok\.svg|logotiktok\.svg|titulotiktok\.png)(?:[?#]|$)/i.test(watermarkSource)
+    ? ""
+    : privacy.image(watermarkSource);
   const watermarkRepeat =
     typeof config.watermarkRepeat === "boolean" ? config.watermarkRepeat : false;
   const watermarkOpacity = clampNumber(config.watermarkOpacity ?? 0.12, 0, 1);
@@ -655,14 +644,6 @@ function LegacyTiktokSection({ theme, posts = [] }) {
               align-self: center;
             }
 
-            .tiktok-mobile-profile-logo {
-              width: 20px;
-              height: 20px;
-              object-fit: contain;
-              display: block;
-              flex-shrink: 0;
-            }
-
             .tiktok-mobile-profile-user {
               font-size: 0.84rem;
               line-height: 1;
@@ -732,8 +713,8 @@ function LegacyTiktokSection({ theme, posts = [] }) {
               }}
             />
           ) : (
-            <img
-              src={watermarkImage}
+            <SocialImage
+              src={watermarkSource}
               alt=""
               aria-hidden="true"
               draggable={false}
@@ -746,18 +727,9 @@ function LegacyTiktokSection({ theme, posts = [] }) {
 
       <div className="relative z-10">
         <div className="mb-4 text-center tiktok-mobile-head">
-          {config.titleImage ? (
-            <img
-              src={config.titleImage}
-              alt={config.titleAlt || "Síguenos en TikTok"}
-              className="mx-auto w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg h-auto object-contain"
-              draggable={false}
-            />
-          ) : (
-            <div className="text-center" style={titleStyle}>
-              {config.titleText || "Síguenos en TikTok"}
-            </div>
-          )}
+          <div className="text-center" style={titleStyle}>
+            {config.titleText || "Síguenos en TikTok"}
+          </div>
 
           <a
             href={config.profileLink || "https://www.tiktok.com"}
@@ -766,21 +738,7 @@ function LegacyTiktokSection({ theme, posts = [] }) {
             className="tiktok-mobile-profile md:hidden"
             style={bigLogoAnimationStyle}
           >
-            {config.tiktokLogo ? (
-              <img
-                src={config.tiktokLogo}
-                alt="TikTok Logo"
-                draggable={false}
-                className="tiktok-mobile-profile-logo"
-              />
-            ) : (
-              <Music2
-                className="tiktok-mobile-profile-logo"
-                style={{
-                  color: config.userTextColor || config.titleTextColor || "#111111",
-                }}
-              />
-            )}
+            <TiktokBrand compact/>
             <span className="tiktok-mobile-profile-user">{profileUser}</span>
           </a>
         </div>
@@ -823,6 +781,8 @@ function LegacyTiktokSection({ theme, posts = [] }) {
                         post={post}
                         config={config}
                         isHovered={false}
+                        isPlaybackSelected={playbackId === `mobile:${post.id}`}
+                        onRequestPlayback={() => setPlaybackId(`mobile:${post.id}`)}
                         onMouseEnter={() => {}}
                         onMouseLeave={() => {}}
                         hoverTransitionMs={hoverTransitionMs}
@@ -881,6 +841,8 @@ function LegacyTiktokSection({ theme, posts = [] }) {
                     post={post}
                     config={config}
                     isHovered={isHovered}
+                    isPlaybackSelected={playbackId === `desktop:${post.id}`}
+                    onRequestPlayback={() => setPlaybackId(`desktop:${post.id}`)}
                     onMouseEnter={() => setHoveredId(post.id)}
                     onMouseLeave={() => setHoveredId(null)}
                     hoverTransitionMs={hoverTransitionMs}
@@ -911,30 +873,13 @@ function LegacyTiktokSection({ theme, posts = [] }) {
                     padding: 0,
                   }}
                 >
-                  {config.tiktokLogo ? (
-                    <img
-                      src={config.tiktokLogo}
-                      alt="TikTok Logo"
-                      draggable={false}
-                      style={{
-                        width: `${clampNumber(config.logoSizePx ?? 180, 24, 420)}px`,
-                        height: `${clampNumber(config.logoSizePx ?? 180, 24, 420)}px`,
-                        objectFit: "contain",
-                        maxWidth: "none",
-                        display: "block",
-                      }}
-                    />
-                  ) : (
-                    <Music2
-                      style={{
-                        width: `${clampNumber(config.logoSizePx ?? 180, 24, 420)}px`,
-                        height: `${clampNumber(config.logoSizePx ?? 180, 24, 420)}px`,
-                        color: "#111111",
-                        maxWidth: "none",
-                        display: "block",
-                      }}
-                    />
-                  )}
+                  <span style={{
+                    ...titleStyle,
+                    display: "grid",
+                    placeItems: "center",
+                    width: `min(100%, ${clampNumber(config.logoSizePx ?? 180, 24, 420)}px)`,
+                    minHeight: `${clampNumber(config.logoSizePx ?? 180, 24, 420)}px`,
+                  }}><TiktokBrand/></span>
                 </a>
               </div>
             </div>

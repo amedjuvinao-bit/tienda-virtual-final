@@ -31,8 +31,14 @@ describe('acceso seguro de favoritos', () => {
         data: { sessionId, favoriteAccessToken: token },
       }),
     };
-    await expect(ensureFavoriteAccess(api)).resolves.toEqual({ sessionId, token });
-    await expect(ensureFavoriteAccess(api)).resolves.toEqual({ sessionId, token });
+    await expect(ensureFavoriteAccess(api)).resolves.toEqual({
+      sessionId,
+      token,
+    });
+    await expect(ensureFavoriteAccess(api)).resolves.toEqual({
+      sessionId,
+      token,
+    });
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(api.post).toHaveBeenCalledWith('/api/favorites/access');
   });
@@ -43,4 +49,30 @@ describe('acceso seguro de favoritos', () => {
     expect(getFavoriteAccess()).toBeNull();
     expect(buildFavoriteAccessHeaders()).toEqual({});
   });
+});
+
+it('migra las dos claves anteriores a una pareja atómica sin cambiar la sesión', () => {
+  localStorage.clear();
+  localStorage.setItem('favorite_session_id', sessionId);
+  localStorage.setItem('favorite_access_token', token);
+  expect(getFavoriteAccess()).toEqual({ sessionId, token });
+  expect(JSON.parse(localStorage.getItem('favorite_access'))).toEqual({
+    sessionId,
+    token,
+  });
+  expect(localStorage.getItem('favorite_access_token')).toBeNull();
+});
+it('deduplica emisiones simultáneas dentro de la misma página', async () => {
+  localStorage.clear();
+  const api = {
+    post: vi.fn(async () => ({
+      data: { sessionId, favoriteAccessToken: token },
+    })),
+  };
+  const values = await Promise.all([
+    ensureFavoriteAccess(api),
+    ensureFavoriteAccess(api),
+  ]);
+  expect(values[0]).toEqual(values[1]);
+  expect(api.post).toHaveBeenCalledTimes(1);
 });

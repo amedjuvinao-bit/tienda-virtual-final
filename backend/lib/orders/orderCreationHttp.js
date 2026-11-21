@@ -9,6 +9,7 @@ const {
 function sendOrderCreationError(res, error) {
   const code = String(error?.code || '');
 
+  if (code.startsWith('CONSUMER_')) return res.status(error.statusCode || 409).json({ ok: false, error: code, code, message: error.message });
   if (code === 'CART_ACCESS_ALREADY_USED') {
     return res.status(404).json(SAFE_CART_ACCESS_ERROR);
   }

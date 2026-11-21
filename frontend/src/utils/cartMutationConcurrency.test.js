@@ -38,7 +38,10 @@ function conflict(state) {
 }
 
 function createMemoryBackend(initialItems = []) {
-  const state = { items: initialItems.map((entry) => ({ ...entry })), version: 'v1' };
+  const state = {
+    items: initialItems.map((entry) => ({ ...entry })),
+    version: 'v1',
+  };
   let revision = 1;
   const calls = { writes: 0, reloads: 0, active: 0, maxActive: 0 };
 
@@ -76,7 +79,9 @@ function createTab(backend, initialItems, initialVersion) {
     getSnapshot: async () => snapshot,
     write: (request) => backend.write(request),
     reload: () => backend.reload(),
-    adopt: (next) => { snapshot = next; },
+    adopt: (next) => {
+      snapshot = next;
+    },
   });
   return { coordinator, getSnapshot: () => snapshot };
 }
@@ -88,7 +93,10 @@ describe('concurrencia del carrito', () => {
     const tabB = createTab(backend, [], 'v1');
 
     await tabA.coordinator.enqueue({ type: 'add', item: item(PRODUCT_A) });
-    const resultB = await tabB.coordinator.enqueue({ type: 'add', item: item(PRODUCT_B) });
+    const resultB = await tabB.coordinator.enqueue({
+      type: 'add',
+      item: item(PRODUCT_B),
+    });
 
     expect(resultB.retried).toBe(true);
     expect(backend.calls.reloads).toBe(1);
@@ -161,7 +169,9 @@ describe('concurrencia del carrito', () => {
       items: [item(PRODUCT_B, 7, '4__royalblue')],
       version: 'server-v3',
     };
-    const writes = vi.fn(async () => { throw conflict(serverState); });
+    const writes = vi.fn(async () => {
+      throw conflict(serverState);
+    });
     const reload = vi.fn(async () => serverState);
     let adopted = null;
     const onTerminalConflict = vi.fn();
@@ -169,7 +179,9 @@ describe('concurrencia del carrito', () => {
       getSnapshot: async () => ({ items: [item(PRODUCT_A)], version: 'v1' }),
       write: writes,
       reload,
-      adopt: (snapshot) => { adopted = snapshot; },
+      adopt: (snapshot) => {
+        adopted = snapshot;
+      },
       onTerminalConflict,
     });
 
@@ -194,9 +206,13 @@ describe('concurrencia del carrito', () => {
     const onRejected = vi.fn();
     const coordinator = createCartMutationCoordinator({
       getSnapshot: async () => serverState,
-      write: async () => { throw rejected; },
+      write: async () => {
+        throw rejected;
+      },
       reload: async () => serverState,
-      adopt: (snapshot) => { adopted = snapshot; },
+      adopt: (snapshot) => {
+        adopted = snapshot;
+      },
       onRejected,
     });
 
@@ -222,10 +238,13 @@ describe('concurrencia del carrito', () => {
       status: 409,
       data: {
         error: 'CART_ITEMS_INVALID',
-        items: [{ ...stale, productId: PRODUCT_A, invalidReason: 'OUT_OF_STOCK' }],
+        items: [
+          { ...stale, productId: PRODUCT_A, invalidReason: 'OUT_OF_STOCK' },
+        ],
       },
     };
-    const write = vi.fn()
+    const write = vi
+      .fn()
       .mockRejectedValueOnce(rejected)
       .mockResolvedValueOnce({ items: [available], version: 'v2' });
     let adopted = null;
@@ -234,7 +253,9 @@ describe('concurrencia del carrito', () => {
       getSnapshot: async () => serverState,
       write,
       reload: async () => serverState,
-      adopt: (snapshot) => { adopted = snapshot; },
+      adopt: (snapshot) => {
+        adopted = snapshot;
+      },
       onRejected,
     });
 
@@ -252,7 +273,7 @@ describe('concurrencia del carrito', () => {
     );
   });
 
-  it('descarta de forma controlada un carrito que ya no existe en el servidor', async () => {
+  it('delega la recuperación de acceso sin asumir que el carrito fue eliminado', async () => {
     const missing = new Error('missing cart');
     missing.response = {
       status: 404,
@@ -265,13 +286,18 @@ describe('concurrencia del carrito', () => {
     });
     const write = vi.fn();
     const coordinator = createCartMutationCoordinator({
-      getSnapshot: async () => { throw missing; },
+      getSnapshot: async () => {
+        throw missing;
+      },
       write,
       reload: vi.fn(),
       adopt: vi.fn(),
       onMissingCart,
     });
-    const operation = { type: 'remove', identity: cartItemIdentity(item(PRODUCT_A)) };
+    const operation = {
+      type: 'remove',
+      identity: cartItemIdentity(item(PRODUCT_A)),
+    };
 
     await expect(coordinator.enqueue(operation)).resolves.toMatchObject({
       recoveredMissingCart: true,
@@ -304,4 +330,18 @@ describe('concurrencia del carrito', () => {
       }
     );
   });
+});
+
+it('mantiene qty y quantity coherentes al reintentar sobre filas recibidas del servidor', () => {
+  const row = item(PRODUCT_A, 2);
+  const increased = applyCartOperation([row], {
+    type: 'increase',
+    identity: cartItemIdentity(row),
+  });
+  expect(increased[0]).toMatchObject({ qty: 3, quantity: 3 });
+  const added = applyCartOperation([row], {
+    type: 'add',
+    item: item(PRODUCT_A, 1),
+  });
+  expect(added[0]).toMatchObject({ qty: 3, quantity: 3 });
 });

@@ -58,7 +58,7 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
     if (!file) return;
     setError('');
     if (!['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(file.type)) { setError('Usa una imagen PNG, JPG, WEBP o AVIF.'); return; }
-    if (typeof uploadToCloudinary !== 'function') { setError('No se pudo iniciar la carga. Puedes pegar la URL de la imagen.'); return; }
+    if (typeof uploadToCloudinary !== 'function') { setError('No se pudo iniciar la carga. La carga no está disponible. Recarga la página e inténtalo de nuevo.'); return; }
     setPending(true);
     try {
       const url = await uploadToCloudinary(file);
@@ -72,7 +72,7 @@ export default function InstagramJournalUI({ theme, setPath, uploadToCloudinary,
   }
   const image = (label, key, value, target) => {
     const change = v => target?.post ? patchPost(target.post, key, v) : target?.highlight ? patchHighlight(target.highlight, key, v) : patch(key, v);
-    return <div><Text label={label} value={value || ''} placeholder="https://… o /imagen.webp" onChange={change} />
+    return <div><strong>{label}</strong>{value && <Button kind="outline" disabled={pending || uploading} onClick={() => change('')}>Quitar imagen</Button>}
       <label className="inline-flex mt-2 cursor-pointer rounded-lg border p-2 text-sm">{pending ? 'Subiendo…' : 'Subir imagen'}<input type="file" className="hidden" aria-label={`Subir ${label.toLowerCase()}`} accept="image/png,image/jpeg,image/webp,image/avif" disabled={pending || uploading} onChange={e => { upload(e.target.files?.[0], key, target); e.target.value = ''; }} /></label>
       {value && <img src={value} alt={label} className="mt-2 max-h-28 max-w-full rounded-lg object-contain" />}
     </div>;

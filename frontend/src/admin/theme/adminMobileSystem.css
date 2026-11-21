@@ -1007,7 +1007,7 @@
 
   .orders-control-panel {
     position: fixed !important;
-    z-index: 105 !important;
+    z-index: 132 !important;
     inset: auto 8px calc(76px + env(safe-area-inset-bottom)) 8px !important;
     max-height: min(72dvh, 620px);
     overflow-y: auto !important;

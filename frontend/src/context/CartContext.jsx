@@ -1,10 +1,16 @@
 // src/context/CartContext.jsx
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from 'react-toastify';
 import api, { setSessionId as setApiSessionId } from '../lib/api';
 import {
   buildCartAccessHeaders,
-  clearCartAccess,
   getCartAccess,
   storeCartAccess,
 } from '../utils/cartAccess';
@@ -20,13 +26,34 @@ import {
   clearCartRecoveryFragment,
   readCartRecoveryFragment,
 } from '../utils/cartRecoveryAccess';
+import {
+  readCartSnapshot,
+  storeCartSnapshot,
+} from '../utils/cartSnapshotStorage';
+
+import { createCartTabSync, withCartBootstrapLock } from '../utils/cartTabSync';
+import { readSharedCart } from '../utils/cartSharedAccess';
+import {
+  assertSelectionCurrent,
+  readSelectionRetention,
+  recordSelectionActivity,
+  watchSelectionRetention,
+} from '../utils/selectionRetention';
+
+const EXPIRED_CART_MESSAGE = 'Tu carrito guardado venció tras 30 días sin cambios.';
 
 function clean(value) {
   return String(value || '').trim();
 }
 
 function readVariantId(item = {}) {
-  return clean(item.variantId || item.variantKey || item.selectedVariantId || item.selectedVariantKey || '');
+  return clean(
+    item.variantId ||
+      item.variantKey ||
+      item.selectedVariantId ||
+      item.selectedVariantKey ||
+      ''
+  );
 }
 
 function normalizeVariantAttributes(attributes = []) {
@@ -34,7 +61,9 @@ function normalizeVariantAttributes(attributes = []) {
   const seen = new Set();
 
   (Array.isArray(attributes) ? attributes : []).forEach((attribute) => {
-    const key = clean(attribute?.key || attribute?.name || attribute?.label).toLowerCase();
+    const key = clean(
+      attribute?.key || attribute?.name || attribute?.label
+    ).toLowerCase();
     const label = clean(attribute?.label || attribute?.name || attribute?.key);
     const value = clean(attribute?.value);
     if (!key || !value || seen.has(key) || normalized.length >= 4) return;
@@ -53,7 +82,11 @@ function normalizeVariantAttributes(attributes = []) {
  */
 function toBackendItem(it) {
   const productId =
-    it.productId || it._id || (it.product && (it.product._id || it.product.id)) || it.id || '';
+    it.productId ||
+    it._id ||
+    (it.product && (it.product._id || it.product.id)) ||
+    it.id ||
+    '';
   const qty = Number(it.qty ?? it.quantity ?? 1) || 1;
   const price = Number(it.price ?? it.unitPrice ?? it.priceNumber ?? 0) || 0;
   const variantId = readVariantId(it);
@@ -116,9 +149,13 @@ function fromBackendItem(it) {
     sku: it.variantSku || p?.sku || p?.skun || '',
     barcode: it.variantBarcode || p?.barcode || '',
     productType: it.productType || p?.productType || 'physical',
-    requiresShipping:
-      it.requiresShipping ?? p?.requiresShipping ?? true,
+    requiresShipping: it.requiresShipping ?? p?.requiresShipping ?? true,
     fulfillment: it.fulfillment || p?.fulfillment || null,
+    availableStock:
+      it.availableStock == null ? null : Number(it.availableStock),
+    inventoryTracked: it.inventoryTracked === true,
+    purchasable: it.purchasable !== false && it.valid !== false,
+    validationMessage: clean(it.validationMessage),
   };
 }
 
@@ -136,9 +173,15 @@ function calcSummary(items) {
 }
 
 function readStoredCart() {
+  if (readSelectionRetention('cart').expired) return [];
   try {
+    const access = getCartAccess();
+    const saved = readCartSnapshot(access?.sessionId);
+    if (saved) return saved;
     const stored = JSON.parse(localStorage.getItem('cart') || '[]');
-    return Array.isArray(stored) ? stored.filter((item) => item && item._id) : [];
+    return Array.isArray(stored)
+      ? stored.filter((item) => item && item._id)
+      : [];
   } catch {
     return [];
   }
@@ -154,6 +197,8 @@ function itemsShallowEqual(a, b) {
     const y = b[i];
     if (
       x._id !== y._id ||
+      (x.title || '') !== (y.title || '') ||
+      (x.image || '') !== (y.image || '') ||
       (x.color || '') !== (y.color || '') ||
       (x.colorValue || '') !== (y.colorValue || '') ||
       (x.colorLabel || '') !== (y.colorLabel || '') ||
@@ -164,10 +209,8 @@ function itemsShallowEqual(a, b) {
         JSON.stringify(normalizeVariantAttributes(y.variantAttributes)) ||
       Number(x.quantity || 0) !== Number(y.quantity || 0) ||
       Number(x.price || 0) !== Number(y.price || 0) ||
-      (x.productType || 'physical') !==
-        (y.productType || 'physical') ||
-      (x.requiresShipping !== false) !==
-        (y.requiresShipping !== false)
+      (x.productType || 'physical') !== (y.productType || 'physical') ||
+      (x.requiresShipping !== false) !== (y.requiresShipping !== false)
     ) {
       return false;
     }
@@ -175,23 +218,111 @@ function itemsShallowEqual(a, b) {
   return true;
 }
 
-const CartContext = createContext();
+export const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(readStoredCart);
   const [loading, setLoading] = useState(false);
-  const [cartMessage, setCartMessage] = useState('');
+  const [cartMessage, setCartMessage] = useState(() =>
+    readSelectionRetention('cart').expired ? EXPIRED_CART_MESSAGE : ''
+  );
+  const [pendingOperations, setPendingOperations] = useState(0);
+  const [syncError, setSyncError] = useState(false);
   const cartRef = useRef(cart);
   const authoritativeRef = useRef({ items: cart, version: '' });
   const creatingRef = useRef(null);
   const coordinatorRef = useRef(null);
   const recoveryClaimRef = useRef(false);
+  const refreshingRef = useRef(null);
+  const tabSyncRef = useRef(null);
+  const refreshAgainRef = useRef(false);
+  const retentionRef = useRef(readSelectionRetention('cart'));
+
+  const resetRetainedCart = () => {
+    authoritativeRef.current = { items: [], version: '' };
+    cartRef.current = [];
+    setCart([]);
+    setSyncError(false);
+    setCartMessage(EXPIRED_CART_MESSAGE);
+  };
+  const checkRetainedCart = () => {
+    const current = readSelectionRetention('cart');
+    if ((current.expired && !retentionRef.current.expired) ||
+        current.generation !== retentionRef.current.generation)
+      resetRetainedCart();
+    retentionRef.current = current;
+    return current;
+  };
+  const assertCartCurrent = (generation) => {
+    try {
+      assertSelectionCurrent('cart', generation);
+    } catch (error) {
+      checkRetainedCart();
+      throw error;
+    }
+  };
+  const recordCartActivity = () => {
+    recordSelectionActivity('cart');
+    retentionRef.current = readSelectionRetention('cart');
+  };
+
+  const getTabSync = () => {
+    tabSyncRef.current ||= createCartTabSync({
+      getAccess: getCartAccess,
+      onChange: () => {
+        if (refreshingRef.current) refreshAgainRef.current = true;
+        else void syncCart();
+      },
+    });
+    return tabSyncRef.current;
+  };
+
+  const prepareSharedCart = async () => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
+    const candidate = await getTabSync().resolve();
+    assertCartCurrent(generation);
+    const own = getCartAccess();
+    if (
+      !candidate ||
+      (candidate.sessionId === own?.sessionId && candidate.token === own.token)
+    )
+      return;
+    let snapshot;
+    try {
+      snapshot = await readSharedCart({
+        api,
+        access: candidate,
+        previousItems: authoritativeRef.current.items,
+        previousSessionId: own?.sessionId,
+        toBackendItem,
+        normalizeItem: fromBackendItem,
+        assertCurrent: () => assertCartCurrent(generation),
+      });
+    } catch (cause) {
+      if (cause?.code === 'SELECTION_RETENTION_EXPIRED') throw cause;
+      setSyncError(true);
+      // A failed peer capability says nothing about this tab's current cart.
+      throw new Error('No se pudo sincronizar el carrito compartido.', {
+        cause,
+      });
+    }
+    assertCartCurrent(generation);
+    if (!storeCartAccess(candidate.sessionId, candidate.token))
+      throw new Error('CART_SHARED_ACCESS_STORAGE_FAILED');
+    adoptSnapshot(snapshot);
+    getTabSync().publishChange();
+  };
 
   const adoptSnapshot = (value, { updateUi = true } = {}) => {
     const snapshot = normalizeCartSnapshot(value);
-    const local = snapshot.items.map(fromBackendItem).filter((item) => item._id);
+    const local = snapshot.items
+      .map(fromBackendItem)
+      .filter((item) => item._id);
     const normalized = { items: local, version: snapshot.version };
     authoritativeRef.current = normalized;
+    storeCartSnapshot(getCartAccess()?.sessionId, local);
+    setSyncError(false);
     if (updateUi) {
       cartRef.current = local;
       setCart(local);
@@ -200,29 +331,40 @@ export function CartProvider({ children }) {
   };
 
   const createRemoteCart = async (items) => {
-    if (creatingRef.current) return creatingRef.current;
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
+    if (creatingRef.current?.generation === generation)
+      return creatingRef.current.promise;
     const creation = api
       .post('/api/cart', { items })
       .then(({ data }) => {
-        const sessionId = String(data?.sessionId || data?.cart?.sessionId || '').trim();
+        assertCartCurrent(generation);
+        const sessionId = String(
+          data?.sessionId || data?.cart?.sessionId || ''
+        ).trim();
         const token = String(data?.cartAccessToken || '').trim();
         if (!storeCartAccess(sessionId, token)) {
-          throw new Error('No fue posible conservar el acceso seguro al carrito.');
+          throw new Error(
+            'No fue posible conservar el acceso seguro al carrito.'
+          );
         }
         const snapshot = adoptSnapshot({
           cart: data?.cart || { items },
           version: data?.version || data?.cart?.updatedAt,
         });
+        getTabSync().publishAccess({ sessionId, token });
         return { sessionId, token, version: snapshot.version };
       })
       .finally(() => {
-        creatingRef.current = null;
+        if (creatingRef.current?.promise === creation) creatingRef.current = null;
       });
-    creatingRef.current = creation;
+    creatingRef.current = { generation, promise: creation };
     return creation;
   };
 
   const loadRemoteCart = async (access = getCartAccess()) => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
     const response = await api.get(
       `/api/cart/${encodeURIComponent(access.sessionId)}`,
@@ -231,23 +373,56 @@ export function CartProvider({ children }) {
         headers: buildCartAccessHeaders(access),
       }
     );
+    assertCartCurrent(generation);
     return adoptSnapshot(response.data || {});
   };
 
+  const createValidatedCart = async (items) => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
+    const { data } = items.length
+      ? await api.post('/api/cart/validate', { items, mode: 'soft' })
+      : { data: { items: [], adjustments: [] } };
+    assertCartCurrent(generation);
+    if (!Array.isArray(data?.items))
+      throw new Error('No se pudo validar el carrito guardado.');
+    const restored = data.items.filter(
+      (item) => Number(item.qty ?? item.quantity) > 0
+    );
+    const access = await createRemoteCart(restored);
+    return { access, adjustments: data.adjustments || [] };
+  };
+
   const ensureCartReady = async (items) => {
+    const retained = checkRetainedCart();
+    assertCartCurrent(retained.generation);
+    if (!retained.generation) recordCartActivity();
+    await prepareSharedCart();
     const existing = getCartAccess();
     if (existing) {
       if (!authoritativeRef.current.version) await loadRemoteCart(existing);
       return { ...existing, version: authoritativeRef.current.version };
     }
-    clearCartAccess();
-    const createPayload = Array.isArray(items)
-      ? { items }
-      : { items: cart.map(toBackendItem) };
-    return createRemoteCart(createPayload.items);
+    return withCartBootstrapLock(async () => {
+      // Another tab may have created the cart while this one waited for the lock.
+      await prepareSharedCart();
+      const shared = getCartAccess();
+      if (shared)
+        return { ...shared, version: authoritativeRef.current.version };
+      const { access, adjustments } = await createValidatedCart(
+        Array.isArray(items) ? items : cartRef.current.map(toBackendItem)
+      );
+      if (adjustments.length)
+        toast.info(
+          'Actualizamos los precios y la disponibilidad de tu carrito guardado.'
+        );
+      return access;
+    });
   };
 
   const renewCartAccess = async () => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     const access = getCartAccess();
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
     const { data } = await api.post(
@@ -255,12 +430,14 @@ export function CartProvider({ children }) {
       null,
       { headers: buildCartAccessHeaders(access) }
     );
+    assertCartCurrent(generation);
     const sessionId = clean(data?.sessionId);
     const token = clean(data?.cartAccessToken);
     if (!storeCartAccess(sessionId, token)) {
       throw new Error('CART_ACCESS_REFRESH_INVALID');
     }
     setApiSessionId(sessionId);
+    getTabSync().publishAccess({ sessionId, token });
     const version = clean(data?.version);
     authoritativeRef.current = {
       ...authoritativeRef.current,
@@ -270,6 +447,8 @@ export function CartProvider({ children }) {
   };
 
   const writeCartVersion = async ({ items, version }) => {
+    const { generation } = checkRetainedCart();
+    assertCartCurrent(generation);
     const access = getCartAccess();
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
     const response = await writeVersionedCart({
@@ -278,6 +457,7 @@ export function CartProvider({ children }) {
       version,
       items: items.map(toBackendItem),
     });
+    assertCartCurrent(generation);
     return {
       cart: response?.data?.cart,
       version: response?.data?.version,
@@ -285,32 +465,53 @@ export function CartProvider({ children }) {
   };
 
   const recoverMissingCart = async (operation) => {
-    clearCartAccess();
-    setApiSessionId('');
-    adoptSnapshot({ items: [], version: '' });
-
-    if (operation?.type === 'add' && operation.item) {
-      await createRemoteCart([toBackendItem(operation.item)]);
+    const generation = operation.retentionGeneration;
+    assertCartCurrent(generation);
+    // A privacy-preserving 404 means missing OR unauthorized. It is never proof
+    // that the customer's selection should be erased. Rebuild a new capability
+    // from the last confirmed local items, without reading the inaccessible cart.
+    const previous = authoritativeRef.current;
+    const desired = applyCartOperation(previous.items, operation);
+    try {
+      const { adjustments } = await createValidatedCart(
+        desired.map(toBackendItem)
+      );
+      const message = adjustments.length
+        ? 'Recuperamos tu carrito y actualizamos los precios y la disponibilidad de los productos.'
+        : 'Recuperamos tu carrito conservando tus productos.';
+      setCartMessage(message);
+      toast.info(message, { toastId: 'cart-recovered' });
+      return { ...authoritativeRef.current, recoveredMissingCart: true };
+    } catch (error) {
+      assertCartCurrent(generation);
+      adoptSnapshot(previous);
+      setSyncError(true);
+      const message =
+        'No pudimos recuperar el acceso al carrito. Conservamos tus productos; vuelve a intentarlo.';
+      setCartMessage(message);
+      toast.error(message, { toastId: 'cart-recovery-failed' });
+      throw error;
     }
-
-    const message = 'El carrito anterior ya no existía. Iniciamos uno nuevo.';
-    setCartMessage(message);
-    toast.info(message, { toastId: 'cart-recreated' });
-    return {
-      ...authoritativeRef.current,
-      recoveredMissingCart: true,
-    };
   };
 
   coordinatorRef.current ||= createCartMutationCoordinator({
+    beforeExecute: (operation) => assertCartCurrent(operation.retentionGeneration),
     getSnapshot: async () => {
       await ensureCartReady(authoritativeRef.current.items.map(toBackendItem));
       return authoritativeRef.current;
     },
     write: writeCartVersion,
     reload: async () => {
-      const access = getCartAccess();
-      if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
+      const retentionGeneration = checkRetainedCart().generation;
+      assertCartCurrent(retentionGeneration);
+      await prepareSharedCart();
+      if (!getCartAccess() && !authoritativeRef.current.items.length)
+        return { items: [], version: '' };
+      const access =
+        getCartAccess() ||
+        (await ensureCartReady(
+          authoritativeRef.current.items.map(toBackendItem)
+        ));
       const response = await api.get(
         `/api/cart/${encodeURIComponent(access.sessionId)}`,
         {
@@ -318,11 +519,25 @@ export function CartProvider({ children }) {
           headers: buildCartAccessHeaders(access),
         }
       );
+      assertCartCurrent(retentionGeneration);
       return response.data || {};
     },
-    adopt: (snapshot) => adoptSnapshot(snapshot),
+    adopt: (snapshot, metadata = {}) => {
+      assertCartCurrent(metadata.operation.retentionGeneration);
+      const adopted = adoptSnapshot(snapshot);
+      if (metadata.operation?.type === 'refresh') getTabSync().publishReady();
+      if (
+        metadata.operation?.type !== 'refresh' &&
+        !metadata.rejected &&
+        !metadata.reloaded &&
+        !metadata.terminalConflict
+      )
+        getTabSync().publishChange();
+      return adopted;
+    },
     onTerminalConflict: () => {
-      const message = 'El carrito volvió a cambiar. Conservamos la versión más reciente.';
+      const message =
+        'El carrito volvió a cambiar. Conservamos la versión más reciente.';
       setCartMessage(message);
       toast.error(message, { toastId: 'cart-write-conflict' });
     },
@@ -331,7 +546,9 @@ export function CartProvider({ children }) {
         ? error.response.data.items
         : [];
       const affected = invalidItems[0] || {};
-      const productName = String(affected.title || operation?.item?.title || 'Este producto').trim();
+      const productName = String(
+        affected.title || operation?.item?.title || 'Este producto'
+      ).trim();
       const reasonMessages = {
         OUT_OF_STOCK: 'se agotó',
         INSUFFICIENT_STOCK: 'no tiene suficientes unidades disponibles',
@@ -342,6 +559,7 @@ export function CartProvider({ children }) {
         PRODUCT_PRICE_INVALID: 'requiere actualizar su precio',
       };
       const reason = reasonMessages[affected.invalidReason || affected.reason];
+      if (!authoritativeRef.current.version) setSyncError(true);
       const message = recovery.recovered
         ? `Retiramos “${productName}” porque ${reason || 'requiere revisión'}. El nuevo producto sí se agregó.`
         : invalidItems.length
@@ -350,25 +568,53 @@ export function CartProvider({ children }) {
       setCartMessage(message);
       const notify = invalidItems.length ? toast.warning : toast.error;
       notify(message, {
-        toastId: invalidItems.length ? 'cart-item-unavailable' : 'cart-update-rejected',
+        toastId: invalidItems.length
+          ? 'cart-item-unavailable'
+          : 'cart-update-rejected',
       });
     },
     onMissingCart: recoverMissingCart,
+    getFallbackSnapshot: () => authoritativeRef.current,
   });
 
   const enqueueCartOperation = (operation, { optimistic = true } = {}) => {
+    checkRetainedCart();
+    if (operation.type !== 'replace_validated') recordCartActivity();
+    const retainedOperation = {
+      ...operation,
+      retentionGeneration: retentionRef.current.generation,
+    };
     if (optimistic) {
       const optimisticCart = applyCartOperation(cartRef.current, operation);
       cartRef.current = optimisticCart;
       setCart(optimisticCart);
     }
-    return coordinatorRef.current.enqueue(operation).catch((error) => {
-      if (error?.code !== 'CART_WRITE_CONFLICT') {
-        console.error('Error al sincronizar carrito:', error?.message);
-      }
-      throw error;
-    });
+    setPendingOperations((value) => value + 1);
+    setCartMessage('');
+    return coordinatorRef.current
+      .enqueue(retainedOperation)
+      .catch((error) => {
+        if (error?.code !== 'CART_WRITE_CONFLICT') {
+          console.error('Error al sincronizar carrito:', error?.message);
+        }
+        throw error;
+      })
+      .finally(() => setPendingOperations((value) => Math.max(0, value - 1)));
   };
+
+  useEffect(() => {
+    getTabSync();
+    return () => {
+      tabSyncRef.current?.close();
+      tabSyncRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => watchSelectionRetention('cart', (retained) => {
+    retentionRef.current = retained;
+    resetRetainedCart();
+    if (!retained.expired) void syncCart();
+  }), []);
 
   // Asegura que el header X-Session-Id esté siempre presente
   useEffect(() => {
@@ -382,6 +628,9 @@ export function CartProvider({ children }) {
     if (recoveryClaimRef.current) return;
     const recovery = readCartRecoveryFragment();
     if (!recovery) return;
+    checkRetainedCart();
+    recordCartActivity();
+    const generation = retentionRef.current.generation;
     recoveryClaimRef.current = true;
     clearCartRecoveryFragment();
     setLoading(true);
@@ -390,6 +639,7 @@ export function CartProvider({ children }) {
         headers: buildCartRecoveryHeaders(recovery),
       })
       .then(({ data }) => {
+        assertCartCurrent(generation);
         const sessionId = clean(data?.sessionId);
         const token = clean(data?.cartAccessToken);
         if (!storeCartAccess(sessionId, token)) {
@@ -400,34 +650,65 @@ export function CartProvider({ children }) {
           cart: data?.cart,
           version: data?.version || data?.cart?.version,
         });
+        getTabSync().publishAccess({ sessionId, token });
         toast.success('Tu carrito fue recuperado de forma segura.');
       })
       .catch(() => {
         toast.error('El enlace de recuperacion no es valido o ya expiro.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        recoveryClaimRef.current = false;
+        setLoading(false);
+      });
   }, []);
 
-  // ---------- Cargar carrito desde la base de datos cuando se fuerce manualmente ----------
-  const syncCart = async () => {
-    const access = getCartAccess();
-    if (!access) return;
+  // Refreshes share the mutation queue and one in-flight request.
+  const syncCart = () => {
+    const retained = checkRetainedCart();
+    if (retained.expired) return Promise.resolve(true);
+    if (refreshingRef.current) return refreshingRef.current;
     setLoading(true);
-    try {
-      await loadRemoteCart(access);
-    } catch (err) {
-      if (err?.response?.status !== 404) {
-        console.log('No hay carrito o error al conectar al backend:', err?.message);
-      }
-    } finally {
-      setLoading(false);
-    }
+    const request = coordinatorRef.current
+      .enqueue({ type: 'refresh', retentionGeneration: retained.generation })
+      .then(() => {
+        setCartMessage('');
+        return true;
+      })
+      .catch((error) => {
+        if (error?.code === 'SELECTION_RETENTION_EXPIRED') return true;
+        setSyncError(true);
+        setCartMessage(
+          'No se pudo actualizar el carrito. Revisa tu conexión e inténtalo de nuevo.'
+        );
+        return false;
+      })
+      .finally(() => {
+        refreshingRef.current = null;
+        setLoading(false);
+        if (refreshAgainRef.current) {
+          refreshAgainRef.current = false;
+          void syncCart();
+        }
+      });
+    refreshingRef.current = request;
+    return request;
   };
+
+  useEffect(() => {
+    const refresh = () => {
+      if (!recoveryClaimRef.current && !readCartRecoveryFragment())
+        void syncCart();
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
 
   // ---------- Persistencia local ----------
   useEffect(() => {
     cartRef.current = cart;
     try {
+      assertSelectionCurrent('cart', retentionRef.current.generation);
       localStorage.setItem('cart', JSON.stringify(cart));
     } catch {}
   }, [cart]);
@@ -437,7 +718,8 @@ export function CartProvider({ children }) {
     const unitPrice = Number(
       product.price ?? product.unitPrice ?? product.priceNumber ?? 0
     );
-    const safePrice = Number.isFinite(unitPrice) && unitPrice >= 0 ? unitPrice : 0;
+    const safePrice =
+      Number.isFinite(unitPrice) && unitPrice >= 0 ? unitPrice : 0;
     const inc = Number(product.quantity || 1) || 1;
     const variantId = readVariantId(product);
     const item = {
@@ -450,12 +732,20 @@ export function CartProvider({ children }) {
       size: product.size || '',
       variantId,
       variantKey: product.variantKey || variantId,
-      variantLabel: product.variantLabel || product.selectedVariant?.label || '',
+      variantLabel:
+        product.variantLabel || product.selectedVariant?.label || '',
       variantAttributes: normalizeVariantAttributes(
-        product.variantAttributes || product.attributes || product.selectedVariant?.attributes
+        product.variantAttributes ||
+          product.attributes ||
+          product.selectedVariant?.attributes
       ),
-      variantSku: product.variantSku || product.selectedVariant?.sku || product.sku || '',
-      variantBarcode: product.variantBarcode || product.selectedVariant?.barcode || product.barcode || '',
+      variantSku:
+        product.variantSku || product.selectedVariant?.sku || product.sku || '',
+      variantBarcode:
+        product.variantBarcode ||
+        product.selectedVariant?.barcode ||
+        product.barcode ||
+        '',
       productType: product.productType || 'physical',
       requiresShipping: product.requiresShipping !== false,
       fulfillment: product.fulfillment || null,
@@ -466,18 +756,42 @@ export function CartProvider({ children }) {
   };
 
   const removeFromCart = (_id, color, size, variantId = '') => {
-    const identity = cartItemIdentity({ _id, color, size, variantId, variantKey: variantId });
-    void enqueueCartOperation({ type: 'remove', identity }).catch(() => undefined);
+    const identity = cartItemIdentity({
+      _id,
+      color,
+      size,
+      variantId,
+      variantKey: variantId,
+    });
+    void enqueueCartOperation({ type: 'remove', identity }).catch(
+      () => undefined
+    );
   };
 
   const increaseQuantity = (_id, color, size, variantId = '') => {
-    const identity = cartItemIdentity({ _id, color, size, variantId, variantKey: variantId });
-    void enqueueCartOperation({ type: 'increase', identity }).catch(() => undefined);
+    const identity = cartItemIdentity({
+      _id,
+      color,
+      size,
+      variantId,
+      variantKey: variantId,
+    });
+    void enqueueCartOperation({ type: 'increase', identity }).catch(
+      () => undefined
+    );
   };
 
   const decreaseQuantity = (_id, color, size, variantId = '') => {
-    const identity = cartItemIdentity({ _id, color, size, variantId, variantKey: variantId });
-    void enqueueCartOperation({ type: 'decrease', identity }).catch(() => undefined);
+    const identity = cartItemIdentity({
+      _id,
+      color,
+      size,
+      variantId,
+      variantKey: variantId,
+    });
+    void enqueueCartOperation({ type: 'decrease', identity }).catch(
+      () => undefined
+    );
   };
 
   // ---------- Vaciar sin borrar la credencial ni la sesion ----------
@@ -498,14 +812,22 @@ export function CartProvider({ children }) {
    * Retorna { items, adjustments, summary, ok, mode }
    */
   const validateCart = async (mode = 'soft') => {
+    await coordinatorRef.current.waitForIdle();
     try {
+      const { generation } = checkRetainedCart();
+      assertCartCurrent(generation);
       const access = await ensureCartReady(cartRef.current.map(toBackendItem));
-      const { data } = await api.post('/api/cart/validate', {
-        sessionId: access.sessionId,
-        mode,
-      }, {
-        headers: buildCartAccessHeaders(access),
-      });
+      const { data } = await api.post(
+        '/api/cart/validate',
+        {
+          sessionId: access.sessionId,
+          mode,
+        },
+        {
+          headers: buildCartAccessHeaders(access),
+        }
+      );
+      assertCartCurrent(generation);
       const items = Array.isArray(data?.items) ? data.items : [];
       const local = items.map(fromBackendItem).filter((x) => x._id);
 
@@ -554,7 +876,10 @@ export function CartProvider({ children }) {
         cart,
         cartVersion: authoritativeRef.current.version,
         cartMessage,
-        loading,
+        loading: loading || pendingOperations > 0,
+        syncing: loading,
+        syncError,
+        pendingOperations,
         totalItems,
         subtotal,
         addToCart,
@@ -563,7 +888,10 @@ export function CartProvider({ children }) {
         decreaseQuantity,
         clearCart,
         validateCart,
-        ensureCartReady,
+        ensureCartReady: async (...args) => {
+          await coordinatorRef.current.waitForIdle();
+          return ensureCartReady(...args);
+        },
         renewCartAccess,
         syncCart,
         API_BASE: api.defaults.baseURL,

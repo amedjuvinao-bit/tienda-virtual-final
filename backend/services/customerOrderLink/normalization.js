@@ -124,7 +124,7 @@ function buildCustomerPayloadFromOrder(order = {}, { source = '' } = {}) {
     postalCode: cleanText(customer.postalCode || billing.postalCode, 40),
     source: cleanLower(source || raw.source, 40) === 'pos' ? 'pos' : 'web',
     status: 'active',
-    acceptsMarketing: customer.wantsNewsletter === true,
+    acceptsMarketing: false, // Email ownership and consent are confirmed separately.
     defaultBranch: raw.branch || null,
     branchIds: raw.branch ? [raw.branch] : [],
     fiscalProfile: {

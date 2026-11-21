@@ -1,69 +1,37 @@
+import CollectionCatalogControls from "./workspace/CollectionCatalogControls";
+import { pageMeta, pagePublicPath } from "./workspace/pageModel";
+import { applyCatalogEditorialPreset, restoreCatalogVisualBackup } from "../../components/catalog/catalogEditorialPreset";
 import { adminFetch } from '../../lib/api';
 // frontend/src/admin/pages/CatalogPageEditor.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import PageLoadState from "./workspace/PageLoadState";
+import PageEditorWorkspace from "./workspace/PageEditorWorkspace";
+import SectionCard from "./workspace/EditorSection";
+import CatalogAppearancePanel from "./workspace/CatalogAppearancePanel";
+import usePageDraft from "./workspace/usePageDraft";
+import { buildSafeCatalogConfig, buildSafeCardUiConfig, buildSafeFilterUiConfig, buildSafeColumnControlsUiConfig } from '../../components/catalog/catalogConfig';
 import { API_BASE_URL } from "../../config/apiBaseUrl";
 
 const API_BASE = API_BASE_URL;
 
 const EDITOR_TABS = [
-  { id: "general", label: "General" },
-  { id: "header", label: "Encabezado" },
-  { id: "products", label: "Productos" },
-  { id: "visual", label: "Visual" },
-  { id: "grid", label: "Grilla y filtros" },
-  { id: "empty", label: "Estado vacío" },
+  { id: "products", label: "Productos", group: "content" },
+  { id: "visual", label: "Fondo y cristal", group: "design" },
+  { id: "collection", label: "Ilustración y mensajes", group: "design" },
+  { id: "header", label: "Encabezado", group: "design" },
+  { id: "grid", label: "Distribución", group: "design" },
+  { id: "card-style", label: "Tarjetas de producto", group: "design" },
+  { id: "filter-style", label: "Filtros", group: "design" },
+  { id: "motion", label: "Animaciones", group: "design" },
+  { id: "empty", label: "Sin resultados", group: "options" },
+  { id: "general", label: "Datos de la página", group: "settings" },
 ];
 
 const PRODUCT_SUBTABS = [
-  { id: "universe", label: "Universo" },
+  { id: "universe", label: "Origen de productos" },
   { id: "categories", label: "Categorías" },
   { id: "manual", label: "Selección manual" },
-];
-
-const VISUAL_SUBTABS = [
-  { id: "layout", label: "Estructura" },
-  { id: "filter-style", label: "Estilo del filtro" },
-  { id: "card-style", label: "Estilo de cards" },
-];
-
-const SHADOW_OPTIONS = [
-  { value: "none", label: "Sin sombra" },
-  { value: "soft", label: "Suave" },
-  { value: "medium", label: "Media" },
-  { value: "strong", label: "Fuerte" },
-];
-
-const FILTER_ANIMATION_OPTIONS = [
-  { value: "none", label: "Sin animación" },
-  { value: "soft", label: "Suave" },
-  { value: "fade", label: "Fade" },
-  { value: "slide", label: "Deslizamiento" },
-];
-
-const CARD_IMAGE_FIT_OPTIONS = [
-  { value: "cover", label: "Cover" },
-  { value: "contain", label: "Contain" },
-];
-
-const FAVORITE_ICON_OPTIONS = [
-  { value: "star", label: "Estrella" },
-  { value: "heart", label: "Corazón" },
-  { value: "sparkles", label: "Destello" },
-];
-
-const CART_ICON_OPTIONS = [
-  { value: "shopping-cart", label: "Carrito clásico" },
-  { value: "shopping-bag", label: "Bolsa" },
-  { value: "bag-heart", label: "Bolsa con corazón" },
-];
-
-const FONT_FAMILY_OPTIONS = [
-  { value: "inherit", label: "Heredada del diseño" },
-  { value: "jost", label: "Jost" },
-  { value: "cormorant", label: "Cormorant Garamond" },
-  { value: "playfair", label: "Playfair Display" },
-  { value: "inter", label: "Inter" },
 ];
 
 const Input = ({ label, ...rest }) => (
@@ -110,39 +78,7 @@ const Select = ({ label, children, ...rest }) => (
   </label>
 );
 
-const ColorInput = ({ label, value, onChange }) => {
-  const safeValue = isHexColor(value) ? value : "#ec4899";
 
-  return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-
-      <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
-        <input
-          type="color"
-          value={safeValue}
-          onChange={(e) => onChange({ target: { value: e.target.value } })}
-          className="h-10 w-12 cursor-pointer rounded border border-gray-200 bg-white"
-        />
-
-        <input
-          type="text"
-          value={value || ""}
-          onChange={(e) => onChange({ target: { value: e.target.value } })}
-          className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none"
-          placeholder="#ec4899"
-        />
-      </div>
-    </label>
-  );
-};
-
-const InfoCard = ({ title, text }) => (
-  <div className="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3">
-    <div className="text-sm font-semibold text-pink-700">{title}</div>
-    <p className="mt-1 text-sm leading-6 text-gray-600">{text}</p>
-  </div>
-);
 
 function slugify(value) {
   return String(value || "")
@@ -153,22 +89,6 @@ function slugify(value) {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
-}
-
-function clampInt(value, min, max, fallback) {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
-}
-
-function clampNumber(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
-}
-
-function isHexColor(value) {
-  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
 }
 
 function normalizeCsvText(value) {
@@ -206,298 +126,6 @@ function listToCsv(list) {
   return dedupeCaseInsensitive(list).join(", ");
 }
 
-function buildSafeFilterUiConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    panelBg: typeof cfg.panelBg === "string" ? cfg.panelBg : "#ffffff",
-    panelBorderColor:
-      typeof cfg.panelBorderColor === "string" ? cfg.panelBorderColor : "#ead7aa",
-    panelTitleColor:
-      typeof cfg.panelTitleColor === "string" ? cfg.panelTitleColor : "#111827",
-    panelSubtitleColor:
-      typeof cfg.panelSubtitleColor === "string" ? cfg.panelSubtitleColor : "#6b7280",
-    sectionHeaderBg:
-      typeof cfg.sectionHeaderBg === "string" ? cfg.sectionHeaderBg : "#fff8fb",
-    sectionHeaderTextColor:
-      typeof cfg.sectionHeaderTextColor === "string"
-        ? cfg.sectionHeaderTextColor
-        : "#1f2937",
-    accentColor:
-      typeof cfg.accentColor === "string" ? cfg.accentColor : "#ec4899",
-    accentColor2:
-      typeof cfg.accentColor2 === "string" ? cfg.accentColor2 : "#d4af37",
-    chipBg: typeof cfg.chipBg === "string" ? cfg.chipBg : "#ffffff",
-    chipTextColor:
-      typeof cfg.chipTextColor === "string" ? cfg.chipTextColor : "#374151",
-    radiusPx: clampInt(cfg.radiusPx, 8, 40, 22),
-    sectionRadiusPx: clampInt(cfg.sectionRadiusPx, 6, 32, 18),
-    borderWidthPx: clampInt(cfg.borderWidthPx, 1, 4, 1),
-    shadowStyle:
-      cfg.shadowStyle === "none" ||
-      cfg.shadowStyle === "soft" ||
-      cfg.shadowStyle === "medium" ||
-      cfg.shadowStyle === "strong"
-        ? cfg.shadowStyle
-        : "soft",
-    sectionGapPx: clampInt(cfg.sectionGapPx, 8, 40, 20),
-    colorDotSizePx: clampInt(cfg.colorDotSizePx, 16, 40, 26),
-    titleSizePx: clampInt(cfg.titleSizePx, 16, 32, 22),
-    sectionTitleSizePx: clampInt(cfg.sectionTitleSizePx, 13, 24, 17),
-    contentTextSizePx: clampInt(cfg.contentTextSizePx, 11, 20, 14),
-    animation:
-      cfg.animation === "none" ||
-      cfg.animation === "soft" ||
-      cfg.animation === "fade" ||
-      cfg.animation === "slide"
-        ? cfg.animation
-        : "soft",
-    showSectionIcons: cfg.showSectionIcons !== false,
-    showCounters: cfg.showCounters !== false,
-    showSelectedSummary: cfg.showSelectedSummary !== false,
-    categoriesSearchEnabled: cfg.categoriesSearchEnabled !== false,
-    stickyHeader: cfg.stickyHeader === true,
-  };
-}
-
-function buildSafeCardUiConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    cardBg: typeof cfg.cardBg === "string" ? cfg.cardBg : "#ffffff",
-    cardBorderColor:
-      typeof cfg.cardBorderColor === "string" ? cfg.cardBorderColor : "#ecdcb6",
-    cardBorderWidthPx: clampInt(cfg.cardBorderWidthPx, 0, 6, 1),
-    cardRadiusPx: clampInt(cfg.cardRadiusPx, 8, 40, 28),
-    cardPaddingPx: clampInt(cfg.cardPaddingPx, 0, 40, 12),
-    cardShadowStyle:
-      cfg.cardShadowStyle === "none" ||
-      cfg.cardShadowStyle === "soft" ||
-      cfg.cardShadowStyle === "medium" ||
-      cfg.cardShadowStyle === "strong"
-        ? cfg.cardShadowStyle
-        : "soft",
-
-    imageBg: typeof cfg.imageBg === "string" ? cfg.imageBg : "#faf8f3",
-    imageRadiusPx: clampInt(cfg.imageRadiusPx, 0, 40, 24),
-    imageFit:
-      cfg.imageFit === "cover" || cfg.imageFit === "contain" ? cfg.imageFit : "cover",
-
-    titleColor: typeof cfg.titleColor === "string" ? cfg.titleColor : "#2f3440",
-    priceColor: typeof cfg.priceColor === "string" ? cfg.priceColor : "#e54497",
-    oldPriceColor:
-      typeof cfg.oldPriceColor === "string" ? cfg.oldPriceColor : "#9ca3af",
-    metaColor: typeof cfg.metaColor === "string" ? cfg.metaColor : "#6b7280",
-
-    buttonBg: typeof cfg.buttonBg === "string" ? cfg.buttonBg : "#ffffff",
-    favoriteButtonBg:
-      typeof cfg.favoriteButtonBg === "string" ? cfg.favoriteButtonBg : "#ffffff",
-    cartButtonBg:
-      typeof cfg.cartButtonBg === "string" ? cfg.cartButtonBg : "#ffffff",
-
-    favoriteButtonOpacity: clampNumber(cfg.favoriteButtonOpacity, 0, 1, 1),
-    cartButtonOpacity: clampNumber(cfg.cartButtonOpacity, 0, 1, 1),
-
-    buttonTextColor:
-      typeof cfg.buttonTextColor === "string" ? cfg.buttonTextColor : "#ffffff",
-    actionButtonBorderColor:
-      typeof cfg.actionButtonBorderColor === "string"
-        ? cfg.actionButtonBorderColor
-        : "#ffffff",
-    actionButtonBorderWidthPx: clampInt(cfg.actionButtonBorderWidthPx, 0, 4, 1),
-
-    cartIconColor:
-      typeof cfg.cartIconColor === "string" ? cfg.cartIconColor : "#D4AF37",
-
-    favoriteIconColor:
-      typeof cfg.favoriteIconColor === "string" ? cfg.favoriteIconColor : "#d946ef",
-    favoriteActiveColor:
-      typeof cfg.favoriteActiveColor === "string"
-        ? cfg.favoriteActiveColor
-        : "#D4AF37",
-
-    favoriteIconName:
-      cfg.favoriteIconName === "heart" ||
-      cfg.favoriteIconName === "sparkles" ||
-      cfg.favoriteIconName === "star"
-        ? cfg.favoriteIconName
-        : "star",
-
-    cartIconName:
-      cfg.cartIconName === "shopping-bag" ||
-      cfg.cartIconName === "bag-heart" ||
-      cfg.cartIconName === "shopping-cart"
-        ? cfg.cartIconName
-        : "shopping-cart",
-
-    titleFontFamily:
-      cfg.titleFontFamily === "jost" ||
-      cfg.titleFontFamily === "cormorant" ||
-      cfg.titleFontFamily === "playfair" ||
-      cfg.titleFontFamily === "inter" ||
-      cfg.titleFontFamily === "inherit"
-        ? cfg.titleFontFamily
-        : "inherit",
-
-    priceFontFamily:
-      cfg.priceFontFamily === "jost" ||
-      cfg.priceFontFamily === "cormorant" ||
-      cfg.priceFontFamily === "playfair" ||
-      cfg.priceFontFamily === "inter" ||
-      cfg.priceFontFamily === "inherit"
-        ? cfg.priceFontFamily
-        : "inherit",
-
-    metaFontFamily:
-      cfg.metaFontFamily === "jost" ||
-      cfg.metaFontFamily === "cormorant" ||
-      cfg.metaFontFamily === "playfair" ||
-      cfg.metaFontFamily === "inter" ||
-      cfg.metaFontFamily === "inherit"
-        ? cfg.metaFontFamily
-        : "inherit",
-
-    showBorder: cfg.showBorder !== false,
-    showShadow: cfg.showShadow !== false,
-    showImageBg: cfg.showImageBg !== false,
-  };
-}
-
-function buildSafeColumnControlsUiConfig(raw) {
-   const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    buttonBgColor:
-      typeof cfg.buttonBgColor === "string" ? cfg.buttonBgColor : "#ffffff",
-    buttonBorderColor:
-      typeof cfg.buttonBorderColor === "string" ? cfg.buttonBorderColor : "#e8e7eb",
-    buttonIconColor:
-      typeof cfg.buttonIconColor === "string" ? cfg.buttonIconColor : "#D4AF37",
-
-    hoverButtonBgColor:
-      typeof cfg.hoverButtonBgColor === "string"
-        ? cfg.hoverButtonBgColor
-        : "#ffffff",
-    hoverButtonBorderColor:
-      typeof cfg.hoverButtonBorderColor === "string"
-        ? cfg.hoverButtonBorderColor
-        : "#D4AF37",
-    hoverButtonIconColor:
-      typeof cfg.hoverButtonIconColor === "string"
-        ? cfg.hoverButtonIconColor
-        : "#D4AF37",
-
-    activeButtonBgColor:
-      typeof cfg.activeButtonBgColor === "string"
-        ? cfg.activeButtonBgColor
-        : "#fff5fa",
-    activeButtonBorderColor:
-      typeof cfg.activeButtonBorderColor === "string"
-        ? cfg.activeButtonBorderColor
-        : "#ec4899",
-    activeButtonIconColor:
-      typeof cfg.activeButtonIconColor === "string"
-        ? cfg.activeButtonIconColor
-        : "#ec4899",
-
-    buttonRadiusPx: clampInt(cfg.buttonRadiusPx, 8, 24, 12),
-    buttonBorderWidthPx: clampInt(cfg.buttonBorderWidthPx, 1, 4, 1),
-  };
-}
-
-function buildSafeCatalogConfig(raw) {
-  const cfg = raw && typeof raw === "object" ? raw : {};
-
-  return {
-    title: typeof cfg.title === "string" ? cfg.title : "",
-    subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : "",
-    description: typeof cfg.description === "string" ? cfg.description : "",
-    titleMode:
-      cfg.titleMode === "image" || cfg.titleMode === "text" ? cfg.titleMode : "text",
-    titleImage: typeof cfg.titleImage === "string" ? cfg.titleImage : "",
-    titleImageAlt: typeof cfg.titleImageAlt === "string" ? cfg.titleImageAlt : "",
-    showBreadcrumb: cfg.showBreadcrumb !== false,
-    showFilters: cfg.showFilters !== false,
-    showToolbar: cfg.showToolbar !== false,
-    showFilterFab: cfg.showFilterFab !== false,
-    showResultCount: cfg.showResultCount !== false,
-    columnsDesktop: clampInt(cfg.columnsDesktop, 1, 6, 4),
-    columnsTablet: clampInt(cfg.columnsTablet, 1, 4, 3),
-    columnsMobile: clampInt(cfg.columnsMobile, 1, 2, 2),
-    defaultColsDesktop: clampInt(
-      cfg.defaultColsDesktop ?? cfg.columnsDesktop,
-      1,
-      6,
-      clampInt(cfg.columnsDesktop, 1, 6, 4)
-    ),
-    defaultColsMobile: clampInt(
-      cfg.defaultColsMobile ?? cfg.columnsMobile,
-      1,
-      2,
-      clampInt(cfg.columnsMobile, 1, 2, 2)
-    ),
-    limit: clampInt(cfg.limit, 0, 200, 0),
-
-    sourceMode:
-      cfg.sourceMode === "categories" || cfg.sourceMode === "manual"
-        ? cfg.sourceMode
-        : "all",
-
-    allowedCategoriesText:
-      typeof cfg.allowedCategoriesText === "string"
-        ? normalizeCsvText(cfg.allowedCategoriesText)
-        : "",
-
-    manualProductIdsText:
-      typeof cfg.manualProductIdsText === "string"
-        ? normalizeCsvText(cfg.manualProductIdsText)
-        : "",
-
-    onlyActive: cfg.onlyActive !== false,
-
-    initialCategoriesText:
-      typeof cfg.initialCategoriesText === "string"
-        ? normalizeCsvText(cfg.initialCategoriesText)
-        : "",
-    initialColorsText:
-      typeof cfg.initialColorsText === "string"
-        ? normalizeCsvText(cfg.initialColorsText)
-        : "",
-    initialMinPrice: clampNumber(cfg.initialMinPrice, 0, 10000000, 0),
-    initialMaxPrice: clampNumber(cfg.initialMaxPrice, 0, 10000000, 10000000),
-    emptyTitle:
-      typeof cfg.emptyTitle === "string" && cfg.emptyTitle.trim()
-        ? cfg.emptyTitle
-        : "No se encontraron productos",
-    emptyText:
-      typeof cfg.emptyText === "string" && cfg.emptyText.trim()
-        ? cfg.emptyText
-        : "Intenta cambiar los filtros para ver más resultados.",
-    filterUiConfig: buildSafeFilterUiConfig(cfg.filterUiConfig),
-    cardUiConfig: buildSafeCardUiConfig(cfg.cardUiConfig),
-    columnControlsUiConfig: buildSafeColumnControlsUiConfig(
-      cfg.columnControlsUiConfig
-    ),
-  };
-}
-
-function TabButton({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-2xl border px-4 py-2.5 text-sm font-medium transition",
-        active
-          ? "border-pink-500 bg-pink-600 text-white shadow-sm"
-          : "border-pink-100 bg-white text-pink-700 hover:border-pink-200 hover:bg-pink-50",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
-}
-
 function MiniTabButton({ active, onClick, children }) {
   return (
     <button
@@ -512,20 +140,6 @@ function MiniTabButton({ active, onClick, children }) {
     >
       {children}
     </button>
-  );
-}
-
-function SectionCard({ title, text, children, className = "" }) {
-  return (
-    <section
-      className={`space-y-4 rounded-3xl border border-gray-200 bg-white p-4 md:p-5 ${className}`}
-    >
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {text ? <p className="mt-1 text-sm text-gray-500">{text}</p> : null}
-      </div>
-      {children}
-    </section>
   );
 }
 
@@ -634,7 +248,7 @@ function ManualProductsPicker({
         const title = String(product?.title || product?.name || "").toLowerCase();
         const slug = String(product?.slug || "").toLowerCase();
         const id = String(product?._id || "").toLowerCase();
-        return title.includes(q) || slug.includes(q) || id.includes(q);
+        return [title, slug, id, product.sku, product.barcode, ...(product.variants || []).flatMap(v => [v.sku, v.barcode])].some(value => String(value || '').toLowerCase().includes(q));
       })
       .slice(0, 20);
   }, [allProducts, query]);
@@ -653,8 +267,9 @@ function ManualProductsPicker({
       <Input
         label="Buscar productos"
         value={query}
+        maxLength={160}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Busca por nombre, slug o id"
+        placeholder="Busca por nombre o referencia"
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
@@ -684,7 +299,7 @@ function ManualProductsPicker({
                       ID: {productId || "—"}
                     </div>
                     <div className="mt-1 break-all text-xs text-gray-500">
-                      Slug: {product?.slug || "—"}
+                      Dirección: {product?.slug || "—"}
                     </div>
 
                     <button
@@ -728,7 +343,7 @@ function ManualProductsPicker({
                     ID: {product?._id || "—"}
                   </div>
                   <div className="mt-1 break-all text-xs text-gray-500">
-                    Slug: {product?.slug || "—"}
+                    Dirección: {product?.slug || "—"}
                   </div>
 
                   <button
@@ -755,16 +370,21 @@ export default function CatalogPageEditor() {
 
   const [page, setPage] = useState(null);
   const [form, setForm] = useState(null);
+  const draft = usePageDraft(form);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const loadSequence = useRef(0);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("products");
   const [productsSubtab, setProductsSubtab] = useState("universe");
-  const [visualSubtab, setVisualSubtab] = useState("layout");
+  const [uploadingAppearance, setUploadingAppearance] = useState(false);
 
   const [allProducts, setAllProducts] = useState([]);
   const [availableProductCategories, setAvailableProductCategories] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productsError, setProductsError] = useState('');
+  const selectedKeysRef = useRef([]), productRequests = useRef(0);
 
   const [titleImageFile, setTitleImageFile] = useState(null);
   const [titleImagePreview, setTitleImagePreview] = useState("");
@@ -773,7 +393,7 @@ export default function CatalogPageEditor() {
   const previewUrl = useMemo(() => {
     const slug = String(form?.slug || page?.slug || "").trim();
     if (!slug) return "";
-    return `/pagina/${slug}`;
+    return pagePublicPath({...(page || {}),...(form || {}),slug});
   }, [form?.slug, page?.slug]);
 
   const allCategoryOptions = useMemo(() => {
@@ -813,13 +433,18 @@ export default function CatalogPageEditor() {
     [form?.catalogConfig?.manualProductIdsText]
   );
 
+  selectedKeysRef.current = selectedManualKeys;
+
   const fetchPage = async () => {
+    const sequence = ++loadSequence.current;
     try {
       setLoading(true);
       setNotFound(false);
+      setLoadError("");
 
       const res = await adminFetch(`${API_BASE}/api/pages/${id}`);
 
+      if (sequence !== loadSequence.current) return;
       if (res.status === 404) {
         setPage(null);
         setForm(null);
@@ -832,10 +457,11 @@ export default function CatalogPageEditor() {
       }
 
       const data = await res.json();
+      if (sequence !== loadSequence.current) return;
       const safeCatalogConfig = buildSafeCatalogConfig(data?.catalogConfig);
 
       setPage(data);
-      setForm({
+      const loadedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "catalog",
@@ -843,58 +469,78 @@ export default function CatalogPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         catalogConfig: safeCatalogConfig,
-      });
+      };
+      setForm(loadedForm);
+      draft.initialize(loadedForm);
       setTitleImagePreview(String(safeCatalogConfig?.titleImage || ""));
       setTitleImageFile(null);
     } catch (error) {
+      if (sequence !== loadSequence.current) return;
+      setLoadError(error.message || "Error de conexión");
       console.error("Error cargando página catálogo:", error);
       setPage(null);
       setForm(null);
       setNotFound(true);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
   const fetchProducts = useCallback(async (query = '', productKeys = []) => {
+    productRequests.current++;
     try {
       setLoadingProducts(true);
+      setProductsError('');
       const params = new URLSearchParams({
         page: '1',
         limit: query ? '20' : '40',
         sort: 'title',
       });
-      if (query) params.set('q', query);
+      if (query) params.set('q', query.trim().slice(0, 160));
       productKeys.forEach((value) => params.append('productKeys', value));
-      const [productsResponse, metaResponse] = await Promise.all([
+      const [productsResponse, metaResponse, taxonomyResponse] = await Promise.all([
         adminFetch(`${API_BASE}/api/products?${params.toString()}`),
         query || productKeys.length
           ? Promise.resolve(null)
           : adminFetch(`${API_BASE}/api/products/meta`),
+        query || productKeys.length
+          ? Promise.resolve(null)
+          : adminFetch(`${API_BASE}/api/products/catalog-categories`).catch(() => null),
       ]);
       if (!productsResponse.ok) throw new Error(`HTTP ${productsResponse.status}`);
       const data = await productsResponse.json();
       const incoming = Array.isArray(data?.products) ? data.products : [];
       setAllProducts((current) => {
         const byId = new Map(
-          [...current, ...incoming].map((product) => [
+          [...incoming, ...current].map((product) => [
             String(product?._id || product?.slug || ''),
             product,
           ])
         );
         byId.delete('');
-        return [...byId.values()];
+        const values = [...byId.values()];
+        const selected = values.filter(p => selectedKeysRef.current.includes(String(p._id)) || selectedKeysRef.current.includes(p.slug));
+        const bounded = new Map([...selected, ...values.slice(0, 100)].map(p => [String(p._id || p.slug), p]));
+        return [...bounded.values()];
       });
-      if (metaResponse?.ok) {
-        const meta = await metaResponse.json();
+      if (taxonomyResponse?.ok || metaResponse?.ok) {
+        const meta = metaResponse?.ok ? await metaResponse.json() : {};
+        const taxonomy = taxonomyResponse?.ok ? await taxonomyResponse.json() : {};
         setAvailableProductCategories(
-          Array.isArray(meta?.categories) ? meta.categories : []
+          [
+            ...(Array.isArray(meta?.categories) ? meta.categories : []),
+            ...(Array.isArray(taxonomy?.categories)
+              ? taxonomy.categories.map(item => item.name).filter(Boolean)
+              : []),
+          ]
         );
       }
     } catch (error) {
       console.error("Error cargando productos del editor catálogo:", error);
+      setProductsError('No pudimos cargar los productos disponibles. Revisa tu conexión y vuelve a intentarlo.');
     } finally {
-      setLoadingProducts(false);
+      productRequests.current--;
+      setLoadingProducts(productRequests.current > 0);
     }
   }, []);
 
@@ -918,6 +564,16 @@ export default function CatalogPageEditor() {
     setForm((prev) => ({ ...prev, ...patch }));
   };
 
+  const updateCollectionConfig = (patch) => {
+    setForm((previous) => ({
+      ...previous,
+      catalogConfig: {
+        ...previous.catalogConfig,
+        collection: { ...previous.catalogConfig.collection, ...patch },
+      },
+    }));
+  };
+
   const updateCatalogConfig = (patch) => {
     setForm((prev) => ({
       ...prev,
@@ -926,6 +582,13 @@ export default function CatalogPageEditor() {
         ...patch,
       },
     }));
+  };
+
+  const updateCatalogPresentation = (patch) => {
+    setForm(prev => {
+      const catalogConfig = { ...prev.catalogConfig, presentation: { ...prev.catalogConfig.presentation, ...patch } };
+      return { ...prev, catalogConfig: patch.layout === 'glass-grid' && catalogConfig.presentation.styleVersion < 3 ? buildSafeCatalogConfig(catalogConfig) : catalogConfig };
+    });
   };
 
   const updateFilterUiConfig = (patch) => {
@@ -969,18 +632,14 @@ export default function CatalogPageEditor() {
     }));
   };
 
-  const handleNameChange = (value) => {
-    setForm((prev) => {
-      const currentSlug = String(prev?.slug || "").trim();
-      const autoSlug = slugify(value);
-
-      return {
-        ...prev,
-        name: value,
-        slug: currentSlug ? currentSlug : autoSlug,
-      };
-    });
+  const updateAppearance = (scope, patch) => {
+    const handlers = { catalog: updateCatalogConfig, collection: updateCollectionConfig, presentation: updateCatalogPresentation,
+      cardUiConfig: updateCardUiConfig, filterUiConfig: updateFilterUiConfig,
+      columnControlsUiConfig: updateColumnControlsUiConfig };
+    handlers[scope](patch);
   };
+
+  const handleNameChange = (value) => setForm(previous => ({ ...previous, name: value }));
 
   const toggleCsvCategoryField = (fieldName, category) => {
     const current = parseCsvArray(form?.catalogConfig?.[fieldName] || "");
@@ -1060,7 +719,7 @@ export default function CatalogPageEditor() {
 
   const handleUploadTitleImage = async () => {
     if (!titleImageFile) {
-      alert("Primero selecciona una imagen.");
+      draft.notify("Primero selecciona una imagen.");
       return;
     }
 
@@ -1089,28 +748,29 @@ export default function CatalogPageEditor() {
         titleImageInputRef.current.value = "";
       }
 
-      alert("Imagen subida correctamente ✅");
+      draft.inform("Imagen subida correctamente ✅");
     } catch (error) {
       console.error("Error subiendo imagen de título:", error);
-      alert(error.message || "No se pudo subir la imagen a Cloudinary.");
+      draft.notify(error.message || "No se pudo subir la imagen a Cloudinary.");
     } finally {
       setUploadingTitleImage(false);
     }
   };
 
   const handleSave = async () => {
+    if (uploadingTitleImage || uploadingAppearance) return;
     if (!form) return;
 
     const name = String(form.name || "").trim();
     const slug = slugify(form.slug || form.name);
 
     if (!name) {
-      alert("El nombre de la página es obligatorio.");
+      draft.notify("El nombre de la página es obligatorio.");
       return;
     }
 
     if (!slug) {
-      alert("El slug de la página es obligatorio.");
+      draft.notify("Escribe una dirección válida para la página.");
       return;
     }
 
@@ -1118,9 +778,17 @@ export default function CatalogPageEditor() {
       setSaving(true);
 
       const safeCatalogConfig = buildSafeCatalogConfig(form.catalogConfig);
+      const allowed = parseCsvArray(safeCatalogConfig.allowedCategoriesText);
+      const manual = parseCsvArray(safeCatalogConfig.manualProductIdsText);
+      if (safeCatalogConfig.sourceMode === 'categories' && (!allowed.length || allowed.length > 30)) {
+        draft.notify('Selecciona entre 1 y 30 categorías para este catálogo.'); return;
+      }
+      if (safeCatalogConfig.sourceMode === 'manual' && (!manual.length || manual.length > 100)) {
+        draft.notify('Selecciona entre 1 y 100 productos para este catálogo.'); return;
+      }
 
       if (safeCatalogConfig.initialMinPrice > safeCatalogConfig.initialMaxPrice) {
-        alert("El precio mínimo inicial no puede ser mayor que el precio máximo inicial.");
+        draft.notify("El precio mínimo inicial no puede ser mayor que el precio máximo inicial.");
         return;
       }
 
@@ -1149,8 +817,12 @@ export default function CatalogPageEditor() {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
 
+      if (JSON.stringify(buildSafeCatalogConfig(data?.catalogConfig)) !== JSON.stringify(payload.catalogConfig)) {
+        throw new Error("El servidor no conservó todos los ajustes. Tus cambios siguen en el editor; vuelve a intentarlo.");
+      }
+
       setPage(data);
-      setForm({
+      const savedForm = {
         name: typeof data?.name === "string" ? data.name : "",
         slug: typeof data?.slug === "string" ? data.slug : "",
         pageType: "catalog",
@@ -1158,32 +830,21 @@ export default function CatalogPageEditor() {
         useHeader: data?.useHeader !== false,
         useFooter: data?.useFooter !== false,
         catalogConfig: buildSafeCatalogConfig(data?.catalogConfig),
-      });
+      };
+      setForm(savedForm);
+      draft.markSaved(savedForm);
 
-      alert("Página catálogo guardada correctamente ✅");
     } catch (error) {
       console.error("Error guardando página catálogo:", error);
-      alert(error.message || "No se pudo guardar la página catálogo.");
+      draft.notify(error.message || "No se pudo guardar la página catálogo.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleOpenPreview = () => {
-    if (!previewUrl) {
-      alert("La página todavía no tiene un slug válido para vista previa.");
-      return;
-    }
 
-    window.open(previewUrl, "_blank", "noopener,noreferrer");
-  };
-
-  if (loading) {
-    return <div className="p-6 text-gray-500">Cargando página catálogo...</div>;
-  }
-
-  if (notFound || !page || !form) {
-    return <div className="p-6 text-red-500">Página catálogo no encontrada</div>;
+  if (loading || notFound || !page || !form) {
+    return <PageLoadState loading={loading} error={loadError} onRetry={fetchPage} onBack={() => navigate("/admin/paginas")}/>;
   }
 
   if (String(page?.pageType || "custom").toLowerCase() !== "catalog") {
@@ -1203,66 +864,21 @@ export default function CatalogPageEditor() {
   }
 
   return (
-    <div className="min-w-0 space-y-6 p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/paginas")}
-            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
-          >
-            ← Volver
-          </button>
-
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Editor de página catálogo
-            </h1>
-            <p className="text-sm text-gray-500">
-              Configura una página tipo catálogo, separada del editor por bloques.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleOpenPreview}
-            className="inline-flex items-center gap-2 rounded-xl border border-pink-300 bg-pink-50 px-4 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100"
-          >
-            Vista previa
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-60"
-          >
-            {saving ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
-      </div>
-
-      <InfoCard
-        title="Control del catálogo"
-        text="Aquí el usuario ya puede controlar estructura, filtros, columnas, comportamiento inicial, contenido vacío, universo base, imagen de título, estilo visual del filtro y ahora también la base editable del estilo de las cards del catálogo."
-      />
-
-      <div className="rounded-3xl border border-pink-100 bg-gradient-to-br from-white to-pink-50/60 p-3 md:p-4">
-        <div className="flex flex-wrap gap-2">
-          {EDITOR_TABS.map((tab) => (
-            <TabButton
-              key={tab.id}
-              active={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </TabButton>
-          ))}
-        </div>
-      </div>
-
+    <PageEditorWorkspace
+      form={form}
+      tabs={EDITOR_TABS.filter(tab => tab.id !== "collection" || form.catalogConfig.collection)}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onBack={() => draft.leave(() => navigate("/admin/paginas"))}
+      onSave={handleSave}
+      saving={saving}
+      uploading={uploadingTitleImage || uploadingAppearance}
+      lockNavigationDuringUpload
+      draft={draft}
+      pageTypeLabel="Catálogo"
+      scrollToFieldsOnTabChange
+    >
+      <fieldset disabled={saving} className="pages-editor-fields">
       {activeTab === "general" && (
         <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
           <SectionCard
@@ -1278,7 +894,8 @@ export default function CatalogPageEditor() {
             />
 
             <Input
-              label="Slug / ruta"
+              label="Dirección de la página"
+              readOnly={pageMeta(page).system}
               value={form.slug}
               onChange={(e) => updateRoot({ slug: slugify(e.target.value) })}
               placeholder="Ej: lo-nuevo"
@@ -1291,13 +908,13 @@ export default function CatalogPageEditor() {
             />
 
             <Toggle
-              label="Usar header"
+              label="Mostrar encabezado"
               checked={form.useHeader}
               onChange={(value) => updateRoot({ useHeader: value })}
             />
 
             <Toggle
-              label="Usar footer"
+              label="Mostrar pie de página"
               checked={form.useFooter}
               onChange={(value) => updateRoot({ useFooter: value })}
             />
@@ -1335,11 +952,11 @@ export default function CatalogPageEditor() {
 
               <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Header / Footer
+                  Encabezado y pie de página
                 </div>
                 <div className="mt-2 text-sm text-gray-800">
-                  {form.useHeader ? "Header activo" : "Sin header"} ·{" "}
-                  {form.useFooter ? "Footer activo" : "Sin footer"}
+                  {form.useHeader ? "Encabezado activo" : "Sin encabezado"} ·{" "}
+                  {form.useFooter ? "Pie de página activo" : "Sin pie de página"}
                 </div>
               </div>
             </div>
@@ -1347,30 +964,18 @@ export default function CatalogPageEditor() {
         </div>
       )}
 
+      {activeTab === "collection" && form.catalogConfig.collection && <CollectionCatalogControls value={form.catalogConfig.collection} saving={saving} onUploadingChange={setUploadingAppearance} onChange={updateCollectionConfig}/>}
       {activeTab === "header" && (
-        <SectionCard
-          title="Encabezado del catálogo"
-          text="Título, subtítulo, descripción e imagen de título."
-        >
-          <div className="grid gap-3 md:grid-cols-2">
-            <Toggle
-              label="Usar título en texto"
-              checked={form.catalogConfig.titleMode === "text"}
-              onChange={(value) =>
-                updateCatalogConfig({ titleMode: value ? "text" : "image" })
-              }
-            />
-
-            <Toggle
-              label="Usar imagen de título"
-              checked={form.catalogConfig.titleMode === "image"}
-              onChange={(value) =>
-                updateCatalogConfig({ titleMode: value ? "image" : "text" })
-              }
-            />
-          </div>
-
+        <CatalogAppearancePanel key="header" section="header" config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance} disabled={saving}
+          onApplyPreset={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}
+          onRestore={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}
+          content={<>
+          <Select label="Formato del título" value={form.catalogConfig.titleMode} onChange={event=>updateCatalogConfig({titleMode:event.target.value})}>
+            <option value="text">Texto</option><option value="image">Imagen</option>
+          </Select>
           <div className="grid gap-4 md:grid-cols-2">
+            <Toggle label="Mostrar distintivo del catálogo" checked={form.catalogConfig.showHeroBadge} onChange={value => updateCatalogConfig({ showHeroBadge: value })}/>
+            <Input label="Texto del distintivo" value={form.catalogConfig.heroBadge} onChange={e => updateCatalogConfig({ heroBadge: e.target.value })}/>
             <Input
               label="Título del catálogo"
               value={form.catalogConfig.title}
@@ -1393,17 +998,13 @@ export default function CatalogPageEditor() {
             placeholder="Texto descriptivo del catálogo"
           />
 
+          {form.catalogConfig.titleMode === "image" && (
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <Input
-                label="URL de imagen de título"
-                value={form.catalogConfig.titleImage}
-                onChange={(e) => updateCatalogConfig({ titleImage: e.target.value })}
-                placeholder="https://... o /ruta/imagen.png"
-              />
+              {(form.catalogConfig.titleImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => updateCatalogConfig({ titleImage: "" })}>Quitar imagen</button>}
 
               <Input
-                label="Alt de la imagen de título"
+                label="Descripción de la imagen"
                 value={form.catalogConfig.titleImageAlt}
                 onChange={(e) =>
                   updateCatalogConfig({ titleImageAlt: e.target.value })
@@ -1425,7 +1026,7 @@ export default function CatalogPageEditor() {
                   onClick={handlePickTitleImage}
                   className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
                 >
-                  Escoger imagen
+                  Elegir imagen
                 </button>
 
                 <button
@@ -1434,7 +1035,7 @@ export default function CatalogPageEditor() {
                   disabled={uploadingTitleImage || !titleImageFile}
                   className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-pink-700 disabled:opacity-50"
                 >
-                  {uploadingTitleImage ? "Subiendo..." : "Subir a Cloudinary"}
+                  {uploadingTitleImage ? "Subiendo..." : "Cargar imagen"}
                 </button>
               </div>
 
@@ -1468,11 +1069,13 @@ export default function CatalogPageEditor() {
               </div>
             </div>
           </div>
-        </SectionCard>
+          )}
+          </>}/>
       )}
 
       {activeTab === "products" && (
         <div className="space-y-4">
+          {productsError && <p role="alert" className="text-sm">{productsError} <button type="button" onClick={() => fetchProducts()}>Reintentar productos</button></p>}
           <div className="rounded-2xl border border-gray-200 bg-white p-3">
             <div className="flex flex-wrap gap-2">
               {PRODUCT_SUBTABS.map((tab) => (
@@ -1489,8 +1092,8 @@ export default function CatalogPageEditor() {
 
           {productsSubtab === "universe" && (
             <SectionCard
-              title="Universo base del catálogo"
-              text="Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."
+              title="Productos de este catálogo"
+              text={page?.slug === "lo-nuevo" ? "Por defecto muestra los productos publicados más recientes primero, según su fecha de creación. Puedes limitar la selección por categorías o elegir productos manualmente. El orden inicial se cambia en Distribución → Herramientas." : pageMeta(page).system ? "Los productos publicados aparecerán cuando los asignes a las categorías permitidas de esta página. Puedes elegirlas en el apartado Categorías." : "Define qué conjunto de productos puede mostrar esta página antes de aplicar filtros del cliente."}
             >
               <Select
                 label="Origen de productos"
@@ -1504,11 +1107,7 @@ export default function CatalogPageEditor() {
                 <option value="manual">Selección manual</option>
               </Select>
 
-              <Toggle
-                label="Mostrar solo productos activos"
-                checked={form.catalogConfig.onlyActive}
-                onChange={(value) => updateCatalogConfig({ onlyActive: value })}
-              />
+              <p className="text-sm text-gray-500">La tienda muestra únicamente productos activos, visibles y sin archivar.</p>
             </SectionCard>
           )}
 
@@ -1516,7 +1115,7 @@ export default function CatalogPageEditor() {
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <SectionCard
                 title="Categorías permitidas"
-                text="El usuario selecciona las categorías reales ya existentes en productos."
+                text="Elige entre las categorías de tu catálogo."
               >
                 {loadingProducts ? (
                   <div className="text-sm text-gray-500">Cargando categorías...</div>
@@ -1524,7 +1123,7 @@ export default function CatalogPageEditor() {
                   <>
                     <CategoryPicker
                       label="Selecciona categorías permitidas"
-                      helper="Esto reemplaza el texto manual. Sigue guardando en allowedCategoriesText sin romper tu estructura."
+                      helper="Elige las categorías cuyos productos se mostrarán en esta página."
                       options={allCategoryOptions}
                       selected={selectedAllowedCategories}
                       onToggle={(category) =>
@@ -1557,7 +1156,7 @@ export default function CatalogPageEditor() {
                   <>
                     <CategoryPicker
                       label="Selecciona categorías iniciales"
-                      helper="También sigue guardando el CSV original en initialCategoriesText."
+                      helper="Estas categorías estarán seleccionadas al abrir el catálogo."
                       options={allCategoryOptions}
                       selected={selectedInitialCategories}
                       onToggle={(category) =>
@@ -1585,7 +1184,7 @@ export default function CatalogPageEditor() {
           {productsSubtab === "manual" && (
             <SectionCard
               title="Selección manual de productos"
-              text="Busca productos y agrégalos visualmente. Se sigue guardando manualProductIdsText."
+              text="Busca los productos que quieres mostrar y añádelos a tu selección."
             >
               {loadingProducts ? (
                 <div className="text-sm text-gray-500">Cargando productos...</div>
@@ -1600,7 +1199,7 @@ export default function CatalogPageEditor() {
                   />
 
                   <Textarea
-                    label="IDs o slugs manuales (avanzado)"
+                    label="Referencias de productos (avanzado)"
                     value={form.catalogConfig.manualProductIdsText}
                     onChange={(e) =>
                       updateCatalogConfig({
@@ -1616,1006 +1215,10 @@ export default function CatalogPageEditor() {
         </div>
       )}
 
-      {activeTab === "visual" && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-3">
-            <div className="flex flex-wrap gap-2">
-              {VISUAL_SUBTABS.map((tab) => (
-                <MiniTabButton
-                  key={tab.id}
-                  active={visualSubtab === tab.id}
-                  onClick={() => setVisualSubtab(tab.id)}
-                >
-                  {tab.label}
-                </MiniTabButton>
-              ))}
-            </div>
-          </div>
-
-          {visualSubtab === "layout" && (
-            <SectionCard
-              title="Estructura visual"
-              text="Activa u oculta partes del catálogo."
-            >
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <Toggle
-                  label="Mostrar breadcrumb"
-                  checked={form.catalogConfig.showBreadcrumb}
-                  onChange={(value) =>
-                    updateCatalogConfig({ showBreadcrumb: value })
-                  }
-                />
-
-                <Toggle
-                  label="Mostrar filtros"
-                  checked={form.catalogConfig.showFilters}
-                  onChange={(value) => updateCatalogConfig({ showFilters: value })}
-                />
-
-                <Toggle
-                  label="Mostrar toolbar"
-                  checked={form.catalogConfig.showToolbar}
-                  onChange={(value) => updateCatalogConfig({ showToolbar: value })}
-                />
-
-                <Toggle
-                  label="Mostrar botón flotante de filtros"
-                  checked={form.catalogConfig.showFilterFab}
-                  onChange={(value) =>
-                    updateCatalogConfig({ showFilterFab: value })
-                  }
-                />
-
-                <Toggle
-                  label="Mostrar contador de resultados"
-                  checked={form.catalogConfig.showResultCount}
-                  onChange={(value) =>
-                    updateCatalogConfig({ showResultCount: value })
-                  }
-                />
-              </div>
-            </SectionCard>
-          )}
-
-          {visualSubtab === "filter-style" && (
-            <SectionCard
-              title="Estilo profesional del filtro"
-              text="Todo lo que ves en el filtro lateral ahora queda manipulable por el usuario desde el panel."
-            >
-              <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Colores principales
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ColorInput
-                      label="Fondo del panel"
-                      value={form.catalogConfig.filterUiConfig.panelBg}
-                      onChange={(e) =>
-                        updateFilterUiConfig({ panelBg: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color de borde del panel"
-                      value={form.catalogConfig.filterUiConfig.panelBorderColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          panelBorderColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color título principal"
-                      value={form.catalogConfig.filterUiConfig.panelTitleColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          panelTitleColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color subtítulo principal"
-                      value={form.catalogConfig.filterUiConfig.panelSubtitleColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          panelSubtitleColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo cabecera secciones"
-                      value={form.catalogConfig.filterUiConfig.sectionHeaderBg}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionHeaderBg: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Texto cabecera secciones"
-                      value={form.catalogConfig.filterUiConfig.sectionHeaderTextColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionHeaderTextColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color acento 1"
-                      value={form.catalogConfig.filterUiConfig.accentColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          accentColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color acento 2"
-                      value={form.catalogConfig.filterUiConfig.accentColor2}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          accentColor2: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo chips / items"
-                      value={form.catalogConfig.filterUiConfig.chipBg}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          chipBg: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Texto chips / items"
-                      value={form.catalogConfig.filterUiConfig.chipTextColor}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          chipTextColor: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Tamaños, bordes y comportamiento
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Input
-                      label="Radio panel (px)"
-                      type="number"
-                      min="8"
-                      max="40"
-                      value={form.catalogConfig.filterUiConfig.radiusPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          radiusPx: clampInt(e.target.value, 8, 40, 22),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Radio secciones (px)"
-                      type="number"
-                      min="6"
-                      max="32"
-                      value={form.catalogConfig.filterUiConfig.sectionRadiusPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionRadiusPx: clampInt(e.target.value, 6, 32, 18),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Ancho borde (px)"
-                      type="number"
-                      min="1"
-                      max="4"
-                      value={form.catalogConfig.filterUiConfig.borderWidthPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          borderWidthPx: clampInt(e.target.value, 1, 4, 1),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Separación entre bloques (px)"
-                      type="number"
-                      min="8"
-                      max="40"
-                      value={form.catalogConfig.filterUiConfig.sectionGapPx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionGapPx: clampInt(e.target.value, 8, 40, 20),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño bolitas color (px)"
-                      type="number"
-                      min="16"
-                      max="40"
-                      value={form.catalogConfig.filterUiConfig.colorDotSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          colorDotSizePx: clampInt(e.target.value, 16, 40, 26),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño título panel (px)"
-                      type="number"
-                      min="16"
-                      max="32"
-                      value={form.catalogConfig.filterUiConfig.titleSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          titleSizePx: clampInt(e.target.value, 16, 32, 22),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño título secciones (px)"
-                      type="number"
-                      min="13"
-                      max="24"
-                      value={form.catalogConfig.filterUiConfig.sectionTitleSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          sectionTitleSizePx: clampInt(e.target.value, 13, 24, 17),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Tamaño texto contenido (px)"
-                      type="number"
-                      min="11"
-                      max="20"
-                      value={form.catalogConfig.filterUiConfig.contentTextSizePx}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          contentTextSizePx: clampInt(e.target.value, 11, 20, 14),
-                        })
-                      }
-                    />
-
-                    <Select
-                      label="Tipo de sombra"
-                      value={form.catalogConfig.filterUiConfig.shadowStyle}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          shadowStyle: e.target.value,
-                        })
-                      }
-                    >
-                      {SHADOW_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Animación"
-                      value={form.catalogConfig.filterUiConfig.animation}
-                      onChange={(e) =>
-                        updateFilterUiConfig({
-                          animation: e.target.value,
-                        })
-                      }
-                    >
-                      {FILTER_ANIMATION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Toggle
-                      label="Mostrar íconos en secciones"
-                      checked={form.catalogConfig.filterUiConfig.showSectionIcons}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ showSectionIcons: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Mostrar contadores"
-                      checked={form.catalogConfig.filterUiConfig.showCounters}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ showCounters: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Mostrar resumen de filtros activos"
-                      checked={form.catalogConfig.filterUiConfig.showSelectedSummary}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ showSelectedSummary: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Buscador de categorías"
-                      checked={
-                        form.catalogConfig.filterUiConfig.categoriesSearchEnabled
-                      }
-                      onChange={(value) =>
-                        updateFilterUiConfig({
-                          categoriesSearchEnabled: value,
-                        })
-                      }
-                    />
-
-                    <Toggle
-                      label="Cabecera sticky en desktop"
-                      checked={form.catalogConfig.filterUiConfig.stickyHeader}
-                      onChange={(value) =>
-                        updateFilterUiConfig({ stickyHeader: value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {visualSubtab === "card-style" && (
-            <SectionCard
-              title="Estilo editable de cards"
-              text="Aquí dejamos solo controles seguros para personalizar botones, íconos, tipografías y bordes sin perder la estructura base bonita de la card."
-            >
-              <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Colores y tipografía
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ColorInput
-                      label="Fondo de card"
-                      value={form.catalogConfig.cardUiConfig.cardBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({ cardBg: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color de borde"
-                      value={form.catalogConfig.cardUiConfig.cardBorderColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardBorderColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo del contenedor de imagen"
-                      value={form.catalogConfig.cardUiConfig.imageBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({ imageBg: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color del título"
-                      value={form.catalogConfig.cardUiConfig.titleColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ titleColor: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color del precio"
-                      value={form.catalogConfig.cardUiConfig.priceColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ priceColor: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color del precio anterior"
-                      value={form.catalogConfig.cardUiConfig.oldPriceColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ oldPriceColor: e.target.value })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Color de metadatos"
-                      value={form.catalogConfig.cardUiConfig.metaColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({ metaColor: e.target.value })
-                      }
-                    />
-
-                    <Select
-                      label="Fuente del título"
-                      value={form.catalogConfig.cardUiConfig.titleFontFamily}
-                      onChange={(e) =>
-                        updateCardUiConfig({ titleFontFamily: e.target.value })
-                      }
-                    >
-                      {FONT_FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Fuente del precio"
-                      value={form.catalogConfig.cardUiConfig.priceFontFamily}
-                      onChange={(e) =>
-                        updateCardUiConfig({ priceFontFamily: e.target.value })
-                      }
-                    >
-                      {FONT_FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Fuente de metadatos"
-                      value={form.catalogConfig.cardUiConfig.metaFontFamily}
-                      onChange={(e) =>
-                        updateCardUiConfig({ metaFontFamily: e.target.value })
-                      }
-                    >
-                      {FONT_FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-sm font-semibold text-gray-800">
-                    Botones, íconos y bordes
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ColorInput
-                      label="Fondo botón favorito"
-                      value={form.catalogConfig.cardUiConfig.favoriteButtonBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteButtonBg: e.target.value,
-                        })
-                      }
-                    />
-                    <Input
-                      label="Transparencia botón favorito"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={form.catalogConfig.cardUiConfig.favoriteButtonOpacity ?? 1}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteButtonOpacity: clampNumber(e.target.value, 0, 1, 1),
-                        })
-                      }
-                    />
-                    <Input
-                      label="Transparencia botón carrito"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={form.catalogConfig.cardUiConfig.cartButtonOpacity ?? 1}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartButtonOpacity: clampNumber(e.target.value, 0, 1, 1),
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Fondo botón carrito"
-                      value={form.catalogConfig.cardUiConfig.cartButtonBg}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartButtonBg: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Borde botones"
-                      value={form.catalogConfig.cardUiConfig.actionButtonBorderColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          actionButtonBorderColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Grosor borde botones (px)"
-                      type="number"
-                      min="0"
-                      max="4"
-                      value={
-                        form.catalogConfig.cardUiConfig.actionButtonBorderWidthPx
-                      }
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          actionButtonBorderWidthPx: clampInt(
-                            e.target.value,
-                            0,
-                            4,
-                            1
-                          ),
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Ícono carrito"
-                      value={form.catalogConfig.cardUiConfig.cartIconColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartIconColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Favorito normal"
-                      value={form.catalogConfig.cardUiConfig.favoriteIconColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteIconColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <ColorInput
-                      label="Favorito activo"
-                      value={form.catalogConfig.cardUiConfig.favoriteActiveColor}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteActiveColor: e.target.value,
-                        })
-                      }
-                    />
-
-                    <Select
-                      label="Ícono de favorito"
-                      value={form.catalogConfig.cardUiConfig.favoriteIconName}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          favoriteIconName: e.target.value,
-                        })
-                      }
-                    >
-                      {FAVORITE_ICON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Ícono de carrito"
-                      value={form.catalogConfig.cardUiConfig.cartIconName}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cartIconName: e.target.value,
-                        })
-                      }
-                    >
-                      {CART_ICON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Input
-                      label="Ancho borde card (px)"
-                      type="number"
-                      min="0"
-                      max="6"
-                      value={form.catalogConfig.cardUiConfig.cardBorderWidthPx}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardBorderWidthPx: clampInt(e.target.value, 0, 6, 1),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Radio card (px)"
-                      type="number"
-                      min="8"
-                      max="40"
-                      value={form.catalogConfig.cardUiConfig.cardRadiusPx}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardRadiusPx: clampInt(e.target.value, 8, 40, 28),
-                        })
-                      }
-                    />
-
-                    <Input
-                      label="Radio imagen (px)"
-                      type="number"
-                      min="0"
-                      max="40"
-                      value={form.catalogConfig.cardUiConfig.imageRadiusPx}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          imageRadiusPx: clampInt(e.target.value, 0, 40, 24),
-                        })
-                      }
-                    />
-
-                    <Select
-                      label="Sombra de card"
-                      value={form.catalogConfig.cardUiConfig.cardShadowStyle}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          cardShadowStyle: e.target.value,
-                        })
-                      }
-                    >
-                      {SHADOW_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Ajuste de imagen"
-                      value={form.catalogConfig.cardUiConfig.imageFit}
-                      onChange={(e) =>
-                        updateCardUiConfig({
-                          imageFit: e.target.value,
-                        })
-                      }
-                    >
-                      {CARD_IMAGE_FIT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Toggle
-                      label="Mostrar borde"
-                      checked={form.catalogConfig.cardUiConfig.showBorder}
-                      onChange={(value) =>
-                        updateCardUiConfig({ showBorder: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Mostrar sombra"
-                      checked={form.catalogConfig.cardUiConfig.showShadow}
-                      onChange={(value) =>
-                        updateCardUiConfig({ showShadow: value })
-                      }
-                    />
-
-                    <Toggle
-                      label="Usar fondo en imagen"
-                      checked={form.catalogConfig.cardUiConfig.showImageBg}
-                      onChange={(value) =>
-                        updateCardUiConfig({ showImageBg: value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-        </div>
-      )}
-
-      {activeTab === "grid" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            title="Grilla del catálogo"
-            text="Control de columnas y límite inicial."
-          >
-            <div className="grid gap-4 md:grid-cols-3">
-              <Input
-                label="Máximo columnas desktop"
-                type="number"
-                min="1"
-                max="6"
-                value={form.catalogConfig.columnsDesktop}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    columnsDesktop: clampInt(e.target.value, 1, 6, 4),
-                  })
-                }
-              />
-
-              <Input
-                label="Máximo columnas tablet"
-                type="number"
-                min="1"
-                max="4"
-                value={form.catalogConfig.columnsTablet}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    columnsTablet: clampInt(e.target.value, 1, 4, 3),
-                  })
-                }
-              />
-
-              <Input
-                label="Máximo columnas móvil"
-                type="number"
-                min="1"
-                max="2"
-                value={form.catalogConfig.columnsMobile}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    columnsMobile: clampInt(e.target.value, 1, 2, 2),
-                  })
-                }
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Columnas iniciales desktop"
-                type="number"
-                min="1"
-                max="6"
-                value={form.catalogConfig.defaultColsDesktop}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    defaultColsDesktop: clampInt(e.target.value, 1, 6, 4),
-                  })
-                }
-              />
-
-              <Input
-                label="Columnas iniciales móvil"
-                type="number"
-                min="1"
-                max="2"
-                value={form.catalogConfig.defaultColsMobile}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    defaultColsMobile: clampInt(e.target.value, 1, 2, 2),
-                  })
-                }
-              />
-            </div>
-
-            <Input
-              label="Límite inicial de productos (0 = sin límite)"
-              type="number"
-              min="0"
-              max="200"
-              value={form.catalogConfig.limit}
-              onChange={(e) =>
-                updateCatalogConfig({
-                  limit: clampInt(e.target.value, 0, 200, 0),
-                })
-              }
-            />
-          </SectionCard>
-
-          <SectionCard
-            title="Botones de columnas"
-            text="Aquí se controla el color de los botones de vista de columnas sin afectar la estructura de la card."
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <ColorInput
-                label="Fondo botón normal"
-                value={form.catalogConfig.columnControlsUiConfig.buttonBgColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonBgColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Borde botón normal"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.buttonBorderColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonBorderColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Ícono botón normal"
-                value={form.catalogConfig.columnControlsUiConfig.buttonIconColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonIconColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Fondo botón hover"
-                value={form.catalogConfig.columnControlsUiConfig.hoverButtonBgColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    hoverButtonBgColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Borde botón hover"
-                value={form.catalogConfig.columnControlsUiConfig.hoverButtonBorderColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    hoverButtonBorderColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Ícono botón hover"
-                value={form.catalogConfig.columnControlsUiConfig.hoverButtonIconColor}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    hoverButtonIconColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Fondo botón activo"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.activeButtonBgColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    activeButtonBgColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Borde botón activo"
-                value={
-                  form.catalogConfig.columnControlsUiConfig
-                    .activeButtonBorderColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    activeButtonBorderColor: e.target.value,
-                  })
-                }
-              />
-
-              <ColorInput
-                label="Ícono botón activo"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.activeButtonIconColor
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    activeButtonIconColor: e.target.value,
-                  })
-                }
-              />
-
-              <Input
-                label="Radio botón columnas (px)"
-                type="number"
-                min="8"
-                max="24"
-                value={form.catalogConfig.columnControlsUiConfig.buttonRadiusPx}
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonRadiusPx: clampInt(e.target.value, 8, 24, 12),
-                  })
-                }
-              />
-
-              <Input
-                label="Grosor borde botón columnas (px)"
-                type="number"
-                min="1"
-                max="4"
-                value={
-                  form.catalogConfig.columnControlsUiConfig.buttonBorderWidthPx
-                }
-                onChange={(e) =>
-                  updateColumnControlsUiConfig({
-                    buttonBorderWidthPx: clampInt(e.target.value, 1, 4, 1),
-                  })
-                }
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Filtros iniciales"
-            text="Estado inicial con el que debe abrir la página catálogo."
-          >
-            <Textarea
-              label="Colores iniciales (separados por coma)"
-              value={form.catalogConfig.initialColorsText}
-              onChange={(e) =>
-                updateCatalogConfig({
-                  initialColorsText: normalizeCsvText(e.target.value),
-                })
-              }
-              placeholder="Ej: #ffffff, dorado, rosa"
-            />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Precio mínimo inicial"
-                type="number"
-                min="0"
-                max="10000000"
-                value={form.catalogConfig.initialMinPrice}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    initialMinPrice: clampNumber(e.target.value, 0, 10000000, 0),
-                  })
-                }
-              />
-
-              <Input
-                label="Precio máximo inicial"
-                type="number"
-                min="0"
-                max="10000000"
-                value={form.catalogConfig.initialMaxPrice}
-                onChange={(e) =>
-                  updateCatalogConfig({
-                    initialMaxPrice: clampNumber(
-                      e.target.value,
-                      0,
-                      10000000,
-                      10000000
-                    ),
-                  })
-                }
-              />
-            </div>
-          </SectionCard>
-        </div>
+      {["visual", "grid", "card-style", "filter-style", "motion"].includes(activeTab) && (
+        <CatalogAppearancePanel key={activeTab} section={activeTab} config={form.catalogConfig} onChange={updateAppearance} onUploadingChange={setUploadingAppearance}
+          onApplyPreset={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(applyCatalogEditorialPreset(prev.catalogConfig)) }))}
+          onRestore={() => setForm(prev => ({ ...prev, catalogConfig: buildSafeCatalogConfig(restoreCatalogVisualBackup(prev.catalogConfig)) }))}/>
       )}
 
       {activeTab === "empty" && (
@@ -2642,6 +1245,7 @@ export default function CatalogPageEditor() {
           />
         </SectionCard>
       )}
-    </div>
+      </fieldset>
+    </PageEditorWorkspace>
   );
 }

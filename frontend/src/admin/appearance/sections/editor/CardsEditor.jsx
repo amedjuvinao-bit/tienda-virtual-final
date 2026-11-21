@@ -303,11 +303,7 @@ export default function CardsEditor({
             {/* Imagen principal */}
             <Field label="Imagen principal" hint="image">
               <div className="flex gap-2">
-                <Input
-                  value={it.image}
-                  onChange={(e) => patchItem?.(safeOpenIdx, { image: e.target.value })}
-                  placeholder="https://..."
-                />
+                {(it.image) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => patchItem?.(safeOpenIdx, { image: "" })}>Quitar imagen</button>}
                 <label className="cursor-pointer shrink-0">
                   <input
                     type="file"
@@ -336,11 +332,7 @@ export default function CardsEditor({
             {/* Hover image */}
             <Field label="Imagen hover" hint="hoverImage (se muestra al pasar el mouse)">
               <div className="flex gap-2">
-                <Input
-                  value={it.hoverImage}
-                  onChange={(e) => patchItem?.(safeOpenIdx, { hoverImage: e.target.value })}
-                  placeholder="https://... (segunda imagen)"
-                />
+                {(it.hoverImage) && <button type="button" className="rounded-xl border px-3 py-2 text-xs" onClick={() => patchItem?.(safeOpenIdx, { hoverImage: "" })}>Quitar imagen</button>}
                 <label className="cursor-pointer shrink-0">
                   <input
                     type="file"

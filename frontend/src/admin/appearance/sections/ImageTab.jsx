@@ -153,11 +153,7 @@ export default function ImageTab({ section, onChange, uploadToCloudinary, upload
           )}
 
           <div className="flex items-center gap-3">
-            <Input
-              value={cfg.titleImage}
-              onChange={(e) => patchConfig({ titleImage: e.target.value })}
-              placeholder="https://..."
-            />
+
             <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
               <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
               <input
@@ -189,11 +185,7 @@ export default function ImageTab({ section, onChange, uploadToCloudinary, upload
             )}
 
             <div className="flex items-center gap-3">
-              <Input
-                value={cfg.watermarkImage}
-                onChange={(e) => patchConfig({ watermarkImage: e.target.value })}
-                placeholder="https://..."
-              />
+
               <label className="inline-flex items-center px-3 py-2 rounded-xl section-editor-accent text-white text-xs font-medium cursor-pointer shadow-sm section-editor-accent-hover transition">
                 <span className="mr-1">{uploading ? "Subiendo..." : "Subir"}</span>
                 <input

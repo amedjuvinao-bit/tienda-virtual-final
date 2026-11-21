@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { installPageDraftNavigationGuard } from './admin/pages/workspace/pageDraftNavigationGuard';
 import './index.css';
 import './admin/productFormContrast.css';
 import './admin/finance/financeLayoutFix.css';
@@ -12,6 +13,8 @@ import './admin/coupons/couponAdminLayout.css';
 
 // Toastify (el contenedor global se monta una sola vez dentro de App)
 import 'react-toastify/dist/ReactToastify.css';
+
+installPageDraftNavigationGuard();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />

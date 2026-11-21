@@ -1,4 +1,5 @@
 'use strict';
+const { acceptConsumerOffer } = require('./consumer/checkoutContract');
 
 const Counter = require('../models/Counter');
 const Order = require('../models/Order');
@@ -385,7 +386,12 @@ async function createOrderInTransaction({
       adminUserId,
       reservationRequired,
     });
+    // The server rebuilds the exact offer inside the transaction, before any order is saved.
+    base.consumerContract = acceptConsumerOffer(quote.consumerOffer, rawBody.consumerAcceptance);
     base.status = base.status || 'pending';
+
+    const newsletterIntent = normalizeNewsletterIntent(cleaned.customer, cleaned.sessionId, { settings });
+    if (newsletterIntent?.proof) base.customer.newsletterConsent = newsletterIntent.proof;
 
     const customerResolution = await resolveCustomerForOrder(base, {
       session,
@@ -472,10 +478,7 @@ async function createOrderInTransaction({
       inventoryReservation,
       fullyPaidWithStoreCredit:
         storeCreditResult.fullyPaidWithStoreCredit,
-      newsletterIntent: normalizeNewsletterIntent(
-        cleaned.customer,
-        cleaned.sessionId
-      ),
+      newsletterIntent: newsletterIntent ? { ...newsletterIntent, customerId: created.customer?.customerId } : null,
     };
   });
 

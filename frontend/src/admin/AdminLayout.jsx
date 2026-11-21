@@ -1,5 +1,5 @@
 // src/admin/AdminLayout.jsx
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import {
   Outlet,
   useNavigate,
@@ -60,6 +60,9 @@ import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
 import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import AdminMobileNavigation from './components/AdminMobileNavigation';
+import AdminAlertList from './notifications/AdminAlertList';
+import useAdminAlerts from './notifications/useAdminAlerts';
+import { isAdminNavigationActive } from './components/adminNavigationIdentity';
 import { preloadAdminRoute } from './adminRoutePreload';
 import AdminLoadingScreen from './loading/AdminLoadingScreen';
 import useAdminModuleLoading from './loading/useAdminModuleLoading';
@@ -143,6 +146,8 @@ export default function AdminLayout({ initialSettings }) {
 
   const isConfigRoute = location.pathname.startsWith('/admin/configuracion');
   const twoFactorSetupRequired = Boolean(adminUser?.twoFactorSetupRequired);
+  const adminAlerts = useAdminAlerts(adminUser, !twoFactorSetupRequired);
+  const [notificationView, setNotificationView] = useState('alerts');
   const [configMenuOpen, setConfigMenuOpen] = useState(isConfigRoute);
 
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
@@ -311,32 +316,41 @@ export default function AdminLayout({ initialSettings }) {
     return () => clearInterval(interval);
   }, []);
 
-  const unseenCount = useMemo(() => {
-    const seen = new Set(getSeenReviewIds());
-    return reviews.filter((review) => !seen.has(String(review.reviewId || ''))).length;
-  }, [reviews]);
+  const seenReviewIds = new Set(getSeenReviewIds());
+  const unseenCount = reviewsModalOpen && notificationView === 'reviews'
+    ? 0
+    : reviews.filter((review) => !seenReviewIds.has(String(review.reviewId || ''))).length;
+
+  const pendingAlertCount = adminAlerts.alerts.reduce((total, alert) => total + (alert.count || 1), 0);
+  const notificationCount = pendingAlertCount + unseenCount;
+
+  const openNotificationDestination = (event) => {
+    if (document.documentElement.dataset.pageDraftDirty === 'true' &&
+      !window.confirm('Tienes cambios sin guardar. ¿Quieres salir y descartarlos?')) {
+      event.preventDefault();
+      return;
+    }
+    closeReviewsModal();
+  };
 
   const closeReviewsModal = () => {
     setReviewsModalOpen(false);
   };
 
-  const handleOpenReviewsModal = async (event) => {
+  const handleOpenNotifications = (event) => {
     reviewsTriggerRef.current = event?.currentTarget || document.activeElement;
+    setNotificationView('alerts');
     setReviewsModalOpen(true);
-    await fetchAdminReviews();
-    const ids = reviews
-      .map((review) => String(review?.reviewId || '').trim())
-      .filter(Boolean);
-    if (ids.length) saveSeenReviewIds(ids);
+    adminAlerts.refresh();
   };
 
   useEffect(() => {
-    if (!reviewsModalOpen) return;
+    if (!reviewsModalOpen || notificationView !== 'reviews') return;
     const ids = reviews
       .map((review) => String(review?.reviewId || '').trim())
       .filter(Boolean);
     if (ids.length) saveSeenReviewIds(ids);
-  }, [reviewsModalOpen, reviews]);
+  }, [reviewsModalOpen, notificationView, reviews]);
 
   useEffect(() => {
     if (!reviewsModalOpen) return undefined;
@@ -502,8 +516,7 @@ export default function AdminLayout({ initialSettings }) {
     .sort((a, b) => b.to.length - a.to.length)
     .find(
       (item) =>
-        location.pathname === item.to ||
-        location.pathname.startsWith(`${item.to}/`)
+        isAdminNavigationActive(location.pathname, item.to)
     );
 
   const formattedHeaderTime = currentTime.toLocaleTimeString('es-CO', {
@@ -2286,7 +2299,7 @@ export default function AdminLayout({ initialSettings }) {
                           onPointerEnter={() => { void preloadAdminRoute(item.to); }}
                           onFocus={() => { void preloadAdminRoute(item.to); }}
                           className={`${linkBase} admin-nav-link`}
-                          style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          style={({ isActive }) => ((isActive || isAdminNavigationActive(location.pathname, item.to)) ? activeNavStyle : normalNavStyle)}
                           data-tooltip={item.label}
                           aria-label={sidebarCollapsed ? item.label : undefined}
                         >
@@ -2312,7 +2325,7 @@ export default function AdminLayout({ initialSettings }) {
                           key={item.to}
                           to={item.to}
                           className={`${linkBase} admin-nav-link`}
-                          style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          style={({ isActive }) => ((isActive || isAdminNavigationActive(location.pathname, item.to)) ? activeNavStyle : normalNavStyle)}
                           data-tooltip={item.label}
                           aria-label={sidebarCollapsed ? item.label : undefined}
                         >
@@ -2364,7 +2377,7 @@ export default function AdminLayout({ initialSettings }) {
                             key={item.to}
                             to={item.to}
                             className={`${subLinkBase} admin-nav-link`}
-                            style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                            style={({ isActive }) => ((isActive || isAdminNavigationActive(location.pathname, item.to)) ? activeNavStyle : normalNavStyle)}
                           >
                             <Icon className="h-3.5 w-3.5 shrink-0" />
                             <span className="admin-nav-label">{item.label}</span>
@@ -2519,15 +2532,15 @@ export default function AdminLayout({ initialSettings }) {
 
                 <button
                   type="button"
-                  onClick={handleOpenReviewsModal}
+                  onClick={handleOpenNotifications}
                   className="admin-header-icon-button"
-                  aria-label="Abrir reseñas"
+                  aria-label="Abrir notificaciones"
                   aria-haspopup="dialog"
-                  title="Reseñas y alertas"
+                  title="Notificaciones"
                 >
                   <Bell className="h-4 w-4" />
-                  {unseenCount > 0 && (
-                    <span className="admin-badge">{unseenCount}</span>
+                  {notificationCount > 0 && (
+                    <span className="admin-badge">{notificationCount}</span>
                   )}
                 </button>
 
@@ -2557,14 +2570,14 @@ export default function AdminLayout({ initialSettings }) {
                 <div className="admin-mobile-header-actions flex items-center">
                   <button
                     type="button"
-                    onClick={handleOpenReviewsModal}
+                    onClick={handleOpenNotifications}
                     className="admin-mobile-header-action"
-                    aria-label="Ver reseñas"
+                    aria-label="Abrir notificaciones"
                     aria-haspopup="dialog"
                   >
                     <Bell className="h-4 w-4" />
-                    {unseenCount > 0 && (
-                      <span className="admin-badge">{unseenCount}</span>
+                    {notificationCount > 0 && (
+                      <span className="admin-badge">{notificationCount}</span>
                     )}
                   </button>
 
@@ -2616,11 +2629,11 @@ export default function AdminLayout({ initialSettings }) {
               aria-labelledby="admin-reviews-modal-title"
               aria-describedby="admin-reviews-modal-description"
               tabIndex={-1}
-              className="admin-card-glass admin-modal-card w-full max-w-5xl max-h-[88vh] overflow-hidden"
+              className="admin-card-glass admin-modal-card flex w-full max-w-5xl max-h-[88vh] flex-col overflow-hidden"
               style={{ boxShadow: 'var(--admin-shadow-modal, 0 32px 80px rgba(0,0,0,0.18))' }}
             >
               <div
-                className="admin-modal-header flex items-center justify-between"
+                className="admin-modal-header flex shrink-0 items-center justify-between"
                 style={{
                   borderBottom: '1px solid var(--admin-card-border)',
                 }}
@@ -2631,14 +2644,14 @@ export default function AdminLayout({ initialSettings }) {
                     className="text-xl font-bold"
                     style={{ color: 'var(--admin-card-text)' }}
                   >
-                    Reseñas de productos
+                    Notificaciones
                   </h2>
                   <p
                     id="admin-reviews-modal-description"
                     className="text-sm mt-0.5"
                     style={{ color: 'var(--admin-card-muted-text)' }}
                   >
-                    Revisa y modera las reseñas del catálogo
+                    Abre los avisos que requieren atención
                   </p>
                 </div>
 
@@ -2666,7 +2679,23 @@ export default function AdminLayout({ initialSettings }) {
                 </button>
               </div>
 
-              <div className="admin-modal-body">
+              <div className="admin-modal-body min-h-0 overflow-y-auto">
+                <div role="group" aria-label="Tipos de notificaciones" className="flex flex-wrap gap-2 pb-4">
+                  <button type="button" className="admin-header-icon-button !w-auto px-3"
+                    aria-pressed={notificationView === 'alerts'} onClick={() => setNotificationView('alerts')}>
+                    Alertas {pendingAlertCount || ''}
+                  </button>
+                  <button type="button" className="admin-header-icon-button !w-auto px-3"
+                    aria-pressed={notificationView === 'reviews'} onClick={() => {
+                      setNotificationView('reviews');
+                      void fetchAdminReviews();
+                    }}>
+                    Reseñas {unseenCount || ''}
+                  </button>
+                </div>
+                {notificationView === 'alerts' ? (
+                  <AdminAlertList {...adminAlerts} onNavigate={openNotificationDestination} />
+                ) : <>
                 {reviewsError ? (
                   <div className="admin-modal-error border border-red-200 bg-red-50 text-sm text-red-700" role="alert">
                     {reviewsError}
@@ -2833,6 +2862,7 @@ export default function AdminLayout({ initialSettings }) {
                     })}
                   </div>
                 )}
+                </>}
               </div>
             </div>
           </div>

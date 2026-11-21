@@ -275,7 +275,7 @@ async function run() {
         },
       },
       {
-        settings: {},
+        settings: {}, returnPolicy: {},
       }
     );
     assert.strictEqual(virtualQuote.pricing.shipping, 0);
@@ -292,7 +292,7 @@ async function run() {
         customer: { deliveryType: 'envio' },
       },
       {
-        settings: {},
+        settings: {}, returnPolicy: {},
       }
     );
     assert.strictEqual(bundleQuote.pricing.shipping, 20000);

@@ -65,7 +65,7 @@
 .store-feedback--success { border-color: color-mix(in srgb, #16a34a 30%, transparent); background: color-mix(in srgb, #16a34a 9%, var(--admin-card-bg)); color: #166534; }
 .store-feedback--error, .store-feedback--conflict { border-color: color-mix(in srgb, var(--admin-danger, #dc2626) 30%, transparent); background: color-mix(in srgb, var(--admin-danger, #dc2626) 8%, var(--admin-card-bg)); color: var(--admin-danger, #b91c1c); }
 
-.store-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 6px; border: 1px solid var(--store-border); border-radius: 18px; background: color-mix(in srgb, var(--admin-card-bg) 84%, transparent); }
+.store-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; padding: 6px; border: 1px solid var(--store-border); border-radius: 18px; background: color-mix(in srgb, var(--admin-card-bg) 84%, transparent); }
 .store-step { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 13px; background: transparent; color: var(--store-muted); text-align: left; cursor: pointer; transition: .18s ease; }
 .store-step > span { display: grid; min-width: 0; }
 .store-step strong { color: inherit; font-size: 13px; }

@@ -1,3 +1,4 @@
+import ConsumerSettingsEditor from "./ConsumerSettingsEditor";
 // src/admin/configuracion/sections/EnviosSection.jsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../lib/api';
@@ -109,7 +110,9 @@ function normalizeEnvios(raw) {
 export default function EnviosSection() {
   const [loading, setLoading] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
-  const [activeView, setActiveView] = useState('rates');
+  const [activeView, setActiveView] = useState(() => new URLSearchParams(window.location.search).get('tema') === 'condiciones' ? 'delivery' : 'rates');
+  const [deliveryDirty, setDeliveryDirty] = useState(false);
+  const switchView = view => { if (!deliveryDirty || window.confirm('Tienes condiciones de entrega sin guardar. ¿Quieres descartarlas?')) setActiveView(view); };
   const [form, setForm] = useState(() => normalizeEnvios({}));
   const [savedForm, setSavedForm] = useState(() => normalizeEnvios({}));
   const [revision, setRevision] = useState(null);
@@ -692,14 +695,14 @@ export default function EnviosSection() {
               </span>
             </div>
             <p className="shipping-muted mt-0.5 text-xs">
-              Configura el cobro al cliente y la entrega del pedido en dos pasos.
+              Configura tarifas, condiciones de entrega y transportadoras. Gestiona cada pedido desde Órdenes.
             </p>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:w-[500px]">
+          <div className="grid gap-2 sm:grid-cols-3 xl:w-[660px]">
               <button
                 type="button"
-                onClick={() => setActiveView('rates')}
+                onClick={() => switchView('rates')}
                 data-active={activeView === 'rates'}
                 className="shipping-nav-option group flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition"
               >
@@ -713,7 +716,7 @@ export default function EnviosSection() {
 
               <button
                 type="button"
-                onClick={() => setActiveView('carrier')}
+                onClick={() => switchView('carrier')}
                 data-active={activeView === 'carrier'}
                 className="shipping-nav-option group flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition"
               >
@@ -724,10 +727,12 @@ export default function EnviosSection() {
                   <span className="block text-sm font-bold">Entrega del paquete</span>
                 </span>
               </button>
+              <button type="button" onClick={() => switchView('delivery')} data-active={activeView === 'delivery'} className="shipping-nav-option shipping-secondary-action rounded-xl border px-3 py-2 text-sm font-bold">Plazo y recogida</button>
           </div>
         </div>
       </section>
 
+      {activeView === 'delivery' && <ConsumerSettingsEditor section="delivery" countries={countries} onDirtyChange={setDeliveryDirty} />}
       {feedback && (
         <div
           role="status"
@@ -750,7 +755,7 @@ export default function EnviosSection() {
         </div>
       )}
 
-      {activeView === 'rates' ? (
+      {activeView === 'delivery' ? null : activeView === 'rates' ? (
         <section className="shipping-surface rounded-2xl border p-3 shadow-sm md:p-4">
           <div className="mb-3 flex flex-col gap-2 border-b border-gray-100 pb-3 md:flex-row md:items-center md:justify-between">
             <div>
