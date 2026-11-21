@@ -22,7 +22,7 @@ jobs:
       - name: Validar privacidad, suscripciones, PQR y conservación automática
         working-directory: backend
         run: |
-          node --test scripts/testSelectionRetentionWorker.js scripts/testAbandonedCartCleanup.js scripts/testPrivacyPreferencesPolicy.cjs scripts/testAdminNewsletterSubscribers.cjs scripts/testSubscriberQueryValidation.cjs test/socialMediaRelay.test.js
+          node --test scripts/testOrderConsumerAcceptance.js scripts/testSelectionRetentionWorker.js scripts/testAbandonedCartCleanup.js scripts/testPrivacyPreferencesPolicy.cjs scripts/testAdminNewsletterSubscribers.cjs scripts/testSubscriberQueryValidation.cjs test/socialMediaRelay.test.js
           node scripts/testProductReviewPrivacy.js
           node scripts/testNewsletterConsent.js
           node scripts/testCustomersStage4Privacy.js

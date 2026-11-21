@@ -61,6 +61,8 @@ function buildAuthoritativeCartItems(cart) {
 
 function buildAuthorizedOrderBody(body, cart, sessionId, paymentSnapshot) {
   const source = body && typeof body === 'object' ? body : {};
+  const acceptance = source.consumerAcceptance;
+  const hasAcceptance = acceptance && typeof acceptance === 'object' && !Array.isArray(acceptance);
   const requestedProvider = String(source?.payment?.provider || '')
     .trim()
     .toLowerCase();
@@ -88,6 +90,11 @@ function buildAuthorizedOrderBody(body, cart, sessionId, paymentSnapshot) {
     payment: { ...safePaymentSnapshot },
     storeCredit: source.storeCredit,
     couponCode: source.couponCode,
+    ...(hasAcceptance ? { consumerAcceptance: {
+      terms: acceptance.terms === true,
+      privacy: acceptance.privacy === true,
+      fingerprint: typeof acceptance.fingerprint === 'string' ? acceptance.fingerprint.slice(0, 128) : '',
+    } } : {}),
   };
 }
 

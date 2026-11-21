@@ -594,14 +594,14 @@ try {
       await page
         .getByRole("dialog", { name: "Filtros", exact: true })
         .waitFor();
-      await page.getByRole("button", { name: "rojo", exact: true }).click();
+      await page.getByRole("button", { name: "Rojo", exact: true }).click();
       await page.keyboard.press("Escape");
       if (
         await page.getByRole("dialog", { name: "Filtros", exact: true }).count()
       )
         throw Error("Filter drawer did not close");
     } else
-      await page.getByRole("button", { name: "rojo", exact: true }).click();
+      await page.getByRole("button", { name: "Rojo", exact: true }).click();
     await page
       .getByRole("heading", { name: "Producto 1", exact: true })
       .waitFor();

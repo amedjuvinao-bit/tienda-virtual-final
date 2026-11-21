@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const Branch = require('../models/Branch');
 const Product = require('../models/Product');
 const SiteSettings = require('../models/SiteSettings');
+const OrderReturnPolicy = require('../models/OrderReturnPolicy');
 const orders = require('../routes/orders');
 const {
   findManualBranch,
@@ -38,6 +39,7 @@ async function main() {
     branchFind: Branch.findOne,
     productFind: Product.find,
     settingsFind: SiteSettings.findOne,
+    returnPolicyFind: OrderReturnPolicy.findOne,
   };
   try {
     const branchRoute = orders.stack.find((entry) => entry.route?.path === '/admin/manual/branches');
@@ -85,6 +87,7 @@ async function main() {
     };
     Product.find = () => ({ select() { return this; }, lean: async () => [product] });
     SiteSettings.findOne = () => ({ lean: async () => ({ billing: { taxes: { iva: { enabled: false } } } }) });
+    OrderReturnPolicy.findOne = () => ({ lean: async () => null });
     const { pricing, branch } = await prepareQuote(owner, {
       ...input,
       items: [{ ...input.items[0], price: 1_000_000, title: 'Precio falso' }],
@@ -99,6 +102,7 @@ async function main() {
     Branch.findOne = old.branchFind;
     Product.find = old.productFind;
     SiteSettings.findOne = old.settingsFind;
+    OrderReturnPolicy.findOne = old.returnPolicyFind;
   }
 }
 
