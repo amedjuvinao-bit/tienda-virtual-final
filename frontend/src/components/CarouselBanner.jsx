@@ -19,6 +19,58 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
   const isPaused = useRef(false)
   const [selectedImage, setSelectedImage] = useState(null)
+  const imageOpenerRef = useRef(null)
+  const imageDialogRef = useRef(null)
+  const imageCloseRef = useRef(null)
+  const focusWithinRef = useRef(false)
+  const imageOpenRef = useRef(false)
+  imageOpenRef.current = Boolean(selectedImage)
+
+  const openImage = (src, event) => {
+    if (!src) return
+    imageOpenerRef.current = event.currentTarget
+    setSelectedImage(src)
+  }
+
+  const pauseForKeyboard = () => { focusWithinRef.current = true }
+  const resumeAfterKeyboard = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      focusWithinRef.current = false
+      startTsRef.current = performance.now()
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedImage || !imageDialogRef.current) return
+    const dialog = imageDialogRef.current
+    const previousOverflow = document.body.style.overflow
+    const background = Array.from(document.body.children)
+      .filter((node) => node !== dialog)
+      .map((node) => [node, node.getAttribute('inert')])
+    background.forEach(([node]) => node.setAttribute('inert', ''))
+    document.body.style.overflow = 'hidden'
+    imageCloseRef.current?.focus()
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setSelectedImage(null)
+      } else if (event.key === 'Tab') {
+        event.preventDefault()
+        imageCloseRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+      background.forEach(([node, inert]) => {
+        if (inert === null) node.removeAttribute('inert')
+        else node.setAttribute('inert', inert)
+      })
+      if (imageOpenerRef.current?.isConnected) imageOpenerRef.current.focus()
+    }
+  }, [selectedImage])
 
   // ✅ settings banner
   const [localBanner, setBanner] = useState(null) // theme.banner
@@ -235,6 +287,11 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
   const bannerType = bannerLoading ? "loading" : String(banner?.type || "slider")
   const useTemplate = ['discovery', 'editorial', 'atelier'].includes(banner?.templateId)
   const plainMedia = banner?.templateId === 'plain'
+
+  useEffect(() => {
+    setSelectedImage(null)
+    focusWithinRef.current = false
+  }, [bannerType, banner?.templateId])
   const isMobile = viewportWidth < 640
   const isTablet = viewportWidth >= 640 && viewportWidth < 1024
   const isDesktop = viewportWidth >= 1024
@@ -421,12 +478,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     return { posX: safeX, posY: safeY }
   }
 
-  const isClickFromButton = (e) => {
-    const t = e?.target
-    if (!t || typeof t.closest !== "function") return false
-    return !!t.closest("[data-rb-btn]")
-  }
-
   const getResponsiveButtonWidth = useCallback(
     (requestedWidth) => {
       const raw = Number(requestedWidth)
@@ -502,6 +553,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       link ? (
         <a
           href={link}
+          tabIndex={isActive ? 0 : -1}
           onClick={(e) => {
             if (stopPropagation) e.stopPropagation()
           }}
@@ -731,7 +783,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     if (instanceRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = setInterval(() => {
-        if (!isPaused.current) instanceRef.current.next()
+        if (!isPaused.current && !focusWithinRef.current && !imageOpenRef.current) instanceRef.current?.next()
       }, autoplayMs)
     }
 
@@ -739,7 +791,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
       if (bannerType !== "slider") return
       if (!startTsRef.current) startTsRef.current = ts
 
-      if (!isPaused.current) {
+      if (!isPaused.current && !focusWithinRef.current && !imageOpenRef.current) {
         const elapsed = ts - startTsRef.current
         const p = elapsed / autoplayMs
         setProgress(p >= 1 ? 1 : p)
@@ -822,12 +874,14 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
   if (useTemplate && bannerType === 'slider') {
     return <div className={heroWrapClass} style={heroWrapStyle}
+      onFocusCapture={pauseForKeyboard}
+      onBlurCapture={resumeAfterKeyboard}
       onMouseEnter={() => { isPaused.current = true }}
       onMouseLeave={() => { startTsRef.current = performance.now() - progress * autoplayMs; isPaused.current = false }}>
       <div className={heroContainerClass} style={heroContainerStyle}>
         <BannerTemplateView banner={banner} sections={bannerSections}>
           <div key={sliderMountKey} ref={sliderRef} className="keen-slider h-full w-full">
-            {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide}>
+            {slides.map((slide, index) => <div key={index} className="keen-slider__slide relative h-full w-full" data-active={index === currentSlide} aria-hidden={index !== currentSlide} inert={index !== currentSlide ? '' : undefined}>
               <img src={selectDeviceImage(slide, heightDevice)} alt={`Portada ${index + 1}`} className="absolute inset-0 h-full w-full" style={{ objectFit: normalizeFit(slide.fit), objectPosition: positionForDevice(slide, heightDevice) }} />
             </div>)}
           </div>
@@ -917,9 +971,6 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
           ref={bannerBoxRef}
           className={`${heroContainerClass} ${heroFullscreenClass} bg-[#fff8e1]`}
           style={heroContainerStyle}
-          onClick={() => {
-            if (imageUrl) setSelectedImage(imageUrl)
-          }}
         >
           {imageUrl ? (
             imageLink ? (
@@ -931,7 +982,14 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
                 {Img}
               </a>
             ) : (
-              Img
+              <button
+                type="button"
+                aria-label="Ampliar imagen de la portada"
+                onClick={(event) => openImage(imageUrl, event)}
+                className="absolute inset-0 h-full w-full cursor-zoom-in border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[#7c1538]"
+              >
+                {Img}
+              </button>
             )
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-sm">
@@ -944,6 +1002,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
         {selectedImage && createPortal(
           <div
+            ref={imageDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Imagen ampliada"
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-auto animate-fade-in"
             style={{zIndex:10000}}
             onClick={() => setSelectedImage(null)}
@@ -953,6 +1015,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
               onClick={(e) => e.stopPropagation()}
             >
               <button
+                ref={imageCloseRef}
                 type="button"
                 aria-label="Cerrar imagen ampliada"
                 onClick={() => setSelectedImage(null)}
@@ -977,6 +1040,8 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
     <div
       className={heroWrapClass}
       style={heroWrapStyle}
+      onFocusCapture={pauseForKeyboard}
+      onBlurCapture={resumeAfterKeyboard}
       onMouseEnter={() => (isPaused.current = true)}
       onMouseLeave={() => {
         const p = progress
@@ -1004,13 +1069,16 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
                 key={idx}
                 className="keen-slider__slide relative h-full w-full"
                 data-active={isActive}
-                onClick={(e) => {
-                  if (isClickFromButton(e)) return
-                  setSelectedImage(selectDeviceImage(slide, heightDevice))
-                }}
-                role="button"
-                tabIndex={0}
+                aria-hidden={!isActive}
+                inert={!isActive ? '' : undefined}
               >
+                <button
+                  type="button"
+                  aria-label={`Ampliar imagen ${idx + 1} de ${slides.length} de la portada`}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={(event) => openImage(selectDeviceImage(slide, heightDevice), event)}
+                  className="absolute inset-0 h-full w-full cursor-zoom-in border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[#7c1538]"
+                >
                 <img
                   src={selectDeviceImage(slide, heightDevice)}
                   alt={`Slide ${idx + 1}`}
@@ -1022,6 +1090,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
                   }}
                   draggable={false}
                 />
+                </button>
 
                 {showButtons && renderMovableButtons(slideButtons, slide.link, true, isActive)}
               </div>
@@ -1034,6 +1103,10 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
 
       {selectedImage && createPortal(
         <div
+          ref={imageDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Imagen ampliada"
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-auto animate-fade-in"
           style={{zIndex:10000}}
           onClick={() => setSelectedImage(null)}
@@ -1043,6 +1116,7 @@ export default function CarouselBanner({ bannerOverride = null, sectionsOverride
             onClick={(e) => e.stopPropagation()}
           >
             <button
+              ref={imageCloseRef}
               type="button"
               aria-label="Cerrar imagen ampliada"
               onClick={() => setSelectedImage(null)}

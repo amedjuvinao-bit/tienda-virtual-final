@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import { getColorDisplayName } from "../utils/colorDisplay";
 import LookEditorialGlass from "./LookEditorialGlass";
 import {
   LOOK_MAX_PRODUCTS,
@@ -408,7 +409,6 @@ export default function LookSection({ theme, previewProducts }) {
           style={{
             transform: "scale(1) rotate(0deg)",
           }}
-          onClick={() => setSelectedId(prod.id)}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = `scale(${style.thumbHoverScale}) rotate(${style.thumbHoverRotateDeg}deg)`;
           }}
@@ -416,8 +416,12 @@ export default function LookSection({ theme, previewProducts }) {
             e.currentTarget.style.transform = "scale(1) rotate(0deg)";
           }}
         >
-          <div
-            className="w-full overflow-hidden"
+          <button
+            type="button"
+            aria-label={`Mostrar ${prod.subtitle}`}
+            aria-pressed={selectedId === prod.id}
+            onClick={() => setSelectedId(prod.id)}
+            className="block w-full overflow-hidden border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c1538]"
             style={{
               height: isMobile ? Math.max(150, Math.round(thumbHeightPx * 0.9)) : thumbHeightPx,
               borderRadius: style.thumbRadiusPx,
@@ -430,17 +434,19 @@ export default function LookSection({ theme, previewProducts }) {
               className="w-full h-full object-cover"
               draggable={false}
             />
-          </div>
+          </button>
 
           <div className="absolute top-2 right-2 flex flex-col items-center space-y-2 overflow-visible">
             {config?.actions?.favorite?.enabled ? (
               <button
                 type="button"
+                aria-label={`${favoriteActive ? 'Quitar de' : 'Agregar a'} favoritos: ${prod.subtitle}`}
+                aria-pressed={favoriteActive}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleFavorite(favoritePayload);
                 }}
-                className="relative group p-1 rounded-full shadow focus:outline-none"
+                className="relative group p-1 rounded-full shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c1538]"
                 style={{
                   backgroundColor: style.actionButtonBg,
                   border: `1px solid ${style.actionButtonBorderColor}`,
@@ -468,11 +474,12 @@ export default function LookSection({ theme, previewProducts }) {
             {config?.actions?.cart?.enabled ? (
               <button
                 type="button"
+                aria-label={`Agregar al carrito: ${prod.subtitle}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   addToCart(cartPayload);
                 }}
-                className="relative group p-1 rounded-full shadow focus:outline-none"
+                className="relative group p-1 rounded-full shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c1538]"
                 style={{
                   backgroundColor: style.actionButtonBg,
                   border: `1px solid ${style.actionButtonBorderColor}`,
@@ -506,17 +513,17 @@ export default function LookSection({ theme, previewProducts }) {
 
           <div className="flex justify-center space-x-2 mt-1">
             {prod.colors.map((col, i) => (
-              <button
+              <span
                 key={`${prod.id}_${i}`}
-                type="button"
-                aria-label={`Color option ${i + 1}`}
+                role="img"
+                aria-label={`Color disponible: ${getColorDisplayName(col)}`}
                 style={{
                   backgroundColor: col,
                   width: isMobile ? Math.max(12, style.colorDotSizePx - 2) : style.colorDotSizePx,
                   height: isMobile ? Math.max(12, style.colorDotSizePx - 2) : style.colorDotSizePx,
                   borderColor: style.colorDotBorderColor,
                 }}
-                className="rounded-full border-2 focus:outline-none"
+                className="rounded-full border-2"
               />
             ))}
           </div>
