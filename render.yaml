@@ -1,0 +1,110 @@
+# Candidate configuration. Review Render's charges before creating services.
+# Do not narrow rootDir: both applications import the repository's shared/.
+services:
+  - type: web
+    name: rosa-boutique-api
+    runtime: docker
+    branch: main
+    region: virginia
+    plan: starter
+    numInstances: 1
+    dockerfilePath: ./deploy/backend.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 120
+    disk:
+      name: tienda-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '10000'
+      - key: BACKUP_DIRECTORY
+        value: /var/data/backups
+      - key: BACKUP_PANEL_SINGLE_INSTANCE
+        value: 'false'
+      - key: ADMIN_2FA_REQUIRED_ROLES
+        value: owner,admin
+      - key: SELECTION_RETENTION_ENABLED
+        value: 'true'
+      - key: MONGO_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: ADMIN_COOKIE_SAME_SITE
+        sync: false
+      # Supply the existing values when migrating encrypted settings/2FA.
+      # Do not generate replacements for an existing database.
+      - key: JWT_SECRET
+        sync: false
+      - key: CART_ACCESS_SECRET
+        sync: false
+      - key: ORDER_PAYMENT_ACCESS_SECRET
+        sync: false
+      - key: ORDER_RETURN_ACCESS_SECRET
+        sync: false
+      - key: BILLING_ENCRYPTION_KEY
+        sync: false
+      - key: INTEGRATIONS_ENCRYPTION_KEY
+        sync: false
+      - key: MAIL_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_2FA_ENCRYPTION_KEY
+        sync: false
+      - key: INSTAGRAM_ENCRYPTION_KEY
+        sync: false
+      - key: CUSTOMER_AUDIT_HASH_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: BACKUP_DB_NAME
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
+      - key: STAGING_MONGODB_URI
+        sync: false
+
+  - type: web
+    name: rosa-boutique-web
+    runtime: static
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: npm --prefix frontend ci && node deploy/build-frontend.mjs
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: VITE_API_BASE_URL
+        sync: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    routes:
+      - type: redirect
+        source: /legal/privacidad.html
+        destination: /privacidad
+      - type: redirect
+        source: /legal/terminos.html
+        destination: /terminos
+      - type: redirect
+        source: /legal
+        destination: /privacidad
+      - type: redirect
+        source: /legal/*
+        destination: /privacidad
+      - type: rewrite
+        source: /*
+        destination: /index.html

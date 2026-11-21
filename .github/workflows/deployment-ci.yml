@@ -1,0 +1,69 @@
+name: Despliegue Docker y Render
+
+on:
+  push:
+    branches: [main, feature/despliegue-render-docker]
+  pull_request:
+    branches: [main]
+    paths:
+      - backend/**
+      - frontend/**
+      - shared/**
+      - deploy/**
+      - render.yaml
+      - .dockerignore
+      - .gitattributes
+      - .github/workflows/deployment-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-package:
+    name: Paquete de producción y respaldo verificado
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Validar estado, cierre y configuración del frontend
+        run: node --test backend/test/deploymentRuntime.test.js deploy/build-frontend.test.mjs
+      - name: Validar Blueprint con el esquema oficial de Render
+        run: |
+          python -m pip install --disable-pip-version-check 'PyYAML==6.0.3' 'jsonschema==4.26.0'
+          python - <<'PY'
+          import json, urllib.request, yaml, jsonschema
+          with urllib.request.urlopen('https://render.com/schema/render.yaml.json', timeout=30) as response:
+              schema = json.load(response)
+          with open('render.yaml') as source:
+              blueprint = yaml.safe_load(source)
+          jsonschema.Draft202012Validator(schema).validate(blueprint)
+          print('Blueprint válido según el esquema oficial de Render.')
+          PY
+      - name: Compilar el frontend comercial
+        run: |
+          npm --prefix frontend ci
+          node .github/scripts/audit-production-dependencies.cjs frontend
+          node deploy/build-frontend.mjs
+          test -f frontend/dist/index.html
+          test -f frontend/dist/page-preview.html
+          test ! -d frontend/dist/legal
+        env:
+          # Reserved example origin for CI only; this artifact is never deployed.
+          VITE_API_BASE_URL: https://api.example.com
+      - name: Construir la imagen de producción sin publicar imágenes ni servicios
+        run: |
+          printf 'CI_ONLY_SECRET_SENTINEL=excluded-from-image\n' > backend/.env
+          docker build --file deploy/backend.Dockerfile --tag tienda-backend:ci .
+      - name: Probar el contenedor y el respaldo con dos MongoDB desechables
+        run: bash deploy/smoke-backend.sh tienda-backend:ci

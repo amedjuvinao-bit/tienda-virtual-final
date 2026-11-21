@@ -35,6 +35,9 @@ const {
   COLLECTION_NAME: SELECTION_RETENTION_COLLECTION,
 } = require('./services/selectionRetentionWorkerService');
 const { listenHttpServer, startupErrorMessage } = require('./lib/listenHttpServer');
+const { createDeploymentHealth } = require('./lib/deploymentHealth');
+const { createGracefulShutdown } = require('./lib/gracefulShutdown');
+const { pendingBackgroundOperations } = require('./services/backupActivityTracker');
 
 const app = express();
 app.disable('x-powered-by');
@@ -73,6 +76,10 @@ function requireCritical(relPath) {
 }
 
 app.use(securityHeaders);
+app.get('/healthz', createDeploymentHealth({
+  connection: mongoose.connection,
+  isStopping: () => Boolean(shutdownLifecycle?.isStopping()),
+}));
 app.use(cors(buildCorsOptions(env)));
 // Must precede raw shipping/payment webhooks and every writer route.
 app.use(backupMaintenance.middleware);
@@ -256,6 +263,7 @@ let shippingWebhookRecoveryRunning = false;
 let orderPostCommitOutboxWorker = null;
 let selectionRetentionWorker = null;
 let httpServer = null;
+let shutdownLifecycle = null;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -459,6 +467,25 @@ mongoose
   .then(async () => {
     console.log('MongoDB conectado');
     httpServer = await listenHttpServer(app, PORT);
+    shutdownLifecycle = createGracefulShutdown({
+      server: httpServer,
+      stopWorkers: () => {
+        clearInterval(inventoryReservationExpirationTimer);
+        clearInterval(billingRecoveryTimer);
+        clearInterval(shippingWebhookRecoveryTimer);
+        orderPostCommitOutboxWorker?.stop();
+        selectionRetentionWorker?.stop();
+      },
+      workersIdle: () =>
+        !inventoryReservationExpirationRunning && !billingRecoveryRunning &&
+        !shippingWebhookRecoveryRunning && !orderPostCommitOutboxWorker?.metrics().running &&
+        !selectionRetentionWorker?.metrics().running &&
+        adminAccessGate.pendingAuditCount() === 0 && pendingBackgroundOperations() === 0,
+      disconnect: () => mongoose.disconnect(),
+    });
+    const terminate = () => { void shutdownLifecycle.shutdown().then(code => process.exit(code)); };
+    process.on('SIGTERM', terminate);
+    process.on('SIGINT', terminate);
     console.log(`Servidor corriendo en http://localhost:${PORT} | PID ${process.pid}`);
     backupMaintenance.setWorkersIdle(() =>
       !inventoryReservationExpirationRunning && !billingRecoveryRunning &&
