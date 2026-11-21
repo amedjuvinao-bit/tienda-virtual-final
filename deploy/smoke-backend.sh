@@ -66,6 +66,8 @@ docker run --detach --name "$api" --network "$test_run" \
   -p 127.0.0.1::10000 "$image" >/dev/null
 url="http://$(docker port "$api" 10000/tcp)"
 wait_health() {
+  # Docker may allocate a different ephemeral host port after start/restart.
+  url="http://$(docker port "$api" 10000/tcp)"
   for attempt in $(seq 1 90); do
     if curl --fail --silent --max-time 4 "$url/healthz" > "$temp/health.json"; then
       test "$(cat "$temp/health.json")" = '{"ok":true}'
@@ -73,6 +75,7 @@ wait_health() {
     fi
     sleep 1
   done
+  echo "El endpoint de prueba no respondió en $url/healthz" >&2
   return 1
 }
 wait_health
