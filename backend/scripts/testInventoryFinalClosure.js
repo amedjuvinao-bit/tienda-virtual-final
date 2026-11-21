@@ -174,7 +174,9 @@ function run() {
     [
       "const InventoryAdmin = lazy(() => import('./admin/InventoryAdmin'))",
       'path="inventario"',
-      'protectAdminContent(<InventoryAdmin />)',
+      'protectAdminContent(<AdminInventoryRoute />)',
+      'function AdminInventoryRoute()',
+      '<InventoryAdmin key={search} openAlerts={openAlerts} alertTab={alertTab} />',
     ],
     'Ruta frontend de Inventario'
   );

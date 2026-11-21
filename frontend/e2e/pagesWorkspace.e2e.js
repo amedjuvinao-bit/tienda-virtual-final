@@ -664,10 +664,14 @@ try {
     if (await page.locator('.cpv-product-item').count() !== 8) throw Error('Editorial dropped products');
     await page.getByRole('heading', { name:'Últimas tendencias', exact:true }).waitFor();
     if (await page.locator('.cpv-title-image').count()) throw Error('Legacy title artwork bypasses the approved typography');
-    const surface = await page.locator('.catalog-liquid__surface').evaluate(node => ({source:getComputedStyle(node).backgroundImage,size:getComputedStyle(node).backgroundSize}));
-    const bevel = await page.locator('.catalog-liquid__bevel').evaluate(node => ({source:getComputedStyle(node).borderImageSource,slice:getComputedStyle(node).borderImageSlice}));
-    if (!surface.source.includes('/catalog/glass-horizontal-clear-v2.webp') || surface.size !== 'cover') throw Error('Horizontal glass surface is missing or distorted');
-    if (!bevel.source.includes('/information/glass.webp') || bevel.slice.includes('fill')) throw Error('Glass bevel must be separate from the optical surface');
+    const headerRim = page.locator('.catalog-liquid > .polished-glass-rim');
+    await headerRim.locator('svg').waitFor();
+    const rim = await headerRim.evaluate(node => ({
+      width:parseFloat(node.style.getPropertyValue('--pg-width')),
+      events:getComputedStyle(node).pointerEvents,
+      filledRects:[...node.querySelectorAll('svg rect')].some(rect => rect.getAttribute('fill') !== 'none'),
+    }));
+    if (!(rim.width > 0) || rim.events !== 'none' || rim.filledRects) throw Error('Measured glass rim must leave the panel face clear and controls usable');
     if (width === 1440) {
       const hero = await page.locator('.cpv-hero-glass').boundingBox();
       await page.mouse.move(hero.x + hero.width * .7,hero.y + hero.height * .5);
@@ -677,18 +681,18 @@ try {
     }
 
     const headingCollision = await page.locator('.cpv-hero-glass').evaluate(node => {
-      const text = node.querySelector('.cpv-hero-top').getBoundingClientRect();
+      const text = node.querySelector('.cpv-hero-identity').getBoundingClientRect();
       const icon = node.querySelector('.cpv-glass-bags').getBoundingClientRect();
       return text.right > icon.left + 1 || icon.right > node.getBoundingClientRect().right;
     });
     if (headingCollision) throw Error('Glass heading collides with shopping bags at ' + width);
     const featuredCount = await page.locator('.cpv-product-item--featured').count();
     if (featuredCount !== 0) throw Error('Conventional grid contains a featured frame');
-    if (await page.locator('.look-glass-rim').count() !== 8) throw Error('Homepage optical rims are missing');
-    await page.waitForFunction(() => document.querySelectorAll('.look-glass-rim svg').length === 8);
+    if (await page.locator('.catalog-ecard > .polished-glass-rim').count() !== 8) throw Error('Measured optical rims are missing');
+    await page.waitForFunction(() => document.querySelectorAll('.catalog-ecard > .polished-glass-rim svg').length === 8);
     if (!(await page.locator('.cpv-title').evaluate(node => getComputedStyle(node).fontFamily)).includes('Georgia')) throw Error('Editorial typography not applied');
     const refined = await page.locator('.catalog-ecard').first().evaluate(node => ({ border:getComputedStyle(node).borderTopWidth, padding:getComputedStyle(node).paddingTop, title:node.style.getPropertyValue('--ecard-title') }));
-    if (refined.border !== '1px' || refined.padding !== '0px' || refined.title !== '#562633') throw Error('Legacy styles still contaminate the editorial design');
+    if (refined.border !== '0px' || refined.padding !== '0px' || refined.title !== '#562633') throw Error('Legacy styles still contaminate the editorial design');
     const collision = await page.locator('.catalog-ecard__footer').evaluateAll(nodes => nodes.some(node => {
       const info=node.querySelector('.catalog-ecard__info').getBoundingClientRect(), actions=node.querySelector('.catalog-ecard__actions').getBoundingClientRect();
       return Math.min(info.right,actions.right)-Math.max(info.left,actions.left)>1 && Math.min(info.bottom,actions.bottom)-Math.max(info.top,actions.top)>1;

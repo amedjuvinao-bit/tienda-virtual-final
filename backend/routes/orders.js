@@ -3,10 +3,6 @@ const express = require('express');
 const router = express.Router();
 
 const requireAdmin = require('../middleware/requireAdmin');
-const { getPostSaleAlerts } = require('../services/adminPostSaleAlerts');
-const Order = require('../models/Order');
-const { buildScopedOrderFilter } = require('../services/orderAdminScopeService');
-const { buildOperationalSummaryPipeline } = require('../services/orderAdminQueryService');
 const requirePermission = require('../middleware/requirePermission');
 const {
   requireOrderBulkActionPermission,
@@ -18,6 +14,8 @@ const {
 const { createOrder } = require('../controllers/orderCreationController');
 const {
   listAdminOrders,
+  getOrderOperationalAlerts,
+  getOrderPostSaleAlerts,
 } = require('../controllers/orderAdminQueryController');
 const {
   getOrderOperationalHealth,
@@ -100,30 +98,9 @@ router.post('/admin/manual', requirePermission('orders:create'), postManualOrder
 
 router.get('/admin/operations/health', getOrderOperationalHealth);
 
-router.get('/admin/operational-alerts', requirePermission('orders:view'), async (req, res) => {
-  try {
-    const scope = buildScopedOrderFilter(req, { archived: { $ne: true } });
-    if (!scope.ok) return res.status(scope.status || 403).json({ message: scope.message });
-    const [operational] = await Order.aggregate([
-      { $match: scope.filter },
-      ...buildOperationalSummaryPipeline(new Date()),
-    ]).allowDiskUse(true);
-    res.set('Cache-Control', 'private, no-store').json({ operational: operational || {} });
-  } catch (error) {
-    console.error('Error consultando alertas de órdenes:', error.message);
-    res.status(500).json({ message: 'No se pudieron consultar las alertas de órdenes.' });
-  }
-});
+router.get('/admin/operational-alerts', requirePermission('orders:view'), getOrderOperationalAlerts);
 
-router.get('/admin/post-sale-alerts', requirePermission('orders:view'), async (req, res) => {
-  try {
-    const alerts = await getPostSaleAlerts(req);
-    res.set('Cache-Control', 'private, no-store').json(alerts);
-  } catch (error) {
-    console.error('Error consultando alertas de posventa:', error.message);
-    res.status(500).json({ message: 'No se pudieron consultar las alertas de posventa.' });
-  }
-});
+router.get('/admin/post-sale-alerts', requirePermission('orders:view'), getOrderPostSaleAlerts);
 
 router.get(
   '/admin/shipping/providers',
