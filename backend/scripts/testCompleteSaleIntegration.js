@@ -684,7 +684,7 @@ async function run() {
   ]) {
     const rejected = await requestJson(baseUrl, '/api/orders', {
       method: 'POST',
-      headers: { ...cartAccessHeaders(checkoutAccess), 'Idempotency-Key': `${PREFIX}-${name}` },
+      headers: { ...checkoutOrderHeaders, 'Idempotency-Key': `${PREFIX}-${name}` },
       body: { ...checkoutPayload, consumerAcceptance: acceptance },
     });
     assert.equal(rejected.status, status, JSON.stringify(rejected.data));

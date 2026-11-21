@@ -457,7 +457,7 @@ try {
       if (kind === "detail") {
         const count = writes.length;
         await frame
-          .getByRole("button", { name: "Favorito", exact: true })
+          .locator('.pd-fav-btn')
           .click();
         await frame.getByRole("button", { name: /añadir al carrito/i }).click();
         if (writes.length !== count)
