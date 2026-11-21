@@ -63,6 +63,28 @@ const server = await createServer({ root, server: { host: '127.0.0.1', port: 529
 }] });
 let browser;
 const results = [];
+// Snapshot verification must load offscreen lazy images too; decode() alone
+// can wait indefinitely while the browser defers their network request.
+async function verifyImages(page) {
+  await page.locator('img').evaluateAll(async images => {
+    await Promise.all(images.map(async image => {
+      image.loading = 'eager';
+      let timer;
+      try {
+        await Promise.race([
+          image.decode(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Image decoding timed out')), 10000);
+          }),
+        ]);
+      } catch {
+        throw new Error(`No se pudo verificar la imagen: ${image.currentSrc || image.src}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
+  });
+}
 async function comparePixels(page, actual, expected) {
   return page.evaluate(async ([left, right]) => {
     const decode = async value => {
@@ -94,12 +116,11 @@ try {
       assert.equal(url.hostname, 'www.tiktok.com', 'Only the explicitly permitted player may connect directly');
       return route.fulfill({ contentType: 'text/html', body: '<html><body>Reproductor controlado</body></html>' });
     });
+    console.log('SOCIAL_DELIVERY_START', width);
     await page.goto(origin, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     await page.locator('main').scrollIntoViewIfNeeded();
-    await page.locator('img').evaluateAll(async images => { await Promise.all(images.map(async image => {
-      try { await image.decode(); } catch { throw new Error(`No se pudo verificar la imagen: ${image.currentSrc || image.src}`); }
-    })); });
+    await verifyImages(page);
     assert.equal(external.length, 0);
     assert.equal(await page.locator('[data-privacy-placeholder]').count(), 0);
     assert.equal(await page.locator('.privacy-social-note,.privacy-video-surface').count(), 0);
@@ -130,7 +151,7 @@ try {
     assert.equal(await stage.locator('.tk-player__dock').count(), 1);
     await page.goto(`${origin}?baseline=1`, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
-    await page.locator('img').evaluateAll(async images => { await Promise.all(images.map(image => image.decode())); });
+    await verifyImages(page);
     for (const layout of ['journal', 'editorial', 'stage', 'legacy']) {
       await page.mouse.move(-20, -20);
       const baseline = await page.locator(`[data-design="${layout}"]`).screenshot({ path: `${artifacts}/baseline-${layout}-${width}.png`, animations: 'disabled' });
@@ -139,6 +160,7 @@ try {
       assert(pixels.sameSize && pixels.maximum <= 2, `The ${layout} design changed at ${width}px: ${JSON.stringify(pixels)}`);
     }
     assert.deepEqual(errors, []);
+    console.log('SOCIAL_DELIVERY_PASS', width);
     results.push({ width, identicalDesigns: 4, directRequestsBeforeConsent: 0, relayCookieStripped: true, explicitPlayerChoice: true, withdrawalPreservesControls: true });
     await context.close();
   }
