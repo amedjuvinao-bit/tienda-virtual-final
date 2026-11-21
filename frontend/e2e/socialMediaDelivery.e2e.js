@@ -95,9 +95,13 @@ async function comparePixels(page, actual, expected) {
     };
     const [a, b] = await Promise.all([decode(left), decode(right)]);
     if (a.width !== b.width || a.height !== b.height) return { sameSize: false };
-    let maximum = 0;
-    for (let index = 0; index < a.data.length; index += 1) maximum = Math.max(maximum, Math.abs(a.data[index] - b.data[index]));
-    return { sameSize: true, maximum };
+    let maximum = 0, total = 0;
+    for (let index = 0; index < a.data.length; index += 1) {
+      const difference = Math.abs(a.data[index] - b.data[index]);
+      maximum = Math.max(maximum, difference);
+      total += difference;
+    }
+    return { sameSize: true, maximum, mean: total / a.data.length };
   }, [actual.toString('base64'), expected.toString('base64')]);
 }
 try {
@@ -156,12 +160,14 @@ try {
       await page.mouse.move(-20, -20);
       const baseline = await page.locator(`[data-design="${layout}"]`).screenshot({ path: `${artifacts}/baseline-${layout}-${width}.png`, animations: 'disabled' });
       const pixels = await comparePixels(page, actual[layout], baseline);
-      // GPU rounding can vary by one RGB level along blurred glass edges.
-      assert(pixels.sameSize && pixels.maximum <= 2, `The ${layout} design changed at ${width}px: ${JSON.stringify(pixels)}`);
+      // Blurred glass can round by up to 3/255 on a few GPU-rendered edges.
+      // The mean bound also rejects widespread changes of even one level.
+      console.log('SOCIAL_PIXELS', JSON.stringify({ layout, width, ...pixels }));
+      assert(pixels.sameSize && pixels.maximum <= 3 && pixels.mean <= .05, `The ${layout} design changed at ${width}px: ${JSON.stringify(pixels)}`);
     }
     assert.deepEqual(errors, []);
     console.log('SOCIAL_DELIVERY_PASS', width);
-    results.push({ width, identicalDesigns: 4, directRequestsBeforeConsent: 0, relayCookieStripped: true, explicitPlayerChoice: true, withdrawalPreservesControls: true });
+    results.push({ width, visuallyMatchingDesigns: 4, directRequestsBeforeConsent: 0, relayCookieStripped: true, explicitPlayerChoice: true, withdrawalPreservesControls: true });
     await context.close();
   }
   assert(deliveries.length > 0);
