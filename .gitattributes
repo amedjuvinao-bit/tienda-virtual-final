@@ -1,0 +1,3 @@
+# Docker entrypoints and CI scripts must keep Unix line endings on Windows too.
+deploy/*.sh text eol=lf
+deploy/*.Dockerfile text eol=lf
