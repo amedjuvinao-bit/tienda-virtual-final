@@ -149,18 +149,22 @@ function validateStaticCode() {
   );
   ok('Carrito backend valida precio y stock por variante avanzada');
 
-  const productDetail = readRepoFile('frontend/src/pages/ProductDetail.jsx');
+  const productDetail = [
+    'frontend/src/pages/ProductDetail.jsx',
+    'frontend/src/components/product-detail/ProductDetailView.jsx',
+    'frontend/src/components/product-detail/productDetailModel.js',
+  ].map(readRepoFile).join('\n');
   assertSourceContains(
     productDetail,
     ['selectedVariant', 'variantAwareProduct', 'getColorDisplayName', 'variantId', 'variantSku', 'variantBarcode'],
-    'ProductDetail.jsx'
+    'Composición de ProductDetail'
   );
   ok('Detalle publico usa variante para imagen, precio y carrito');
 
   const cartContext = readRepoFile('frontend/src/context/CartContext.jsx');
   assertSourceContains(
     cartContext,
-    ['readVariantId', 'variantId', 'variantKey', 'variantSku', 'variantBarcode', 'items: cart.map(toBackendItem)'],
+    ['readVariantId', 'variantId', 'variantKey', 'variantSku', 'variantBarcode', 'items: items.map(toBackendItem)'],
     'CartContext.jsx'
   );
   ok('Carrito frontend conserva variante exacta y valida contra backend');
@@ -450,8 +454,10 @@ async function main() {
   } catch (error) {
     fail('Error inesperado en prueba general de Productos', error);
   } finally {
-    await cleanup(product?._id);
-    ok('Limpieza final de datos temporales');
+    if (mongoose.connection.readyState === 1) {
+      await cleanup(product?._id);
+      ok('Limpieza final de datos temporales');
+    }
 
     console.log('\n=== Resultado final ===');
     console.log(`OK: ${results.ok}`);

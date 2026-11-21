@@ -19,21 +19,43 @@ jobs:
         working-directory: backend
       - run: npm run test:catalog-plus && npm run test:product-pagination && npm run test:products-public-security
         working-directory: backend
+      - name: Validar privacidad, suscripciones, PQR y conservación automática
+        working-directory: backend
+        run: |
+          node --test scripts/testSelectionRetentionWorker.js scripts/testAbandonedCartCleanup.js scripts/testPrivacyPreferencesPolicy.cjs scripts/testAdminNewsletterSubscribers.cjs scripts/testSubscriberQueryValidation.cjs test/socialMediaRelay.test.js
+          node scripts/testProductReviewPrivacy.js
+          node scripts/testNewsletterConsent.js
+          node scripts/testCustomersStage4Privacy.js
+          node scripts/testConsumerProtectionContract.js
+          node scripts/testConsumerCaseAccess.js
+          node scripts/testPrivacyPresentation.js
       - run: npm ci
         working-directory: frontend
       - run: npm run test:pages-module
         working-directory: frontend
+      - name: Validar preferencias, teclado y vencimiento de selecciones
+        working-directory: frontend
+        run: |
+          npm run test:privacy-preferences
+          npx vitest run src/components/StorefrontKeyboard.test.jsx src/utils/selectionRetention.test.js src/utils/favoriteStore.test.js src/context/CartContext.sync.test.jsx
       - run: node node_modules/playwright/cli.js install --with-deps chromium
         working-directory: frontend
-      - run: npm run test:e2e:pages-module
+      - name: Validar páginas y privacidad en Chromium
+        run: |
+          npm run test:e2e:pages-module
+          npm run test:e2e:privacy-preferences
+          npm run test:e2e:social-media-delivery
         working-directory: frontend
         env:
           PAGES_E2E_ARTIFACTS: ${{ runner.temp }}/pages-e2e
+          PRIVACY_ARTIFACTS: ${{ runner.temp }}/privacy-e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: pages-editor-browser
-          path: ${{ runner.temp }}/pages-e2e
+          path: |
+            ${{ runner.temp }}/pages-e2e
+            ${{ runner.temp }}/privacy-e2e
       - run: npm run build
         working-directory: frontend
       - name: Verificar la entrada independiente de vista previa

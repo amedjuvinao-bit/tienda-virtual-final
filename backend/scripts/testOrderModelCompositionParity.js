@@ -33,15 +33,19 @@ function describePath(path) {
   };
 }
 
-function buildSchemaFingerprint(schema) {
+function buildSchemaFingerprint(schema, excludedPaths = []) {
+  const isIncluded = (name) => !excludedPaths.some(
+    (excluded) => name === excluded || name.startsWith(`${excluded}.`)
+  );
   const shape = {
     paths: Object.fromEntries(
       Object.entries(schema.paths)
+        .filter(([name]) => isIncluded(name))
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([name, path]) => [name, describePath(path)])
     ),
     nested: Object.keys(schema.nested || {}).sort(),
-    singleNested: Object.keys(schema.singleNestedPaths || {}).sort(),
+    singleNested: Object.keys(schema.singleNestedPaths || {}).filter(isIncluded).sort(),
     indexes: schema.indexes(),
     pre: Object.fromEntries(
       [...schema.s.hooks._pres.entries()]
@@ -244,15 +248,27 @@ async function validateBehaviorParity() {
 async function main() {
   const schema = Order.schema;
 
-  assert.strictEqual(Object.keys(schema.paths).length, 117);
+  assert.strictEqual(Object.keys(schema.paths).length, 119);
   assert.strictEqual(Object.keys(schema.nested).length, 8);
-  assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 347);
+  assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 366);
   assert(schema.path('payment.manualConfirmation.requestFingerprint'));
   assert.strictEqual(schema.path('inventoryControl.reservationExpiresAt')?.instance, 'Date');
   assert.strictEqual(schema.indexes().length, 45);
   assert.strictEqual(schema.s.hooks._pres.get('validate')?.length, 1);
   assert.strictEqual(schema.s.hooks._pres.get('save')?.length, 6);
-  assert.strictEqual(buildSchemaFingerprint(schema), EXPECTED_SCHEMA_FINGERPRINT);
+  // Estas dos ampliaciones conservan la estructura previa del pedido.
+  // La huella original sigue protegiendo todos los demás campos, índices y hooks.
+  const additions = ['consumerContract', 'customer.newsletterConsent'];
+  assert.strictEqual(schema.path('consumerContract').instance, 'Mixed');
+  assert.strictEqual(schema.path('consumerContract').options.immutable, true);
+  assert.strictEqual(schema.path('consumerContract').options.default, undefined);
+  const consent = schema.path('customer.newsletterConsent');
+  assert.strictEqual(consent.options.default, undefined);
+  assert.strictEqual(consent.schema.options._id, false);
+  assert.strictEqual(consent.schema.path('confirmedAt').instance, 'Date');
+  assert.strictEqual(consent.schema.path('privacyVersion').instance, 'String');
+  assert.strictEqual(consent.schema.path('proofReference').instance, 'String');
+  assert.strictEqual(buildSchemaFingerprint(schema, additions), EXPECTED_SCHEMA_FINGERPRINT);
 
   await validateBehaviorParity();
   console.log('OK  Paridad estructural y de comportamiento del modelo Order');

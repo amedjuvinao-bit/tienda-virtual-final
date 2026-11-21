@@ -175,6 +175,13 @@ try {
   await page.route("**/api/**", async (route) => {
     const u = new URL(route.request().url());
     if (!u.pathname.startsWith("/api/")) return route.continue();
+    if (u.pathname === '/api/uploads' && route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        headers: { 'access-control-allow-origin': 'http://127.0.0.1:5205', 'access-control-allow-credentials': 'true' },
+        body: JSON.stringify({ url: '/information/satin.webp' }),
+      });
+    }
     if (!["GET", "OPTIONS"].includes(route.request().method())) {
       const method = route.request().method();
       if (
@@ -381,13 +388,12 @@ try {
             throw Error("Browser back discarded a draft");
         }
       }
-      await page
-        .getByRole("button", { name: "Contenido", exact: true })
-        .click();
       if (kind === "catalog") {
+        await page.getByRole("button", { name: "Diseño", exact: true }).click();
         await page
-          .getByRole("button", { name: "Título y presentación", exact: true })
+          .getByRole("button", { name: "Encabezado", exact: true })
           .click();
+        await page.getByRole("tab", { name: "Contenido", exact: true }).click();
         await page
           .getByLabel("Título del catálogo", { exact: true })
           .fill(publicTitle);
@@ -395,6 +401,7 @@ try {
         await page
           .getByRole("button", { name: "Ajustes", exact: true })
           .click();
+        await page.getByRole("button", { name: "Datos y título", exact: true }).click();
         await page
           .getByRole("button", { name: "Encabezado del detalle", exact: true })
           .click();
@@ -413,25 +420,28 @@ try {
         .waitFor({ timeout: 12000 });
       if (kind === "catalog" && device.id === "desktop") {
         await page.getByRole('button', { name: 'Diseño', exact: true }).click();
-        await page.getByRole('button', { name: 'Estructura visual', exact: true, expanded: true }).waitFor();
-        await page.getByRole('tab', {name:'Productos', exact:true}).click();
+        await page.getByRole('button', { name: 'Tarjetas de producto', exact: true }).click();
+        await page.getByRole('tab', {name:'Cristal y bordes', exact:true}).click();
         await page.getByLabel('Borde de las tarjetas', { exact: true }).selectOption('fine');
         await frame.locator('.catalog-ecard[data-rim="fine"]').first().waitFor();
         await page.getByLabel('Borde de las tarjetas', { exact: true }).selectOption('optical');
-        await page.getByRole('tab', {name:'Encabezado', exact:true}).click();
-        await page.getByRole('tab', {name:'Texto', exact:true}).click();
+        await page.getByRole('button', {name:'Encabezado', exact:true}).click();
+        await page.getByRole('tab', {name:'Tipografía', exact:true}).click();
         await page.getByLabel('Tamaño del título de catálogo (px)', { exact: true }).fill('40');
+        await page.getByRole('button', {name:'Fondo y cristal', exact:true}).click();
         await page.getByRole('tab', {name:'Fondo', exact:true}).click();
-        await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
         await page.getByLabel('Origen del fondo', { exact: true }).selectOption('custom');
-        await page.getByLabel('Dirección de la imagen de fondo', { exact: true }).fill('/information/satin.webp');
-        await page.getByRole('tab', {name:'Encabezado', exact:true}).click();
+        await page.getByLabel('Subir imagen de fondo', { exact: true }).setInputFiles(fileURLToPath(new URL('../public/information/satin.webp', import.meta.url)));
+        await page.getByRole('status').filter({hasText:'Imagen subida.'}).waitFor();
+        await page.getByRole('tab', {name:'Cristal', exact:true}).click();
+        await page.getByLabel('Opacidad del cristal (0 a 1)', { exact: true }).fill('0.45');
+        await page.getByRole('button', {name:'Encabezado', exact:true}).click();
         await page.getByRole('tab', {name:'Cristal', exact:true}).click();
         await page.getByLabel('Color del cristal del encabezado', { exact:true }).fill('#d4eee1');
         await page.getByRole('tab', {name:'Bordes y luz', exact:true}).click();
         await page.getByLabel('Color del borde del encabezado', { exact:true }).fill('#24785a');
         await page.getByLabel('Intensidad de los reflejos (0 a 1)', { exact:true }).fill('0.3');
-        await page.getByRole('tab', {name:'Bolsas', exact:true}).click();
+        await page.getByRole('tab', {name:'Adorno', exact:true}).click();
         await page.getByLabel('Adorno del encabezado', { exact:true }).selectOption('none');
         await frame.locator('.cpv-glass-bags').waitFor({state:'detached'});
         await page.waitForFunction(() => {
@@ -631,7 +641,7 @@ try {
     await page.goto('http://127.0.0.1:5205/admin/catalogo/catalog');
     await page.locator('.pages-workspace__form').waitFor();
     await page.getByRole('button', {name:'Diseño',exact:true}).click();
-    await page.getByRole('tab', {name:'Encabezado',exact:true}).click();
+    await page.getByRole('button', {name:'Encabezado',exact:true}).click();
     await page.locator('.pages-workspace__form').evaluate(node => { node.style.minHeight='1800px'; });
     for (const offset of [500,1000]) {
       await page.evaluate(offset => window.scrollTo(0,document.querySelector('.pages-workspace__grid').getBoundingClientRect().top + scrollY + offset),offset);

@@ -3,14 +3,15 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const { policyDocument } = require("../services/consumer/policies");
 const { buildConsumerOffer } = require("../services/consumer/checkoutContract");
-// Golden hashes recorded before extracting the presentation topics.
+// Huellas de la política vigente, que incorpora las preferencias de contenido externo.
+// Una edición de su presentación debe conservar estos textos y esta oferta.
 const cases = [
   {
     settings: {},
     sectionsHash:
-      "2ce5b77c5c0ef4e0c70098ccf5a6738970b3826d83f2cc2066c782039a7fa409",
+      "54ed508948d9c77dbd7b8dd3c8d1d7a5a0d75501f21caced0a698a433d8536b5",
     offerFingerprint:
-      "6203244077b241c210aefe8e06c1139d168f8f4d49c74a7d80061af12a50ee0b",
+      "18dfef79309f4538a4c238ec4ac18b712e52cafabae652cde93b20f8955729ec",
   },
   {
     settings: {
@@ -22,9 +23,9 @@ const cases = [
       },
     },
     sectionsHash:
-      "33ddae9f5483fd944f27039bd722c5178b0fa4e3ea56160e1c3fe4490dc3c9a5",
+      "9ecfe9fca56e18cafe2f714881bf0ebe3224c9a62aa84197a4e2d395543d1d73",
     offerFingerprint:
-      "227bffbaee813b544ac4f714665a402ff95aa40ce18160276010aeff12d7ae27",
+      "98765b9b4d2bdaa6c2bf2895c0c0bd17d8a8bf9cf1d7796ea9c2ae8f59a191d2",
   },
   {
     settings: {
@@ -42,9 +43,9 @@ const cases = [
       },
     },
     sectionsHash:
-      "b610510914bea06d20bebd3dbb56cfe93612a756e2c47d116c3a394117253133",
+      "fae5bc3bfbcd3fe0a26315fb33f4384a65c336edd7f920ad7f7b9424e4126b3c",
     offerFingerprint:
-      "a396ed8fc14bd02a709cfb6936fc44ffe2eecd5b969ee377e368d129c05eb76c",
+      "0588466d8d00c8ff0fd23a11e6f2b9ab571fad98ca7156402e7181f5476cc9d6",
   },
   {
     settings: {
@@ -78,9 +79,9 @@ const cases = [
       },
     },
     sectionsHash:
-      "65214678047251b27e5a9e341b19cd098bf510f2b9289aa0312f8fba2250d02b",
+      "76f5db23709ac6708dfba0f23e6c6d227446cf632b4a99f58d372ed2bea2303c",
     offerFingerprint:
-      "8f1e6caaee88118d30bc1fa5a48353b479a14e76ba5f1b8726104996ddda1384",
+      "2249c3a65ccffc088b9674a25e91fe779abe77e6bd16e12215f720c59f25da93",
   },
 ];
 for (const [index, item] of cases.entries()) {
@@ -103,7 +104,7 @@ for (const [index, item] of cases.entries()) {
   );
   assert.deepEqual(
     doc.privacySections.map((section) => section.id),
-    ["datos", "autorizacion", "conservacion", "consultas"],
+    ["datos", "autorizacion", "conservacion", "consultas", "cookies"],
   );
   let remaining = doc.sections.find(
     (section) => section.id === "privacidad",
@@ -124,7 +125,7 @@ for (const [index, item] of cases.entries()) {
     "Topics omitted part of the canonical policy",
   );
   console.log(
-    `OK ${index + 1}: políticas y huella histórica idénticas; lectura por temas íntegra`,
+    `OK ${index + 1}: política vigente y huella de compra conservadas; lectura por temas íntegra`,
   );
 }
 console.log(
