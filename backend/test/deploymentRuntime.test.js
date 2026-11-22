@@ -83,6 +83,24 @@ test('un cierre que excede el plazo termina con error y cierra conexiones', asyn
   assert.equal(forced, true);
 });
 
+test('el plazo predeterminado termina antes del SIGKILL de Render con disco', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  context.after(() => context.mock.timers.reset());
+  let forced = false;
+  let result;
+  const lifecycle = createGracefulShutdown({
+    server: { close() {}, closeAllConnections() { forced = true; } },
+    stopWorkers() {}, workersIdle: () => true,
+    disconnect: () => assert.fail('Hay solicitudes que todavía no terminaron'),
+    logger,
+  });
+  void lifecycle.shutdown().then(code => { result = code; });
+  context.mock.timers.tick(29000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(result, 1, 'El cierre debe terminar antes del límite fijo de 30 segundos');
+  assert.equal(forced, true);
+});
+
 test('un error al cerrar no anuncia éxito ni expone el error interno', async () => {
   const messages = [];
   const lifecycle = createGracefulShutdown({

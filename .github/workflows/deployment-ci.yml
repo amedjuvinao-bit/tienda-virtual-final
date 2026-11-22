@@ -2,7 +2,7 @@ name: Despliegue Docker y Render
 
 on:
   push:
-    branches: [main, feature/despliegue-render-docker]
+    branches: [main, feature/despliegue-render-docker, 'fix/render-*']
   pull_request:
     branches: [main]
     paths:
@@ -48,6 +48,10 @@ jobs:
           with open('render.yaml') as source:
               blueprint = yaml.safe_load(source)
           jsonschema.Draft202012Validator(schema).validate(blueprint)
+          # Render's API enforces this disk constraint beyond its JSON schema.
+          for i, service in enumerate(blueprint.get('services', [])):
+              if service.get('disk') is not None and 'maxShutdownDelaySeconds' in service:
+                  raise ValueError(f'services[{i}]: maxShutdownDelaySeconds no es compatible con disco persistente')
           print('Blueprint válido según el esquema oficial de Render.')
           PY
       - name: Compilar el frontend comercial

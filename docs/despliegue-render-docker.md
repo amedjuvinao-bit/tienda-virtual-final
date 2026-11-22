@@ -131,8 +131,10 @@ páginas comerciales actuales. La vista previa mantiene `page-preview.html`.
   segundos y devuelve solamente `{ "ok": true/false }`. No muestra credenciales
   ni diagnósticos internos. Una pausa por respaldo no provoca por sí sola el
   reinicio del proceso.
-- El cierre por SIGTERM deja hasta 110 segundos para terminar solicitudes y
-  tareas en curso antes de cerrar MongoDB. Render concede 120 segundos.
+- El cierre por SIGTERM deja hasta 25 segundos para terminar solicitudes y
+  tareas en curso antes de cerrar MongoDB. Render aplica un plazo fijo de
+  30 segundos a los servicios con disco y no permite personalizarlo mediante
+  `maxShutdownDelaySeconds`; ese campo debe permanecer ausente del Blueprint.
 - Los trabajos existentes siguen dentro de una única instancia. No agregar
   otro backend o worker escritor sin revisar la coordinación de respaldos.
 - `BACKUP_PANEL_SINGLE_INSTANCE` permanece `false` hasta confirmar que se ha

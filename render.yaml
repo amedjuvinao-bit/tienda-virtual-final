@@ -12,7 +12,6 @@ services:
     dockerContext: .
     autoDeployTrigger: checksPass
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 120
     disk:
       name: tienda-data
       mountPath: /var/data

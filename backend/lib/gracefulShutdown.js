@@ -2,7 +2,9 @@
 
 function createGracefulShutdown({
   server, stopWorkers, workersIdle, disconnect, logger = console,
-  timeoutMs = 110000,
+  // Render services with a disk have a fixed 30-second shutdown window.
+  // Leave five seconds for process termination before the platform sends SIGKILL.
+  timeoutMs = 25000,
 }) {
   let stopping = false;
   let completion;
