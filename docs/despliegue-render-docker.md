@@ -28,7 +28,7 @@ del Blueprint en Render sí puede generar cargos por servidor y almacenamiento.
   excluye `.env`, dependencias locales, pruebas y respaldos.
 - `deploy/backend-entrypoint.sh`: prepara el disco, conserva las imágenes locales
   heredadas sin sobrescribir archivos existentes y ejecuta Node como uid 1000.
-- `deploy/build-frontend.mjs`: exige la URL HTTPS del backend, compila ambas
+- `deploy/build-frontend.mjs`: exige el origen HTTPS de acceso a la API, compila ambas
   entradas y retira únicamente del artefacto comercial las políticas antiguas de
   desarrollo de `public/legal`. Esos originales permanecen en el repositorio.
 - `.github/workflows/deployment-ci.yml`: valida el Blueprint oficial, compila el
@@ -65,20 +65,30 @@ ese artefacto: Render lo reconstruye con la URL real introducida en su panel.
 4. Elegir el buzón empresarial y el proveedor de envío automático. Se conserva
    el módulo SMTP existente. En Render de pago usar SMTP 465 o 587; no puerto 25.
 
-Las direcciones `.onrender.com` pueden servir para una comprobación inicial. Para
-la operación administrativa se recomienda el dominio propio compartido: algunos
-navegadores bloquean las cookies entre sitios distintos aunque usen `SameSite=None`.
+El navegador accede a la API a través de `/api/*` en la misma dirección de la
+tienda. Render reenvía esas peticiones al backend existente; `/uploads/*` conserva
+el acceso a sus imágenes heredadas. Las reglas son reescrituras, no redirecciones,
+y preceden al fallback de React. Las respuestas de `/api/*` se marcan
+`Cache-Control: private, no-store` para no compartir datos de sesiones en la CDN.
+Así las cookies administrativas son de primera parte también en Safari, sin
+pedir que se desactiven las protecciones del navegador ni guardar JWT en JavaScript.
 
 En el primer despliegue, el Blueprint obtiene automáticamente `FRONTEND_URL`,
-`BACKEND_URL` y `VITE_API_BASE_URL` de la variable `RENDER_EXTERNAL_URL` del
-servicio correspondiente mediante `fromService`. No es necesario adivinar los
+`BACKEND_URL` y `VITE_API_BASE_URL` de la variable `RENDER_EXTERNAL_URL` mediante
+`fromService`: `FRONTEND_URL` y `VITE_API_BASE_URL` apuntan a `rosa-boutique-web` y
+`BACKEND_URL` apunta a `rosa-boutique-api`. No es necesario adivinar los
 subdominios ni copiar los túneles de desarrollo. La referencia usa la dirección
 pública HTTPS, no el nombre de la red privada de Render.
 
-Al conectar el dominio propio, sustituir esas referencias en `render.yaml` por
-las URLs públicas definitivas antes de sincronizar. Una edición únicamente en el
-panel puede ser reemplazada por las referencias del Blueprint en una futura
-sincronización.
+Los destinos de las reescrituras usan la URL pública del backend ya creado,
+`https://rosa-boutique-api.onrender.com`. Si se reutiliza esta plantilla para
+otros servicios, comprobar y sustituir ambos destinos: Render no interpola
+variables en las reglas.
+
+Al conectar el dominio propio, establecer `FRONTEND_URL` y `VITE_API_BASE_URL`
+en ese mismo origen público y mantener `/api/*` apuntando al backend. Actualizar
+también `BACKEND_URL` si cambia su URL pública. Una edición únicamente en el
+panel puede ser reemplazada por el Blueprint en una futura sincronización.
 
 ## 3. Preparar MongoDB, claves e integraciones
 
@@ -94,7 +104,7 @@ No pegarlas en el repositorio, una incidencia, el chat ni una captura de pantall
 | Auditoría | `CUSTOMER_AUDIT_HASH_SECRET` |
 | Imágenes | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
 | Respaldos | `BACKUP_DB_NAME`, `BACKUP_ENCRYPTION_KEY`, `STAGING_MONGODB_URI` |
-| Frontend | `VITE_API_BASE_URL`, asignada automáticamente al origen HTTPS del backend sin `/api` |
+| Frontend | `VITE_API_BASE_URL`, asignada al origen HTTPS de la tienda, sin `/api`; Render reenvía `/api/*` al backend |
 
 Si se migra una base existente, conservar las claves efectivas con las que se
 cifraron configuraciones, secretos TOTP y registros de auditoría. Para una clave
@@ -113,9 +123,12 @@ necesarias antes de admitir pedidos: producción tiene `autoIndex` desactivado.
 No ejecutar seeds ni comandos de borrado contra la base comercial. Las pruebas
 Docker no sustituyen esa verificación de índices de la base real.
 
-Con frontend y API HTTPS bajo el mismo dominio, configurar
-`ADMIN_COOKIE_SAME_SITE=lax`. Si se prueban temporalmente dominios distintos, usar
-`none`, sabiendo que el navegador puede bloquear esas cookies de terceros.
+Las cookies mantienen `HttpOnly` y `Secure` y no llevan un dominio compartido.
+El valor existente `ADMIN_COOKIE_SAME_SITE=none` es compatible con las peticiones
+de primera parte a través de la reescritura; no necesita cambiarse para este
+ajuste. `lax` también es válido cuando todos los accesos del navegador a la API
+pasan por la misma dirección de la tienda. No volver a apuntar el frontend
+directamente a otro sitio: Safari puede bloquear esas cookies aunque usen `none`.
 
 Revisar en el panel los destinos de Wompi, Factus, correo e integraciones de envío
 con las URLs definitivas. Las credenciales de producción deben pertenecer a sus
@@ -134,6 +147,13 @@ cuentas reales; esta preparación no las activa ni ejecuta cobros o facturas.
 5. Conectar los dominios siguiendo los registros DNS que muestre Render. Mantener
    los registros del correo y autenticar al proveedor de envío.
 6. Verificar HTTPS, la página pública y el acceso administrativo con 2FA.
+
+Después de aplicar las reescrituras, comprobar que `/api/admin/auth/verify` en
+la dirección de la tienda devuelve JSON del backend y no `index.html`, que las
+respuestas de autenticación no se almacenan en caché y que las cookies
+`Set-Cookie` conservan `HttpOnly`, `Secure` y sus rutas. Validar en Safari el
+inicio de sesión, recarga, navegación y cierre de sesión; estas comprobaciones
+del entorno real no quedan sustituidas por el build local.
 
 El frontend conserva el acceso directo a sus rutas mediante la reescritura a
 `index.html`. `/legal/privacidad.html` y `/legal/terminos.html` redirigen a las
