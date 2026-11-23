@@ -16,8 +16,9 @@ const get = router.stack.find((layer) => layer.route?.methods?.get).route.stack[
 function response() {
   return {
     statusCode: 200,
+    headers: {},
     status(code) { this.statusCode = code; return this; },
-    set() { return this; },
+    set(name, value) { this.headers[name] = value; return this; },
     once() { return this; },
     json(data) { this.body = data; return this; },
   };
@@ -48,6 +49,7 @@ async function run() {
     findOneAndUpdate: BackupPreference.findOneAndUpdate,
     findAdminById: AdminUser.findById,
     begin: backupMaintenance.begin,
+    now: Date.now,
   };
   let current = null;
   BackupPreference.findById = () => ({ lean: async () => current });
@@ -86,15 +88,54 @@ async function run() {
     assert.equal(current.strategy, 'atlas_managed');
 
     const start = router.stack.find((layer) => layer.route?.path === '/start').route.stack.at(-1).handle;
+    Date.now = () => 1_725_000_000_000;
     process.env.ADMIN_2FA_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
     const secret = 'JBSWY3DPEHPK3PXP';
-    AdminUser.findById = () => ({ select: async () => ({ twoFactorEnabled: true,
-      twoFactorSecret: encryptTwoFactorSecret(secret), comparePassword: async (value) => value === 'correct' }) });
+    let owner = { twoFactorEnabled: true,
+      twoFactorSecret: encryptTwoFactorSecret(secret), comparePassword: async (value) => value === 'correct' };
+    AdminUser.findById = () => ({ select: async () => owner });
     let starts = 0;
     backupMaintenance.begin = async () => { starts += 1; return 'a'.repeat(24); };
     const credentials = { currentPassword: 'correct', twoFactorCode: generateTotp(secret) };
     const wrong = await call(start, { adminUserId: 'owner', adminUsername: 'owner', body: { ...credentials, currentPassword: 'wrong' } });
     assert.equal(wrong.statusCode, 403);
+    assert.equal(wrong.body.code, 'BACKUP_PASSWORD_INVALID');
+    assert.equal(starts, 0);
+    const missing = await call(start, { adminUserId: 'owner', body: { twoFactorCode: credentials.twoFactorCode } });
+    assert.equal(missing.statusCode, 400);
+    assert.equal(missing.body.code, 'BACKUP_CREDENTIALS_REQUIRED');
+    const savedOwner = owner;
+    owner = null;
+    const absent = await call(start, { adminUserId: 'owner', body: credentials });
+    assert.equal(absent.body.code, 'BACKUP_OWNER_UNAVAILABLE');
+    owner = { ...savedOwner, twoFactorEnabled: false };
+    const disabled = await call(start, { adminUserId: 'owner', body: credentials });
+    assert.equal(disabled.statusCode, 403);
+    assert.equal(disabled.body.code, 'BACKUP_TWO_FACTOR_REQUIRED');
+    owner = { ...savedOwner, twoFactorSecret: 'PRIVATE_CORRUPTED_SECRET_SENTINEL' };
+    const unreadable = await call(start, { adminUserId: 'owner', body: credentials });
+    assert.equal(unreadable.statusCode, 503);
+    assert.equal(unreadable.body.code, 'BACKUP_TWO_FACTOR_UNREADABLE');
+    assert.equal(JSON.stringify(unreadable.body).includes('PRIVATE_CORRUPTED_SECRET_SENTINEL'), false);
+    owner = savedOwner;
+    const malformed = await call(start, { adminUserId: 'owner', body: { ...credentials, twoFactorCode: 'ABCDEF' } });
+    assert.equal(malformed.statusCode, 400);
+    assert.equal(malformed.body.code, 'BACKUP_CODE_FORMAT_INVALID');
+    const validCodes = new Set([-1, 0, 1].map((offset) => generateTotp(secret, { time: Date.now() + offset * 30000 })));
+    let invalidCode = '000000';
+    while (validCodes.has(invalidCode)) invalidCode = String(Number(invalidCode) + 1).padStart(6, '0');
+    const protectedPaths = ['/start', '/media-start', '/recover', '/runs/:id/download',
+      '/media-runs/:id/download', '/media-runs/:id/native-download'];
+    for (const routePath of protectedPaths) {
+      const handle = router.stack.find((layer) => layer.route?.path === routePath).route.stack.at(-1).handle;
+      const invalid = await call(handle, { adminUserId: 'owner', params: { id: 'a'.repeat(24) },
+        body: { ...credentials, twoFactorCode: invalidCode } });
+      assert.equal(invalid.statusCode, 403, routePath);
+      assert.equal(invalid.body.code, 'BACKUP_CODE_INVALID', routePath);
+      assert.match(invalid.body.message, /contraseña es correcta/);
+      assert.equal(JSON.stringify(invalid.body).includes(secret), false);
+      assert.equal(invalid.headers['Cache-Control'], 'no-store, private');
+    }
     assert.equal(starts, 0);
     const paid = await call(start, { adminUserId: 'owner', adminUsername: 'owner', body: credentials });
     assert.equal(paid.statusCode, 409);
@@ -109,6 +150,7 @@ async function run() {
     BackupPreference.findOneAndUpdate = original.findOneAndUpdate;
     AdminUser.findById = original.findAdminById;
     backupMaintenance.begin = original.begin;
+    Date.now = original.now;
   }
   console.log('Preferencias de respaldo: owner, auditoría, validación y conflictos OK');
 }
