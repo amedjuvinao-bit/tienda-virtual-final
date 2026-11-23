@@ -89,8 +89,9 @@ services:
       - key: NODE_VERSION
         value: '24'
       - key: VITE_API_BASE_URL
+        # Browser requests stay first-party, including Safari session cookies.
         fromService:
-          name: rosa-boutique-api
+          name: rosa-boutique-web
           type: web
           envVarKey: RENDER_EXTERNAL_URL
     headers:
@@ -100,7 +101,18 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+      - path: /api/*
+        name: Cache-Control
+        value: private, no-store
     routes:
+      # These public upstream URLs belong to the existing production API.
+      # Keep proxy rules before the SPA fallback; do not turn them into redirects.
+      - type: rewrite
+        source: /api/*
+        destination: https://rosa-boutique-api.onrender.com/api/*
+      - type: rewrite
+        source: /uploads/*
+        destination: https://rosa-boutique-api.onrender.com/uploads/*
       - type: redirect
         source: /legal/privacidad.html
         destination: /privacidad
