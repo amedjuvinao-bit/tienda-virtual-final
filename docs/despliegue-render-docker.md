@@ -171,9 +171,18 @@ páginas comerciales actuales. La vista previa mantiene `page-preview.html`.
   `maxShutdownDelaySeconds`; ese campo debe permanecer ausente del Blueprint.
 - Los trabajos existentes siguen dentro de una única instancia. No agregar
   otro backend o worker escritor sin revisar la coordinación de respaldos.
-- `BACKUP_PANEL_SINGLE_INSTANCE` permanece `false` hasta confirmar que se ha
-  detenido el backend local y cualquier otro escritor externo de esa misma base.
-  Entonces puede establecerse `true` para usar el respaldo desde el panel.
+- `BACKUP_PANEL_SINGLE_INSTANCE` se administra directamente en Render. El
+  Blueprint la declara con `sync: false` para conservar la decisión operacional
+  en futuras sincronizaciones. En una instalación nueva, introducir `false`
+  hasta confirmar que se ha detenido el backend local y cualquier otro escritor
+  externo de esa misma base. Entonces establecer `true` y desplegar el backend
+  para usar el respaldo desde el panel. El cambio habilita el botón; no crea una
+  copia ni inicia mantenimiento por sí solo.
+- Las pruebas locales deben usar una base separada de la comercial. Si se vuelve
+  a conectar otro escritor a la base comercial, deshabilitar primero la
+  confirmación (`false`) y desplegar el backend; no ejecutar copias del panel
+  mientras existan esos escritores. La variable es una confirmación del operador,
+  no un mecanismo de detección de procesos externos.
 - El botón existente pausa la tienda, genera la copia cifrada y comprueba una
   restauración. Programar su ejecución operacional según el volumen de ventas;
   este despliegue no añade una tarea nocturna ni modifica el módulo de respaldo.
