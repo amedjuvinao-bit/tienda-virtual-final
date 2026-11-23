@@ -24,7 +24,9 @@ services:
       - key: BACKUP_DIRECTORY
         value: /var/data/backups
       - key: BACKUP_PANEL_SINGLE_INSTANCE
-        value: 'false'
+        # Operational confirmation, managed in Render after checking all writers.
+        # Blueprint syncs must not reset a previously confirmed value.
+        sync: false
       - key: ADMIN_2FA_REQUIRED_ROLES
         value: owner,admin
       - key: SELECTION_RETENTION_ENABLED
