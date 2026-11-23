@@ -4,16 +4,9 @@ on:
   push:
     branches: [main, feature/despliegue-render-docker, 'fix/render-*']
   pull_request:
+    # Required by proteccion-main: run even when a PR only changes documentation.
+    # Path filters here would leave the required check pending and block merging.
     branches: [main]
-    paths:
-      - backend/**
-      - frontend/**
-      - shared/**
-      - deploy/**
-      - render.yaml
-      - .dockerignore
-      - .gitattributes
-      - .github/workflows/deployment-ci.yml
   workflow_dispatch:
 
 permissions:
