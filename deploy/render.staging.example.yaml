@@ -1,0 +1,148 @@
+# Staging candidate, NOT linked to Render. See docs/entorno-pruebas-render.md.
+# Create only after approving costs. The staging branch must exist first.
+# Replace BOTH .invalid proxy destinations with the new API's verified URL.
+# Never use production service names, credentials, database or proxy upstream.
+previews:
+  generation: 'off'
+
+services:
+  - type: web
+    name: rosa-boutique-staging-api
+    runtime: docker
+    branch: staging
+    region: virginia
+    plan: 0.5c-512mb
+    numInstances: 1
+    dockerfilePath: ./deploy/backend.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: 'off'
+    healthCheckPath: /healthz
+    disk:
+      name: tienda-staging-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '10000'
+      - key: FRONTEND_URL
+        fromService:
+          name: rosa-boutique-staging-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: BACKEND_URL
+        fromService:
+          name: rosa-boutique-staging-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ADMIN_COOKIE_SAME_SITE
+        value: lax
+      - key: ADMIN_2FA_REQUIRED_ROLES
+        value: owner,admin
+      - key: BACKUP_DIRECTORY
+        value: /var/data/backups
+      - key: BACKUP_PANEL_SINGLE_INSTANCE
+        value: 'false'
+      - key: BACKUP_DB_NAME
+        value: rosa_boutique_staging
+      - key: SELECTION_RETENTION_ENABLED
+        value: 'true'
+      # NODE_ENV=production rejects Envia sandbox; use manual shipping initially.
+      - key: SHIPPING_PROVIDER
+        value: manual
+      - key: ENVIA_MODE
+        value: sandbox
+      - key: CLOUDINARY_FOLDER
+        value: rosa_boutique_staging
+      # New independent secrets are safe ONLY for a new blank staging database.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CART_ACCESS_SECRET
+        generateValue: true
+      - key: ORDER_PAYMENT_ACCESS_SECRET
+        generateValue: true
+      - key: ORDER_RETURN_ACCESS_SECRET
+        generateValue: true
+      - key: BILLING_ENCRYPTION_KEY
+        generateValue: true
+      - key: INTEGRATIONS_ENCRYPTION_KEY
+        generateValue: true
+      - key: MAIL_ENCRYPTION_KEY
+        generateValue: true
+      - key: ADMIN_2FA_ENCRYPTION_KEY
+        generateValue: true
+      - key: INSTAGRAM_ENCRYPTION_KEY
+        generateValue: true
+      - key: TIKTOK_ENCRYPTION_KEY
+        generateValue: true
+      - key: CUSTOMER_AUDIT_HASH_SECRET
+        generateValue: true
+      # Enter privately in Render; application DB must be rosa_boutique_staging.
+      - key: MONGO_URI
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Backup encryption requires 64 HEX characters, not Render's base64 generator.
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
+      # Restore-test-only URI, on another server; NEVER the running staging DB.
+      - key: STAGING_MONGODB_URI
+        sync: false
+
+  - type: web
+    name: rosa-boutique-staging-web
+    runtime: static
+    branch: staging
+    autoDeployTrigger: 'off'
+    buildCommand: npm --prefix frontend ci && node deploy/build-frontend.mjs
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: rosa-boutique-staging-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+    headers:
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex, nofollow, noarchive
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /api/*
+        name: Cache-Control
+        value: private, no-store
+    routes:
+      # Reserved .invalid hostname intentionally blocks API use until wired.
+      # Render does not interpolate environment variables in destinations.
+      - type: rewrite
+        source: /api/*
+        destination: https://staging-api-not-configured.invalid/api/*
+      - type: rewrite
+        source: /uploads/*
+        destination: https://staging-api-not-configured.invalid/uploads/*
+      - type: redirect
+        source: /legal/privacidad.html
+        destination: /privacidad
+      - type: redirect
+        source: /legal/terminos.html
+        destination: /terminos
+      - type: redirect
+        source: /legal
+        destination: /privacidad
+      - type: redirect
+        source: /legal/*
+        destination: /privacidad
+      - type: rewrite
+        source: /*
+        destination: /index.html
