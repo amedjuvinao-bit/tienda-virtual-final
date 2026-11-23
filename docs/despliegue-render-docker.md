@@ -69,6 +69,17 @@ Las direcciones `.onrender.com` pueden servir para una comprobación inicial. Pa
 la operación administrativa se recomienda el dominio propio compartido: algunos
 navegadores bloquean las cookies entre sitios distintos aunque usen `SameSite=None`.
 
+En el primer despliegue, el Blueprint obtiene automáticamente `FRONTEND_URL`,
+`BACKEND_URL` y `VITE_API_BASE_URL` de la variable `RENDER_EXTERNAL_URL` del
+servicio correspondiente mediante `fromService`. No es necesario adivinar los
+subdominios ni copiar los túneles de desarrollo. La referencia usa la dirección
+pública HTTPS, no el nombre de la red privada de Render.
+
+Al conectar el dominio propio, sustituir esas referencias en `render.yaml` por
+las URLs públicas definitivas antes de sincronizar. Una edición únicamente en el
+panel puede ser reemplazada por las referencias del Blueprint en una futura
+sincronización.
+
 ## 3. Preparar MongoDB, claves e integraciones
 
 Las variables `sync: false` del Blueprint se introducen privadamente en Render.
@@ -76,13 +87,14 @@ No pegarlas en el repositorio, una incidencia, el chat ni una captura de pantall
 
 | Grupo | Configuración |
 | --- | --- |
-| Datos y direcciones | `MONGO_URI`, `FRONTEND_URL`, `BACKEND_URL` |
+| Base de datos | `MONGO_URI` |
+| Direcciones automáticas | `FRONTEND_URL` y `BACKEND_URL`, mediante referencias a los servicios de Render |
 | Sesiones y accesos | `JWT_SECRET`, `CART_ACCESS_SECRET`, `ORDER_PAYMENT_ACCESS_SECRET`, `ORDER_RETURN_ACCESS_SECRET` |
 | Cifrado de configuraciones | `BILLING_ENCRYPTION_KEY`, `INTEGRATIONS_ENCRYPTION_KEY`, `MAIL_ENCRYPTION_KEY`, `ADMIN_2FA_ENCRYPTION_KEY`, `INSTAGRAM_ENCRYPTION_KEY` |
 | Auditoría | `CUSTOMER_AUDIT_HASH_SECRET` |
 | Imágenes | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
 | Respaldos | `BACKUP_DB_NAME`, `BACKUP_ENCRYPTION_KEY`, `STAGING_MONGODB_URI` |
-| Frontend | `VITE_API_BASE_URL`, origen del backend sin `/api` |
+| Frontend | `VITE_API_BASE_URL`, asignada automáticamente al origen HTTPS del backend sin `/api` |
 
 Si se migra una base existente, conservar las claves efectivas con las que se
 cifraron configuraciones, secretos TOTP y registros de auditoría. Para una clave
@@ -115,8 +127,10 @@ cuentas reales; esta preparación no las activa ni ejecuta cobros o facturas.
 2. En Render, crear un Blueprint desde ese repositorio y `render.yaml`.
 3. Revisar el presupuesto de servidor, disco y cualquier otro servicio antes de
    confirmar su creación. Atlas, correo y dominio tienen facturación separada.
-4. Introducir los valores privados, usando las URLs HTTPS reales. El nombre del
-   servicio no garantiza que su subdominio `.onrender.com` coincida exactamente.
+4. Introducir los valores privados. El Blueprint resuelve las tres direcciones
+   HTTPS públicas automáticamente; no introducir túneles `trycloudflare.com` ni
+   direcciones `localhost`. El nombre del servicio no garantiza que su subdominio
+   `.onrender.com` coincida exactamente.
 5. Conectar los dominios siguiendo los registros DNS que muestre Render. Mantener
    los registros del correo y autenticar al proveedor de envío.
 6. Verificar HTTPS, la página pública y el acceso administrativo con 2FA.

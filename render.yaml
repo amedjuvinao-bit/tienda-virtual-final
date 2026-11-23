@@ -32,9 +32,15 @@ services:
       - key: MONGO_URI
         sync: false
       - key: FRONTEND_URL
-        sync: false
+        fromService:
+          name: rosa-boutique-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: BACKEND_URL
-        sync: false
+        fromService:
+          name: rosa-boutique-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ADMIN_COOKIE_SAME_SITE
         sync: false
       # Supply the existing values when migrating encrypted settings/2FA.
@@ -83,7 +89,10 @@ services:
       - key: NODE_VERSION
         value: '24'
       - key: VITE_API_BASE_URL
-        sync: false
+        fromService:
+          name: rosa-boutique-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
     headers:
       - path: /*
         name: X-Content-Type-Options
