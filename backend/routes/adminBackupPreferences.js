@@ -102,20 +102,53 @@ router.get('/media-runs', async (_req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-async function verifyOwnerCredentials(req) {
+async function verifyOwnerCredentials(req, res) {
+  const reject = (status, code, message) => {
+    res.set('Cache-Control', 'no-store, private');
+    res.status(status).json({ code, message });
+    return false;
+  };
+  const password = String(req.body?.currentPassword || '');
+  const code = String(req.body?.twoFactorCode || '').replace(/\s+/g, '');
+  if (!password || !code) {
+    return reject(400, 'BACKUP_CREDENTIALS_REQUIRED',
+      'Completa de nuevo la contraseña del propietario y el código de la app. Ambos campos se vacían después de cada intento.');
+  }
   const owner = await AdminUser.findById(req.adminUserId).select('+passwordHash +twoFactorSecret');
-  return Boolean(owner && owner.twoFactorEnabled && owner.twoFactorSecret &&
-    await owner.comparePassword(String(req.body?.currentPassword || '')) &&
-    verifyTotp(decryptTwoFactorSecret(owner.twoFactorSecret), String(req.body?.twoFactorCode || '')));
+  if (!owner) {
+    return reject(403, 'BACKUP_OWNER_UNAVAILABLE',
+      'No se pudo verificar la cuenta propietaria de esta sesión. Vuelve a iniciar sesión.');
+  }
+  if (!(await owner.comparePassword(password))) {
+    return reject(403, 'BACKUP_PASSWORD_INVALID',
+      'La contraseña no coincide con la cuenta propietaria de esta sesión. Usa la misma contraseña con la que ingresas a esta cuenta.');
+  }
+  if (!owner.twoFactorEnabled || !owner.twoFactorSecret) {
+    return reject(403, 'BACKUP_TWO_FACTOR_REQUIRED',
+      'Esta cuenta propietaria no tiene la autenticación con app activa. Revisa su estado en Seguridad.');
+  }
+  if (!/^\d{6}$/.test(code)) {
+    return reject(400, 'BACKUP_CODE_FORMAT_INVALID',
+      'Escribe los 6 dígitos del código actual de tu app de autenticación.');
+  }
+  let secret;
+  try { secret = decryptTwoFactorSecret(owner.twoFactorSecret); }
+  catch {
+    return reject(503, 'BACKUP_TWO_FACTOR_UNREADABLE',
+      'El servidor no puede leer la configuración de autenticación de esta cuenta. Es necesario revisar la configuración del servidor; no vuelvas a configurar la app todavía.');
+  }
+  if (!verifyTotp(secret, code)) {
+    return reject(403, 'BACKUP_CODE_INVALID',
+      'La contraseña es correcta, pero el código de la app no coincide con esta cuenta. Usa un código actual de la cuenta con la que ingresaste a la tienda.');
+  }
+  return true;
 }
 
 const startLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true,
   legacyHeaders: false, message: { message: 'Demasiados intentos. Espera 15 minutos.' } });
 router.post('/start', startLimiter, async (req, res, next) => {
   try {
-    if (!(await verifyOwnerCredentials(req))) {
-      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
-    }
+    if (!(await verifyOwnerCredentials(req, res))) return;
     const preference = await BackupPreference.findById('primary').lean();
     if (preference?.strategy !== 'free_manual') {
       return res.status(409).json({ message: 'Primero selecciona y guarda Atlas Free como método de respaldo.' });
@@ -135,9 +168,7 @@ router.post('/start', startLimiter, async (req, res, next) => {
 
 router.post('/media-start', startLimiter, async (req, res, next) => {
   try {
-    if (!(await verifyOwnerCredentials(req))) {
-      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
-    }
+    if (!(await verifyOwnerCredentials(req, res))) return;
     const frontendCloud = String(req.body?.frontendCloud || '').trim();
     if (frontendCloud && frontendCloud !== env.cloudinary.cloudName) {
       return res.status(409).json({ message: 'El frontend de productos y el backend usan cuentas Cloudinary distintas. Corrige la configuración antes de copiar.' });
@@ -161,9 +192,7 @@ router.post('/media-start', startLimiter, async (req, res, next) => {
 
 router.post('/recover', startLimiter, async (req, res, next) => {
   try {
-    if (!(await verifyOwnerCredentials(req))) {
-      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
-    }
+    if (!(await verifyOwnerCredentials(req, res))) return;
     res.set('Cache-Control', 'no-store, private');
     return res.json(await backupMaintenance.recover());
   } catch (error) { return next(error); }
@@ -175,9 +204,7 @@ router.post('/runs/:id/download', downloadLimiter, async (req, res, next) => {
   const { id } = req.params;
   if (!safeBackupId(id)) return res.status(400).json({ message: 'Identificador inválido.' });
   try {
-    if (!(await verifyOwnerCredentials(req))) {
-      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
-    }
+    if (!(await verifyOwnerCredentials(req, res))) return;
     const directory = backupDirectory();
     const record = JSON.parse(await fs.promises.readFile(path.join(directory, `backup-${id}.json`), 'utf8'));
     if (record.id !== id || record.status !== 'verificado' || !record.sha256) {
@@ -219,9 +246,7 @@ router.post('/media-runs/:id/download', downloadLimiter, async (req, res, next) 
   const { id } = req.params;
   if (!safeBackupId(id)) return res.status(400).json({ message: 'Identificador inválido.' });
   try {
-    if (!(await verifyOwnerCredentials(req))) {
-      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
-    }
+    if (!(await verifyOwnerCredentials(req, res))) return;
     const directory = backupDirectory();
     const record = JSON.parse(await fs.promises.readFile(path.join(directory, `media-${id}.json`), 'utf8'));
     if (record.id !== id || record.kind !== 'media' || record.status !== 'verificado' || !record.sha256) {
@@ -262,9 +287,7 @@ router.post('/media-runs/:id/native-download', downloadLimiter, async (req, res,
   const { id } = req.params;
   if (!safeBackupId(id)) return res.status(400).json({ message: 'Identificador inválido.' });
   try {
-    if (!(await verifyOwnerCredentials(req))) {
-      return res.status(403).json({ message: 'Contraseña o código de seguridad incorrecto.' });
-    }
+    if (!(await verifyOwnerCredentials(req, res))) return;
     if (!(await verifiedMediaFile(id))) {
       return res.status(409).json({ message: 'La copia de archivos no coincide con su registro.' });
     }
