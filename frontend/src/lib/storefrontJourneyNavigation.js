@@ -1,4 +1,5 @@
 import { storefrontSectionTop } from './storefrontSectionMotion';
+import { announceJourneyControlNavigation } from './storefrontJourneyInput';
 
 export function journeyTargets(sectionIds, doc=document) {
   const story=doc.querySelector('.storefront-sections');
@@ -19,6 +20,7 @@ export function journeyDuration(distance,viewport,pace='balanced') {
 // Native smooth scrolling has a browser-defined speed. This timeline controls
 // the trip, and the scene engine follows those same real scroll coordinates.
 export function animateJourneyTo(element,{offset=0,pace='balanced',instant=false,onProgress=()=>{},onFinish=()=>{},view=window}={}) {
+  announceJourneyControlNavigation(element);
   let frame=0, stopped=false, started;
   const start=view.scrollY;
   const destination=()=>Math.max(0,Math.min(journeyMaxScroll(view),storefrontSectionTop(element)-offset));

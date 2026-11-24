@@ -1,6 +1,7 @@
 import { collectStoryActors } from './storefrontStoryActors';
 import { actorGeometry } from './storefrontSceneGeometry';
 import { normalizeStoryConfig } from './storefrontStoryConfig';
+import { JOURNEY_CONTROL_NAVIGATION } from './storefrontJourneyInput';
 
 const clamp=value=>Math.max(0,Math.min(1,value));
 const ease=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*t*(t*(t*6-15)+10);};
@@ -47,6 +48,9 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
   const viewport=()=>scroller?scroller.clientHeight:view.innerHeight;
   const pace={quick:.78,balanced:1,leisurely:1.28}[config.pace];
   let chapters=[],frame=0,dirty=true,disposed=false,lastTime=0,held=null;
+  // The preview's automatic tour retains its configured layer demonstration.
+  // On the public page native scrolling starts with a cohesive section reveal.
+  let input=scroller?'controls':'manual';
 
   function restore(actor){
     if(actor.originalTranslate)actor.element.style.setProperty('translate',actor.originalTranslate,actor.originalPriority);
@@ -57,13 +61,18 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
     if(chapter.originalClip)chapter.surface.style.setProperty('clip-path',chapter.originalClip,chapter.originalClipPriority);
     else chapter.surface.style.removeProperty('clip-path');
   }
+  function restoreSurface(chapter){
+    if(chapter.originalSurfaceTranslate)chapter.surface.style.setProperty('translate',chapter.originalSurfaceTranslate,chapter.originalSurfacePriority);
+    else chapter.surface.style.removeProperty('translate');
+    delete chapter.surface.dataset.journeyManualMoving;
+  }
   function clearChapter(chapter){
-    chapter.actors.forEach(restore);restoreClip(chapter);
+    chapter.actors.forEach(restore);restoreClip(chapter);restoreSurface(chapter);
     for(const [key,value] of Object.entries(chapter.originalStyles)){
       if(value)chapter.node.style.setProperty(key,value);else chapter.node.style.removeProperty(key);
     }
   }
-  function disable(){chapters.forEach(clearChapter);delete container.dataset.journeyParallax;delete container.dataset.journeyParallaxSettled;}
+  function disable(){chapters.forEach(clearChapter);delete container.dataset.journeyParallax;delete container.dataset.journeyParallaxSettled;delete container.dataset.journeyInput;}
   function measure(){
     const previous=new Map(chapters.map(chapter=>[chapter.node,chapter]));
     // Read the original layout, never a temporarily pinned rectangle.
@@ -86,7 +95,10 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
       const originalStyles=old?.originalStyles || Object.fromEntries(['--story-layer','--story-pin-top'].map(key=>[key,node.style.getPropertyValue(key)]));
       node.style.setProperty('--story-layer',index+1);
       node.style.setProperty('--story-pin-top',Math.min(0,height-node.offsetHeight)+'px');
-      return {node,surface,top,height:node.offsetHeight,actors,originalStyles,
+      const surfaceTranslate=old?.surfaceTranslate || view.getComputedStyle(surface).translate || 'none';
+      const surfaceParts=surfaceTranslate==='none'?['0px','0px']:surfaceTranslate.match(/calc\([^)]*\)|\S+/g);
+      return {node,surface,top,height:node.offsetHeight,actors,originalStyles,surfaceTranslate,surfaceParts,
+        originalSurfaceTranslate:old?.originalSurfaceTranslate ?? surface.style.getPropertyValue('translate'),originalSurfacePriority:old?.originalSurfacePriority ?? surface.style.getPropertyPriority('translate'),
         originalClip:old?.originalClip ?? surface.style.getPropertyValue('clip-path'),originalClipPriority:old?.originalClipPriority ?? surface.style.getPropertyPriority('clip-path'),
         entryAt:old?.entryAt ?? null,released:old?.released || restoredTop!==null && top<=restoredTop+1};
     });
@@ -96,6 +108,7 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
     frame=0;if(disposed)return;
     if(!enabled()){disable();return;}
     if(dirty)measure();
+    container.dataset.journeyInput=input;
     const now=Number.isFinite(time)?time:view.performance.now(),dt=lastTime?Math.min(50,Math.max(1,now-lastTime)):16;
     lastTime=now;
     const y=scroll(),height=viewport(),width=container.clientWidth || container.getBoundingClientRect().width;
@@ -106,6 +119,7 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
       const outside=top>height*1.4 || top+chapter.height<-height*.25;
       if(outside){
         chapter.released=false;chapter.entryAt=null;
+        restoreSurface(chapter);
         if(top+chapter.height<0)chapter.surface.style.clipPath='inset(0px 0px 100% 0px)';else restoreClip(chapter);
         for(const actor of chapter.actors){actor.arrivalAt=null;actor.x=null;actor.y=null;restore(actor);}return;
       }
@@ -118,6 +132,33 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
       if(covered>.1)chapter.surface.style.clipPath=`inset(0px 0px ${Math.min(chapter.height,covered).toFixed(2)}px 0px)`;
       else if(chapter.originalClip)chapter.surface.style.setProperty('clip-path',chapter.originalClip,chapter.originalClipPriority);
       else chapter.surface.style.removeProperty('clip-path');
+      if(input==='manual'){
+        // Every object retains its layout within the section. Native scroll
+        // alone drives this short vertical reveal, including reverse gestures;
+        // no timers, horizontal flights or delayed deep-content entrances.
+        const entrance=atEnd || chapter.released?1:ease(0,1,(height-top)/(height*.72));
+        const distance=Math.min(compact()?16:28,height*.035)*config.intensity/100;
+        const shift=(!scroller && chapter.node.id==='banner')?0:distance*(1-entrance);
+        if(held!==chapter.node){
+          if(shift<.08)restoreSurface(chapter);
+          else {
+            chapter.surface.dataset.journeyManualMoving='true';
+            chapter.surface.style.setProperty('translate',`${chapter.surfaceParts[0]} calc(${chapter.surfaceParts[1]} + ${shift.toFixed(2)}px) ${chapter.surfaceParts[2] || '0px'}`);
+          }
+        }
+        // When a gesture interrupts a control trip, settle its existing layer
+        // offsets instead of snapping the objects back on the first frame.
+        for(const actor of chapter.actors){
+          if(held===chapter.node)continue;
+          actor.x=(actor.x || 0)*(1-blend);actor.y=(actor.y || 0)*(1-blend);
+          if(Math.abs(actor.x)<.08 && Math.abs(actor.y)<.08){actor.x=0;actor.y=0;restore(actor);continue;}
+          moving=true;
+          actor.element.dataset.journeyLayerMoving='true';
+          actor.element.style.setProperty('translate',`calc(${actor.baseX} + ${actor.x.toFixed(2)}px) calc(${actor.baseY} + ${actor.y.toFixed(2)}px) ${actor.baseZ}`);
+        }
+        return;
+      }
+      restoreSurface(chapter);
       chapter.actors.forEach(actor=>{
         if(held===chapter.node)return;
         const naturalTop=top+actor.geometry.y;
@@ -145,6 +186,17 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
   }
   function schedule(){if(!disposed && !frame)frame=view.requestAnimationFrame(paint);}
   function resize(){dirty=true;schedule();}
+  function controlNavigation(){
+    if(input==='controls')return;
+    input='controls';
+    chapters.forEach(chapter=>{chapter.entryAt=null;chapter.actors.forEach(actor=>{actor.arrivalAt=null;actor.x=null;actor.y=null;});});
+    schedule();
+  }
+  function manualNavigation(event){
+    if(event.type==='keydown' && (!['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key) || event.target.closest?.('input,textarea,select,[contenteditable="true"]') || event.key===' ' && event.target.closest?.('button,[role="button"]')))return;
+    if(input==='manual')return;
+    input='manual';schedule();
+  }
   function chapterFor(element){return chapters.find(chapter=>chapter.node.contains(element));}
   function pointer(event){
     if(!event.target.closest?.('a,button,input,textarea,select,summary,video,iframe,[contenteditable="true"],[role="button"],.keen-slider'))return;
@@ -173,6 +225,8 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
   const mutation=new view.MutationObserver(records=>{if(records.some(record=>!record.target.closest?.('[data-journey-pin]')))resize();});
   mutation.observe(container,{childList:true,subtree:true});
   target.addEventListener('scroll',schedule,{passive:true});view.addEventListener('resize',resize);
+  container.addEventListener(JOURNEY_CONTROL_NAVIGATION,controlNavigation);
+  for(const name of ['wheel','touchstart','pointerdown','keydown'])target.addEventListener(name,manualNavigation,{passive:true,capture:true});
   container.addEventListener('load',resize,true);container.addEventListener('pointerdown',pointer,true);container.addEventListener('focusin',focus,true);
   view.addEventListener('pointerup',release,true);view.addEventListener('pointercancel',release,true);
   reduced?.addEventListener?.('change',preference);mobile?.addEventListener?.('change',preference);doc.addEventListener('visibilitychange',visibility);
@@ -180,6 +234,8 @@ export function mountJourneyParallax(container,rawConfig,{scroller=null,mobileOv
   return ()=>{
     disposed=true;if(frame)view.cancelAnimationFrame(frame);disable();observer?.disconnect();mutation.disconnect();
     target.removeEventListener('scroll',schedule);view.removeEventListener('resize',resize);
+    container.removeEventListener(JOURNEY_CONTROL_NAVIGATION,controlNavigation);
+    for(const name of ['wheel','touchstart','pointerdown','keydown'])target.removeEventListener(name,manualNavigation,true);
     container.removeEventListener('load',resize,true);container.removeEventListener('pointerdown',pointer,true);container.removeEventListener('focusin',focus,true);
     view.removeEventListener('pointerup',release,true);view.removeEventListener('pointercancel',release,true);
     reduced?.removeEventListener?.('change',preference);mobile?.removeEventListener?.('change',preference);doc.removeEventListener('visibilitychange',visibility);

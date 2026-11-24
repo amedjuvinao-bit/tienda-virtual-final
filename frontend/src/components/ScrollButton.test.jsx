@@ -3,6 +3,7 @@ import React from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ScrollButton from './ScrollButton';
+import { JOURNEY_CONTROL_NAVIGATION } from '../lib/storefrontJourneyInput';
 
 beforeEach(() => {
   document.body.innerHTML = '<section id="before"></section><section id="instagram" style="scroll-margin-top:102px"></section><section id="after"></section>';
@@ -42,4 +43,16 @@ it('uses the stable flow position when a section is pinned over the previous car
   mountAt(1400);
   fireEvent.click(screen.getByRole('button',{name:'Siguiente sección'}));
   expect(window.scrollTo).toHaveBeenCalledWith({top:2400,behavior:'auto'});
+});
+
+it('announces the control choreography before keeping the original native smooth scroll',()=>{
+  const story=document.createElement('div');story.className='storefront-sections';
+  story.append(...document.querySelectorAll('section'));document.body.append(story);
+  const navigate=vi.fn();story.addEventListener(JOURNEY_CONTROL_NAVIGATION,navigate);
+  vi.spyOn(window,'scrollY','get').mockReturnValue(0);
+  render(<ScrollButton config={{sectionIds:['before','instagram','after'],behavior:'smooth'}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Siguiente sección'}));
+  expect(navigate).toHaveBeenCalledOnce();
+  expect(navigate.mock.invocationCallOrder[0]).toBeLessThan(window.scrollTo.mock.invocationCallOrder[0]);
+  expect(window.scrollTo).toHaveBeenCalledExactlyOnceWith({top:1000,behavior:'smooth'});
 });
