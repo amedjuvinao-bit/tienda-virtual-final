@@ -9,7 +9,7 @@ import { footerClickFeedback } from './footerClickFeedback';
 import PolishedGlassRim from '../PolishedGlassRim';
 import ConsumerClaimsLink from '../consumer/ConsumerClaimsLink';
 
-export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false, inheritBackground=false }) {
+export default function FooterEditorial({ theme, store, preview=false, polishedGlass=false, inheritBackground=false, legalLinks=null }) {
   const footer=theme?.footer || {}, c=normalizeEditorialOptions(footer,{theme,store}), root=useRef(null);
   const [failedLogo,setFailedLogo]=useState('');
   const signatureId='footer-signature-'+useId().replace(/:/g,'');
@@ -60,6 +60,7 @@ export default function FooterEditorial({ theme, store, preview=false, polishedG
         {c.watermarkStyle==='signature' && <defs><linearGradient id={signatureId} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stopColor="var(--fe-signature-color)" stopOpacity=".16"/><stop offset=".36" stopColor="var(--fe-signature-color)" stopOpacity=".30"/><stop offset=".53" stopColor="var(--fe-edge)" stopOpacity=".32"/><stop offset=".76" stopColor="var(--fe-signature-color)" stopOpacity=".22"/><stop offset="1" stopColor="var(--fe-signature-color)" stopOpacity=".12"/></linearGradient></defs>}
         {(c.watermarkStyle==='signature'?['shadow','light','face','rim']:['shadow','light','edge']).map(layer=><text key={layer} className={'footer-ed__'+(c.watermarkStyle==='signature'?'signature-':'engraving-')+layer} fill={layer==='face'?`url(#${signatureId})`:undefined} x="5" y="151" textLength="990" lengthAdjust="spacingAndGlyphs">{(c.watermarkText || c.brandName).toLocaleUpperCase()}</text>)}
       </svg></div>}
+      {legalLinks}
     </div>
   </footer></div>;
 }

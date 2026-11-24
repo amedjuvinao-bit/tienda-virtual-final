@@ -3,7 +3,7 @@ import "./consumer.css";
 import { normalizeEditorialOptions } from "../footer/footerEditorialConfig";
 import useStorefrontBackdrop from "../useStorefrontBackdrop";
 import { openPrivacyPreferences } from '../../lib/privacyPreferences';
-export default function ConsumerLinks() {
+export default function ConsumerLinks({ embedded = false }) {
   const location = useLocation();
   const backdrop = useStorefrontBackdrop(
     { backgroundMode: "continuity" },
@@ -13,19 +13,26 @@ export default function ConsumerLinks() {
     backdrop.settings?.theme?.footer || {},
     { theme: backdrop.settings?.theme, store: backdrop.settings?.store },
   );
-  if (location.pathname.startsWith("/admin")) return null;
+  const homeEditorialFooter = location.pathname === "/" &&
+    backdrop.settings?.theme?.footer?.enabled !== false &&
+    backdrop.settings?.theme?.footer?.layout !== "classic";
+  if (location.pathname.startsWith("/admin") ||
+      (homeEditorialFooter && !embedded) ||
+      (embedded && !homeEditorialFooter)) return null;
   return (
     <nav
       style={{
         color: footer.textColor,
-        backgroundColor: backdrop.color,
-        backgroundImage: backdrop.image
-          ? `url(${JSON.stringify(backdrop.image)})`
-          : "none",
-        backgroundSize: "cover",
-        backgroundAttachment: "fixed",
+        ...(embedded ? { backgroundColor: "transparent" } : {
+          backgroundColor: backdrop.color,
+          backgroundImage: backdrop.image
+            ? `url(${JSON.stringify(backdrop.image)})`
+            : "none",
+          backgroundSize: "cover",
+          backgroundAttachment: "fixed",
+        }),
       }}
-      className="consumer-legal-links"
+      className={"consumer-legal-links" + (embedded ? " consumer-legal-links--embedded" : "")}
       aria-label="Información y protección al consumidor"
     >
       {[

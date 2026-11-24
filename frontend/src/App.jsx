@@ -140,7 +140,7 @@ function Home({ theme, store }) {
           const content = <Component theme={theme} {...(id==='complementos'?{imageSrc:'/SeccionComplementos/Complementos.png'}:{})} {...(['instagram','tiktok'].includes(id)?{posts:[]}:{})}/>;
           return <section key={id} id={id} className="storefront-section-shell w-full">{['instagram', 'tiktok'].includes(id) ? <SocialContentPrivacy>{content}</SocialContentPrivacy> : content}</section>;
         })}
-        <section id="footer" className="w-full"><FooterSection theme={theme} store={store} /></section>
+        <section id="footer" className="w-full"><FooterSection theme={theme} store={store} legalLinks={<ConsumerLinks embedded />} /></section>
       </StorefrontStory>
     </div>
   );
