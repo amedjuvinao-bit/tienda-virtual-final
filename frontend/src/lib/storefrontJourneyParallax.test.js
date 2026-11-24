@@ -1,5 +1,6 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {journeyLayerPose,mountJourneyParallax} from './storefrontJourneyParallax';
+import {announceJourneyControlNavigation} from './storefrontJourneyInput';
 
 afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();});
 
@@ -12,7 +13,7 @@ function fixture(config={},options={}){
   vi.spyOn(document.documentElement,'scrollHeight','get').mockReturnValue(2800);
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(cb=>{queue.set(++id,cb);return id;});
   vi.spyOn(window,'cancelAnimationFrame').mockImplementation(key=>queue.delete(key));
-  const root=document.createElement('div');Object.defineProperty(root,'clientWidth',{value:1200});root.getBoundingClientRect=()=>({top:-y,left:0,width:1200,height:2800});
+  const root=document.createElement('div');root.className='storefront-sections';Object.defineProperty(root,'clientWidth',{value:1200});root.getBoundingClientRect=()=>({top:-y,left:0,width:1200,height:2800});
   const heights=[800,1500,500],tops=[0,800,2300];
   root.innerHTML=heights.map((height,index)=>`<section id="${index?'scene-'+index:'banner'}" data-story-top="${tops[index]}"><div class="storefront-chapter-surface"><h2 data-story-actor="title">Título</h2><figure data-story-actor="hero" style="transform:rotate(1deg)"><video></video><button>Ver detalle</button></figure><article data-story-actor="product">Segunda pieza</article></div></section>`).join('');
   const nodes=[...root.children];
@@ -29,6 +30,8 @@ function fixture(config={},options={}){
   const step=(dt=16)=>{clock+=dt;const callbacks=[...queue.values()];queue.clear();callbacks.forEach(cb=>cb(clock));};
   const flush=()=>{for(let i=0;queue.size&&i<200;i++)step(25);};
   const scroll=top=>{y=top;if(options.scroller)options.scroller.scrollTop=top;(options.scroller || window).dispatchEvent(new Event('scroll'));step();};
+  // Existing choreography regressions exercise an explicit control trip.
+  if(!options.manual){announceJourneyControlNavigation(nodes[1]);step();}
   return{root,nodes,stop,step,flush,scroll,reduced,mobile,queue};
 }
 
@@ -55,11 +58,11 @@ it('keeps a pointer gesture stable and finishes the interactive chapter after th
   window.dispatchEvent(new Event('pointerup'));button.click();expect(click).toHaveBeenCalledOnce();f.flush();expect(hero.style.translate).toBe('');f.stop();
 });
 
-it('does not cancel the parallax when a touch starts on the section to scroll the page',()=>{
+it('hands a page gesture back to the cohesive manual reveal instead of keeping control layers active',()=>{
   const f=fixture(),chapter=f.nodes[1],hero=chapter.querySelector('figure');
   f.scroll(300);chapter.dispatchEvent(new Event('pointerdown',{bubbles:true}));
   f.scroll(1900);window.dispatchEvent(new Event('pointerup'));f.flush();
-  expect(hero.style.translate).not.toBe('');f.stop();
+  expect(f.root.dataset.journeyInput).toBe('manual');expect(hero.style.translate).toBe('');f.stop();
 });
 
 it('reveals deep content in a long section and finishes short last sections at the scroll limit',()=>{
@@ -98,4 +101,54 @@ it('lands exactly on the saved layout and adapts travel without fading, resizing
   const hero=journeyLayerPose({role:'hero'},frame),type=journeyLayerPose({role:'title'},frame),mobile=journeyLayerPose({role:'hero'},{...frame,compact:true});
   expect(hero).not.toEqual(type);expect(Math.abs(mobile.x)).toBeLessThan(Math.abs(hero.x));
   for(const role of['hero','title','product','detail','action']){const pose=journeyLayerPose({role},{width:1200,height:800});expect(pose.x).toBeCloseTo(0);expect(pose.y).toBeCloseTo(0);}
+});
+
+it('moves a manual section as one vertical composition, follows reversals and stops when scrolling stops',()=>{
+  const f=fixture({}, {manual:true}),chapter=f.nodes[1],surface=chapter.firstChild;
+  expect(f.root.dataset.journeyInput).toBe('manual');
+  f.scroll(300);const entering=surface.style.translate;
+  expect(entering).toMatch(/^0px calc\(0px \+ [\d.]+px\) 0px$/);
+  expect([...chapter.querySelectorAll('[data-story-actor]')].every(node=>node.style.translate==='')).toBe(true);
+  f.flush();expect(surface.style.translate).toBe(entering);expect(f.queue.size).toBe(0);
+  f.scroll(600);expect(surface.style.translate).toBe('');
+  f.scroll(300);expect(surface.style.translate).toBe(entering);
+  expect(chapter.offsetHeight).toBe(1500);expect(surface.style.opacity).toBe('');
+  f.scroll(2000);f.flush();expect(f.nodes[2].firstChild.style.translate).toBe('');
+  f.stop();expect(surface.style.translate).toBe('');expect(f.root.dataset.journeyInput).toBeUndefined();
+});
+
+it.each(['wheel','touchstart','pointerdown','keydown'])('keeps the control choreography until %s and lets native input interrupt it',type=>{
+  const f=fixture({}, {manual:true}),hero=f.nodes[1].querySelector('figure');f.scroll(300);
+  announceJourneyControlNavigation(hero);f.step();
+  expect(f.root.dataset.journeyInput).toBe('controls');expect(hero.style.translate).toContain('calc(');
+  expect(f.nodes[1].firstChild.style.translate).toBe('');
+  f.scroll(1900);
+  const event=type==='keydown'?new KeyboardEvent(type,{key:'PageUp',cancelable:true}):new Event(type,{cancelable:true});
+  window.dispatchEvent(event);f.step();
+  expect(event.defaultPrevented).toBe(false);expect(f.root.dataset.journeyInput).toBe('manual');
+  f.flush();expect(hero.style.translate).toBe('');expect(f.queue.size).toBe(0);
+  announceJourneyControlNavigation(hero);f.step();expect(f.root.dataset.journeyInput).toBe('controls');
+  f.stop();window.dispatchEvent(new Event('wheel'));announceJourneyControlNavigation(hero);expect(f.queue.size).toBe(0);
+});
+
+it('keeps form keyboard input independent from section navigation',()=>{
+  const f=fixture(),input=document.createElement('input');f.nodes[1].append(input);
+  input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));f.step();
+  expect(f.root.dataset.journeyInput).toBe('controls');f.stop();
+});
+
+it('distinguishes keyboard button activation from a page-scroll key on the same button',()=>{
+  const f=fixture(),button=f.nodes[1].querySelector('button');
+  button.dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true}));f.step();
+  expect(f.root.dataset.journeyInput).toBe('controls');
+  button.dispatchEvent(new KeyboardEvent('keydown',{key:'PageDown',bubbles:true}));f.step();
+  expect(f.root.dataset.journeyInput).toBe('manual');f.stop();
+});
+
+it('holds the whole manual composition still while pressing one of its actions',()=>{
+  const f=fixture({}, {manual:true}),chapter=f.nodes[1],surface=chapter.firstChild,button=chapter.querySelector('button');
+  f.scroll(300);const before=surface.style.translate;expect(before).not.toBe('');
+  button.dispatchEvent(new Event('pointerdown',{bubbles:true}));f.step(40);
+  expect(surface.style.translate).toBe(before);
+  window.dispatchEvent(new Event('pointerup'));f.flush();expect(surface.style.translate).toBe('');f.stop();
 });

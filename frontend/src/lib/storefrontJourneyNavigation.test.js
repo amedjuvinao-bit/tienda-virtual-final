@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { animateJourneyTo, journeyDuration } from './storefrontJourneyNavigation';
+import { JOURNEY_CONTROL_NAVIGATION } from './storefrontJourneyInput';
 
 afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();});
 function journey(){
@@ -46,4 +47,11 @@ it('limita el destino al final real de la página y responde al ritmo elegido',(
   expect(f.y()).toBe(4200);
   expect(journeyDuration(800,800,'quick')).toBeLessThan(journeyDuration(800,800,'balanced'));
   expect(journeyDuration(800,800,'balanced')).toBeLessThan(journeyDuration(800,800,'leisurely'));
+});
+
+it('announces the mobile control trip before its first animation frame',()=>{
+  const f=journey(),story=document.createElement('div');story.className='storefront-sections';story.append(f.element);document.body.append(story);
+  const announce=vi.fn();story.addEventListener(JOURNEY_CONTROL_NAVIGATION,announce);
+  animateJourneyTo(f.element);expect(announce).toHaveBeenCalledOnce();expect(f.y()).toBe(0);
+  f.finish();expect(f.y()).toBe(1600);
 });

@@ -7,6 +7,7 @@ import './storefrontChromeGlassHover.css';
 import { safeBannerButtonAnimation } from '../lib/bannerTemplates';
 import { moveChromeGlassLight, resolveChromeGlassMotion } from '../lib/chromeGlassMotion';
 import { storefrontSectionTop } from '../lib/storefrontSectionMotion';
+import { announceJourneyControlNavigation } from '../lib/storefrontJourneyInput';
 import {
   DEFAULT_SECTION_IDS,
   resolveSectionControlStyle,
@@ -45,6 +46,7 @@ function getSectionTargets(sectionIds) {
 
 function scrollExactlyToSection(target, options = {}) {
   if (!target) return;
+  announceJourneyControlNavigation(document.getElementById(target.id));
   const offset = Math.max(0, Number(options.offsetTopPx) || 0);
   const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   window.scrollTo({
