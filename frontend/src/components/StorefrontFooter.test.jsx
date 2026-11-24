@@ -3,6 +3,9 @@ import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import StorefrontFooter from "./StorefrontFooter";
 import FooterSection from "./FooterSection";
+import { MemoryRouter } from "react-router-dom";
+import { StorefrontSettingsContext } from "../context/StorefrontSettingsContext";
+import ConsumerLinks from "./consumer/ConsumerLinks";
 const theme = {
   footer: {
     editorial: {
@@ -15,6 +18,60 @@ const theme = {
   },
 };
 afterEach(cleanup);
+
+function renderHomeLegalLinks(footerTheme, pathname = "/") {
+  return render(
+    <MemoryRouter initialEntries={[pathname]}>
+      <StorefrontSettingsContext.Provider value={{ theme: footerTheme }}>
+        {pathname === "/" && (
+          <FooterSection
+            theme={footerTheme}
+            preview
+            legalLinks={<ConsumerLinks embedded />}
+          />
+        )}
+        <ConsumerLinks />
+      </StorefrontSettingsContext.Provider>
+    </MemoryRouter>,
+  );
+}
+
+it("integra una sola navegación legal en el fondo del footer de inicio", () => {
+  renderHomeLegalLinks(theme);
+  const links = screen.getAllByRole("navigation", {
+    name: "Información y protección al consumidor",
+  });
+  expect(links).toHaveLength(1);
+  expect(screen.getByRole("contentinfo")).toContainElement(links[0]);
+  expect(links[0].style.backgroundImage).toBe("");
+  expect(links[0].style.backgroundColor).toBe("transparent");
+  expect(screen.getByRole("link", { name: "SIC · Protección al consumidor" }))
+    .toHaveAttribute("href", "https://www.sic.gov.co/");
+  expect(screen.getByRole("button", { name: "Cookies y preferencias" }))
+    .toBeInTheDocument();
+});
+
+it.each(["disabled", "classic"])("conserva los enlaces globales con el footer %s", (mode) => {
+  renderHomeLegalLinks({
+    ...theme,
+    footer: { ...theme.footer, ...(mode === "disabled" ? { enabled: false } : { layout: "classic" }) },
+  });
+  const links = screen.getAllByRole("navigation", {
+    name: "Información y protección al consumidor",
+  });
+  expect(links).toHaveLength(1);
+  expect(links[0]).not.toHaveClass("consumer-legal-links--embedded");
+});
+
+it("mantiene los enlaces de otras páginas y los excluye del panel administrativo", () => {
+  const view = renderHomeLegalLinks(theme, "/envios");
+  expect(screen.getByRole("navigation", { name: "Información y protección al consumidor" }))
+    .toBeInTheDocument();
+  view.unmount();
+  renderHomeLegalLinks(theme, "/admin/dashboard");
+  expect(screen.queryByRole("navigation", { name: "Información y protección al consumidor" }))
+    .not.toBeInTheDocument();
+});
 it("continúa el fondo de la página y conserva el marco y los contenidos del footer", () => {
   const { container } = render(<StorefrontFooter theme={theme} preview />);
   const footer = screen.getByRole("contentinfo");

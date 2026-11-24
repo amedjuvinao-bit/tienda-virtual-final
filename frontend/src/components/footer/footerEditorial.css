@@ -106,8 +106,8 @@
 }
 @container footer-editorial (max-width:700px){
  .footer-ed{padding:24px var(--fe-mobile-padding) max(10px,min(var(--fe-padding-bottom),24px));min-height:0}
- /* Dense placement pairs the logo with social actions and the legal line with
-    the top button. Missing optional blocks leave no reserved empty rows. */
+ /* Keep the brand and one horizontal social row above navigation. Pair the
+    legal line with the top button without reserving empty optional blocks. */
  .footer-ed__inner{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-auto-flow:row dense;gap:14px 16px;align-items:center}
  .footer-ed__top{grid-column:1/-1;grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:4px}
  .footer-ed__invitation h2{font-size:var(--fe-mobile-headline-size);line-height:.98}
@@ -121,21 +121,20 @@
  .footer-ed__subscribe span{overflow-wrap:anywhere}.footer-ed__subscribe svg{display:none}
  .footer-ed__form-message{margin-top:12px}
  .footer-ed__body,.footer-ed__utility{display:contents}
- .footer-ed__brand{grid-column:1;min-width:0;margin:0;padding:0;border:0}
+ .footer-ed__brand{grid-column:1/-1;order:1;min-width:0;margin:0;padding:0;border:0}
  .footer-ed__brand:after{display:none}
  .footer-ed__brand-name{font-size:min(var(--fe-mobile-brand-size),34px);line-height:1.05}
  .footer-ed__logo{width:min(var(--fe-logo-size),156px);max-height:90px}
  .footer-ed__tagline{font-size:13px;line-height:1.4;margin-top:8px}
- .footer-ed__social-dock{grid-column:2;justify-self:end;align-self:center;max-width:114px;width:max-content;padding:8px;margin:0}
- .footer-ed__social-list{display:grid;grid-template-columns:repeat(2,max-content);justify-content:center;gap:8px 10px;max-width:100%}
- .footer-ed__social-list:not(:has(>a:nth-child(2))){grid-template-columns:1fr}
+ .footer-ed__social-dock{grid-column:1/-1;order:2;justify-self:start;align-self:center;max-width:100%;width:max-content;padding:8px;margin:0}
+ .footer-ed__social-list{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:clamp(6px,var(--fe-social-gap),12px);max-width:100%}
  .footer-ed__social{flex-basis:auto;width:clamp(44px,calc(var(--fe-social-size) * .72),48px);height:clamp(44px,calc(var(--fe-social-size) * .72),48px);padding:9px}
  .footer-ed__social-dock[data-presentation="glass"]{padding:4px 2px;margin:0}
  .footer-ed__social-dock[data-presentation="glass"] .footer-ed__social{padding:clamp(8px,calc(var(--fe-social-size) * .18),14px)}
  .footer-ed__inner:not(:has(.footer-ed__brand)) .footer-ed__social-dock{grid-column:1/-1;justify-self:center;max-width:100%}
  .footer-ed__inner:not(:has(.footer-ed__brand)) .footer-ed__social-list{display:flex;justify-content:center}
  .footer-ed__inner:not(:has(.footer-ed__social-dock)) .footer-ed__brand{grid-column:1/-1}
- .footer-ed__navigation{grid-column:1/-1;display:grid;grid-template-columns:repeat(var(--fe-columns,3),minmax(0,1fr));gap:0;border-block:1px solid color-mix(in srgb,var(--fe-accent) 65%,transparent)}
+ .footer-ed__navigation{grid-column:1/-1;order:3;display:grid;grid-template-columns:repeat(var(--fe-columns,3),minmax(0,1fr));gap:0;border-block:1px solid color-mix(in srgb,var(--fe-accent) 65%,transparent)}
  .footer-ed__navigation:empty{display:none}
  .footer-ed__column{display:contents}
  .footer-ed__column h3,.footer-ed__column[data-long-title="true"] h3{grid-row:1;grid-column:var(--fe-column);height:100%;margin:0;font-size:clamp(14px,4.2cqi,15px);line-height:1.2}
@@ -157,11 +156,11 @@
  .footer-ed[data-mobile-nav="open"] .footer-ed__accordion{display:none}
  .footer-ed[data-mobile-nav="open"] .footer-ed__links{padding:0}
  .footer-ed[data-mobile-nav="open"] .footer-ed__links ul{grid-template-columns:1fr;gap:0}
- .footer-ed__top-button{grid-column:2;justify-self:end;align-self:center;margin:0;width:44px;height:44px}
+ .footer-ed__top-button{grid-column:2;order:5;justify-self:end;align-self:center;margin:0;width:44px;height:44px}
  .footer-ed__top-button svg{width:24px;height:24px}
- .footer-ed__legal{grid-column:1;font-size:11px;line-height:1.45;padding:10px 0 0;min-width:0}
+ .footer-ed__legal{grid-column:1;order:5;font-size:11px;line-height:1.45;padding:10px 0 0;min-width:0}
  .footer-ed__inner:not(:has(.footer-ed__top-button)) .footer-ed__legal{grid-column:1/-1}
- .footer-ed__watermark{grid-column:1/-1;margin-top:0;padding-bottom:4px}
+ .footer-ed__watermark{grid-column:1/-1;order:6;margin-top:0;padding-bottom:4px}
  .footer-ed__inner:not(:has(.footer-ed__legal)) .footer-ed__watermark{grid-column:1}
  .footer-ed__watermark svg{height:calc(var(--fe-mobile-watermark-size) * .86)}
  .footer-ed__watermark[data-finish="signature"] svg{height:var(--fe-mobile-watermark-size)}
@@ -177,6 +176,8 @@
 
 .footer-ed__utility:empty{display:none}
 .footer-ed__claims{grid-column:1/-1;min-width:0;margin:0 0 24px;color:var(--fe-ink)}
+.footer-ed__inner>.consumer-legal-links--embedded{grid-column:1/-1;order:7;z-index:2;margin-top:16px;padding:16px 0 0;border-top:1px solid color-mix(in srgb,var(--fe-accent) 45%,transparent);background:transparent;gap:12px 18px;font:400 12px/1.6 var(--fe-body-font)}
+@container footer-editorial (max-width:700px){.footer-ed__claims{order:4;margin-bottom:0}}
 
 /* Press feedback also exists without hover, on touch and keyboard activation. */
 .footer-ed__links a{display:inline-block}

@@ -84,11 +84,15 @@ export default function TiktokStage({theme, posts:fallback=[]}) {
       {s.stageEyebrow && <div className="tk-stage__eyebrow"><i/>{s.stageEyebrow}<i/></div>}
       <div className="tk-stage__grid" data-list={s.stageShowList}>
         <header className="tk-stage__intro">
-          {s.stageShowBrand && <TiktokBrand/>}
-          {s.stageShowProfile && <div className="tk-stage__identity">{s.stageShowAvatar && identity.avatar && <SocialImage src={identity.avatar} alt={identity.name || 'Perfil de TikTok'}/>}<div>{identity.user && (identity.url?<a href={identity.url} target="_blank" rel="noopener noreferrer">{identity.user}</a>:<span>{identity.user}</span>)}{identity.name && <span className="tk-stage__name">{identity.name}</span>}</div></div>}
+          <div className="tk-stage__account">
+            {s.stageShowBrand && <TiktokBrand/>}
+            {s.stageShowProfile && <div className="tk-stage__identity">{s.stageShowAvatar && identity.avatar && <SocialImage src={identity.avatar} alt={identity.name || 'Perfil de TikTok'}/>}<div>{identity.user && (identity.url?<a href={identity.url} target="_blank" rel="noopener noreferrer">{identity.user}</a>:<span>{identity.user}</span>)}{identity.name && <span className="tk-stage__name">{identity.name}</span>}</div></div>}
+          </div>
           <div className="tk-stage__ornament" aria-hidden="true"><i/>✧<i/></div>
-          {s.stageShowTitle && s.stageTitle && <h2>{s.stageTitle}</h2>}
-          {s.stageShowSubtitle && s.stageSubtitle && <p className="tk-stage__subtitle">{s.stageSubtitle}</p>}
+          <div className="tk-stage__copy">
+            {s.stageShowTitle && s.stageTitle && <h2>{s.stageTitle}</h2>}
+            {s.stageShowSubtitle && s.stageSubtitle && <p className="tk-stage__subtitle">{s.stageSubtitle}</p>}
+          </div>
           {s.stageShowFollow && identity.url && <a className="tk-stage__follow" href={identity.url} target="_blank" rel="noopener noreferrer">{s.stageFollowText}<ArrowUpRight size={20}/></a>}
         </header>
         <div className="tk-stage__hero tk-glass" onPointerMove={light}>
