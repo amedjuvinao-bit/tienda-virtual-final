@@ -20,6 +20,32 @@
 .tk-stage__item-link{flex-shrink:0;position:relative;display:grid;place-items:center;width:36px;height:44px;border-radius:9px;background:transparent}.tk-stage__item-link::before{content:"";position:absolute;width:28px;height:28px;border:1px solid #fff;border-radius:50%;background:#fff4;z-index:-1}.tk-stage__item-link:hover{background:#fff8}
 .tk-stage__pages{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;font-family:Arial,sans-serif;font-size:12px;position:relative;z-index:2}.tk-stage__pages button{border:1px solid #fff8;border-radius:20px;padding:7px 10px;background:#fff4;min-height:36px;color:inherit;display:flex;align-items:center}.tk-stage__list-empty{text-align:center;padding:35px 10px}.tk-stage[data-motion=true][data-hover=lift] .tk-stage__item:hover{transform:translateY(-4px)}.tk-stage[data-motion=true][data-hover=zoom] .tk-stage__item:hover img{transform:scale(1.07)}.tk-stage[data-motion=true] .tk-stage__follow:hover{transform:translateY(-3px);box-shadow:inset 0 3px 6px #fff7,0 14px 25px #790c2d55}
 @container (max-width:1050px){.tk-stage__grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.tk-stage__intro{grid-column:1/-1;text-align:center;padding:0 0 12px}.tk-stage__intro h2{font-size:min(var(--tk-title),7cqw);line-height:1.05}.tk-stage__identity,.tk-stage__ornament{justify-content:center;margin-left:auto;margin-right:auto}.tk-stage__ornament{max-width:280px;margin-top:16px;margin-bottom:16px}.tk-stage__follow{margin:auto}.tk-stage__subtitle{margin:14px 0 20px}.tk-stage__inner{padding:32px 24px}}
-@container (max-width:620px){.tk-stage__inner{padding:28px var(--tk-mobile-pad)}.tk-stage__grid,.tk-stage__grid[data-list=false]{grid-template-columns:minmax(0,1fr);gap:24px}.tk-stage__intro{grid-column:auto;padding:0}.tk-stage__intro h2{font-size:var(--tk-mobile-title);letter-spacing:-.035em}.tk-stage__identity{font-size:17px}.tk-stage__subtitle{font-size:18px;margin:15px 0 20px}.tk-stage__ornament{margin-top:18px;margin-bottom:18px}.tk-stage__follow{font-size:17px;min-height:48px;width:auto;padding:12px 25px}.tk-stage__hero{max-width:min(100%,calc(var(--tk-mobile-height)*.5625))}.tk-stage__playlist{max-height:none;padding:16px;gap:16px}.tk-stage__items{grid-auto-rows:124px}.tk-stage__thumb{width:68px}.tk-stage__item-link{width:32px}.tk-stage__eyebrow{font-size:13px;gap:10px}.tk-player__play{width:70px;height:70px}.tk-player__dock{gap:2px;padding:6px 3px;font-size:10px}.tk-player__dock button{flex-basis:30px;width:30px;height:34px}.tk-stage__select{gap:12px}}
+@container (max-width:620px){
+ .tk-stage__inner{padding:24px var(--tk-mobile-pad)}
+ .tk-stage__grid,.tk-stage__grid[data-list=false]{grid-template-columns:minmax(0,1fr);gap:20px}
+ .tk-stage__intro{grid-column:auto;display:grid;gap:14px;padding:0;text-align:left}
+ .tk-stage__account{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;min-width:0}
+ .tk-stage__account:empty,.tk-stage__copy:empty{display:none}
+ .tk-stage__account>.tk-brand{font-size:24px}
+ .tk-stage__identity{min-width:0;max-width:100%;margin:0;font-size:14px;line-height:1.35;text-align:left;overflow-wrap:anywhere}
+ .tk-stage__identity img{flex-shrink:0;width:34px;height:34px}
+ .tk-stage__identity>div{min-width:0}
+ .tk-stage__name{font-size:12px;margin-top:2px}
+ .tk-stage__intro h2{font-size:clamp(26px,calc(var(--tk-mobile-title) * .8),36px);line-height:1.08;letter-spacing:-.035em;overflow-wrap:anywhere}
+ .tk-stage__subtitle{font-size:15px;line-height:1.45;margin:6px 0 0}
+ .tk-stage__ornament{display:none}
+ .tk-stage__follow{justify-self:start;margin:0;font-size:14px;line-height:1.3;gap:10px;min-height:44px;width:fit-content;padding:10px 18px}
+ .tk-stage__follow svg{width:17px;height:17px}
+ .tk-stage__hero{max-width:min(100%,calc(var(--tk-mobile-height)*.5625))}
+ .tk-stage__playlist{max-height:none;padding:16px;gap:16px}
+ .tk-stage__items{grid-auto-rows:124px}
+ .tk-stage__thumb{width:68px}
+ .tk-stage__item-link{width:32px}
+ .tk-stage__eyebrow{font-size:12px;line-height:1.4;gap:10px;margin-bottom:16px;letter-spacing:.08em}
+ .tk-player__play{width:70px;height:70px}
+ .tk-player__dock{gap:2px;padding:6px 3px;font-size:10px}
+ .tk-player__dock button{flex-basis:30px;width:30px;height:34px}
+ .tk-stage__select{gap:12px}
+}
 @media(prefers-reduced-motion:reduce){.tk-stage *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @supports not (backdrop-filter:blur(1px)){.tk-stage__playlist,.tk-stage__item{background:#f4dfd9eb}}
