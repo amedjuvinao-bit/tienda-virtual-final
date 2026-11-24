@@ -79,7 +79,7 @@ export default function MobileSectionJourney({config={},motion={},sectionIds}) {
   };
   const glyph=direction=>{
     const url=config[direction+'UseCustomImage'] && String(config[direction+'ImageUrl']||'').trim();
-    return url?<img src={url} alt=""/>:<svg className="mobile-section-journey__glyph" data-direction={direction} viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v16M6 14l6 6 6-6" stroke={`url(#${metalId})`} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+    return url?<img src={url} alt=""/>:<svg className="mobile-section-journey__glyph" data-direction={direction} viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v16M6 14l6 6 6-6" stroke={`url(#${metalId})`} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   };
   return <nav ref={root} className="mobile-section-journey" aria-label="Recorrido por las secciones" aria-busy={busy}
     data-align={config.mobilePosition==='left'?'left':'right'} data-moving={busy} hidden={state.total<2 || (config.showUp===false && config.showDown===false)} style={{'--journey-ink':color,'--journey-tint':config.bgColor || '#f7d9d0','--journey-bottom':bottom+'px'}}>
