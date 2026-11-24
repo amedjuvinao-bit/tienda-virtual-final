@@ -1,8 +1,14 @@
-import {afterEach,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
 import {journeyLayerPose,mountJourneyParallax} from './storefrontJourneyParallax';
 import {announceJourneyControlNavigation} from './storefrontJourneyInput';
+const parallaxStyles=readFileSync('src/storefrontJourneyParallax.css','utf8');
 
-afterEach(()=>{document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();});
+// jsdom does not apply media queries. Apply the real no-reduced-motion rules
+// directly so these regressions exercise the CSS that actually pins sections.
+let sheet;
+beforeEach(()=>{sheet=document.createElement('style');sheet.textContent='.storefront-sections>section{position:relative}'+parallaxStyles.trim().replace(/^@media[^\{]+\{/,'').replace(/\}$/,'');document.head.append(sheet);});
+afterEach(()=>{sheet.remove();document.body.innerHTML='';vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 function fixture(config={},options={}){
   let y=options.initialScroll || 0,clock=0,id=0;const queue=new Map();
@@ -15,10 +21,10 @@ function fixture(config={},options={}){
   vi.spyOn(window,'cancelAnimationFrame').mockImplementation(key=>queue.delete(key));
   const root=document.createElement('div');root.className='storefront-sections';Object.defineProperty(root,'clientWidth',{value:1200});root.getBoundingClientRect=()=>({top:-y,left:0,width:1200,height:2800});
   const heights=[800,1500,500],tops=[0,800,2300];
-  root.innerHTML=heights.map((height,index)=>`<section id="${index?'scene-'+index:'banner'}" data-story-top="${tops[index]}"><div class="storefront-chapter-surface"><h2 data-story-actor="title">Título</h2><figure data-story-actor="hero" style="transform:rotate(1deg)"><video></video><button>Ver detalle</button></figure><article data-story-actor="product">Segunda pieza</article></div></section>`).join('');
+  root.innerHTML=heights.map((height,index)=>`<section id="${index?'scene-'+index:'banner'}" data-story-chapter="true" data-story-top="${tops[index]}"><div class="storefront-chapter-surface"><h2 data-story-actor="title">Título</h2><figure data-story-actor="hero" style="transform:rotate(1deg)"><video></video><button>Ver detalle</button></figure><article data-story-actor="product">Segunda pieza</article></div></section>`).join('');
   const nodes=[...root.children];
   nodes.forEach((node,index)=>{
-    Object.defineProperty(node,'offsetHeight',{get:()=>heights[index]});node.getBoundingClientRect=()=>({top:Math.max(tops[index]-y,Math.min(0,800-heights[index])),left:0,width:1200,height:heights[index]});
+    Object.defineProperty(node,'offsetHeight',{get:()=>heights[index]});node.getBoundingClientRect=()=>({top:getComputedStyle(node).position==='sticky'?Math.max(tops[index]-y,Math.min(0,800-heights[index])):tops[index]-y,left:0,width:1200,height:heights[index]});
     const surface=node.firstChild;surface.getBoundingClientRect=node.getBoundingClientRect;Object.defineProperty(surface,'offsetWidth',{value:1200});
     node.querySelectorAll('[data-story-actor]').forEach(el=>{
       const role=el.dataset.storyActor,top=role==='title'?40:role==='hero'?200:index===1?1100:350,width=role==='hero'?500:240,height=role==='hero'?280:80;
@@ -38,6 +44,7 @@ function fixture(config={},options={}){
 it('moves photographs and type on different planes, settles once, and preserves real media and layout',()=>{
   const f=fixture(),chapter=f.nodes[1],hero=chapter.querySelector('figure'),title=chapter.querySelector('h2');
   expect(f.root.dataset.journeyParallax).toBe('true');expect(f.nodes[0].querySelector('figure').style.translate).toBe('');
+  expect(getComputedStyle(chapter).position).toBe('sticky');
   f.scroll(300);expect(hero.style.translate).not.toBe(title.style.translate);expect(hero.style.translate).toContain('calc(');
   expect(hero.style.transform).toBe('rotate(1deg)');expect(hero.style.opacity).toBe('');expect(f.root.querySelectorAll('video')).toHaveLength(3);
   f.scroll(800);f.flush();expect(hero.style.translate).toBe('');expect(title.style.translate).toBe('');expect(f.queue.size).toBe(0);
@@ -58,7 +65,7 @@ it('keeps a pointer gesture stable and finishes the interactive chapter after th
   window.dispatchEvent(new Event('pointerup'));button.click();expect(click).toHaveBeenCalledOnce();f.flush();expect(hero.style.translate).toBe('');f.stop();
 });
 
-it('hands a page gesture back to the cohesive manual reveal instead of keeping control layers active',()=>{
+it('hands a page gesture back to native scrolling instead of keeping control layers active',()=>{
   const f=fixture(),chapter=f.nodes[1],hero=chapter.querySelector('figure');
   f.scroll(300);chapter.dispatchEvent(new Event('pointerdown',{bubbles:true}));
   f.scroll(1900);window.dispatchEvent(new Event('pointerup'));f.flush();
@@ -103,21 +110,24 @@ it('lands exactly on the saved layout and adapts travel without fading, resizing
   for(const role of['hero','title','product','detail','action']){const pose=journeyLayerPose({role},{width:1200,height:800});expect(pose.x).toBeCloseTo(0);expect(pose.y).toBeCloseTo(0);}
 });
 
-it('moves a manual section as one vertical composition, follows reversals and stops when scrolling stops',()=>{
-  const f=fixture({}, {manual:true}),chapter=f.nodes[1],surface=chapter.firstChild;
+it.each([false,true])('keeps native section positions, no masks and no animated offsets through repeated boundaries (mobile: %s)',mobileOverride=>{
+  const f=fixture({}, {manual:true,mobileOverride}),chapter=f.nodes[1],surface=chapter.firstChild;
   expect(f.root.dataset.journeyInput).toBe('manual');
-  f.scroll(300);const entering=surface.style.translate;
-  expect(entering).toMatch(/^0px calc\(0px \+ [\d.]+px\) 0px$/);
-  expect([...chapter.querySelectorAll('[data-story-actor]')].every(node=>node.style.translate==='')).toBe(true);
-  f.flush();expect(surface.style.translate).toBe(entering);expect(f.queue.size).toBe(0);
-  f.scroll(600);expect(surface.style.translate).toBe('');
-  f.scroll(300);expect(surface.style.translate).toBe(entering);
+  for(const y of [300,760,805,790,820,800,780,1250,1900,2000,1900,800,300]){
+    f.scroll(y);
+    f.nodes.forEach(node=>{
+      expect(getComputedStyle(node).position).toBe('relative');
+      expect(node.getBoundingClientRect().top).toBe(Number(node.dataset.storyTop)-y);
+      expect(node.firstChild.style.translate).toBe('');expect(node.firstChild.style.clipPath).toBe('');
+      expect([...node.querySelectorAll('[data-story-actor]')].every(actor=>actor.style.translate==='')).toBe(true);
+    });
+    expect(f.queue.size).toBe(0);
+  }
   expect(chapter.offsetHeight).toBe(1500);expect(surface.style.opacity).toBe('');
-  f.scroll(2000);f.flush();expect(f.nodes[2].firstChild.style.translate).toBe('');
   f.stop();expect(surface.style.translate).toBe('');expect(f.root.dataset.journeyInput).toBeUndefined();
 });
 
-it.each(['wheel','touchstart','pointerdown','keydown'])('keeps the control choreography until %s and lets native input interrupt it',type=>{
+it.each(['wheel','touchmove','pointerdown','keydown'])('keeps the control choreography until %s and lets native input interrupt it',type=>{
   const f=fixture({}, {manual:true}),hero=f.nodes[1].querySelector('figure');f.scroll(300);
   announceJourneyControlNavigation(hero);f.step();
   expect(f.root.dataset.journeyInput).toBe('controls');expect(hero.style.translate).toContain('calc(');
@@ -126,7 +136,8 @@ it.each(['wheel','touchstart','pointerdown','keydown'])('keeps the control chore
   const event=type==='keydown'?new KeyboardEvent(type,{key:'PageUp',cancelable:true}):new Event(type,{cancelable:true});
   window.dispatchEvent(event);f.step();
   expect(event.defaultPrevented).toBe(false);expect(f.root.dataset.journeyInput).toBe('manual');
-  f.flush();expect(hero.style.translate).toBe('');expect(f.queue.size).toBe(0);
+  expect(hero.style.translate).toBe('');expect(f.nodes.every(node=>node.firstChild.style.clipPath==='')).toBe(true);
+  expect(getComputedStyle(f.nodes[1]).position).toBe('relative');expect(f.queue.size).toBe(0);
   announceJourneyControlNavigation(hero);f.step();expect(f.root.dataset.journeyInput).toBe('controls');
   f.stop();window.dispatchEvent(new Event('wheel'));announceJourneyControlNavigation(hero);expect(f.queue.size).toBe(0);
 });
@@ -145,10 +156,17 @@ it('distinguishes keyboard button activation from a page-scroll key on the same 
   expect(f.root.dataset.journeyInput).toBe('manual');f.stop();
 });
 
-it('holds the whole manual composition still while pressing one of its actions',()=>{
+it('keeps actions still without animating the manual composition',()=>{
   const f=fixture({}, {manual:true}),chapter=f.nodes[1],surface=chapter.firstChild,button=chapter.querySelector('button');
-  f.scroll(300);const before=surface.style.translate;expect(before).not.toBe('');
+  f.scroll(300);const before=surface.style.translate;expect(before).toBe('');
   button.dispatchEvent(new Event('pointerdown',{bubbles:true}));f.step(40);
   expect(surface.style.translate).toBe(before);
   window.dispatchEvent(new Event('pointerup'));f.flush();expect(surface.style.translate).toBe('');f.stop();
+});
+
+it('does not force a corrective page scroll when focusing native content near a section boundary',()=>{
+  const f=fixture({}, {manual:true}),button=f.nodes[1].querySelector('button'),scrollTo=vi.spyOn(window,'scrollTo').mockImplementation(()=>{});
+  f.scroll(1900);button.getBoundingClientRect=()=>({top:700,bottom:780,height:80});
+  button.dispatchEvent(new Event('focusin',{bubbles:true}));f.flush();
+  expect(scrollTo).not.toHaveBeenCalled();expect(f.nodes[1].firstChild.style.clipPath).toBe('');f.stop();
 });
